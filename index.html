@@ -490,6 +490,24 @@ let SUBDEPARTMENTS_BY_DEPT = {
   'Grip':            ['Best Boy'],
   'Post Production': ['Colourist'],
 };
+/* canonical roles a person can be booked as, grouped per department (extensible at
+   runtime, persisted to db:roles) — a crew member can hold several of these at once
+   (c.roles, folder-path strings like "Cinematography/DOP"); c.role stays the single
+   free-text title shown everywhere on the call sheet, and picking a saved role just
+   sets it quickly instead of retyping. */
+let ROLES_BY_DEPT = {
+  'Production':        ['Director','Executive Producer','Line Producer','Field Producer','Producer','Production Manager','Production Coordinator','PA','Runner'],
+  'Talent':            ['Presenter','Host','Guest','Contributor','Cast'],
+  'Cinematography':    ['DOP','1st AC','2nd AC','Camera Operator','Loader','Focus Puller'],
+  'Audio':             ['Sound Mixer','Sound Recordist','Boom Operator'],
+  'Grip':              ['Gaffer','Best Boy','Grip','Rigger'],
+  'Equipment':         ['Equipment Manager','Kit Tech'],
+  'Set':               ['Set Designer','Art Director','Props'],
+  'Vanities':          ['HMUA','Hair Stylist','Costume/Wardrobe'],
+  'Catering & Travel': ['Chef','Caterer','Driver','Travel Coordinator'],
+  'Post Production':   ['Editor','Colourist','DIT','Assistant Editor'],
+};
+function rolesFor(dept){ return ROLES_BY_DEPT[dept] || []; }
 /* best-guess department from a free-text role — used only to pre-fill, never forced */
 function suggestDepartment(role){
   const r = (role||'').toLowerCase();
@@ -569,6 +587,76 @@ async function quickSetDeptPath(crewId, selectEl){
   await saveDB('db:crew', crewDB);
   refreshCrewScreen();
 }
+/* ---- saved roles (multiple per person) ----
+   c.roles is a list of "Department/Role" folder-path strings — the roles this person
+   is booked as across projects. c.role (singular, free text) is still what's actually
+   shown/exported everywhere; picking a saved role here just sets it in one click. */
+function rolesTagListHTML(c){
+  const roles = c.roles || [];
+  if(!roles.length) return '<span class="hint" style="margin-right:4px;">No saved roles yet.</span>';
+  return `<span class="taglist" style="display:inline-flex;">${roles.map(rp=>{
+    const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+    const active = !!c.role && c.role===name;
+    return `<span class="pill dept" style="cursor:pointer;${active?'background:rgba(1,119,86,.28);':''}" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
+  }).join('')}</span>`;
+}
+function roleAddPickerHTML(c){
+  const has = new Set(c.roles||[]);
+  let opts = '<option value="">+ Add a saved role…</option>';
+  DEPARTMENTS.forEach(d=>{
+    const rs = rolesFor(d).filter(r=>!has.has(`${d}/${r}`));
+    if(!rs.length) return;
+    opts += `<optgroup label="${esc(d)}">${rs.map(r=>`<option value="${esc(d)}/${esc(r)}">${esc(r)}</option>`).join('')}</optgroup>`;
+  });
+  opts += '<option value="__addrole__">+ Add new role…</option>';
+  return `<select class="pill-select empty" onchange="addRoleToCrew('${c.id}', this)" onclick="event.stopPropagation()" title="Add a saved role">${opts}</select>`;
+}
+async function addRoleToCrew(crewId, selectEl){
+  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  let value = selectEl.value;
+  if(!value){ refreshCrewScreen(); return; }
+  if(value==='__addrole__'){
+    const dept = (prompt(`Which department is this new role under?\n(${DEPARTMENTS.join(', ')})`, c.department||'')||'').trim();
+    if(!DEPARTMENTS.includes(dept)){ if(dept) alert('Not a recognised department — pick one of: '+DEPARTMENTS.join(', ')); refreshCrewScreen(); return; }
+    const r = (prompt(`New role under ${dept}:`)||'').trim();
+    if(!r){ refreshCrewScreen(); return; }
+    ROLES_BY_DEPT[dept] = ROLES_BY_DEPT[dept] || [];
+    if(!ROLES_BY_DEPT[dept].includes(r)) ROLES_BY_DEPT[dept].push(r);
+    await saveDB('db:roles', ROLES_BY_DEPT);
+    value = `${dept}/${r}`;
+  }
+  c.roles = c.roles || [];
+  if(!c.roles.includes(value)) c.roles.push(value);
+  if(c.roles.length===1) await setActiveRole(crewId, value, true); // first saved role becomes their active one automatically
+  await saveDB('db:crew', crewDB);
+  refreshCrewScreen();
+}
+async function removeRoleFromCrew(crewId, rolePath){
+  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  c.roles = (c.roles||[]).filter(r=>r!==rolePath);
+  await saveDB('db:crew', crewDB);
+  refreshCrewScreen();
+}
+/* sets a saved role as the person's current/active title (c.role) — used everywhere
+   on the call sheet. This is the "correct one, selected/defaulted per project or per
+   day" pick: the day-override form (Position Assignments) offers the same saved list
+   for a per-day-only switch without touching the database record. */
+async function setActiveRole(crewId, rolePath, skipSave){
+  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
+  c.role = roleName;
+  if(!skipSave){ await saveDB('db:crew', crewDB); refreshCrewScreen(); }
+}
+/* clone a crew member — independent record, keeps everything, meant to be
+   reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
+   until the role is actually changed away from the original's. */
+async function duplicateCrew(crewId){
+  const src = crewDB.find(x=>x.id===crewId); if(!src) return;
+  const copy = Object.assign({}, src, { id: uid(), _copyOriginalRole: src.role||'' });
+  crewDB.push(copy);
+  await saveDB('db:crew', crewDB);
+  refreshCrewScreen();
+}
 /* co-production company — quick select, backed by an extensible saved list */
 function coProPillSelect(c){
   const empty = !c.coProductionCompany;
@@ -604,18 +692,20 @@ function crewIdentityHTML(c, opts){
   const buttons = `
     <button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>
     <button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
-  const bits = [c.role, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
+  const bits = [opts.showRole!==false ? c.role : null, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
+  // quiet "copy" badge: shows only until the duplicate's role is actually changed
+  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
   if(opts.oneLine){
     // compact: everything on a single row
     return `<div class="crew-ident one-line">
-      ${buttons}<strong>${esc(c.name)}</strong>
+      ${buttons}<strong>${esc(c.name)}</strong>${copyBadge}
       ${opts.showPickers ? `${deptPillSelect(c)}${coProPillSelect(c)}` : deptLabelHTML(c)}
       ${bits?`<span class="hint crew-ident-sub">${bits}</span>`:''}
       ${opts.extraLine||''}
     </div>`;
   }
   return `<div class="crew-ident">
-    <div class="crew-ident-top">${buttons}<strong>${esc(c.name)}</strong></div>
+    <div class="crew-ident-top">${buttons}<strong>${esc(c.name)}</strong>${copyBadge}</div>
     ${opts.showPickers!==false ? `<div class="crew-ident-pills">${deptPillSelect(c)}${coProPillSelect(c)}</div>` : ''}
     ${bits?`<div class="hint">${bits}</div>`:''}
     ${opts.extraLine||''}
@@ -722,6 +812,8 @@ async function initApp(){
   coProCompaniesList = await loadDB('db:coprocompanies');
   const savedSubDepts = await loadDB('db:subdepartments');
   if(savedSubDepts && !Array.isArray(savedSubDepts) && Object.keys(savedSubDepts).length) SUBDEPARTMENTS_BY_DEPT = savedSubDepts;
+  const savedRoles = await loadDB('db:roles');
+  if(savedRoles && !Array.isArray(savedRoles) && Object.keys(savedRoles).length) ROLES_BY_DEPT = savedRoles;
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
     await saveDB('db:travelmethods', travelMethodsList);
@@ -1728,7 +1820,7 @@ function renderProjectCrew(body){
       <h2>Add from crew database</h2>
       ${unassigned.length ? `
         <select id="addCrewPick"><option value="">— Select crew member —</option>
-          ${unassigned.map(c=>`<option value="${c.id}">${esc(c.name)} (${esc(c.role||'')})</option>`).join('')}
+          ${groupedCrewOptionsHTML(unassigned)}
         </select>
         <div class="toolbar" style="margin-top:8px;"><button class="primary" onclick="addCrewToProject()">Add to project</button></div>
       ` : '<div class="empty-note">Everyone in your database is already on this project.</div>'}
@@ -1736,14 +1828,59 @@ function renderProjectCrew(body){
       ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
 }
-/* Roles tab row — department / sub-department / lead-company editing, one row per
-   person, no day columns (that's what Days on site is for). */
+/* Roles tab row — department / sub-department / lead-company editing, plus this
+   person's saved roles (multiple allowed — click one to make it active, or add
+   another from the canonical per-department list). No day columns here (that's
+   what Days on site is for). */
 function crewRolesRowHTML(c){
   const isEditing = editingCrewId===c.id;
   return `<div class="crewgrid-row ${isEditing?'crewgrid-row-editing':''}">
     ${crewIdentityHTML(c, {showPickers:true, oneLine:true, showPhone:true})}
+    <div style="margin:6px 0 2px 30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      ${rolesTagListHTML(c)}${roleAddPickerHTML(c)}
+    </div>
     ${crewExpansionHTML(c, 'crewgrid-editform')}
   </div>`;
+}
+/* Days on site — inline role quick-edit. A tiny pencil-to-text-box toggle, no full
+   crew form. If the person has saved roles, offers a one-click dropdown of those
+   (same list as the Roles tab); otherwise a free-text box, same as the role field
+   everywhere else. */
+let quickEditRoleId = null;
+function roleQuickEditHTML(c){
+  if(quickEditRoleId===c.id){
+    const savedRoles = c.roles||[];
+    const roleControl = savedRoles.length
+      ? `<select id="qrRole_${c.id}" style="width:130px;padding:3px 6px;font-size:12px;min-height:0;" onclick="event.stopPropagation()">
+          ${savedRoles.map(rp=>{ const name = rp.includes('/')?rp.split('/').slice(1).join('/'):rp; return `<option value="${esc(name)}" ${c.role===name?'selected':''}>${esc(name)}</option>`; }).join('')}
+          <option value="__custom__" ${!savedRoles.some(rp=>(rp.includes('/')?rp.split('/').slice(1).join('/'):rp)===c.role)?'selected':''}>${esc(c.role||'Other…')}</option>
+        </select>`
+      : `<input type="text" id="qrRole_${c.id}" value="${esc(c.role||'')}" style="width:120px;padding:3px 6px;font-size:12px;min-height:0;" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter')saveQuickRole('${c.id}')">`;
+    return `<span class="crew-ident-sub" style="display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">
+      ${roleControl}
+      <button class="icon-btn active" onclick="event.stopPropagation();saveQuickRole('${c.id}')" title="Save">${icon('save')}</button>
+    </span>`;
+  }
+  return `<span class="hint crew-ident-sub" style="cursor:pointer;" onclick="event.stopPropagation();quickEditRoleId='${c.id}';renderProjectBody();" title="Quick-edit role, no full form">${c.role?esc(c.role):'— set role —'} ${icon('edit')}</span>`;
+}
+async function saveQuickRole(crewId){
+  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const el = document.getElementById('qrRole_'+crewId);
+  let value = (el?.value||'').trim();
+  if(value==='__custom__') value = c.role||'';
+  c.role = value;
+  await saveDB('db:crew', crewDB);
+  quickEditRoleId = null;
+  renderProjectBody();
+}
+/* shared "add from crew database" option-list builder — grouped by department
+   instead of a flat list, for the project Crew tab and Position Assignments pickers */
+function groupedCrewOptionsHTML(list){
+  const buckets = {};
+  list.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
+  return DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length).map(d=>
+    `<optgroup label="${esc(d)}">${buckets[d].map(c=>`<option value="${c.id}">${esc(c.name)}${c.role?' ('+esc(c.role)+')':''}</option>`).join('')}</optgroup>`
+  ).join('');
 }
 function crewAssignRowHTML(c, days){
   const isEditing = editingCrewId===c.id;
@@ -1763,8 +1900,10 @@ function crewAssignRowHTML(c, days){
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${onDay?'checked':''} onchange="toggleCrewOnDay('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
   const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
+  const identOpts = {showPickers:false, oneLine:true, showPhone:false};
+  if(crewGridView==='days') identOpts.showRole = false; // role shown via the quick-edit control instead
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${colCount};">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, oneLine:true, showPhone:false})}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}${crewGridView==='days'?roleQuickEditHTML(c):''}</div>
     ${preCell}${dayCells}
     <div class="crewgrid-remove">
       ${(crewGridView==='hotel'||crewGridView==='days') ? `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${c.id}','${crewGridView}')" title="Toggle all on/off for this person">All</button>` : ''}
@@ -2340,7 +2479,7 @@ function renderCrewDatabase(m){
 }
 function crewSearchBlob(c){
   return [c.name, c.role, c.department, c.subDepartment, c.coProductionCompany, c.skills, c.camera1, c.camera2, c.camera3, c.cameraExtras, c.dietary,
-          c.previousProjects, c.generalNotes, c.coffeeOrder, c.instagram, c.youtube, c.linkedin, c.email, c.phone]
+          c.previousProjects, c.generalNotes, c.coffeeOrder, c.instagram, c.youtube, c.linkedin, c.email, c.phone, (c.roles||[]).join(' ')]
     .filter(Boolean).join(' ').toLowerCase();
 }
 function crewCardHTML(c){
@@ -2360,6 +2499,7 @@ function crewCardHTML(c){
     <div class="list-card ${isEditing?'list-card-editing':''}">
       <div class="meta">${crewIdentityHTML(c, {extraLine})}</div>
       <div class="actions">
+        <button class="small" onclick="duplicateCrew('${c.id}')" title="Clone this person as an independent record, e.g. to reassign a different role">Duplicate</button>
         <button class="small danger" onclick="deleteCrew('${c.id}')">Delete</button>
       </div>
     </div>
@@ -2992,7 +3132,7 @@ function refreshAddPosnPick(){
   const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
   const already = new Set((day.positions||[]).map(p=>p[0]));
   const crew = projectCrewOptions().filter(c=>!already.has(c.id));
-  sel.innerHTML = '<option value="">— Select crew —</option>' + crew.map(c=>`<option value="${c.id}">${esc(c.name)} (${esc(c.role||'')})</option>`).join('');
+  sel.innerHTML = '<option value="">— Select crew —</option>' + groupedCrewOptionsHTML(crew);
 }
 async function addPosnToDay(){
   const id = val('addPosnPick'); if(!id) return;
@@ -3248,7 +3388,13 @@ function dayOverrideFormHTML(crewId){
     <div class="hint" style="margin-bottom:10px;">Changes here apply to this day only — the crew database keeps ${esc(base.name||'this person')} as
       <strong>${esc([base.role, base.department].filter(Boolean).join(', ')||'unset')}</strong>. Phone, email, dietary and sizes always come from the database.</div>
     <div class="grid g3" style="margin-bottom:10px;">
-      <div><label>Role / position</label><input type="text" id="ovRole" value="${esc(eff.role||'')}"></div>
+      <div><label>Role / position</label>
+        ${(base.roles&&base.roles.length) ? `<select onchange="if(this.value!=='__keep__')document.getElementById('ovRole').value=this.value;" onclick="event.stopPropagation()" style="margin-bottom:4px;" title="Quick-pick one of their saved roles">
+            <option value="__keep__">— pick a saved role for this day —</option>
+            ${base.roles.map(rp=>{const name=rp.includes('/')?rp.split('/').slice(1).join('/'):rp; return `<option value="${esc(name)}" ${eff.role===name?'selected':''}>${esc(name)}</option>`;}).join('')}
+          </select>` : ''}
+        <input type="text" id="ovRole" value="${esc(eff.role||'')}">
+      </div>
       <div><label>Department</label><select id="ovDept">${deptOpts}</select></div>
       <div><label>Lead company</label><select id="ovCoPro">${coOpts}</select></div>
     </div>
