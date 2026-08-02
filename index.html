@@ -68,6 +68,16 @@
   .section h2{font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px; text-transform:none;
     color:var(--tape); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
   .section h2::after{content:''; flex:1; height:1px; background:var(--line);}
+  /* Shoot Day build screen — top-level collapsible section headers (General
+     information / Schedule / Position assignments / Tech specs & cameras).
+     Headline-weight so they read as clear page divisions, not another field label. */
+  .sd-block{margin-bottom:4px;}
+  .sd-block-head{display:flex; align-items:center; gap:9px; cursor:pointer; user-select:none;
+    font-family:var(--disp); font-weight:700; font-size:20px; letter-spacing:.2px;
+    color:var(--text); margin:26px 0 12px; padding-bottom:9px; border-bottom:2px solid var(--tape);}
+  .sd-block:first-child .sd-block-head{margin-top:0;}
+  .sd-block-head .dept-caret{font-size:13px; color:var(--tape);}
+  .sd-block-head:hover{color:var(--tape);}
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
   .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
@@ -128,8 +138,16 @@
 
   .row{display:grid; gap:8px; align-items:end; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--line);}
   .row:last-child{border-bottom:none;}
-  .rows-sched .row{grid-template-columns:24px 30px 100px 90px 1fr 34px;}
+  .rows-sched .row{grid-template-columns:24px 30px 100px 90px 1fr 34px; position:relative;}
   .rows-sched .row .sc-select{align-self:center; width:16px; height:16px;}
+  /* hover between schedule rows to insert a new blank row at that point, instead of
+     only being able to append at the bottom */
+  .sched-insert-hint{position:absolute; top:-13px; left:0; right:0; height:16px;
+    display:flex; align-items:center; justify-content:center; opacity:0; z-index:2;
+    cursor:pointer; transition:opacity .12s ease;}
+  .sched-insert-hint span{font-family:var(--label); font-size:9.5px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--tape-ink); background:var(--tape); border-radius:20px; padding:2px 9px; white-space:nowrap;}
+  .rows-sched .row:hover .sched-insert-hint, .sched-insert-hint:hover{opacity:1;}
   .sc-move{display:flex; flex-direction:column; align-self:center; gap:0;}
   .sc-move .icon-btn{width:20px; height:14px;}
   .sc-move .ic{width:11px; height:11px;}
@@ -2400,11 +2418,14 @@ function renderProjectPreview(body){
 }
 function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
 /* shared record shape — used by addShootDay, createProject (auto first day), and syncShootDayCount */
+/* starter schedule for every new shoot day — [time, duration, description] rows,
+   same shape rowsOf()/addSchedRow() already read and write */
+const STARTER_SCHEDULE = [['','','CALL'], ['','',''], ['','1hr','LUNCH'], ['','','WRAP']];
 function makeShootDayRecord(projectId, p){
   const existing = shootDaysDB.filter(d=>d.projectId===projectId);
   return { id: uid(), projectId, dayNum: existing.length+1, dayTotal: existing.length+1,
     date: existing.length? '' : (p?p.startDate:''), allCrewCall:'', locationId:'', additionalLocationIds:[],
-    weather:null, techSpecs:{}, schedule:[], positions:[], brief:[], parking:'', notes:'',
+    weather:null, techSpecs:{}, schedule:STARTER_SCHEDULE.map(r=>r.slice()), positions:[], brief:[], parking:'', notes:'',
     hotelNights:[], cateringMeals:{} };
 }
 async function addShootDay(){
@@ -3152,11 +3173,16 @@ async function removePosnRow(crewId){
   renderPositionAssignments();
   refreshAddPosnPick();
 }
-function addSchedRow(vals){
+function addSchedRow(vals, insertBeforeEl){
   const c=document.getElementById('rows-sched'); const row=document.createElement('div'); row.className='row';
-  row.innerHTML=`<input type="checkbox" class="sc-select" title="Select for bulk time shift"><span class="sc-move"><button class="icon-btn" onclick="moveSchedRow(this,-1)" title="Move up" aria-label="Move up">${icon('up')}</button><button class="icon-btn" onclick="moveSchedRow(this,1)" title="Move down" aria-label="Move down">${icon('down')}</button></span><input type="text" class="sc-time" placeholder="08:00" oninput="onScheduleTimeInput(this)"><input type="text" class="sc-dur" placeholder="4hrs" oninput="onScheduleDurationInput(this)"><input type="text" class="sc-desc" placeholder="Description"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
-  c.appendChild(row);
+  row.innerHTML=`<div class="sched-insert-hint" onclick="insertSchedRowBefore(this)" title="Insert a row here"><span>+ Insert row here</span></div><input type="checkbox" class="sc-select" title="Select for bulk time shift"><span class="sc-move"><button class="icon-btn" onclick="moveSchedRow(this,-1)" title="Move up" aria-label="Move up">${icon('up')}</button><button class="icon-btn" onclick="moveSchedRow(this,1)" title="Move down" aria-label="Move down">${icon('down')}</button></span><input type="text" class="sc-time" placeholder="08:00" oninput="onScheduleTimeInput(this)"><input type="text" class="sc-dur" placeholder="4hrs" oninput="onScheduleDurationInput(this)"><input type="text" class="sc-desc" placeholder="Description"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
+  if(insertBeforeEl && insertBeforeEl.parentNode===c){ c.insertBefore(row, insertBeforeEl); }
+  else { c.appendChild(row); }
   if(vals){ row.querySelector('.sc-time').value=vals[0]||''; row.querySelector('.sc-dur').value=vals[1]||''; row.querySelector('.sc-desc').value=vals[2]||''; }
+}
+function insertSchedRowBefore(hintEl){
+  const row = hintEl.closest('.row');
+  addSchedRow(null, row);
 }
 /* ---------- schedule time/duration helpers ---------- */
 function parseTimeStrToMins(s){
