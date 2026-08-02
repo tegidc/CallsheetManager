@@ -95,8 +95,9 @@
     padding:9px 0; border-bottom:1px solid var(--line);}
   .cam-row:last-child{border-bottom:none;}
   .cam-who strong{font-family:var(--disp); font-weight:600; font-size:14px;}
-  .cam-slot{display:flex; align-items:center; gap:8px; min-width:0;}
-  .cam-slot select{width:105px; flex:0 0 auto;}
+  .cam-slot{display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0;}
+  .cam-slot select{width:100%;}
+  .cam-body-input{width:100%; font-size:12px; padding:5px 7px; min-height:0;}
   .cam-tag{font-family:var(--mono); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .req::after{content:' *'; color:var(--danger);}
   input[type=text], input[type=date], textarea, select{
@@ -1799,7 +1800,13 @@ function renderProjectCrew(body){
       }).join('');
       assignedHTML = toggleRow + deptGroupsHTML;
     } else if(crewGridView==='travel'){
-      // travel is a once-per-project choice per person, not day-by-day — simple list, no day columns
+      // travel is a once-per-project choice per person, not day-by-day — same
+      // crewgrid row/column pattern as the other tabs, just one "column" wide
+      const travelHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:1; --daycolwidth:210px;">
+          <div class="crewgrid-header crewgrid-corner"></div>
+          <div class="crewgrid-header" style="text-align:left;">Travel method</div>
+          <div class="crewgrid-header"></div>
+        </div>`;
       const deptGroupsHTML = deptsPresent.map(d=>{
         const collapsed = collapsedProjectDepts.has(d);
         return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
@@ -1807,7 +1814,7 @@ function renderProjectCrew(body){
           </div>
           <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewTravelRowHTML(c, p)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + deptGroupsHTML;
+      assignedHTML = toggleRow + `<div class="tablewrap">${travelHeaderRow}${deptGroupsHTML}</div>`;
     } else {
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const dayHeaderRow = days.length ? `
@@ -2121,14 +2128,11 @@ function crewTravelRowHTML(c, p){
     .concat(['<option value="__add__">+ Add option…</option>']).join('');
   const carInfo = (c.drives==='Yes' && (c.carMakeModel||c.carReg)) ? `<div class="hint">${icon('car')} ${esc([c.carMakeModel,c.carReg].filter(Boolean).join(' — '))}</div>` : '';
   const isEditing = editingCrewId===c.id;
-  return `<div class="crew-entry">
-    <div class="list-card ${isEditing?'list-card-editing':''}">
-      <div class="meta">${crewIdentityHTML(c, {showPickers:false, extraLine:carInfo})}</div>
-      <div class="actions" style="min-width:170px;">
-        <select style="width:100%;" onchange="setTravelMethod('${c.id}',this)">${opts}</select>
-      </div>
-    </div>
-    ${crewExpansionHTML(c, 'inline-form-card')}
+  return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:1; --daycolwidth:210px;">
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, extraLine:carInfo, oneLine:true, showPhone:false})}</div>
+    <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${c.id}',this)">${opts}</select></div>
+    <div class="crewgrid-remove"></div>
+    ${crewExpansionHTML(c, 'crewgrid-editform')}
   </div>`;
 }
 async function setTravelMethod(crewId, selectEl){
@@ -2225,19 +2229,27 @@ function renderCameraDesignations(scope){
   } else {
     html += crew.map(c=>{
       const a = (cams.assign||{})[c.id] || {};
-      const tag1 = a.a ? cameraFileTag(a.a, c.camera1, c.name) : '';
-      const tag2 = a.b ? cameraFileTag(a.b, c.camera2||c.camera1, c.name) : '';
+      const bodyA = cameraBodyFor(a, 'a', c.camera1||'');
+      const bodyB = cameraBodyFor(a, 'b', c.camera2||c.camera1||'');
+      const tag1 = a.a ? cameraFileTag(a.a, bodyA, c.name) : '';
+      const tag2 = a.b ? cameraFileTag(a.b, bodyB, c.name) : '';
+      const scopeLabel = scope==='project' ? "this project's default" : 'this day';
       return `<div class="cam-row">
         <div class="cam-who">
           <strong>${esc(c.name)}</strong> <span class="hint">${esc(c.role||'Camera')}</span>
-          ${c.camera1?`<div class="hint">${esc(c.camera1)}</div>`:''}
         </div>
         <div class="cam-slot">
           <select onchange="setCameraDesignation('${scope}','${c.id}','a',this.value)">${letterOpts(a.a||'')}</select>
+          <input type="text" class="cam-body-input" value="${esc(bodyA)}" placeholder="${esc(c.camera1||'Camera body')}"
+            onchange="setCameraBodyOverride('${scope}','${c.id}','a',this.value)"
+            title="Camera body for ${scopeLabel} — starts from ${esc(c.name)}'s crew database record, editable here without changing it">
           <span class="hint cam-tag">${tag1?esc(tag1):''}</span>
         </div>
         <div class="cam-slot">
           <select onchange="setCameraDesignation('${scope}','${c.id}','b',this.value)">${letterOpts(a.b||'')}</select>
+          <input type="text" class="cam-body-input" value="${esc(bodyB)}" placeholder="${esc(c.camera2||c.camera1||'2nd camera body')}"
+            onchange="setCameraBodyOverride('${scope}','${c.id}','b',this.value)"
+            title="Camera body for ${scopeLabel} — starts from ${esc(c.name)}'s crew database record, editable here without changing it">
           <span class="hint cam-tag">${tag2?esc(tag2):'2nd camera'}</span>
         </div>
       </div>`;
@@ -2277,6 +2289,28 @@ async function setCameraDesignation(scope, crewId, slot, value){
   t.obj.assign[crewId] = t.obj.assign[crewId] || {};
   t.obj.assign[crewId][slot] = value;
   if(!t.obj.assign[crewId].a && !t.obj.assign[crewId].b) delete t.obj.assign[crewId];
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
+/* camera body: per-operator, per-context (project default vs a specific day) —
+   starts out equal to the crew database record (camera1/camera2) but can be
+   overridden here (e.g. "on loan FX9 this week") without ever touching that record. */
+function cameraBodyFor(assignEntry, slot, crewDefault){
+  const key = 'body'+slot.toUpperCase();
+  return (assignEntry && assignEntry[key]!==undefined) ? assignEntry[key] : (crewDefault||'');
+}
+async function setCameraBodyOverride(scope, crewId, slot, value){
+  const t = camerasForEdit(scope); if(!t) return;
+  const c = crewDB.find(x=>x.id===crewId);
+  const crewDefault = slot==='a' ? (c&&c.camera1||'') : (c&&(c.camera2||c.camera1)||'');
+  t.obj.assign = t.obj.assign || {};
+  t.obj.assign[crewId] = t.obj.assign[crewId] || {};
+  const key = 'body'+slot.toUpperCase();
+  const trimmed = (value||'').trim();
+  if(trimmed===crewDefault.trim()) delete t.obj.assign[crewId][key];
+  else t.obj.assign[crewId][key] = trimmed;
+  if(!t.obj.assign[crewId].a && !t.obj.assign[crewId].b && t.obj.assign[crewId].bodyA===undefined && t.obj.assign[crewId].bodyB===undefined) delete t.obj.assign[crewId];
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
   if(scope==='day') refreshTechSpecsBanner();
@@ -3547,8 +3581,8 @@ function buildFullData(d){
   const cams = resolveCameras(d);
   const cameraDesignations = Object.keys(cams.assign||{}).map(cid=>{
     const c = crewInfo(cid); const a = cams.assign[cid]; const entries=[];
-    if(a.a) entries.push({letter:a.a, name:c.name, tag:cameraFileTag(a.a,c.camera1,c.name)});
-    if(a.b) entries.push({letter:a.b, name:c.name, tag:cameraFileTag(a.b,c.camera2||c.camera1,c.name)});
+    if(a.a) entries.push({letter:a.a, name:c.name, tag:cameraFileTag(a.a,cameraBodyFor(a,'a',c.camera1),c.name)});
+    if(a.b) entries.push({letter:a.b, name:c.name, tag:cameraFileTag(a.b,cameraBodyFor(a,'b',c.camera2||c.camera1),c.name)});
     return entries;
   }).flat().concat(
     (cams.unnamed||[]).map(u=>({letter:u.letter, name:'Unassigned'+(u.note?(' — '+u.note):''), tag:cameraFileTag(u.letter,'','')}))
