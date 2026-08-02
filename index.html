@@ -3078,7 +3078,7 @@ function shootDayBuildHTML(){
     </div>
     <div class="section"><h2>Production notes</h2><textarea id="sdNotes"></textarea></div>
     <div class="section"><h2>Primary location</h2>
-      <select id="sdLocation" onchange="onDayChanged()"></select>
+      <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
       <div id="sdLocationSummary" class="hint" style="margin-top:8px;"></div>
     </div>
     <div class="section"><h2>Additional locations</h2>
@@ -3164,18 +3164,73 @@ function projectCrewOptions(){
   const ids = p ? (p.crewIds||[]) : [];
   return ids.map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
 }
+/* shared option-list builder for every location <select> on the Shoot Day screen —
+   primary (#sdLocation) and each additional-location row (.sdaddloc-sel) — so both
+   always offer the same "+ Add new location…" entry point (Phase H). */
+function locSelectOptionsHTML(){
+  return '<option value="">— Select a location —</option>'
+    + locationsDB.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')
+    + '<option value="__addloc__">+ Add new location…</option>';
+}
 function refreshLocationDropdowns(){
   const sel=document.getElementById('sdLocation'); if(!sel) return;
   const cur=sel.value;
-  sel.innerHTML='<option value="">— Select a location —</option>'+locationsDB.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  sel.innerHTML=locSelectOptionsHTML();
   if(cur) sel.value=cur;
 }
 function addSdLocRow(vals){
   const c=document.getElementById('rows-sdaddloc'); const row=document.createElement('div'); row.className='row';
-  const opts='<option value="">— Select location —</option>'+locationsDB.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
-  row.innerHTML=`<select class="sdaddloc-sel">${opts}</select><input type="text" class="sdaddloc-note" placeholder="Note (optional)"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
+  row.innerHTML=`<select class="sdaddloc-sel" onchange="onSdAddLocChange(this)">${locSelectOptionsHTML()}</select><input type="text" class="sdaddloc-note" placeholder="Note (optional)"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
   c.appendChild(row);
   if(vals){ row.querySelector('.sdaddloc-sel').value=vals[0]||''; row.querySelector('.sdaddloc-note').value=vals[1]||''; }
+}
+/* Phase H — reverse direction of the Phase D sync: picking "+ Add new location…"
+   on a Shoot Day matches what you type against the Locations database by
+   case/whitespace-insensitive exact name match (never fuzzy — avoids merging two
+   genuinely different locations with similar names), reusing a match if found or
+   creating a minimal new record if not, then links this day to it immediately.
+   No separate "checked" state exists for the Locations-tab day-grid — it's derived
+   live from d.locationId/d.additionalLocationIds on every render — so this and the
+   Phase D direction both just write those same two fields; there's nothing to
+   fight over and no loop to guard against. */
+function findLocationByName(name){
+  const norm = s => (s||'').trim().toLowerCase();
+  const target = norm(name);
+  return locationsDB.find(l=>norm(l.name)===target);
+}
+async function quickAddLocationForDay(selectEl){
+  const raw = (prompt('New location name:')||'').trim();
+  if(!raw){ selectEl.value=''; if(selectEl.id==='sdLocation') onDayChanged(); return; }
+  let loc = findLocationByName(raw);
+  if(!loc){
+    loc = { id: uid(), name: raw, address:'', lat:null, lon:null, onsiteContactName:'', onsiteContactPhone:'',
+      accessInfo:'', recceInfo:'', parkingInfo:'', hospital:null, nearestParking:null };
+    locationsDB.push(loc);
+    await saveDB('db:locations', locationsDB);
+  }
+  // the Locations-tab day-grid only lists locations in p.locationIds — make sure
+  // this one is on the project so its row (and ticked checkbox) actually shows up
+  const day = shootDaysDB.find(x=>x.id===currentShootDayId);
+  const proj = projectsDB.find(x=>x.id===(day&&day.projectId));
+  if(proj){
+    proj.locationIds = proj.locationIds||[];
+    if(!proj.locationIds.includes(loc.id)){ proj.locationIds.push(loc.id); await saveDB('db:projects', projectsDB); }
+  }
+  // rebuild every location dropdown on this screen so the (possibly new) location
+  // is selectable everywhere, preserving whatever each was already showing
+  const sdSel = document.getElementById('sdLocation');
+  if(sdSel){ const cur=sdSel.value==='__addloc__'?'':sdSel.value; sdSel.innerHTML=locSelectOptionsHTML(); sdSel.value=cur; }
+  document.querySelectorAll('.sdaddloc-sel').forEach(sel=>{ const cur=sel.value==='__addloc__'?'':sel.value; sel.innerHTML=locSelectOptionsHTML(); sel.value=cur; });
+  selectEl.value = loc.id;
+  if(selectEl.id==='sdLocation') onDayChanged();
+  await saveShootDay(false);   // link immediately so the Locations tab checkbox reflects it without waiting for a manual Save
+}
+function onSdLocationChange(selectEl){
+  if(selectEl.value==='__addloc__'){ quickAddLocationForDay(selectEl); return; }
+  onDayChanged();
+}
+function onSdAddLocChange(selectEl){
+  if(selectEl.value==='__addloc__') quickAddLocationForDay(selectEl);
 }
 let collapsedPosnCompanies = new Set();
 let collapsedPosnDepts = new Set(); // keys are `${company}||${dept}`
