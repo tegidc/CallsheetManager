@@ -2333,14 +2333,11 @@ function renderProjectLocations(body){
   const p = projectsDB.find(x=>x.id===currentProjectId);
   const assigned = (p.locationIds||[]).map(id=>locationsDB.find(l=>l.id===id)).filter(Boolean);
   const unassigned = locationsDB.filter(l=>!(p.locationIds||[]).includes(l.id));
+  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
   body.innerHTML = `
     <div class="section">
       <h2>Locations on this project</h2>
-      ${assigned.length ? assigned.map(l=>`
-        <div class="list-card">
-          <div class="meta"><strong>${esc(l.name)}</strong><div>${esc(l.address||'')}</div></div>
-          <div class="actions"><button class="small danger" onclick="removeLocFromProject('${l.id}')">Remove</button></div>
-        </div>`).join('') : '<div class="empty-note">No locations assigned to this project yet.</div>'}
+      ${assigned.length ? locDayGridHTML(assigned, days) : '<div class="empty-note">No locations assigned to this project yet.</div>'}
     </div>
     <div class="section">
       <h2>Add from locations database</h2>
@@ -2356,6 +2353,50 @@ function renderProjectLocations(body){
       <button class="small" onclick="toggleLocForm('${p.id}')">+ Add location</button>
       <div id="locFormWrap" style="display:none; margin-top:12px;"></div>
     </div>`;
+}
+/* Day-checkbox grid for project locations — same pattern as Crew tab's Days on site.
+   Ticking a day for a location sets it as that day's primary location if the day has
+   none yet, otherwise adds it to that day's additional locations. */
+function locDayGridHTML(assigned, days){
+  if(!days.length){
+    return assigned.map(l=>`
+      <div class="list-card">
+        <div class="meta"><strong>${esc(l.name)}</strong><div>${esc(l.address||'')}</div></div>
+        <div class="actions"><button class="small danger" onclick="removeLocFromProject('${l.id}')">Remove</button></div>
+      </div>`).join('') + `<div class="hint" style="margin-top:8px;">Add shoot days first, then tick which days each location is used.</div>`;
+  }
+  const dayHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length};">
+      <div class="crewgrid-header crewgrid-corner"></div>
+      ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
+      <div class="crewgrid-header"></div>
+    </div>`;
+  return `<div class="tablewrap">${dayHeaderRow}${assigned.map(l=>locRowHTML(l, days)).join('')}</div>`;
+}
+function locRowHTML(l, days){
+  const dayCells = days.map(d=>{
+    const isPrimary = d.locationId===l.id;
+    const isAdditional = (d.additionalLocationIds||[]).some(pair=>pair[0]===l.id);
+    const checked = isPrimary || isAdditional;
+    return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleLocOnDay('${l.id}','${d.id}',this.checked)" title="${isPrimary?'Primary location — ':''}Day ${esc(d.dayNum||'?')}"></div>`;
+  }).join('');
+  return `<div class="crewgrid crewgrid-row" style="--daycols:${days.length};">
+    <div class="crewgrid-row-name"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
+    ${dayCells}
+    <div class="crewgrid-remove"><button class="small danger" onclick="removeLocFromProject('${l.id}')">Remove</button></div>
+  </div>`;
+}
+async function toggleLocOnDay(locId, dayId, checked){
+  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  d.additionalLocationIds = d.additionalLocationIds || [];
+  if(checked){
+    if(!d.locationId){ d.locationId = locId; }
+    else if(d.locationId!==locId && !d.additionalLocationIds.some(pair=>pair[0]===locId)){ d.additionalLocationIds.push([locId, '']); }
+  } else {
+    if(d.locationId===locId) d.locationId = '';
+    d.additionalLocationIds = d.additionalLocationIds.filter(pair=>pair[0]!==locId);
+  }
+  await saveDB('db:shootdays', shootDaysDB);
+  renderProjectBody();
 }
 async function addLocToProject(){
   const id = val('addLocPick'); if(!id) return;
@@ -2795,7 +2836,7 @@ function renderLocationsList(){
       </div>
     </div>`).join('');
 }
-let locFormState = { lat:null, lon:null, hospital:null };
+let locFormState = { lat:null, lon:null, hospital:null, parking:null };
 let locFormContext = null;  // set to a project id when the form was opened from a project's Locations tab
 function locFormHTML(l){
   l=l||{};
@@ -2821,6 +2862,11 @@ function locFormHTML(l){
     <label style="margin-top:10px;">Recce info / link</label><textarea id="nlRecce">${esc(l.recceInfo||'')}</textarea>
     <label style="margin-top:10px;">Parking</label><textarea id="nlParking">${esc(l.parkingInfo||'')}</textarea>
     <div class="section" style="margin-top:12px; background:var(--panel-2);">
+      <h2 style="margin-bottom:8px;">Nearest parking</h2>
+      <div id="nlParkingInfo" class="hint">${l.nearestParking?`${esc(l.nearestParking.name)} — ${esc(l.nearestParking.address||'')} (~${esc(l.nearestParking.distanceKm)}km)`:'Not looked up yet.'}</div>
+      <button class="small" onclick="lookupParkingForForm()" style="margin-top:8px;">${icon('car')} Find nearest parking</button>
+    </div>
+    <div class="section" style="margin-top:12px; background:var(--panel-2);">
       <h2 style="margin-bottom:8px;">Nearest hospital</h2>
       <div id="nlHospitalInfo" class="hint">${l.hospital?`${esc(l.hospital.name)} — ${esc(l.hospital.address||'')} (~${esc(l.hospital.distanceKm)}km)`:'Not looked up yet.'}</div>
       <button class="small" onclick="lookupHospitalForForm()" style="margin-top:8px;">${icon('hospital')} Find nearest hospital</button>
@@ -2832,12 +2878,12 @@ function locFormHTML(l){
 }
 function toggleLocForm(projectId){
   const w=document.getElementById('locFormWrap');
-  if(w.style.display==='none'){ locFormState={lat:null,lon:null,hospital:null}; locFormContext=projectId||null; w.innerHTML=locFormHTML(); w.style.display=''; } else closeLocForm();
+  if(w.style.display==='none'){ locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=projectId||null; w.innerHTML=locFormHTML(); w.style.display=''; } else closeLocForm();
 }
-function closeLocForm(){ const w=document.getElementById('locFormWrap'); w.style.display='none'; w.innerHTML=''; locFormState={lat:null,lon:null,hospital:null}; locFormContext=null; }
+function closeLocForm(){ const w=document.getElementById('locFormWrap'); w.style.display='none'; w.innerHTML=''; locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=null; }
 function editLocation(id){
   const l = locationsDB.find(x=>x.id===id); if(!l) return;
-  locFormState = { lat: l.lat||null, lon: l.lon||null, hospital: l.hospital||null }; locFormContext=null;
+  locFormState = { lat: l.lat||null, lon: l.lon||null, hospital: l.hospital||null, parking: l.nearestParking||null }; locFormContext=null;
   const w=document.getElementById('locFormWrap'); w.innerHTML=locFormHTML(l); w.style.display='';
   updateMapPreview(); w.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
@@ -2846,7 +2892,7 @@ async function saveLocation(){
   const id = val('locEditId');
   const rec = { id:id||uid(), name, address:val('nlAddress'), lat:locFormState.lat, lon:locFormState.lon,
     onsiteContactName:val('nlContactName'), onsiteContactPhone:val('nlContactPhone'),
-    accessInfo:val('nlAccess'), recceInfo:val('nlRecce'), parkingInfo:val('nlParking'), hospital:locFormState.hospital };
+    accessInfo:val('nlAccess'), recceInfo:val('nlRecce'), parkingInfo:val('nlParking'), hospital:locFormState.hospital, nearestParking:locFormState.parking };
   const existing = locationsDB.find(x=>x.id===id);
   const merged = Object.assign({}, existing||{}, rec);
   const idx = locationsDB.findIndex(x=>x.id===merged.id);
@@ -2927,6 +2973,33 @@ async function findNearestHospital(lat,lon){
   }
   return null;
 }
+async function lookupParkingForForm(){
+  if(locFormState.lat==null){ alert('Search and pick an address first so we have coordinates to search from.'); return; }
+  const infoEl=document.getElementById('nlParkingInfo'); infoEl.textContent='Searching nearby parking…';
+  try{
+    const pk = await findNearestParking(locFormState.lat, locFormState.lon);
+    if(!pk){ infoEl.textContent='No parking found nearby.'; return; }
+    locFormState.parking=pk; infoEl.textContent=`${pk.name} — ${pk.address||'address not tagged'} (~${pk.distanceKm}km)`;
+  }catch(e){ infoEl.textContent='Lookup failed — check your connection.'; }
+}
+/* same Overpass approach as findNearestHospital, but with amenity=parking and
+   smaller search radii — parking is far denser than hospitals, so 10-25km would
+   just return noise */
+async function findNearestParking(lat,lon){
+  for(const r of [1000,3000,8000]){
+    const query=`[out:json][timeout:20];node["amenity"="parking"](around:${r},${lat},${lon});out;`;
+    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:query});
+    const data=await res.json();
+    if(data.elements&&data.elements.length){
+      let best=null,bestD=Infinity;
+      data.elements.forEach(el=>{ const dist=haversine(lat,lon,el.lat,el.lon); if(dist<bestD){bestD=dist;best=el;} });
+      const t=best.tags||{};
+      const addr=[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:postcode']].filter(Boolean).join(', ');
+      return { name:t.name||'Unnamed parking', address:addr, distanceKm:bestD.toFixed(1) };
+    }
+  }
+  return null;
+}
 
 /* ============================================================ SHOOT DAY EDITOR */
 function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
@@ -2988,7 +3061,8 @@ function shootDayBuildHTML(){
         <div><label>Sunrise/Sunset</label><input type="text" id="wxSun"></div>
       </div>
     </div>
-    <div class="section"><h2>Nearest hospital</h2><div id="sdHospitalInfo" class="hint"></div></div>`;
+    <div class="section"><h2>Nearest hospital</h2><div id="sdHospitalInfo" class="hint"></div></div>
+    <div class="section"><h2>Nearest parking</h2><div id="sdParkingLookupInfo" class="hint"></div></div>`;
 
   const schedule = `
     <div class="section">
@@ -3301,10 +3375,11 @@ function populateShootDay(d){
   TECHSPEC_FIELDS.forEach(f=>setv('ts'+f.charAt(0).toUpperCase()+f.slice(1), ts[f]));
   setv('sdBrief',(d.brief||[]).join('\n')); setv('sdParking',d.parking); setv('sdNotes',d.notes);
   updateHospitalDisplay();
+  updateParkingLookupDisplay();
   renderCameraDesignations('day');
   refreshTechSpecsBanner();
 }
-function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); }
+function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); updateParkingLookupDisplay(); }
 function updateLocationSummary(){
   const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
   const el=document.getElementById('sdLocationSummary'); if(!el) return;
@@ -3317,6 +3392,12 @@ function updateHospitalDisplay(){
   const el=document.getElementById('sdHospitalInfo'); if(!el) return;
   if(!l){ el.textContent='Select a primary location to see its saved hospital.'; return; }
   el.textContent = l.hospital?`${l.hospital.name} — ${l.hospital.address||''} (~${l.hospital.distanceKm}km)`:'No hospital saved for this location yet — add one in the Locations database.';
+}
+function updateParkingLookupDisplay(){
+  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const el=document.getElementById('sdParkingLookupInfo'); if(!el) return;
+  if(!l){ el.textContent='Select a primary location to see its saved parking.'; return; }
+  el.textContent = l.nearestParking?`${l.nearestParking.name} — ${l.nearestParking.address||''} (~${l.nearestParking.distanceKm}km)`:'No parking saved for this location yet — add one in the Locations database.';
 }
 const WMO={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Dense drizzle',61:'Slight rain',63:'Rain',65:'Heavy rain',71:'Slight snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Violent showers',95:'Thunderstorm'};
 async function fetchWeatherForDay(){
