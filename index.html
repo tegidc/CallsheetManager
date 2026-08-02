@@ -1624,7 +1624,7 @@ function renderProjectCrew(body){
   const assigned = (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
   const unassigned = crewDB.filter(c=>!(p.crewIds||[]).includes(c.id));
 
-  const viewLabels = {days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
+  const viewLabels = {roles:'Roles', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
@@ -1640,7 +1640,17 @@ function renderProjectCrew(body){
         <span onclick="setAllProjectDeptsCollapsed(true, '${deptsCSV}')">Collapse all</span>
       </div>` : '';
 
-    if(crewGridView==='travel'){
+    if(crewGridView==='roles'){
+      // department / sub-department / lead-company editing — no day columns, just one row per person
+      const deptGroupsHTML = deptsPresent.map(d=>{
+        const collapsed = collapsedProjectDepts.has(d);
+        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
+            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
+          </div>
+          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewRolesRowHTML(c)).join('')}</div>`;
+      }).join('');
+      assignedHTML = toggleRow + deptGroupsHTML;
+    } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — simple list, no day columns
       const deptGroupsHTML = deptsPresent.map(d=>{
         const collapsed = collapsedProjectDepts.has(d);
@@ -1688,6 +1698,15 @@ function renderProjectCrew(body){
       ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
 }
+/* Roles tab row — department / sub-department / lead-company editing, one row per
+   person, no day columns (that's what Days on site is for). */
+function crewRolesRowHTML(c){
+  const isEditing = editingCrewId===c.id;
+  return `<div class="crewgrid-row ${isEditing?'crewgrid-row-editing':''}">
+    ${crewIdentityHTML(c, {showPickers:true, oneLine:true, showPhone:true})}
+    ${crewExpansionHTML(c, 'crewgrid-editform')}
+  </div>`;
+}
 function crewAssignRowHTML(c, days){
   const isEditing = editingCrewId===c.id;
   let preCell = '';
@@ -1707,7 +1726,7 @@ function crewAssignRowHTML(c, days){
   }).join('');
   const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${colCount};">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers: crewGridView==='days', oneLine:true, showPhone:false})}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, oneLine:true, showPhone:false})}</div>
     ${preCell}${dayCells}
     <div class="crewgrid-remove">
       ${(crewGridView==='hotel'||crewGridView==='days') ? `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${c.id}','${crewGridView}')" title="Toggle all on/off for this person">All</button>` : ''}
