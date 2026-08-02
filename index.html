@@ -653,6 +653,16 @@ let crewGridView = 'days';   // 'days' | 'hotel' | 'travel' | 'catering' — whi
 let travelMethodsList = [];  // shared, extensible list of travel method options
 let coProCompaniesList = []; // shared, extensible list of co-production company names
 
+/* ---- autosave ----
+   ~1s after the user stops typing/changing a field, save silently — no modal,
+   no button flash, just the same discreet "Saved" status text the manual Save
+   buttons already write to. Keyed so different forms debounce independently. */
+let autosaveTimers = {};
+function scheduleAutosave(key, fn){
+  clearTimeout(autosaveTimers[key]);
+  autosaveTimers[key] = setTimeout(fn, 1000);
+}
+
 const uid = () => 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const esc = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const val = id => (document.getElementById(id)?.value || '').trim();
@@ -1495,6 +1505,10 @@ async function createProject(){
   const rec = { id: uid(), client, title, startDate: start, company: COMPANY,
     logline: val('npLogline'), description: val('npDescription'), crewIds: [], locationIds: [], createdAt: new Date().toISOString() };
   projectsDB.push(rec); await saveDB('db:projects', projectsDB);
+  // every project starts life with one shoot day — nobody wants to hunt for "+ New day" first
+  const day = makeShootDayRecord(rec.id, rec);
+  shootDaysDB.push(day); await saveDB('db:shootdays', shootDaysDB);
+  currentShootDayId = day.id;
   openProject(rec.id);
 }
 
@@ -1531,7 +1545,9 @@ function renderProjectBody(){
 function renderProjectOverview(body){
   const p = projectsDB.find(x=>x.id===currentProjectId);
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
+  const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
   body.innerHTML = `
+    ${bareMinimumWarningsHTML(p, days)}
     <div class="section">
       <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
@@ -1541,6 +1557,10 @@ function renderProjectOverview(body){
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label class="req">Initial shoot date</label><input type="date" id="ovStart" value="${esc(p.startDate)}"></div>
         <div><label>Production company</label><input type="text" value="${esc(p.company||COMPANY)}" readonly></div>
+      </div>
+      <div class="grid g2" style="margin-bottom:10px;">
+        <div><label>Shoot days</label><input type="text" id="ovDayCount" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
+        <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Shoot Days tab — both stay in sync.</div></div>
       </div>
       <label>Log line</label>
       <input type="text" id="ovLogline" value="${esc(p.logline)}" style="margin-bottom:10px;">
@@ -1576,6 +1596,24 @@ function renderProjectOverview(body){
       <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
     </div>`;
   renderCameraDesignations('project');
+  // autosave: ~1s after the user stops typing anywhere in this tab, save both
+  // project details and tech-spec defaults silently (no alert, no button flash —
+  // just the same discreet status text the Save buttons already use)
+  body.oninput = () => scheduleAutosave('overview', () => { saveProjectOverview(true); saveProjectTechSpecs(); });
+}
+/* Overview "bare minimums" — visual nudges only, never a hard blocker. Each one
+   jumps straight to where it can be fixed. */
+function bareMinimumWarningsHTML(p, days){
+  const items = [];
+  const noDateDays = days.filter(d=>!d.date);
+  if(noDateDays.length) items.push({ label:`${noDateDays.length} shoot day${noDateDays.length>1?'s':''} missing a date`, onclick:`currentShootDayId='${noDateDays[0].id}';goProjectTab('days')` });
+  if(!(p.locationIds||[]).length) items.push({ label:'No locations added yet', onclick:`goProjectTab('locations')` });
+  if(!(p.crewIds||[]).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
+  if(!items.length) return '';
+  return `<div class="section" style="border-color:var(--danger)">
+    <h2 style="color:var(--danger)">Bare minimums</h2>
+    <div class="taglist">${items.map(it=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="${it.onclick}" title="Click to fix">⚠ ${esc(it.label)}</span>`).join('')}</div>
+  </div>`;
 }
 async function saveProjectTechSpecs(){
   const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
@@ -1585,18 +1623,18 @@ async function saveProjectTechSpecs(){
     if(v) p.techSpecs[f] = v; else delete p.techSpecs[f];
   });
   await saveDB('db:projects', projectsDB);
-  const st=document.getElementById('pjStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{st.textContent='';},2000); }
+  const st=document.getElementById('pjStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
 }
-async function saveProjectOverview(){
+async function saveProjectOverview(silent){
   const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
   const client=val('ovClient'), title=val('ovTitle'), start=val('ovStart');
-  if(!client||!title||!start){ alert('Client, working title and initial shoot date are required.'); return; }
+  if(!client||!title||!start){ if(!silent) alert('Client, working title and initial shoot date are required.'); return; }
   p.client=client; p.title=title; p.startDate=start; p.logline=val('ovLogline'); p.description=val('ovDescription');
   await saveDB('db:projects', projectsDB);
-  const st=document.getElementById('ovStatus'); st.textContent='Saved'; setTimeout(()=>{st.textContent='';},2000);
+  const st=document.getElementById('ovStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
   renderSide();
-  document.querySelector('.page-head h1').textContent = p.title;
-  document.querySelector('.page-head .code').textContent = projCode(p);
+  const h1=document.querySelector('.page-head h1'); if(h1) h1.textContent = p.title;
+  const codeEl=document.querySelector('.page-head .code'); if(codeEl) codeEl.textContent = projCode(p);
 }
 async function deleteProject(id){
   if(!confirm('Delete this project and all its shoot days? Crew and locations in your databases are not affected.')) return;
@@ -2196,6 +2234,7 @@ function renderProjectDays(body){
   body.innerHTML = dayTabsBarHTML(days) + shootDayBuildHTML();
   const d = days.find(x=>x.id===currentShootDayId);
   populateShootDay(d);
+  body.oninput = () => scheduleAutosave('shootday', () => saveShootDay(false));
 }
 function renderProjectPreview(body){
   const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
@@ -2221,13 +2260,17 @@ function renderProjectPreview(body){
   renderCateringExport();
 }
 function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
-async function addShootDay(){
-  const existing = shootDaysDB.filter(d=>d.projectId===currentProjectId);
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const rec = { id: uid(), projectId: currentProjectId, dayNum: existing.length+1, dayTotal: existing.length+1,
+/* shared record shape — used by addShootDay, createProject (auto first day), and syncShootDayCount */
+function makeShootDayRecord(projectId, p){
+  const existing = shootDaysDB.filter(d=>d.projectId===projectId);
+  return { id: uid(), projectId, dayNum: existing.length+1, dayTotal: existing.length+1,
     date: existing.length? '' : (p?p.startDate:''), allCrewCall:'', locationId:'', additionalLocationIds:[],
     weather:null, techSpecs:{}, schedule:[], positions:[], brief:[], parking:'', notes:'',
     hotelNights:[], cateringMeals:{} };
+}
+async function addShootDay(){
+  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const rec = makeShootDayRecord(currentProjectId, p);
   shootDaysDB.push(rec); await saveDB('db:shootdays', shootDaysDB);
   currentShootDayId = rec.id;
   renderProjectBody();
@@ -2237,6 +2280,42 @@ async function deleteShootDay(id){
   shootDaysDB = shootDaysDB.filter(d=>d.id!==id);
   if(currentShootDayId===id) currentShootDayId = null;
   await saveDB('db:shootdays', shootDaysDB); renderProjectBody();
+}
+/* Overview "shoot days" count field — kept in sync both ways with the actual
+   Shoot Days list. Growing it creates blank new days (same shape as + New day).
+   Shrinking it never silently deletes — it always asks which day to lose. */
+async function syncShootDayCount(newCountStr){
+  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const newCount = parseInt(newCountStr, 10);
+  if(!Number.isFinite(newCount) || newCount < 0 || newCount === days.length){ renderProjectOverview(document.getElementById('projectBody')); return; }
+  if(newCount > days.length){
+    for(let i=days.length; i<newCount; i++){
+      const rec = makeShootDayRecord(p.id, p);
+      shootDaysDB.push(rec);
+    }
+    await saveDB('db:shootdays', shootDaysDB);
+    renderProjectOverview(document.getElementById('projectBody'));
+    return;
+  }
+  // shrinking — ask which specific day(s) to lose rather than guessing
+  const dayLabel = d => `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locationsDB.find(l=>l.id===d.locationId)||{}).name||''):''}`;
+  let remaining = days.slice();
+  const toRemove = [];
+  const removeCount = days.length - newCount;
+  for(let i=0; i<removeCount; i++){
+    const list = remaining.map((d,idx)=>`${idx+1}. ${dayLabel(d)}`).join('\n');
+    const choice = prompt(`Which shoot day have we lost?\n\n${list}\n\nEnter a number (1-${remaining.length}), or Cancel to leave the count as-is:`);
+    if(choice===null){ renderProjectOverview(document.getElementById('projectBody')); return; }
+    const idx = parseInt(choice, 10) - 1;
+    if(!Number.isFinite(idx) || idx<0 || idx>=remaining.length){ renderProjectOverview(document.getElementById('projectBody')); return; }
+    toRemove.push(remaining[idx].id);
+    remaining = remaining.filter((d,i2)=>i2!==idx);
+  }
+  shootDaysDB = shootDaysDB.filter(d=>!toRemove.includes(d.id));
+  if(toRemove.includes(currentShootDayId)) currentShootDayId = null;
+  await saveDB('db:shootdays', shootDaysDB);
+  renderProjectOverview(document.getElementById('projectBody'));
 }
 
 /* ============================================================ CREW DATABASE */
