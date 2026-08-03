@@ -247,6 +247,7 @@
   .subhead.dept-toggle:hover{color:var(--tape);}
   .dept-caret{font-size:9px; width:10px; display:inline-block;}
   .dept-code{color:var(--tape); font-weight:700; letter-spacing:.6px;}
+  .dept-count{color:var(--muted); font-weight:400;}
   .dept-toggle-all{font-size:11px; color:var(--muted); text-align:right; margin-bottom:8px;}
   .dept-toggle-all span{cursor:pointer;}
   .dept-toggle-all span:hover{color:var(--tape);}
@@ -602,6 +603,25 @@ function rolesFor(dept){ return ROLES_BY_DEPT[dept] || []; }
 function departmentForRolePath(rolePath){ const i = rolePath.indexOf('/'); return i>=0 ? rolePath.slice(0,i) : ''; }
 /* single source of truth for department order — used for grouping crew lists AND ordering the final call sheet */
 function deptBucketKey(dept){ return DEPARTMENTS.includes(dept) ? dept : 'Other'; }
+/* ---- one canonical collapsible group header ----
+   The project Crew tab and the crew database rendered this markup independently;
+   sharing it means the caret, code, label and count can't drift apart. `code` is
+   optional — the project Crew tab can group by hotel rather than department, and
+   those groups have no department code to show. */
+function deptHeaderHTML(label, count, collapsed, onclickJS, code){
+  const c = code===undefined ? (DEPARTMENT_CODES[label]||'') : code;
+  return `<div class="subhead dept-toggle" onclick="${onclickJS}">
+      <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${c?`<span class="dept-code">${esc(c)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span>
+    </div>`;
+}
+/* the "Expand all · Collapse all" strip */
+function expandCollapseAllHTML(fnName, arg){
+  const a = arg===undefined ? '' : `, '${arg}'`;
+  return `<div class="dept-toggle-all">
+      <span onclick="${fnName}(false${a})">Expand all</span> ·
+      <span onclick="${fnName}(true${a})">Collapse all</span>
+    </div>`;
+}
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
 /* Heads of Department (c.isHoD) pinned to the top of any department roster, then alphabetical */
 function sortHoDFirst(list){ return list.slice().sort((a,b)=> (b.isHoD?1:0)-(a.isHoD?1:0) || (a.name||'').localeCompare(b.name||'')); }
@@ -2114,12 +2134,9 @@ function renderProjectCrew(body){
     const toggleRow = `<div class="dept-toggle-all">
         ${selectAllHTML}${groups.length>1 ? ` · <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> · <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>` : ''}
       </div>`;
-    const groupHeaderHTML = g => {
-      const collapsed = collapsedProjectDepts.has(g.key);
-      return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${g.key}')">
-          <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${g.code?`<span class="dept-code">${esc(g.code)}</span> `:''}${esc(g.label)} <span style="color:var(--muted);font-weight:400">(${g.items.length})</span>
-        </div>`;
-    };
+    const groupHeaderHTML = g => deptHeaderHTML(
+      g.label, g.items.length, collapsedProjectDepts.has(g.key),
+      `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
 
     if(crewGridView==='roles'){
       // tidy columns (Phase S): CONTROLS | Name | Role | Department (reference) | Show as — one row per person, no day columns
@@ -2882,22 +2899,21 @@ function renderProjectDays(body){
    collapsed (see pvBlockHTML) — collapsing is about scanning the page fast, not
    about hiding the one action you actually came here for. */
 let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, hotel:true, catering:true, excel:true };
-function togglePreviewBlock(key){
-  previewBlocks[key] = !previewBlocks[key];
-  const bodyEl = document.getElementById('pvb-'+key);
-  const caret = document.getElementById('pvc-'+key);
-  if(bodyEl) bodyEl.style.display = previewBlocks[key] ? '' : 'none';
-  if(caret) caret.textContent = previewBlocks[key] ? '▾' : '▸';
+/* ---- collapsible block plumbing, shared by Preview & Export and the Shoot Day editor ----
+   Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
+   only thing that differed between them was the id prefix, so that's the parameter. */
+function applyBlockState(state, prefix, key){
+  const bodyEl = document.getElementById(prefix+'b-'+key);
+  const caret  = document.getElementById(prefix+'c-'+key);
+  if(bodyEl) bodyEl.style.display = state[key] ? '' : 'none';
+  if(caret)  caret.textContent    = state[key] ? '▾' : '▸';
 }
-function setAllPreviewBlocksCollapsed(collapsed){
-  Object.keys(previewBlocks).forEach(key=>{
-    previewBlocks[key] = !collapsed;
-    const bodyEl = document.getElementById('pvb-'+key);
-    const caret = document.getElementById('pvc-'+key);
-    if(bodyEl) bodyEl.style.display = previewBlocks[key] ? '' : 'none';
-    if(caret) caret.textContent = previewBlocks[key] ? '▾' : '▸';
-  });
+function toggleBlock(state, prefix, key){ state[key] = !state[key]; applyBlockState(state, prefix, key); }
+function setAllBlocksCollapsed(state, prefix, collapsed){
+  Object.keys(state).forEach(key=>{ state[key] = !collapsed; applyBlockState(state, prefix, key); });
 }
+function togglePreviewBlock(key){ toggleBlock(previewBlocks, 'pv', key); }
+function setAllPreviewBlocksCollapsed(collapsed){ setAllBlocksCollapsed(previewBlocks, 'pv', collapsed); }
 function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = previewBlocks[key];
   return `<div class="section">
@@ -2916,10 +2932,7 @@ function renderProjectPreview(body){
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
   body.innerHTML = dayTabsBarHTML(days) + `
-    <div class="dept-toggle-all">
-      <span onclick="setAllPreviewBlocksCollapsed(false)">Expand all</span> ·
-      <span onclick="setAllPreviewBlocksCollapsed(true)">Collapse all</span>
-    </div>
+    ${expandCollapseAllHTML('setAllPreviewBlocksCollapsed')}
     <div class="card" id="previewCard"></div>
     ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
       `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
@@ -3218,16 +3231,11 @@ function renderCrewList(){
   Object.keys(buckets).forEach(d=>{ buckets[d] = sortCrewDbGroup(buckets[d]); });
   const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
   const deptsCSV = deptsPresent.join(',');
-  const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
-      <span onclick="setAllDeptsCollapsed(false, '${deptsCSV}')">Expand all</span> ·
-      <span onclick="setAllDeptsCollapsed(true, '${deptsCSV}')">Collapse all</span>
-    </div>` : '';
+  const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML('setAllDeptsCollapsed', deptsCSV) : '';
   const html = deptsPresent.map(d=>{
     const collapsed = collapsedDepts.has(d);
-    return `<div class="subhead dept-toggle" onclick="toggleDeptCollapse('${d}')">
-        <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-      </div>
-      <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(crewCardHTML).join('')}</div>`;
+    return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`)
+      + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(crewCardHTML).join('')}</div>`;
   }).join('');
   list.innerHTML = toggleRow + (html || filtered.map(crewCardHTML).join(''));
 }
@@ -3518,12 +3526,12 @@ function locFormHTML(l){
     <div class="section" style="margin-top:12px; background:var(--panel-2);">
       <h2 style="margin-bottom:8px;">Nearest parking</h2>
       <div id="nlParkingInfo" class="hint">${l.nearestParking?`${esc(l.nearestParking.name)} — ${esc(l.nearestParking.address||'')} (~${esc(l.nearestParking.distanceKm)}km)`:'Not looked up yet.'}</div>
-      <button class="small" onclick="lookupParkingForForm()" style="margin-top:8px;">${icon('car')} Find nearest parking</button>
+      <button class="small" onclick="lookupAmenityForForm('parking')" style="margin-top:8px;">${icon('car')} Find nearest parking</button>
     </div>
     <div class="section" style="margin-top:12px; background:var(--panel-2);">
       <h2 style="margin-bottom:8px;">Nearest hospital</h2>
       <div id="nlHospitalInfo" class="hint">${l.hospital?`${esc(l.hospital.name)} — ${esc(l.hospital.address||'')} (~${esc(l.hospital.distanceKm)}km)`:'Not looked up yet.'}</div>
-      <button class="small" onclick="lookupHospitalForForm()" style="margin-top:8px;">${icon('hospital')} Find nearest hospital</button>
+      <button class="small" onclick="lookupAmenityForForm('hospital')" style="margin-top:8px;">${icon('hospital')} Find nearest hospital</button>
     </div>
     <div class="toolbar" style="margin-top:12px;">
       <button class="primary" onclick="saveLocation()">Save location</button>
@@ -3603,56 +3611,48 @@ function haversine(lat1,lon1,lat2,lon2){
   const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
-async function lookupHospitalForForm(){
-  if(locFormState.lat==null){ alert('Search and pick an address first so we have coordinates to search from.'); return; }
-  const infoEl=document.getElementById('nlHospitalInfo'); infoEl.textContent='Searching nearby hospitals…';
-  try{
-    const h = await findNearestHospital(locFormState.lat, locFormState.lon);
-    if(!h){ infoEl.textContent='No hospital found nearby.'; return; }
-    locFormState.hospital=h; infoEl.textContent=`${h.name} — ${h.address||'address not tagged'} (~${h.distanceKm}km)`;
-  }catch(e){ infoEl.textContent='Lookup failed — check your connection.'; }
+/* ---- nearest-amenity lookup (OpenStreetMap Overpass) ----
+   Hospitals and parking are the same query with a different amenity tag and search
+   radii — parking is far denser than hospitals, so it starts much tighter (1km) or
+   the nearest result is just noise. Radii are tried in order, widening only if the
+   tighter one found nothing. */
+const AMENITY_SEARCH = {
+  hospital: { tag:'hospital', radii:[10000,25000], noun:'hospital', unnamed:'Unnamed hospital', stateKey:'hospital', elId:'nlHospitalInfo' },
+  parking:  { tag:'parking',  radii:[1000,3000,8000], noun:'parking', unnamed:'Unnamed parking', stateKey:'parking', elId:'nlParkingInfo' },
+};
+/* formats a {name, address, distanceKm} amenity as one display line — used by the
+   location form, the shoot day form, and anywhere else one is shown */
+function amenityLine(a, missingAddr){
+  return a ? `${a.name} — ${a.address||(missingAddr||'')} (~${a.distanceKm}km)` : '';
 }
-async function findNearestHospital(lat,lon){
-  for(const r of [10000,25000]){
-    const query=`[out:json][timeout:20];node["amenity"="hospital"](around:${r},${lat},${lon});out;`;
+async function findNearestAmenity(kind, lat, lon){
+  const cfg = AMENITY_SEARCH[kind];
+  for(const r of cfg.radii){
+    const query=`[out:json][timeout:20];node["amenity"="${cfg.tag}"](around:${r},${lat},${lon});out;`;
     const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:query});
     const data=await res.json();
-    if(data.elements&&data.elements.length){
+    if(data.elements && data.elements.length){
       let best=null,bestD=Infinity;
       data.elements.forEach(el=>{ const dist=haversine(lat,lon,el.lat,el.lon); if(dist<bestD){bestD=dist;best=el;} });
       const t=best.tags||{};
       const addr=[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:postcode']].filter(Boolean).join(', ');
-      return { name:t.name||'Unnamed hospital', address:addr, phone:t.phone||t['contact:phone']||'', distanceKm:bestD.toFixed(1) };
+      return { name:t.name||cfg.unnamed, address:addr, phone:t.phone||t['contact:phone']||'', distanceKm:bestD.toFixed(1) };
     }
   }
   return null;
 }
-async function lookupParkingForForm(){
+/* the "Find nearest…" buttons on the location form — same flow for both kinds */
+async function lookupAmenityForForm(kind){
+  const cfg = AMENITY_SEARCH[kind];
+  const infoEl=document.getElementById(cfg.elId); if(!infoEl) return;
   if(locFormState.lat==null){ alert('Search and pick an address first so we have coordinates to search from.'); return; }
-  const infoEl=document.getElementById('nlParkingInfo'); infoEl.textContent='Searching nearby parking…';
+  infoEl.textContent=`Searching nearby ${cfg.noun}…`;
   try{
-    const pk = await findNearestParking(locFormState.lat, locFormState.lon);
-    if(!pk){ infoEl.textContent='No parking found nearby.'; return; }
-    locFormState.parking=pk; infoEl.textContent=`${pk.name} — ${pk.address||'address not tagged'} (~${pk.distanceKm}km)`;
+    const found = await findNearestAmenity(kind, locFormState.lat, locFormState.lon);
+    if(!found){ infoEl.textContent=`No ${cfg.noun} found nearby.`; return; }
+    locFormState[cfg.stateKey]=found;
+    infoEl.textContent=amenityLine(found, 'address not tagged');
   }catch(e){ infoEl.textContent='Lookup failed — check your connection.'; }
-}
-/* same Overpass approach as findNearestHospital, but with amenity=parking and
-   smaller search radii — parking is far denser than hospitals, so 10-25km would
-   just return noise */
-async function findNearestParking(lat,lon){
-  for(const r of [1000,3000,8000]){
-    const query=`[out:json][timeout:20];node["amenity"="parking"](around:${r},${lat},${lon});out;`;
-    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:query});
-    const data=await res.json();
-    if(data.elements&&data.elements.length){
-      let best=null,bestD=Infinity;
-      data.elements.forEach(el=>{ const dist=haversine(lat,lon,el.lat,el.lon); if(dist<bestD){bestD=dist;best=el;} });
-      const t=best.tags||{};
-      const addr=[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:postcode']].filter(Boolean).join(', ');
-      return { name:t.name||'Unnamed parking', address:addr, distanceKm:bestD.toFixed(1) };
-    }
-  }
-  return null;
 }
 
 /* ============================================================ SHOOT DAY EDITOR */
@@ -3662,22 +3662,8 @@ function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return 
    when you're working one concern at a time (e.g. schedules across the week),
    collapsing on Day 1 should stay collapsed when you move to Day 5. */
 let shootDayBlocks = { general:true, schedule:true, positions:true, tech:true };
-function toggleShootDayBlock(key){
-  shootDayBlocks[key] = !shootDayBlocks[key];
-  const body = document.getElementById('sdb-'+key);
-  const caret = document.getElementById('sdc-'+key);
-  if(body) body.style.display = shootDayBlocks[key] ? '' : 'none';
-  if(caret) caret.textContent = shootDayBlocks[key] ? '▾' : '▸';
-}
-function setAllShootDayBlocksCollapsed(collapsed){
-  Object.keys(shootDayBlocks).forEach(key=>{
-    shootDayBlocks[key] = !collapsed;
-    const body = document.getElementById('sdb-'+key);
-    const caret = document.getElementById('sdc-'+key);
-    if(body) body.style.display = shootDayBlocks[key] ? '' : 'none';
-    if(caret) caret.textContent = shootDayBlocks[key] ? '▾' : '▸';
-  });
-}
+function toggleShootDayBlock(key){ toggleBlock(shootDayBlocks, 'sd', key); }
+function setAllShootDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(shootDayBlocks, 'sd', collapsed); }
 function sdBlock(key, title, inner){
   const open = shootDayBlocks[key];
   return `<div class="sd-block">
@@ -3772,10 +3758,7 @@ function shootDayBuildHTML(){
       <div id="cameraDesigList"></div>
     </div>`;
 
-  return `<div class="dept-toggle-all">
-      <span onclick="setAllShootDayBlocksCollapsed(false)">Expand all</span> ·
-      <span onclick="setAllShootDayBlocksCollapsed(true)">Collapse all</span>
-    </div>`
+  return expandCollapseAllHTML('setAllShootDayBlocksCollapsed')
        + sdBlock('general','General information', general)
        + sdBlock('schedule','Schedule', schedule)
        + sdBlock('positions','Position assignments', positions)
@@ -3913,17 +3896,15 @@ function renderPositionAssignments(){
     const totalCount = depts.reduce((sum,d)=>sum+deptMap[d].length,0);
     html += `<div class="posn-company-group">
       <div class="posn-company-header" onclick="togglePosnCompany('${esc(company)}')">
-        <span class="dept-caret">${companyCollapsed?'▸':'▾'}</span> ${esc(company)} <span style="color:var(--muted); font-weight:400;">(${totalCount})</span>
+        <span class="dept-caret">${companyCollapsed?'▸':'▾'}</span> ${esc(company)} <span class="dept-count">(${totalCount})</span>
       </div>
       <div class="posn-company-body" style="display:${companyCollapsed?'none':'block'}">`;
     depts.forEach(dept=>{
       const key = company+'||'+dept;
       const deptCollapsed = collapsedPosnDepts.has(key);
       const entries = deptMap[dept].slice().sort((a,b)=>(a.c.role||'').localeCompare(b.c.role||''));
-      html += `<div class="subhead dept-toggle" onclick="togglePosnDept('${esc(company)}','${esc(dept)}')">
-          <span class="dept-caret">${deptCollapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[dept]||'')}</span> ${esc(dept)} <span style="color:var(--muted); font-weight:400;">(${entries.length})</span>
-        </div>
-        <div class="dept-group" style="display:${deptCollapsed?'none':'block'}">`;
+      html += deptHeaderHTML(dept, entries.length, deptCollapsed, `togglePosnDept('${esc(company)}','${esc(dept)}')`)
+        + `<div class="dept-group" style="display:${deptCollapsed?'none':'block'}">`;
       entries.forEach(en=>{
         const c = en.c;
         const isEditing = editingCrewId===en.cid;
@@ -4108,18 +4089,15 @@ function updateLocationSummary(){
   el.innerHTML=`${esc(l.address||'')}${l.accessInfo?('<br>Access: '+esc(l.accessInfo)):''}${l.onsiteContactName?('<br>On-site: '+esc(l.onsiteContactName)+(l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):'')):''}`;
   if(l.parkingInfo && !val('sdParking')) setv('sdParking', l.parkingInfo);
 }
-function updateHospitalDisplay(){
+/* both read-only day-form summaries are the same lookup with a different field/noun */
+function updateAmenityDisplay(elId, field, noun){
+  const el=document.getElementById(elId); if(!el) return;
   const l=selectedDayLocation();
-  const el=document.getElementById('sdHospitalInfo'); if(!el) return;
-  if(!l){ el.textContent='Select a primary location to see its saved hospital.'; return; }
-  el.textContent = l.hospital?`${l.hospital.name} — ${l.hospital.address||''} (~${l.hospital.distanceKm}km)`:'No hospital saved for this location yet — add one in the Locations database.';
+  if(!l){ el.textContent=`Select a primary location to see its saved ${noun}.`; return; }
+  el.textContent = amenityLine(l[field]) || `No ${noun} saved for this location yet — add one in the Locations database.`;
 }
-function updateParkingLookupDisplay(){
-  const l=selectedDayLocation();
-  const el=document.getElementById('sdParkingLookupInfo'); if(!el) return;
-  if(!l){ el.textContent='Select a primary location to see its saved parking.'; return; }
-  el.textContent = l.nearestParking?`${l.nearestParking.name} — ${l.nearestParking.address||''} (~${l.nearestParking.distanceKm}km)`:'No parking saved for this location yet — add one in the Locations database.';
-}
+function updateHospitalDisplay(){ updateAmenityDisplay('sdHospitalInfo','hospital','hospital'); }
+function updateParkingLookupDisplay(){ updateAmenityDisplay('sdParkingLookupInfo','nearestParking','parking'); }
 const WMO={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Dense drizzle',61:'Slight rain',63:'Rain',65:'Heavy rain',71:'Slight snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Violent showers',95:'Thunderstorm'};
 async function fetchWeatherForDay(){
   const loc=selectedDayLocation();
