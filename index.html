@@ -250,6 +250,16 @@
   .dept-toggle-all{font-size:11px; color:var(--muted); text-align:right; margin-bottom:8px;}
   .dept-toggle-all span{cursor:pointer;}
   .dept-toggle-all span:hover{color:var(--tape);}
+  /* filter panel — shared look for the Crew database and Crew-on-project filters */
+  .filter-toggle{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;
+    font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;}
+  .filter-toggle:hover{color:var(--tape);}
+  .filter-panel{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
+  .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
+  .filter-chips label{font-size:12px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
+  .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(1,119,86,.1);
+    border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;}
+  .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
   .formgroup{border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
   .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;}
   /* collapsible crew-form sections */
@@ -730,8 +740,12 @@ async function quickSetCoPro(crewId, selectEl){
 function crewIdentityHTML(c, opts){
   opts = opts||{};
   const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
+  // bulk-select mode swaps the "view" toggle for a plain checkbox (Crew on this project)
+  const viewOrSelect = opts.bulkSelect
+    ? `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`
+    : `<button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>`;
   const buttons = `
-    <button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>
+    ${viewOrSelect}
     <button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
   const bits = [opts.showRole!==false ? c.role : null, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
   // quiet "copy" badge: shows only until the duplicate's role is actually changed
@@ -1810,39 +1824,158 @@ function setAllProjectDeptsCollapsed(collapsed, deptsCSV){
   renderProjectBody();
 }
 function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
+/* ---- Crew-on-project filter/group/sort + bulk select ----
+   One shared filter state across every view-switcher tab (Roles/Days on
+   site/Hotel/Travel/Catering) — it's a module-level global, so switching
+   tabs via setCrewGridView() never resets it. */
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept' };
+let projectCrewFilterOpen = false;
+let projectCrewSelected = new Set();
+/* shared by both filter panels (Crew on this project + Crew database) — each
+   keeps its own filter-state object but the matching rules are identical */
+function matchesCrewFilterState(c, f){
+  if(f.depts.size && !f.depts.has(deptBucketKey(c.department))) return false;
+  if(f.company && (c.coProductionCompany||'')!==f.company) return false;
+  if(f.roles.size && !(c.roles||[]).some(r=>f.roles.has(r))) return false;
+  if(f.excludeTalent && deptBucketKey(c.department)==='Talent') return false;
+  if(f.excludeOtherCompanies && (c.coProductionCompany||'')) return false;
+  return true;
+}
+function personMatchesProjectFilter(c){ return matchesCrewFilterState(c, projectCrewFilter); }
+function personHasHotel(c, p, days){
+  if(((p&&p.hotelNightBefore)||[]).includes(c.id)) return true;
+  return days.some(d=>(d.hotelNights||[]).includes(c.id));
+}
+function sortProjectCrewGroup(list){
+  return projectCrewFilter.sort==='name' ? list.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')) : sortHoDFirst(list);
+}
+/* groups the (already filtered) crew list either by department (default) or
+   by hotel status — same shape either way, so every crewGridView branch can
+   render off of it without caring which grouping is active */
+function buildProjectCrewGroups(list, p, days){
+  const buckets = {};
+  if(projectCrewFilter.groupBy==='hotel'){
+    list.forEach(c=>{ const key = personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel'; (buckets[key]=buckets[key]||[]).push(c); });
+    return ['Has hotel','No hotel'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:sortProjectCrewGroup(buckets[k])}));
+  }
+  list.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
+  return DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length).map(d=>({key:d, label:d, code:DEPARTMENT_CODES[d]||'', items:sortProjectCrewGroup(buckets[d])}));
+}
+function toggleProjectCrewFilterPanel(){ projectCrewFilterOpen = !projectCrewFilterOpen; renderProjectBody(); }
+function toggleProjectFilterDept(dept, checked){
+  if(checked) projectCrewFilter.depts.add(dept); else projectCrewFilter.depts.delete(dept);
+  renderProjectBody();
+}
+function toggleProjectFilterRole(rolePath, checked){
+  if(checked) projectCrewFilter.roles.add(rolePath); else projectCrewFilter.roles.delete(rolePath);
+  renderProjectBody();
+}
+function setProjectFilterField(field, value){ projectCrewFilter[field] = value; renderProjectBody(); }
+function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = checked; renderProjectBody(); }
+function clearProjectCrewFilter(){
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept' };
+  renderProjectBody();
+}
+function projectCrewActiveFilterCount(){
+  const f = projectCrewFilter;
+  return f.depts.size + f.roles.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0);
+}
+function projectCrewFilterPanelHTML(assignedAll){
+  const f = projectCrewFilter;
+  const companies = [...new Set(assignedAll.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const rolesInUse = [...new Set(assignedAll.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
+  const deptChecks = DEPARTMENTS.filter(d=>assignedAll.some(c=>deptBucketKey(c.department)===d))
+    .map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleProjectFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
+  const roleChecks = rolesInUse.length ? rolesInUse.map(rp=>{
+      const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+      return `<label><input type="checkbox" ${f.roles.has(rp)?'checked':''} onchange="toggleProjectFilterRole('${esc(rp)}', this.checked)"> ${esc(name)}</label>`;
+    }).join('') : '<span class="hint">No saved roles on this project yet.</span>';
+  return `<div class="filter-panel">
+    <div><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks||'<span class="hint">—</span>'}</div></div>
+    <div class="grid g3" style="margin-top:10px;">
+      <div><label>Lead company</label><select onchange="setProjectFilterField('company', this.value)">
+        <option value="">All companies</option>
+        ${companies.map(co=>`<option value="${esc(co)}" ${f.company===co?'selected':''}>${esc(co)}</option>`).join('')}
+      </select></div>
+      <div><label>Sort</label><select onchange="setProjectFilterField('sort', this.value)">
+        <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
+        <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
+      </select></div>
+      <div><label>Group by</label><select onchange="setProjectFilterField('groupBy', this.value)">
+        <option value="dept" ${f.groupBy==='dept'?'selected':''}>Department</option>
+        <option value="hotel" ${f.groupBy==='hotel'?'selected':''}>Has hotel / No hotel</option>
+      </select></div>
+    </div>
+    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Roles</div><div class="filter-chips">${roleChecks}</div></div>
+    <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+      <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
+      <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
+      <span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearProjectCrewFilter()">Clear filters</span>
+    </div>
+  </div>`;
+}
+function toggleCrewSelected(id, checked){
+  if(checked) projectCrewSelected.add(id); else projectCrewSelected.delete(id);
+  renderProjectBody();
+}
+function clearCrewSelection(){ projectCrewSelected.clear(); renderProjectBody(); }
+async function bulkRemoveSelectedFromProject(){
+  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const n = projectCrewSelected.size;
+  if(!n || !confirm(`Remove ${n} crew member(s) from this project?`)) return;
+  p.crewIds = (p.crewIds||[]).filter(id=>!projectCrewSelected.has(id));
+  projectCrewSelected.clear();
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+function bulkActionBarHTML(){
+  if(!projectCrewSelected.size) return '';
+  return `<div class="bulk-action-bar">
+    <strong>${projectCrewSelected.size} selected</strong>
+    <button class="small danger" onclick="bulkRemoveSelectedFromProject()">Remove from project</button>
+    <span class="hint" style="cursor:pointer;" onclick="clearCrewSelection()">Clear selection</span>
+  </div>`;
+}
 function renderProjectCrew(body){
   const p = projectsDB.find(x=>x.id===currentProjectId);
   const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
   const assigned = (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
   const unassigned = crewDB.filter(c=>!(p.crewIds||[]).includes(c.id));
+  const filtered = assigned.filter(personMatchesProjectFilter);
 
   const viewLabels = {roles:'Roles', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
+  const filterCount = projectCrewActiveFilterCount();
+  const filterToggleHTML = `<div class="filter-toggle" onclick="toggleProjectCrewFilterPanel()">
+    <span class="dept-caret">${projectCrewFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}
+  </div>${projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned) : ''}`;
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
-  if(assigned.length){
-    const buckets = {};
-    assigned.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
-    Object.keys(buckets).forEach(d=>{ buckets[d] = sortHoDFirst(buckets[d]); });
-    const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
-    const deptsCSV = deptsPresent.join(',');
-    const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
-        <span onclick="setAllProjectDeptsCollapsed(false, '${deptsCSV}')">Expand all</span> ·
-        <span onclick="setAllProjectDeptsCollapsed(true, '${deptsCSV}')">Collapse all</span>
+  if(assigned.length && !filtered.length){
+    assignedHTML = '<div class="empty-note">No crew match the current filter.</div>';
+  } else if(filtered.length){
+    const groups = buildProjectCrewGroups(filtered, p, days);
+    const groupsCSV = groups.map(g=>g.key).join(',');
+    const toggleRow = groups.length>1 ? `<div class="dept-toggle-all">
+        <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> ·
+        <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>
       </div>` : '';
+    const groupHeaderHTML = g => {
+      const collapsed = collapsedProjectDepts.has(g.key);
+      return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${g.key}')">
+          <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${g.code?`<span class="dept-code">${esc(g.code)}</span> `:''}${esc(g.label)} <span style="color:var(--muted);font-weight:400">(${g.items.length})</span>
+        </div>`;
+    };
 
     if(crewGridView==='roles'){
       // department / sub-department / lead-company editing — no day columns, just one row per person
-      const deptGroupsHTML = deptsPresent.map(d=>{
-        const collapsed = collapsedProjectDepts.has(d);
-        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
-            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-          </div>
-          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewRolesRowHTML(c)).join('')}</div>`;
+      const groupsHTML = groups.map(g=>{
+        const collapsed = collapsedProjectDepts.has(g.key);
+        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewRolesRowHTML(c)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + deptGroupsHTML;
+      assignedHTML = toggleRow + groupsHTML;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
@@ -1851,14 +1984,11 @@ function renderProjectCrew(body){
           <div class="crewgrid-header" style="text-align:left;">Travel method</div>
           <div class="crewgrid-header"></div>
         </div>`;
-      const deptGroupsHTML = deptsPresent.map(d=>{
-        const collapsed = collapsedProjectDepts.has(d);
-        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
-            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-          </div>
-          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewTravelRowHTML(c, p)).join('')}</div>`;
+      const groupsHTML = groups.map(g=>{
+        const collapsed = collapsedProjectDepts.has(g.key);
+        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewTravelRowHTML(c, p)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${travelHeaderRow}${deptGroupsHTML}</div>`;
+      assignedHTML = toggleRow + `<div class="tablewrap">${travelHeaderRow}${groupsHTML}</div>`;
     } else {
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const dayHeaderRow = days.length ? `
@@ -1868,14 +1998,11 @@ function renderProjectCrew(body){
           ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
           <div class="crewgrid-header"></div>
         </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
-      const deptGroupsHTML = deptsPresent.map(d=>{
-        const collapsed = collapsedProjectDepts.has(d);
-        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
-            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-          </div>
-          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
+      const groupsHTML = groups.map(g=>{
+        const collapsed = collapsedProjectDepts.has(g.key);
+        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${dayHeaderRow}${deptGroupsHTML}</div>`;
+      assignedHTML = toggleRow + `<div class="tablewrap">${dayHeaderRow}${groupsHTML}</div>`;
     }
   }
 
@@ -1883,6 +2010,8 @@ function renderProjectCrew(body){
     <div class="section">
       <h2>Crew on this project</h2>
       ${viewSwitcher}
+      ${filterToggleHTML}
+      ${bulkActionBarHTML()}
       ${assignedHTML}
     </div>
     <div class="section">
@@ -1905,7 +2034,7 @@ function crewRolesRowHTML(c){
   const isEditing = editingCrewId===c.id;
   const rolesInline = `<span class="roles-inline">${rolesTagListHTML(c)}${roleAddPickerHTML(c)}</span>`;
   return `<div class="crewgrid-row ${isEditing?'crewgrid-row-editing':''}">
-    ${crewIdentityHTML(c, {showPickers:true, oneLine:true, wrap:true, showPhone:true, extraLine:rolesInline})}
+    ${crewIdentityHTML(c, {showPickers:true, oneLine:true, wrap:true, showPhone:true, bulkSelect:true, extraLine:rolesInline})}
     ${crewExpansionHTML(c, 'crewgrid-editform')}
   </div>`;
 }
@@ -1967,7 +2096,7 @@ function crewAssignRowHTML(c, days){
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${onDay?'checked':''} onchange="toggleCrewOnDay('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
   const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
-  const identOpts = {showPickers:false, oneLine:true, showPhone:false};
+  const identOpts = {showPickers:false, oneLine:true, showPhone:false, bulkSelect:true};
   if(crewGridView==='days') identOpts.showRole = false; // role shown via the quick-edit control instead
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${colCount};">
     <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}${crewGridView==='days'?roleQuickEditHTML(c):''}</div>
@@ -2001,7 +2130,7 @@ function crewCateringBlockHTML(c, days){
   };
   return `<div class="crewgrid-catering-person">
     <div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${days.length};">
-      <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, oneLine:true, showPhone:false})}</div>
+      <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, oneLine:true, showPhone:false, bulkSelect:true})}</div>
       ${days.map(()=>'<div></div>').join('')}
       <div class="crewgrid-remove"></div>
     </div>
@@ -2169,7 +2298,7 @@ function crewTravelRowHTML(c, p){
   const carInfo = (c.drives==='Yes' && (c.carMakeModel||c.carReg)) ? `<div class="hint">${icon('car')} ${esc([c.carMakeModel,c.carReg].filter(Boolean).join(' — '))}</div>` : '';
   const isEditing = editingCrewId===c.id;
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:1; --daycolwidth:210px;">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, extraLine:carInfo, oneLine:true, showPhone:false})}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, {showPickers:false, extraLine:carInfo, oneLine:true, showPhone:false, bulkSelect:true})}</div>
     <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${c.id}',this)">${opts}</select></div>
     <div class="crewgrid-remove"></div>
     ${crewExpansionHTML(c, 'crewgrid-editform')}
@@ -2709,8 +2838,64 @@ async function syncShootDayCount(newCountStr){
 }
 
 /* ============================================================ CREW DATABASE */
+/* ---- Crew database filter panel — same shape/rules as the Crew-on-project
+   one (matchesCrewFilterState), grouping is always by department here since
+   there's no project/hotel context on this screen. */
+let crewDbFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept' };
+let crewDbFilterOpen = false;
+let crewSearchQuery = '';   // kept outside the DOM so filter-panel re-renders don't clear the search box
+function personMatchesCrewDbFilter(c){ return matchesCrewFilterState(c, crewDbFilter); }
+function toggleCrewDbFilterPanel(){ crewDbFilterOpen = !crewDbFilterOpen; renderCrewDatabase(document.getElementById('main')); }
+function toggleCrewDbFilterDept(dept, checked){
+  if(checked) crewDbFilter.depts.add(dept); else crewDbFilter.depts.delete(dept);
+  renderCrewDatabase(document.getElementById('main'));
+}
+function toggleCrewDbFilterRole(rolePath, checked){
+  if(checked) crewDbFilter.roles.add(rolePath); else crewDbFilter.roles.delete(rolePath);
+  renderCrewDatabase(document.getElementById('main'));
+}
+function setCrewDbFilterField(field, value){ crewDbFilter[field] = value; renderCrewDatabase(document.getElementById('main')); }
+function toggleCrewDbFilterFlag(field, checked){ crewDbFilter[field] = checked; renderCrewDatabase(document.getElementById('main')); }
+function clearCrewDbFilter(){
+  crewDbFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept' };
+  renderCrewDatabase(document.getElementById('main'));
+}
+function crewDbActiveFilterCount(){
+  const f = crewDbFilter;
+  return f.depts.size + f.roles.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0);
+}
+function crewDbFilterPanelHTML(){
+  const f = crewDbFilter;
+  const companies = [...new Set(crewDB.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const rolesInUse = [...new Set(crewDB.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
+  const deptChecks = DEPARTMENTS.map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleCrewDbFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
+  const roleChecks = rolesInUse.length ? rolesInUse.map(rp=>{
+      const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+      return `<label><input type="checkbox" ${f.roles.has(rp)?'checked':''} onchange="toggleCrewDbFilterRole('${esc(rp)}', this.checked)"> ${esc(name)}</label>`;
+    }).join('') : '<span class="hint">No saved roles yet.</span>';
+  return `<div class="filter-panel">
+    <div><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks}</div></div>
+    <div class="grid g2" style="margin-top:10px;">
+      <div><label>Lead company</label><select onchange="setCrewDbFilterField('company', this.value)">
+        <option value="">All companies</option>
+        ${companies.map(co=>`<option value="${esc(co)}" ${f.company===co?'selected':''}>${esc(co)}</option>`).join('')}
+      </select></div>
+      <div><label>Sort</label><select onchange="setCrewDbFilterField('sort', this.value)">
+        <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
+        <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
+      </select></div>
+    </div>
+    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Roles</div><div class="filter-chips">${roleChecks}</div></div>
+    <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+      <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleCrewDbFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
+      <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleCrewDbFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
+      <span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearCrewDbFilter()">Clear filters</span>
+    </div>
+  </div>`;
+}
 function renderCrewDatabase(m){
   setTopbarTitle('Crew database');
+  const filterCount = crewDbActiveFilterCount();
   m.innerHTML = `
     <div class="page-head"><div class="eyebrow">Database</div><h1>Crew</h1></div>
     <div class="section">
@@ -2721,13 +2906,11 @@ function renderCrewDatabase(m){
     </div>
     <div class="section">
       <h2>All crew</h2>
-      <div class="grid g2" style="margin-bottom:10px;">
-        <input type="text" id="crewSearch" placeholder="Search name, role, skills, camera gear…" oninput="renderCrewList()">
-        <select id="crewDeptFilter" onchange="renderCrewList()">
-          <option value="">All departments</option>
-          ${DEPARTMENTS.map(d=>`<option value="${d}">${d}</option>`).join('')}
-        </select>
+      <input type="text" id="crewSearch" value="${esc(crewSearchQuery)}" style="margin-bottom:10px;" placeholder="Search name, role, skills, camera gear…" oninput="crewSearchQuery=this.value;renderCrewList()">
+      <div class="filter-toggle" onclick="toggleCrewDbFilterPanel()">
+        <span class="dept-caret">${crewDbFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}
       </div>
+      ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
       <div id="crewList"></div>
       <button class="small" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
       ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
@@ -2836,18 +3019,19 @@ function setAllDeptsCollapsed(collapsed, deptsCSV){
   collapsedDepts = collapsed ? new Set(deptsPresent) : new Set();
   renderCrewList();
 }
+function sortCrewDbGroup(list){
+  return crewDbFilter.sort==='name' ? list.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')) : sortHoDFirst(list);
+}
 function renderCrewList(){
-  const q = (val('crewSearch')||'').toLowerCase();
-  const dept = val('crewDeptFilter')||'';
+  const q = (val('crewSearch')||crewSearchQuery||'').toLowerCase();
   const list = document.getElementById('crewList'); if(!list) return;
   let filtered = crewDB.filter(c => !q || crewSearchBlob(c).includes(q));
-  if(dept) filtered = filtered.filter(c => (c.department||'Other')===dept);
+  filtered = filtered.filter(personMatchesCrewDbFilter);
   if(!filtered.length){ list.innerHTML = '<div class="empty-note">No crew found.</div>'; return; }
-  if(dept){ list.innerHTML = sortHoDFirst(filtered).map(crewCardHTML).join(''); return; }
-  // group by department when showing all; unknown/blank departments fall under "Other"
+  // group by department; unknown/blank departments fall under "Other"
   const buckets = {};
   filtered.forEach(c=>{ const key = deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
-  Object.keys(buckets).forEach(d=>{ buckets[d] = sortHoDFirst(buckets[d]); });
+  Object.keys(buckets).forEach(d=>{ buckets[d] = sortCrewDbGroup(buckets[d]); });
   const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
   const deptsCSV = deptsPresent.join(',');
   const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
