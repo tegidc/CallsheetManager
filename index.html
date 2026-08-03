@@ -261,6 +261,19 @@
     border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;}
   .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
   .bulk-edit-panel{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
+  /* Roles tab (Phase S) — proper tidy columns instead of one packed inline row.
+     Controls | Name | Role | Department (reference-only) | Show as. */
+  .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 92px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
+  .roles-grid-header{font-family:var(--label); font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.3px; text-transform:uppercase;}
+  .roles-grid-row{padding:8px 0; border-bottom:1px solid var(--line);}
+  .roles-grid-row:last-child{border-bottom:none;}
+  .roles-grid-row-editing{background:rgba(1,119,86,.04); border-radius:8px; padding:8px;}
+  .roles-grid-controls{display:flex; align-items:center; gap:0;}
+  .roles-grid-name{min-width:0; font-family:var(--disp); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .roles-grid-cell{min-width:0;}
+  .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:8px; padding:14px; background:var(--panel);}
   .modal-overlay{position:fixed; inset:0; background:rgba(17,10,8,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
   .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
   .modal-box h3{font-family:var(--label); font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;}
@@ -451,6 +464,23 @@
     .crewgrid-check input{width:18px; height:18px; accent-color:var(--tape);}
     .crewgrid-remove{text-align:left; margin-top:4px;}
     .crewgrid-editform{margin-top:10px;}
+    /* Roles tab grid collapses the same way — stacked cards, labelled fields.
+       Two classes (not one) so this reliably beats .roles-grid's display:block
+       regardless of source order — same specificity-tie trap as .crewgrid-header-row. */
+    .roles-grid.roles-grid-header-row{display:none;}
+    .roles-grid{
+      display:block; border:1px solid var(--line); border-radius:10px;
+      padding:12px; margin-bottom:10px; background:var(--panel);
+    }
+    .roles-grid-controls{margin-bottom:6px;}
+    .roles-grid-cell{margin-bottom:8px;}
+    .roles-grid-cell::before{
+      content:attr(data-label); display:block; font-family:var(--label); font-size:10.5px;
+      font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:3px;
+    }
+    .roles-grid-showas{white-space:normal;}
+    .roles-grid-editform{margin-top:10px;}
+    .tablewrap:has(.roles-grid){overflow-x:visible;}
     /* the crew grid no longer needs to scroll sideways once it's stacked */
     .tablewrap:has(.crewgrid){overflow-x:visible;}
 
@@ -721,10 +751,11 @@ async function quickSetCoPro(crewId, selectEl){
   refreshCrewScreen();
 }
 /* ---- single canonical crew identity block, used by every crew list in the app ----
-   opts.hideDept     — suppress the read-only department badge (Crew-on-project Roles row: department is implied by Role, shown separately, not repeated here)
-   opts.hideLeadPill — suppress the inline Lead Company quick-pick (Crew-on-project main row: Lead Company only lives in the edit expansion / bulk edit now)
-   opts.showPhone    — show phone on the sub-line
-   opts.oneLine      — compact single-row layout */
+   opts.hideDept      — suppress the read-only department badge (Crew-on-project Roles row: department is implied by Role, shown separately, not repeated here)
+   opts.hideLeadPill  — suppress the inline Lead Company quick-pick (Crew-on-project main row: Lead Company only lives in the edit expansion / bulk edit now)
+   opts.showAsOrRole  — display c.showAs||c.role instead of the raw role (Phase S item 8: Days on site/Hotel/Travel/Catering are display-only for role — editing only ever happens on the Roles tab)
+   opts.showPhone     — show phone on the sub-line
+   opts.oneLine       — compact single-row layout */
 function crewIdentityHTML(c, opts){
   opts = opts||{};
   const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
@@ -735,7 +766,8 @@ function crewIdentityHTML(c, opts){
   const buttons = `
     ${viewOrSelect}
     <button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
-  const bits = [opts.showRole!==false ? c.role : null, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
+  const roleText = opts.showRole===false ? null : (opts.showAsOrRole ? (c.showAs||c.role) : c.role);
+  const bits = [roleText, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
   // quiet "copy" badge: shows only until the duplicate's role is actually changed
   const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
   const deptBadge = opts.hideDept ? '' : deptLabelHTML(c);
@@ -1995,12 +2027,19 @@ function renderProjectCrew(body){
     };
 
     if(crewGridView==='roles'){
-      // department / sub-department / lead-company editing — no day columns, just one row per person
+      // tidy columns (Phase S): CONTROLS | Name | Role | Department (reference) | Show as — one row per person, no day columns
+      const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
+          <div class="roles-grid-header"></div>
+          <div class="roles-grid-header">Name</div>
+          <div class="roles-grid-header">Role</div>
+          <div class="roles-grid-header">Department</div>
+          <div class="roles-grid-header">Show as</div>
+        </div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewRolesRowHTML(c)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + groupsHTML;
+      assignedHTML = toggleRow + `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
@@ -2051,30 +2090,40 @@ function renderProjectCrew(body){
       ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
 }
-/* Roles tab row — CHECKBOX | EDIT | Name | Role | Show as. Department and Lead
-   Company are no longer edited on this main row: department is implied by
-   whichever saved role is active (see setActiveRole), and Lead Company now
-   only lives in the per-person edit expansion or the bulk-edit panel. */
+/* Roles tab row (Phase S) — tidy grid columns: CONTROLS | Name | Role | Department | Show as.
+   Department is read-only reference (implied by the active saved role — see setActiveRole).
+   "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (crewFormHTML)
+   or the bulk-edit panel — neither appears on this main row. Phone is not shown here either. */
 function crewRolesRowHTML(c){
   const isEditing = editingCrewId===c.id;
-  const rolesInline = `<span class="roles-inline">${rolesTagListHTML(c)}${roleAddPickerHTML(c)}</span>`;
-  const showAsInline = showAsQuickEditHTML(c);
-  return `<div class="crewgrid-row ${isEditing?'crewgrid-row-editing':''}">
-    ${crewIdentityHTML(c, {hideDept:true, hideLeadPill:true, oneLine:true, wrap:true, showPhone:true, showRole:false, bulkSelect:true, extraLine:rolesInline+showAsInline})}
-    ${crewExpansionHTML(c, 'crewgrid-editform')}
+  const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
+  const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
+  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
+  return `<div class="roles-grid roles-grid-row ${isEditing?'roles-grid-row-editing':''}">
+    <div class="roles-grid-controls">${selectCb}${editBtn}</div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}${copyBadge}</div>
+    <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${rolesTagListHTML(c)}</span></div>
+    <div class="roles-grid-cell" data-label="Department">${deptLabelHTML(c)}</div>
+    <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(c)}</div>
+    ${crewExpansionHTML(c, 'roles-grid-editform')}
   </div>`;
 }
 /* inline "Show as" quick-edit — a purely cosmetic override shown on the call sheet
-   instead of the role label (item 3). The saved role/department stay untouched. */
+   instead of the role label (item 3). The saved role/department stay untouched.
+   Uses the same .icon-btn pencil as every other edit affordance in the row (Phase S
+   item 2) — not a separately-styled control — and stays to a single line. */
 let quickEditShowAsId = null;
 function showAsQuickEditHTML(c){
   if(quickEditShowAsId===c.id){
-    return `<span class="crew-ident-sub" style="display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">
-      <input type="text" id="qsaShowAs_${c.id}" value="${esc(c.showAs||'')}" placeholder="Show as…" style="width:150px;padding:3px 6px;font-size:12px;min-height:0;" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter')saveQuickShowAs('${c.id}')">
+    return `<span class="roles-grid-showas" onclick="event.stopPropagation()">
+      <input type="text" id="qsaShowAs_${c.id}" value="${esc(c.showAs||'')}" placeholder="Show as…" style="width:100%;min-width:0;padding:3px 6px;font-size:12px;min-height:0;" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter')saveQuickShowAs('${c.id}')">
       <button class="icon-btn active" onclick="event.stopPropagation();saveQuickShowAs('${c.id}')" title="Save">${icon('save')}</button>
     </span>`;
   }
-  return `<span class="hint crew-ident-sub" style="cursor:pointer;" onclick="event.stopPropagation();quickEditShowAsId='${c.id}';renderProjectBody();" title="Cosmetic override shown on the call sheet instead of the role">${c.showAs?esc(c.showAs):'— show as —'} ${icon('edit')}</span>`;
+  return `<span class="roles-grid-showas">
+    <span class="hint" style="overflow:hidden;text-overflow:ellipsis;">${c.showAs?esc(c.showAs):'— show as —'}</span>
+    <button class="icon-btn" onclick="event.stopPropagation();quickEditShowAsId='${c.id}';renderProjectBody();" title="Edit Show as" aria-label="Edit Show as">${icon('edit')}</button>
+  </span>`;
 }
 async function saveQuickShowAs(crewId){
   const c = crewDB.find(x=>x.id===crewId); if(!c) return;
@@ -2082,31 +2131,6 @@ async function saveQuickShowAs(crewId){
   c.showAs = (el?.value||'').trim();
   await saveDB('db:crew', crewDB);
   quickEditShowAsId = null;
-  renderProjectBody();
-}
-/* Days on site — inline role quick-edit. A tiny pencil-to-text-box toggle, no full
-   crew form. Every crew member always has at least one saved role, so this is
-   always a select of their saved roles (never free text). */
-let quickEditRoleId = null;
-function roleQuickEditHTML(c){
-  const savedRoles = c.roles||[];
-  if(quickEditRoleId===c.id){
-    const roleControl = `<select id="qrRole_${c.id}" style="width:130px;padding:3px 6px;font-size:12px;min-height:0;" onclick="event.stopPropagation()">
-          ${savedRoles.map(rp=>{ const name = rp.includes('/')?rp.split('/').slice(1).join('/'):rp; return `<option value="${esc(rp)}" ${c.role===name?'selected':''}>${esc(name)}</option>`; }).join('')}
-        </select>`;
-    return `<span class="crew-ident-sub" style="display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">
-      ${roleControl}
-      <button class="icon-btn active" onclick="event.stopPropagation();saveQuickRole('${c.id}')" title="Save">${icon('save')}</button>
-    </span>`;
-  }
-  return `<span class="hint crew-ident-sub" style="cursor:pointer;" onclick="event.stopPropagation();quickEditRoleId='${c.id}';renderProjectBody();" title="Quick-switch their active saved role">${c.role?esc(c.role):'— set role —'} ${icon('edit')}</span>`;
-}
-async function saveQuickRole(crewId){
-  const el = document.getElementById('qrRole_'+crewId);
-  const rolePath = el?.value||'';
-  if(rolePath) await setActiveRole(crewId, rolePath, true);
-  await saveDB('db:crew', crewDB);
-  quickEditRoleId = null;
   renderProjectBody();
 }
 /* shared "add from crew database" option-list builder — grouped by department
@@ -2136,10 +2160,11 @@ function crewAssignRowHTML(c, days){
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${onDay?'checked':''} onchange="toggleCrewOnDay('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
   const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
-  const identOpts = {oneLine:true, showPhone:false, bulkSelect:true};
-  if(crewGridView==='days') identOpts.showRole = false; // role shown via the quick-edit control instead
+  // Phase S item 6-8: no dept/lead-company chooser here, and role is display-only
+  // (Show-as-or-role) — editing role/department/Show-as only ever happens on the Roles tab.
+  const identOpts = {oneLine:true, showPhone:false, bulkSelect:true, hideDept:true, hideLeadPill:true, showAsOrRole:true};
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${colCount};">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}${crewGridView==='days'?roleQuickEditHTML(c):''}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}</div>
     ${preCell}${dayCells}
     <div class="crewgrid-remove">
       ${(crewGridView==='hotel'||crewGridView==='days') ? `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${c.id}','${crewGridView}')" title="Toggle all on/off for this person">All</button>` : ''}
@@ -2170,7 +2195,7 @@ function crewCateringBlockHTML(c, days){
   };
   return `<div class="crewgrid-catering-person">
     <div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${days.length};">
-      <div class="crewgrid-row-name">${crewIdentityHTML(c, {oneLine:true, showPhone:false, bulkSelect:true})}</div>
+      <div class="crewgrid-row-name">${crewIdentityHTML(c, {oneLine:true, showPhone:false, bulkSelect:true, hideDept:true, hideLeadPill:true, showAsOrRole:true})}</div>
       ${days.map(()=>'<div></div>').join('')}
       <div class="crewgrid-remove"></div>
     </div>
@@ -2338,7 +2363,7 @@ function crewTravelRowHTML(c, p){
   const carInfo = (c.drives==='Yes' && (c.carMakeModel||c.carReg)) ? `<div class="hint">${icon('car')} ${esc([c.carMakeModel,c.carReg].filter(Boolean).join(' — '))}</div>` : '';
   const isEditing = editingCrewId===c.id;
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:1; --daycolwidth:210px;">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, {extraLine:carInfo, oneLine:true, showPhone:false, bulkSelect:true})}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, {extraLine:carInfo, oneLine:true, showPhone:false, bulkSelect:true, hideDept:true, hideLeadPill:true, showAsOrRole:true})}</div>
     <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${c.id}',this)">${opts}</select></div>
     <div class="crewgrid-remove"></div>
     ${crewExpansionHTML(c, 'crewgrid-editform')}
