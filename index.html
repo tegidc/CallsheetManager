@@ -96,15 +96,22 @@
     border-radius:6px; padding:7px 10px; margin-bottom:12px;}
   .ts-banner.differs{background:rgba(1,119,86,.08); border-color:var(--tape); color:var(--text);}
   .ts-banner span{color:var(--tape); cursor:pointer; text-decoration:underline; margin-left:6px;}
-  /* Camera designations: left-aligned columns, not pushed to the right */
-  .cam-row{display:grid; grid-template-columns:minmax(0,1.4fr) 190px 190px; gap:10px; align-items:center;
-    padding:9px 0; border-bottom:1px solid var(--line);}
+  /* Camera designations: name+tags | stacked per-camera lines | reorder, left-aligned
+     columns, not pushed to the right. File-naming tags live under the operator's
+     name, not per camera column — each camera line is its own left-to-right unit
+     (designation, body, shorthand), stacked rather than column-aligned across cameras. */
+  .cam-row{display:grid; grid-template-columns:minmax(150px,1fr) minmax(0,2fr) 60px; gap:10px; align-items:start;
+    padding:11px 0; border-bottom:1px solid var(--line);}
   .cam-row:last-child{border-bottom:none;}
   .cam-who strong{font-family:var(--disp); font-weight:600; font-size:14px;}
-  .cam-slot{display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0;}
-  .cam-slot select{width:100%;}
-  .cam-body-input{width:100%; font-size:12px; padding:5px 7px; min-height:0;}
-  .cam-tag{font-family:var(--mono); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cam-tags{font-family:var(--mono); font-size:10.5px; margin-top:4px; line-height:1.5;}
+  .cam-cams{display:flex; flex-direction:column; gap:6px; min-width:0;}
+  .cam-cam-line{display:flex; align-items:center; gap:6px;}
+  .cam-badge{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:.3px; color:var(--tape);
+    background:rgba(1,119,86,.1); border-radius:5px; padding:5px 7px; flex:0 0 auto; white-space:nowrap;}
+  .cam-body-input, .cam-shorthand-input{font-size:12px; padding:5px 7px; min-height:0; width:auto; flex:1 1 0; min-width:0;}
+  .cam-reorder{display:flex; flex-direction:column; gap:4px; align-items:center;}
+  .cam-reorder .icon-btn[disabled]{opacity:.25; cursor:default;}
   .req::after{content:' *'; color:var(--danger);}
   input[type=text], input[type=date], textarea, select{
     width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
@@ -369,7 +376,6 @@
     /* tech specs + camera rows stack on mobile */
     .ts-grid{grid-template-columns:repeat(2, minmax(0,1fr));}
     .cam-row{grid-template-columns:1fr; gap:8px;}
-    .cam-slot select{width:100%;}
 
     /* --- schedule / location / crew rows become stacked cards --- */
     .rows-sched .row, .rows-add .row, .crewrow-select{
@@ -1646,6 +1652,7 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS</div>
+      <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
       <div class="tab ${currentProjectTab==='preview'?'active':''}" onclick="goProjectTab('preview')">PREVIEW &amp; EXPORT</div>
     </div>
@@ -1657,13 +1664,13 @@ function renderProjectBody(){
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
   if(currentProjectTab==='locations') return renderProjectLocations(body);
+  if(currentProjectTab==='tech') return renderProjectTech(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='preview') return renderProjectPreview(body);
 }
 
 function renderProjectOverview(body){
   const p = projectsDB.find(x=>x.id===currentProjectId);
-  const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
   body.innerHTML = `
     ${bareMinimumWarningsHTML(p, days)}
@@ -1691,7 +1698,22 @@ function renderProjectOverview(body){
       </div>
     </div>
     <div class="section">
-      <h2>Tech specs &amp; cameras — project defaults</h2>
+      <h2>Danger zone</h2>
+      <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
+    </div>`;
+  // autosave: ~1s after the user stops typing anywhere in this tab, save project
+  // details silently (no alert, no button flash — just the existing "Saved" text)
+  body.oninput = () => scheduleAutosave('overview', () => saveProjectOverview(true));
+}
+/* ---------- Tech (Phase M — split out of Overview: tech specs defaults + camera
+   designations get their own dedicated space for future tech-related features) ---------- */
+function renderProjectTech(body){
+  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
+  const continuous = p.continuousNumbering!==false;
+  body.innerHTML = `
+    <div class="section">
+      <h2>Tech specs — project defaults</h2>
       <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
       <div class="ts-grid">
         <div class="ts-field"><label>Frame rate</label><input type="text" id="pjFrameRate" value="${esc(projTS.frameRate||'')}" placeholder="25p"></div>
@@ -1701,24 +1723,26 @@ function renderProjectOverview(body){
         <div class="ts-field"><label>Timecode</label><input type="text" id="pjTimecode" value="${esc(projTS.timecode||'')}" placeholder="Time of Day"></div>
         <div class="ts-field"><label>Codec</label><input type="text" id="pjCodec" value="${esc(projTS.codec||'')}" placeholder="XAVC"></div>
       </div>
+      <div style="margin-top:14px;">
+        <label>Shot numbering</label>
+        <select id="pjContinuousNumbering">
+          <option value="continuous" ${continuous?'selected':''}>Continuous numbering throughout shoot</option>
+          <option value="reset" ${!continuous?'selected':''}>Reset numbers each day</option>
+        </select>
+        <div class="hint" style="margin-top:4px;">Continuous gives a rough sense of which day footage is from just by the number.</div>
+      </div>
       <div class="toolbar" style="margin-top:12px;">
         <button class="primary" onclick="saveProjectTechSpecs()">Save defaults</button>
         <span class="status" id="pjStatus"></span>
       </div>
-      <div class="subhead" style="margin-top:18px;">Camera designations</div>
-      <div class="hint" style="margin-bottom:10px;">Only people on this project in the Cinematography department appear here.</div>
-      <div id="cameraDesigListProject"></div>
-      <div class="toolbar" style="margin-top:8px;"><button class="small" onclick="addUnnamedCamera('project')">+ Add unnamed camera</button></div>
     </div>
     <div class="section">
-      <h2>Danger zone</h2>
-      <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
+      <h2>Camera designations</h2>
+      <div class="hint" style="margin-bottom:10px;">Only people on this project in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
+      <div id="cameraDesigListProject"></div>
     </div>`;
   renderCameraDesignations('project');
-  // autosave: ~1s after the user stops typing anywhere in this tab, save both
-  // project details and tech-spec defaults silently (no alert, no button flash —
-  // just the same discreet status text the Save buttons already use)
-  body.oninput = () => scheduleAutosave('overview', () => { saveProjectOverview(true); saveProjectTechSpecs(); });
+  body.oninput = () => scheduleAutosave('tech', () => saveProjectTechSpecs());
 }
 /* Overview "bare minimums" — visual nudges only, never a hard blocker. Each one
    jumps straight to where it can be fixed. */
@@ -1741,6 +1765,8 @@ async function saveProjectTechSpecs(){
     const v = val('pj'+f.charAt(0).toUpperCase()+f.slice(1));
     if(v) p.techSpecs[f] = v; else delete p.techSpecs[f];
   });
+  const numbering = document.getElementById('pjContinuousNumbering');
+  if(numbering) p.continuousNumbering = numbering.value!=='reset';
   await saveDB('db:projects', projectsDB);
   const st=document.getElementById('pjStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
 }
@@ -2182,20 +2208,64 @@ function resolveTechSpecs(day){
   return Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{}, day && day.techSpecs || {});
 }
 function techSpecsOverridden(day){ return !!(day && day.techSpecs && Object.keys(day.techSpecs).length); }
-/* cameras: { assign:{crewId:{a:'A',b:''}}, unnamed:[{letter,note}] } */
+/* ---- Camera Designations (Phase K) ----
+   cameras: {
+     order: [crewId, ...],                 // operator order — index determines base letter A,B,C...
+     cameras: { crewId: [{body,shorthand}, ...] },  // each operator's own cameras, numbered off their letter (A01,A02..)
+     unnamed: [{body, note}]                // unmanned cameras, own ordered list, lettered UM_A, UM_B...
+   }
+   Letters are never stored — always recomputed from array position, so reordering
+   operators (or adding/removing an unmanned camera) can never cascade a stale letter
+   onto someone else's assignment the way manually-picked letters used to. */
+const CAMERA_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+function letterForIndex(i){ return CAMERA_LETTERS[i] || ('#'+(i+1)); }
+/* camera crew for a project — Cinematography department, in project crew-assignment order */
+function cinematographyCrew(projectId){
+  const p = projectsDB.find(x=>x.id===projectId); if(!p) return [];
+  return (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(c=>c && c.department==='Cinematography');
+}
+/* brings a possibly-stale/legacy cams object up to the current shape:
+   - migrates the old {assign:{crewId:{a,b,bodyA,bodyB}}} shape (sorted by its old
+     letters, so existing assignments keep the same relative order) if found
+   - makes sure every current Cinematography-department crew member has an order
+     slot (new crew appended at the end) and at least one camera entry, defaulted
+     from their crew-database camera1/camera2/camera3
+   - drops order entries for crew no longer on the project / no longer in that department */
+function normalizeCameras(cams, projectId){
+  cams = cams || {};
+  if(cams.assign && !cams.order && !cams.cameras){
+    const entries = Object.keys(cams.assign).map(cid=>({ cid, a:cams.assign[cid].a||'', bodyA:cams.assign[cid].bodyA, bodyB:cams.assign[cid].bodyB, hasB:!!cams.assign[cid].b }));
+    entries.sort((x,y)=>(x.a||'zz').localeCompare(y.a||'zz'));
+    const order = entries.map(e=>e.cid);
+    const camerasByOp = {};
+    entries.forEach(e=>{
+      const crew = crewDB.find(c=>c.id===e.cid)||{};
+      const list = [{ body: e.bodyA!==undefined?e.bodyA:(crew.camera1||''), shorthand:'' }];
+      if(e.hasB) list.push({ body: e.bodyB!==undefined?e.bodyB:(crew.camera2||crew.camera1||''), shorthand:'' });
+      camerasByOp[e.cid] = list;
+    });
+    cams = { order, cameras: camerasByOp, unnamed: (cams.unnamed||[]).map(u=>({ body:'', note:u.note||'' })) };
+  }
+  cams.order = cams.order || [];
+  cams.cameras = cams.cameras || {};
+  cams.unnamed = cams.unnamed || [];
+  const crew = cinematographyCrew(projectId);
+  crew.forEach(c=>{ if(!cams.order.includes(c.id)) cams.order.push(c.id); });
+  cams.order = cams.order.filter(cid=>crew.some(c=>c.id===cid));
+  cams.order.forEach(cid=>{
+    if(!cams.cameras[cid] || !cams.cameras[cid].length){
+      const c = crewDB.find(x=>x.id===cid)||{};
+      cams.cameras[cid] = [{ body:c.camera1||'', shorthand:'' }];
+    }
+  });
+  return cams;
+}
 function resolveCameras(day){
   const p = projectOf(day) || {};
-  if(day && day.cameras) return day.cameras;
-  return p.cameras || { assign:{}, unnamed:[] };
+  const raw = (day && day.cameras) ? day.cameras : (p.cameras || null);
+  return normalizeCameras(raw, day ? day.projectId : null);
 }
 function camerasOverridden(day){ return !!(day && day.cameras); }
-function nextCameraLetter(cams){
-  const used = new Set();
-  Object.values(cams.assign||{}).forEach(v=>{ if(v.a) used.add(v.a); if(v.b) used.add(v.b); });
-  (cams.unnamed||[]).forEach(u=>{ if(u.letter) used.add(u.letter); });
-  for(const L of ['A','B','C','D','E','F']) if(!used.has(L)) return L;
-  return '';
-}
 function nameInitials(name){
   return (name||'').trim().split(/\s+/).map(w=>w[0]).filter(Boolean).join('').toUpperCase();
 }
@@ -2209,15 +2279,11 @@ function shortenCameraModel(model){
   }
   return m;
 }
+/* letter passed in already includes any numeric suffix, e.g. "A01" or "UM_A" */
 function cameraFileTag(letter, cameraModel, name){
   const cam = (shortenCameraModel(cameraModel)||'CAM').replace(/\s+/g,'');
   const initials = nameInitials(name) || 'UNOP';
   return `${letter||'—'}_${cam}_${initials}_`;
-}
-/* camera crew for a project — Cinematography department */
-function cinematographyCrew(projectId){
-  const p = projectsDB.find(x=>x.id===projectId); if(!p) return [];
-  return (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(c=>c && c.department==='Cinematography');
 }
 /* scope: 'project' (editing the default) or 'day' (editing an override) */
 function renderCameraDesignations(scope){
@@ -2226,108 +2292,130 @@ function renderCameraDesignations(scope){
   const day = scope==='day' ? shootDaysDB.find(x=>x.id===currentShootDayId) : null;
   if(scope==='day' && !day) return;
   const projectId = scope==='day' ? day.projectId : currentProjectId;
-  const cams = scope==='day' ? resolveCameras(day) : (projectsDB.find(x=>x.id===projectId)||{}).cameras || {assign:{},unnamed:[]};
-  const crew = cinematographyCrew(projectId);
-  const letterOpts = (cur)=>['','A','B','C','D','E','F'].map(L=>`<option value="${L}" ${cur===L?'selected':''}>${L?('Camera '+L):'—'}</option>`).join('');
+  const cams = scope==='day' ? resolveCameras(day) : normalizeCameras((projectsDB.find(x=>x.id===projectId)||{}).cameras, projectId);
   let html = '';
-  if(!crew.length){
+  if(!cams.order.length){
     html += `<div class="empty-note">No one on this project is in the Cinematography department yet — add them via the Crew tab first.</div>`;
   } else {
-    html += crew.map(c=>{
-      const a = (cams.assign||{})[c.id] || {};
-      const bodyA = cameraBodyFor(a, 'a', c.camera1||'');
-      const bodyB = cameraBodyFor(a, 'b', c.camera2||c.camera1||'');
-      const tag1 = a.a ? cameraFileTag(a.a, bodyA, c.name) : '';
-      const tag2 = a.b ? cameraFileTag(a.b, bodyB, c.name) : '';
-      const scopeLabel = scope==='project' ? "this project's default" : 'this day';
+    html += cams.order.map((cid,oi)=>{
+      const c = crewDB.find(x=>x.id===cid); if(!c) return '';
+      const baseLetter = letterForIndex(oi);
+      const camList = cams.cameras[cid]||[];
+      const tags = camList.map((cam,ci)=>cameraFileTag(baseLetter+String(ci+1).padStart(2,'0'), cam.body, c.name));
+      const canMoveUp = oi>0, canMoveDown = oi<cams.order.length-1;
+      const camLines = camList.map((cam,ci)=>{
+        const desig = baseLetter+String(ci+1).padStart(2,'0');
+        return `<div class="cam-cam-line">
+          <span class="cam-badge">Cam ${desig}</span>
+          <input type="text" class="cam-body-input" value="${esc(cam.body||'')}" placeholder="Camera body"
+            onchange="setOperatorCameraField('${scope}','${cid}',${ci},'body',this.value)">
+          <input type="text" class="cam-shorthand-input" value="${esc(cam.shorthand||'')}" placeholder="Shorthand (optional)"
+            onchange="setOperatorCameraField('${scope}','${cid}',${ci},'shorthand',this.value)">
+          <button class="icon-btn" title="Remove this camera" onclick="removeOperatorCamera('${scope}','${cid}',${ci})">${icon('close')}</button>
+        </div>`;
+      }).join('');
       return `<div class="cam-row">
         <div class="cam-who">
           <strong>${esc(c.name)}</strong> <span class="hint">${esc(c.role||'Camera')}</span>
+          ${tags.length?`<div class="hint cam-tags">${tags.map(esc).join(' · ')}</div>`:''}
         </div>
-        <div class="cam-slot">
-          <select onchange="setCameraDesignation('${scope}','${c.id}','a',this.value)">${letterOpts(a.a||'')}</select>
-          <input type="text" class="cam-body-input" value="${esc(bodyA)}" placeholder="${esc(c.camera1||'Camera body')}"
-            onchange="setCameraBodyOverride('${scope}','${c.id}','a',this.value)"
-            title="Camera body for ${scopeLabel} — starts from ${esc(c.name)}'s crew database record, editable here without changing it">
-          <span class="hint cam-tag">${tag1?esc(tag1):''}</span>
+        <div class="cam-cams">
+          ${camLines}
+          <button class="small" onclick="addOperatorCamera('${scope}','${cid}')">+ Add camera</button>
         </div>
-        <div class="cam-slot">
-          <select onchange="setCameraDesignation('${scope}','${c.id}','b',this.value)">${letterOpts(a.b||'')}</select>
-          <input type="text" class="cam-body-input" value="${esc(bodyB)}" placeholder="${esc(c.camera2||c.camera1||'2nd camera body')}"
-            onchange="setCameraBodyOverride('${scope}','${c.id}','b',this.value)"
-            title="Camera body for ${scopeLabel} — starts from ${esc(c.name)}'s crew database record, editable here without changing it">
-          <span class="hint cam-tag">${tag2?esc(tag2):'2nd camera'}</span>
+        <div class="cam-reorder">
+          <button class="icon-btn" ${canMoveUp?'':'disabled'} onclick="moveOperator('${scope}','${cid}',-1)" title="Move up">${icon('up')}</button>
+          <button class="icon-btn" ${canMoveDown?'':'disabled'} onclick="moveOperator('${scope}','${cid}',1)" title="Move down">${icon('down')}</button>
         </div>
       </div>`;
     }).join('');
   }
   const unnamed = cams.unnamed||[];
+  html += `<div class="subhead" style="margin-top:16px;">Unmanned</div>`;
   if(unnamed.length){
-    html += `<div class="subhead" style="margin-top:12px;">Unnamed cameras</div>` + unnamed.map((u,i)=>`
-      <div class="cam-row">
-        <div class="cam-who"><strong>Camera ${esc(u.letter)}</strong>
-          <div class="hint">${esc(cameraFileTag(u.letter,'',''))}${u.note?(' — '+esc(u.note)):''}</div>
+    html += unnamed.map((u,ui)=>{
+      const letter = 'UM_'+letterForIndex(ui);
+      const tag = cameraFileTag(letter, u.body, '');
+      const canMoveUp = ui>0, canMoveDown = ui<unnamed.length-1;
+      return `<div class="cam-row">
+        <div class="cam-who"><strong>Cam ${esc(letter)}</strong>
+          <div class="hint cam-tags">${esc(tag)}</div>
         </div>
-        <div class="cam-slot" style="grid-column:2/-1; justify-self:start;">
-          <button class="small danger" onclick="removeUnnamedCamera('${scope}',${i})">${icon('close')} Remove</button>
+        <div class="cam-cams">
+          <div class="cam-cam-line">
+            <input type="text" class="cam-body-input" value="${esc(u.body||'')}" placeholder="Camera body"
+              onchange="setUnnamedCameraField('${scope}',${ui},'body',this.value)">
+            <input type="text" class="cam-shorthand-input" value="${esc(u.note||'')}" placeholder="Note / shorthand (optional)"
+              onchange="setUnnamedCameraField('${scope}',${ui},'note',this.value)">
+            <button class="icon-btn" title="Remove" onclick="removeUnnamedCamera('${scope}',${ui})">${icon('close')}</button>
+          </div>
         </div>
-      </div>`).join('');
+        <div class="cam-reorder">
+          <button class="icon-btn" ${canMoveUp?'':'disabled'} onclick="moveUnnamedCamera('${scope}',${ui},-1)" title="Move up">${icon('up')}</button>
+          <button class="icon-btn" ${canMoveDown?'':'disabled'} onclick="moveUnnamedCamera('${scope}',${ui},1)" title="Move down">${icon('down')}</button>
+        </div>
+      </div>`;
+    }).join('');
   }
+  html += `<div class="toolbar" style="margin-top:8px;"><button class="small" onclick="addUnnamedCamera('${scope}')">+ Add unmanned camera</button></div>`;
   el.innerHTML = html;
 }
 /* returns the cameras object to mutate, creating a day override on first day-scoped edit */
 function camerasForEdit(scope){
   if(scope==='project'){
     const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
-    p.cameras = p.cameras || { assign:{}, unnamed:[] };
+    p.cameras = normalizeCameras(p.cameras, currentProjectId);
     return { obj:p.cameras, key:'db:projects', arr:()=>projectsDB };
   }
   const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return null;
   if(!day.cameras){
-    const base = resolveCameras(day);   // start the override from the project default
-    day.cameras = JSON.parse(JSON.stringify(base));
+    day.cameras = JSON.parse(JSON.stringify(resolveCameras(day)));   // fork the resolved (already-normalized) default
+  } else {
+    day.cameras = normalizeCameras(day.cameras, day.projectId);
   }
   return { obj:day.cameras, key:'db:shootdays', arr:()=>shootDaysDB };
 }
-async function setCameraDesignation(scope, crewId, slot, value){
+async function moveOperator(scope, crewId, dir){
   const t = camerasForEdit(scope); if(!t) return;
-  t.obj.assign = t.obj.assign || {};
-  t.obj.assign[crewId] = t.obj.assign[crewId] || {};
-  t.obj.assign[crewId][slot] = value;
-  if(!t.obj.assign[crewId].a && !t.obj.assign[crewId].b) delete t.obj.assign[crewId];
+  const order = t.obj.order;
+  const i = order.indexOf(crewId), j = i+dir;
+  if(i<0||j<0||j>=order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
   if(scope==='day') refreshTechSpecsBanner();
 }
-/* camera body: per-operator, per-context (project default vs a specific day) —
-   starts out equal to the crew database record (camera1/camera2) but can be
-   overridden here (e.g. "on loan FX9 this week") without ever touching that record. */
-function cameraBodyFor(assignEntry, slot, crewDefault){
-  const key = 'body'+slot.toUpperCase();
-  return (assignEntry && assignEntry[key]!==undefined) ? assignEntry[key] : (crewDefault||'');
-}
-async function setCameraBodyOverride(scope, crewId, slot, value){
+async function addOperatorCamera(scope, crewId){
   const t = camerasForEdit(scope); if(!t) return;
-  const c = crewDB.find(x=>x.id===crewId);
-  const crewDefault = slot==='a' ? (c&&c.camera1||'') : (c&&(c.camera2||c.camera1)||'');
-  t.obj.assign = t.obj.assign || {};
-  t.obj.assign[crewId] = t.obj.assign[crewId] || {};
-  const key = 'body'+slot.toUpperCase();
-  const trimmed = (value||'').trim();
-  if(trimmed===crewDefault.trim()) delete t.obj.assign[crewId][key];
-  else t.obj.assign[crewId][key] = trimmed;
-  if(!t.obj.assign[crewId].a && !t.obj.assign[crewId].b && t.obj.assign[crewId].bodyA===undefined && t.obj.assign[crewId].bodyB===undefined) delete t.obj.assign[crewId];
+  const list = t.obj.cameras[crewId] = t.obj.cameras[crewId] || [];
+  const c = crewDB.find(x=>x.id===crewId) || {};
+  const defaults = [c.camera1, c.camera2, c.camera3];
+  list.push({ body: defaults[list.length]||'', shorthand:'' });
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
+async function removeOperatorCamera(scope, crewId, index){
+  const t = camerasForEdit(scope); if(!t) return;
+  const list = t.obj.cameras[crewId]; if(!list) return;
+  list.splice(index,1);
+  if(!list.length) list.push({body:'',shorthand:''}); // keep at least one slot so the row stays editable
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
+async function setOperatorCameraField(scope, crewId, index, field, value){
+  const t = camerasForEdit(scope); if(!t) return;
+  const list = t.obj.cameras[crewId]; if(!list || !list[index]) return;
+  list[index][field] = value;
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
   if(scope==='day') refreshTechSpecsBanner();
 }
 async function addUnnamedCamera(scope){
   const t = camerasForEdit(scope); if(!t) return;
-  const letter = nextCameraLetter(t.obj);
-  if(!letter){ alert('All camera letters are already assigned.'); return; }
-  const note = prompt('Optional note for this camera (e.g. "GoPro on rig", "fixed wide")') || '';
   t.obj.unnamed = t.obj.unnamed || [];
-  t.obj.unnamed.push({ letter, note });
+  t.obj.unnamed.push({ body:'', note:'' });
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
   if(scope==='day') refreshTechSpecsBanner();
@@ -2335,6 +2423,24 @@ async function addUnnamedCamera(scope){
 async function removeUnnamedCamera(scope, index){
   const t = camerasForEdit(scope); if(!t) return;
   (t.obj.unnamed||[]).splice(index,1);
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
+async function setUnnamedCameraField(scope, index, field, value){
+  const t = camerasForEdit(scope); if(!t) return;
+  const u = (t.obj.unnamed||[])[index]; if(!u) return;
+  u[field] = value;
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
+async function moveUnnamedCamera(scope, index, dir){
+  const t = camerasForEdit(scope); if(!t) return;
+  const list = t.obj.unnamed||[];
+  const j = index+dir;
+  if(j<0||j>=list.length) return;
+  [list[index], list[j]] = [list[j], list[index]];
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
   if(scope==='day') refreshTechSpecsBanner();
@@ -3189,9 +3295,8 @@ function shootDayBuildHTML(){
         <div class="ts-field"><label>Codec</label><input type="text" id="tsCodec" placeholder="XAVC"></div>
       </div>
       <div class="subhead" style="margin-top:18px;">Camera designations</div>
-      <div class="hint" style="margin-bottom:10px;">Only people in the Cinematography department appear here.</div>
+      <div class="hint" style="margin-bottom:10px;">Only people in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
       <div id="cameraDesigList"></div>
-      <div class="toolbar" style="margin-top:8px;"><button class="small" onclick="addUnnamedCamera('day')">+ Add unnamed camera</button></div>
     </div>`;
 
   return `<div class="dept-toggle-all">
@@ -3688,14 +3793,18 @@ function buildFullData(d){
   const coProductionGroups = Object.keys(coProBuckets).sort((a,b)=>a.localeCompare(b))
     .map(company=>({ company, people: coProBuckets[company].sort((a,b)=>deptRank(a.department)-deptRank(b.department)) }));
   const cams = resolveCameras(d);
-  const cameraDesignations = Object.keys(cams.assign||{}).map(cid=>{
-    const c = crewInfo(cid); const a = cams.assign[cid]; const entries=[];
-    if(a.a) entries.push({letter:a.a, name:c.name, tag:cameraFileTag(a.a,cameraBodyFor(a,'a',c.camera1),c.name)});
-    if(a.b) entries.push({letter:a.b, name:c.name, tag:cameraFileTag(a.b,cameraBodyFor(a,'b',c.camera2||c.camera1),c.name)});
-    return entries;
+  const cameraDesignations = cams.order.map((cid,oi)=>{
+    const c = crewInfo(cid); const baseLetter = letterForIndex(oi);
+    return (cams.cameras[cid]||[]).map((cam,ci)=>{
+      const letter = baseLetter+String(ci+1).padStart(2,'0');
+      return { letter, name:c.name, shorthand:cam.shorthand||'', tag:cameraFileTag(letter,cam.body,c.name) };
+    });
   }).flat().concat(
-    (cams.unnamed||[]).map(u=>({letter:u.letter, name:'Unassigned'+(u.note?(' — '+u.note):''), tag:cameraFileTag(u.letter,'','')}))
-  ).sort((a,b)=>(a.letter||'').localeCompare(b.letter||''));
+    (cams.unnamed||[]).map((u,ui)=>{
+      const letter = 'UM_'+letterForIndex(ui);
+      return { letter, name:'Unassigned'+(u.note?(' — '+u.note):''), shorthand:'', tag:cameraFileTag(letter,u.body,'') };
+    })
+  );
   return { prodCompany:p.company||COMPANY, shootTitle:[p.client,p.title].filter(Boolean).join(' — '),
     dayNum:d.dayNum,dayTotal:d.dayTotal,shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
     primary,addLocs,positions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
@@ -3717,7 +3826,7 @@ function renderTechSpecsSection(d){
   if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them in the Build tab.</div>'); return; }
   let body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>`;
   if(rows.length) body += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
-  if(cams.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
+  if(cams.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>Shorthand</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td>${esc(cd.shorthand||'')}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
   el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
 }
 function copyTechSpecsText(){
@@ -3729,7 +3838,7 @@ function copyTechSpecsText(){
     .forEach(([k,v])=>{ if(v) L.push(`${k}: ${v}`); });
   if(data.cameraDesignations && data.cameraDesignations.length){
     L.push('','*CAMERA DESIGNATIONS*');
-    data.cameraDesignations.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name} (${cd.tag})`));
+    data.cameraDesignations.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name}${cd.shorthand?(' ['+cd.shorthand+']'):''} (${cd.tag})`));
   }
   return L.join('\n');
 }
@@ -3832,8 +3941,8 @@ function downloadExcel(){
     ['Colour profile',ts.colorProfile||''],['Timecode',ts.timecode||''],['Codec',ts.codec||'']];
   const tsAoa=[['TECH SPECS — camera/technical crew reference'],[],...tsRows];
   if(data.cameraDesignations && data.cameraDesignations.length){
-    tsAoa.push([]); tsAoa.push(['CAMERA DESIGNATIONS']); tsAoa.push(['Camera','Name','File tag']);
-    data.cameraDesignations.forEach(cd=>tsAoa.push([cd.letter, cd.name, cd.tag]));
+    tsAoa.push([]); tsAoa.push(['CAMERA DESIGNATIONS']); tsAoa.push(['Camera','Name','Shorthand','File tag']);
+    data.cameraDesignations.forEach(cd=>tsAoa.push([cd.letter, cd.name, cd.shorthand||'', cd.tag]));
   }
   const wsTech=XLSX.utils.aoa_to_sheet(tsAoa);
   wsTech['!cols']=[{wch:20},{wch:30}];
