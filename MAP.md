@@ -4,6 +4,22 @@ Update this map whenever a function is added, renamed, or moved — as part of t
 
 Entries are anchored to function/variable names (not line numbers, which go stale). Grouped by the app's tabs, with a shared section for cross-tab utilities.
 
+Module-level state variables (`crewDB`, `editingCrewId`, `collapsedDepts`, …) are deliberately not listed — this map covers functions and the canonical constants.
+
+See also the **Section codes** table at the bottom: short handles (T-1, C-3, …) for the tabs/sections/tools themselves, for referring to a screen without describing it in prose.
+
+## Canonical lookups — use these, don't re-derive
+
+Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what let sort order and fallbacks drift between screens.
+
+- `projById()` / `currentProject()` — a project by id / the currently open one — [Shared/utility functions]
+- `crewById()` / `dayById()` / `locById()` — a crew member / shoot day / location by id, `null` if missing — [Shared/utility functions]
+- `currentDay()` — the shoot day currently being edited or previewed — [Shared/utility functions]
+- `projectDays()` — a project's shoot days, always in day order (defaults to the open project) — [Shared/utility functions]
+- `projectCrew()` — a project's crew records, in the order they were added to it — [Shared/utility functions]
+- `projectOf()` — the project a given shoot day belongs to — [Shared/utility functions]
+- `selectedDayLocation()` — the location currently picked in the Shoot Day form's primary-location select — [Shoot Days]
+
 ## Overview
 
 - `renderProjectOverview()` — renders the project overview tab body (client, title, dates, logline, description form) — [Overview]
@@ -57,8 +73,11 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `debouncedAddressSearch()` / `runAddressSearch()` / `pickAddress()` — debounce and run address geocoding search, and select a result — [Locations]
 - `updateMapPreview()` — refreshes the embedded map preview for the currently selected location coordinates — [Locations]
 - `haversine()` — great-circle distance helper between two lat/lon points — [Locations, Shared/utility functions]
-- `lookupHospitalForForm()` / `findNearestHospital()` — look up and store the nearest hospital to a location's coordinates — [Locations]
-- `lookupParkingForForm()` / `findNearestParking()` — look up and store the nearest parking to a location's coordinates — [Locations]
+- `AMENITY_SEARCH` — per-kind config (OSM tag, search radii, nouns, form element ids) for the nearest-amenity lookups — [Locations]
+- `findNearestAmenity()` — nearest hospital OR parking via the OSM Overpass API, widening through `AMENITY_SEARCH[kind].radii` until something is found — [Locations]
+- `lookupAmenityForForm()` — the "Find nearest hospital / parking" buttons on the location form; stores the result on `locFormState` — [Locations]
+  - REMOVED in Phase U (do not look for these): findNearestHospital, findNearestParking, lookupHospitalForForm, lookupParkingForForm — four near-identical functions now covered by the two above
+- `amenityLine()` — formats a `{name, address, distanceKm}` amenity as one display line, everywhere one is shown — [Locations, Shoot Days]
 - `findLocationByName()` — looks up a location record by its name — [Locations, Shared/utility functions]
 - `locSelectOptionsHTML()` / `refreshLocationDropdowns()` — build and refresh `<option>` lists of locations for pickers — [Locations]
 
@@ -69,7 +88,10 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `resolveTechSpecs()` / `techSpecsOverridden()` — resolve a shoot day's effective tech specs (day override vs. project default) — [Tech Specs]
 - `resetDayTechSpecs()` — clears a day's tech spec override, reverting it to the project default — [Tech Specs]
 - `refreshTechSpecsBanner()` — updates the "using project default / overridden" banner shown on a shoot day — [Tech Specs]
-- `TECHSPEC_FIELDS` / `TECHSPEC_DEFAULTS` — the list of tech spec keys and their default values — [Tech Specs]
+- `TECHSPEC_FIELDS` / `TECHSPEC_DEFAULTS` / `TECHSPEC_LABELS` / `TECHSPEC_HINTS` — the tech spec keys, their default values, their human labels, and per-field placeholder + box width — [Tech Specs]
+- `techSpecFieldsHTML()` — the six tech-spec inputs, rendered once for both the project defaults (prefix `pj`) and a day's override (prefix `ts`) — [Tech Specs]
+- `techSpecFieldId()` / `setTechSpecFields()` / `readTechSpecFields()` — build the DOM id for a field, and fill/read a whole tech-spec form — [Tech Specs]
+- `techSpecRows()` — `[label, value]` pairs for the fields that have a value; shared by the Preview table, the copyable text and the Excel sheet — [Tech Specs, Preview & Export]
 - `CAMERA_LETTERS` — the A–Z pool used to assign camera designation letters — [Tech Specs]
 - `letterForIndex()` — maps a camera's position index to its designation letter — [Tech Specs]
 - `cinematographyCrew()` — returns the crew on a project who belong to the Cinematography department — [Tech Specs]
@@ -83,13 +105,14 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `camerasForEdit()` — returns the camera list currently being edited for a given scope (project/day) — [Tech Specs]
 - `moveOperator()` / `addOperatorCamera()` / `removeOperatorCamera()` / `setOperatorCameraField()` — reorder, add, remove and edit an operator-assigned camera entry — [Tech Specs]
 - `addUnnamedCamera()` / `removeUnnamedCamera()` / `setUnnamedCameraField()` / `moveUnnamedCamera()` — add, remove, edit and reorder a camera with no assigned operator — [Tech Specs]
+- `commitCameras()` — the shared tail of every camera edit: persist, re-render the list, and (day scope only) refresh the overridden-vs-default banner — [Tech Specs]
 
 ## Shoot Days
 
 - `dayTabsBarHTML()` — renders the row of day-number tabs used to switch between shoot days — [Shoot Days]
 - `renderProjectDays()` — renders the Shoot Days tab body (day tabs + selected day's editor) — [Shoot Days]
 - `selectShootDay()` — sets the active shoot day and re-renders the project body — [Shoot Days]
-- `makeShootDayRecord()` — constructs a new blank shoot day record for a project — [Shoot Days]
+- `makeShootDayRecord()` / `STARTER_SCHEDULE` — constructs a new blank shoot day record for a project, seeded with the starter CALL/LUNCH/WRAP schedule — [Shoot Days]
 - `addShootDay()` / `deleteShootDay()` — create and remove a shoot day — [Shoot Days]
 - `syncShootDayCount()` — adds or removes trailing shoot days to match a target day count — [Shoot Days]
 - `toggleShootDayBlock()` / `setAllShootDayBlocksCollapsed()` / `sdBlock()` — collapse/expand and render the shoot day editor's collapsible sub-sections — [Shoot Days]
@@ -108,7 +131,8 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `rowsOf()` — collects DOM rows matching a container/class selector, used by the schedule table logic — [Shoot Days, Shared/utility functions]
 - `populateShootDay()` — fills the shoot day form fields from a day record when switching days — [Shoot Days]
 - `onDayChanged()` — refreshes location/hospital/parking summaries after the selected day changes — [Shoot Days]
-- `updateLocationSummary()` / `updateHospitalDisplay()` / `updateParkingLookupDisplay()` — refresh the read-only location/hospital/parking summaries shown on the day form — [Shoot Days]
+- `updateLocationSummary()` — refreshes the read-only primary-location summary on the day form — [Shoot Days]
+- `updateAmenityDisplay()` / `updateHospitalDisplay()` / `updateParkingLookupDisplay()` — refresh the day form's saved-hospital and saved-parking lines; both are the same lookup with a different field and noun — [Shoot Days]
 - `fetchWeatherForDay()` — fetches forecast weather for the day's date/location from Open-Meteo — [Shoot Days]
 - `WMO` — lookup table mapping Open-Meteo weather codes to human-readable conditions — [Shoot Days]
 - `saveShootDay()` — validates and persists the current shoot day's form data — [Shoot Days]
@@ -117,7 +141,8 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
 - `renderProjectPreview()` — renders the Preview & Export tab body (call sheet, WhatsApp text, tech specs, hotel, catering, Excel blocks) — [Preview & Export]
-- `buildFullData()` — assembles the complete resolved data set for a shoot day (crew, locations, schedule, tech specs, weather) used by every export — [Preview & Export, Shared/utility functions]
+- `buildFullData()` — assembles the complete RESOLVED data set for a shoot day (crew, locations, schedule, tech specs, weather) used by every export — [Preview & Export, Shared/utility functions]
+  - tech specs go through `resolveTechSpecs()`, NOT the raw `day.techSpecs`: a day stores only what differs from the project defaults, so reading it raw exported blank specs for every day sitting on the defaults
 - `generatePreview()` — regenerates and re-renders all preview/export blocks for the selected day — [Preview & Export]
 - `renderTechSpecsSection()` / `copyTechSpecsText()` / `copyTechSpecs()` — render and copy the tech specs reference block — [Preview & Export]
 - `renderPreviewCard()` — renders the formatted call sheet preview card — [Preview & Export]
@@ -132,10 +157,19 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `uid()` — generates a short random unique id — [Shared/utility functions]
 - `esc()` — HTML-escapes a string for safe interpolation into templates — [Shared/utility functions]
 - `val()` / `setv()` — get/set the trimmed value of a form input by element id — [Shared/utility functions]
-- `icon()` / `ICONS` — look up and wrap an inline SVG icon by name — [Shared/utility functions]
+- `icon()` / `ICONS` — look up and wrap an inline SVG icon by name; the sidebar nav and mobile burger also draw from `ICONS` rather than keeping pasted copies of the same SVGs — [Shared/utility functions]
 - `scheduleAutosave()` — debounces a save callback per key so rapid edits coalesce into one autosave — [Shared/utility functions]
+- `flashStatus()` — the discreet "Saved" status flash shared by every save button and autosave — [Shared/utility functions]
+- `copyText()` — the single clipboard path for every Copy button: async API with a textarea fallback, optional confirm message — [Shared/utility functions]
 - `DEPARTMENTS` / `DEPARTMENT_CODES` — canonical department list and their short codes used across Crew/Tech/exports — [Shared/utility functions]
 - `deptBucketKey()` / `deptRank()` / `deptPath()` — normalize a crew member's department to a known bucket, rank it for sort order, and format "dept/subdept" path strings — [Shared/utility functions]
+- `bucketByDept()` — group a crew list by department bucket and return the departments present in canonical order; the basis of every department-grouped list — [Shared/utility functions]
+- `deptHeaderHTML()` / `deptGroupsHTML()` — the one canonical collapsible department header + body, shared by the project Crew tab, the crew database and Position Assignments — [Shared/utility functions]
+- `expandCollapseAllHTML()` — the "Expand all · Collapse all" strip — [Shared/utility functions]
+- `crewGridHeaderRow()` / `dayCols()` — the day-column header strip above any crewgrid matrix, and the shared "D1, D2…" column set — [Crew, Locations]
+- `applyBlockState()` / `toggleBlock()` / `setAllBlocksCollapsed()` — the collapsible-block plumbing shared by Preview & Export (`pv` prefix) and the Shoot Day editor (`sd` prefix) — [Shared/utility functions]
+- `refreshTabScrollCues()` — wraps any horizontally-overflowing `.tabs` strip so it shows an edge-fade scroll cue, and clears the cue at the end of the scroll (mobile) — [Shared/utility functions]
+- `GRID_ROW_SELECTOR` / `checkboxesIn()` — the row selector and per-row checkbox list used by the grid keyboard navigation handler — [Shared/utility functions]
 - `subDeptsFor()` / `SUBDEPARTMENTS_BY_DEPT` — look up the allowed sub-departments for a department — [Shared/utility functions]
 - `ROLES_BY_DEPT` / `rolesFor()` — canonical role list per department — [Shared/utility functions]
 - `suggestDepartment()` / `suggestSubDepartment()` — guess a likely department/sub-department from a free-typed role string — [Shared/utility functions]
@@ -153,6 +187,80 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `fmtDate()` — formats an ISO date string as a human-readable date — [Shared/utility functions]
 - `renderCrewDatabase()` / `renderCrewList()` / `crewSearchBlob()` / `crewCardHTML()` — render the standalone crew database screen, its filtered list, and its search index/card markup — [Crew, Shared/utility functions]
 - `toggleDeptCollapse()` / `setAllDeptsCollapsed()` — collapse/expand department groups in the crew database list — [Crew]
+- `toggleProjectDeptCollapse()` / `setAllProjectDeptsCollapsed()` — the same, for the project Crew tab's department groups — [Crew]
 - `crewFormHTML()` / `onCrewRoleInput()` / `toggleCarFields()` — render the add/edit crew form and react to role-input and "has car" toggling — [Crew]
 - `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view — [Crew]
 - `saveCrew()` / `deleteCrew()` — persist and delete a crew record — [Crew]
+
+---
+
+# Section codes
+
+Short handles for the app's tabs, sections and tools, so a request can name a screen
+instead of describing it ("tighten up T-2.2" rather than "the days-on-site checkbox
+grid on the Crew tab"). This is a convenience aid, not something every request has to
+use. It pairs with the function map above: MAP.md codes the *code*, this codes the *UI*.
+
+The `T-` numbers follow the tab order left to right, which is also the working order —
+coarse information first, finest detail last.
+
+## T — Project tabs
+
+| Code | Section | What it is | Entry point |
+|---|---|---|---|
+| **T-1** | **Overview** | The project itself | `renderProjectOverview()` |
+| T-1.1 | · Project details | Client, title, initial shoot date, log line, description | `saveProjectOverview()` |
+| T-1.2 | · Shoot day count | Day-count field, two-way synced with T-5 | `syncShootDayCount()` |
+| T-1.3 | · Bare minimums | Click-to-fix warning pills for missing dates/locations/crew | `bareMinimumWarningsHTML()` |
+| T-1.4 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
+| **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
+| T-2.1 | · Roles | Department / sub-department / lead company / saved roles | `crewRolesRowHTML()` |
+| T-2.2 | · Days on site | Person × day checkbox matrix | `crewAssignRowHTML()` |
+| T-2.3 | · Hotel | Person × night matrix, incl. the night before Day 1 | `toggleHotelNight()` / `toggleHotelPre()` |
+| T-2.4 | · Travel | One travel method per person per project | `crewTravelRowHTML()` |
+| T-2.5 | · Catering | Breakfast / Lunch / Dinner per person per day | `crewCateringBlockHTML()` |
+| T-2.6 | · Add from crew database | Department-grouped picker | `addCrewToProject()` |
+| **T-3** | **Locations** | Where the project shoots | `renderProjectLocations()` |
+| T-3.1 | · Location × day grid | Which days each location is used | `locDayGridHTML()` |
+| T-3.2 | · Add from locations database | Picker | `addLocToProject()` |
+| T-3.3 | · Add a new location | Inline location form, scoped to this project | `toggleLocForm()` |
+| **T-4** | **Tech** | Project-wide technical defaults | `renderProjectTech()` |
+| T-4.1 | · Tech specs — project defaults | Frame rate, resolution, delivery, colour, timecode, codec | `techSpecFieldsHTML('pj')` |
+| T-4.2 | · Shot numbering | Continuous vs reset-each-day | `saveProjectTechSpecs()` |
+| T-4.3 | · Camera designations (project) | Operator order → letters; unmanned cameras | `renderCameraDesignations('project')` |
+| **T-5** | **Shoot Days** | The per-day detail | `renderProjectDays()` |
+| T-5.1 | · Day tabs | Day switcher + New day | `dayTabsBarHTML()` |
+| T-5.2 | · General information | Day #/date/call, brief, parking, notes, locations, weather, hospital, parking lookup | `sdBlock('general', …)` |
+| T-5.3 | · Schedule | Time/duration rows, insert, reorder, bulk time shift | `addSchedRow()` / `shiftScheduleTimes()` |
+| T-5.4 | · Position assignments | Call times, grouped by company → department | `renderPositionAssignments()` |
+| T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
+| T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
+| **T-6** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
+| T-6.1 | · Call sheet preview | Formatted card | `renderPreviewCard()` |
+| T-6.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) | `buildWAText()` |
+| T-6.3 | · Tech specs | Camera/technical crew reference + camera designations | `renderTechSpecsSection()` |
+| T-6.4 | · Hotel booking | Per-night breakdown + rooming list | `renderHotelExport()` |
+| T-6.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
+| T-6.6 | · Excel export | Multi-sheet .xlsx (Call Sheet + Tech Specs) | `downloadExcel()` |
+
+## D — Databases (project-independent, the source of truth)
+
+| Code | Section | What it is | Entry point |
+|---|---|---|---|
+| **D-1** | **Crew database** | Every crew member, searchable, grouped by department | `renderCrewDatabase()` |
+| D-1.1 | · Crew record form | Basics / Camera & equipment / Logistics & sizing / About & extras / Private | `crewFormHTML()` |
+| D-1.2 | · Crew read-only view | Everything on file, one table | `crewViewHTML()` |
+| **D-2** | **Locations database** | Every location, with address, contacts, access | `renderLocationsDatabase()` |
+| D-2.1 | · Location form | Address search, map preview, access/recce/parking notes | `locFormHTML()` |
+| D-2.2 | · Nearest hospital / parking | OpenStreetMap Overpass lookup, saved onto the location | `lookupAmenityForForm()` |
+
+## G — Global chrome
+
+| Code | Section | What it is | Entry point |
+|---|---|---|---|
+| **G-1** | Sidebar | Databases, project list, + New project | `renderSide()` |
+| **G-2** | Mobile top bar & drawer | Burger, title, slide-out nav | `toggleDrawer()` / `setTopbarTitle()` |
+| **G-3** | Welcome screen | Landing state when no project is open | `renderWelcome()` |
+| **G-4** | Sample data reset | Wipe and reload the demo data set | `resetAndReseed()` |
+| **G-5** | New project form | Create a project (auto-creates its first shoot day) | `renderNewProject()` |
+| **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
