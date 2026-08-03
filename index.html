@@ -54,7 +54,6 @@
     display:flex; align-items:center; gap:8px; margin-bottom:2px;}
   .side-item:hover{background:var(--side-hover);}
   .side-item.active{background:var(--side-hover); color:#5fd6ac; font-weight:600;}
-  .side-item .ico{opacity:.85; font-size:13px;}
   .side-proj{padding:7px 10px; border-radius:7px; font-size:13px; cursor:pointer; margin-bottom:2px; color:var(--side-text);}
   .side-proj:hover{background:var(--side-hover);}
   .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:#5fd6ac; font-weight:600; border-left:2px solid #5fd6ac; padding-left:8px;}
@@ -131,6 +130,8 @@
   .icon-btn:hover{color:var(--tape); background:rgba(1,119,86,.1);}
   .icon-btn.active{color:var(--tape); background:rgba(1,119,86,.14);}
   .ic{display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; vertical-align:-2px;}
+  .ic-lg{width:16px; height:16px;}
+  .side-item .ic{width:14px; height:14px; opacity:.85; flex:0 0 auto;}
   .ic svg{display:block; width:100%; height:100%;}
   .icon-btn .ic{width:14px; height:14px; vertical-align:middle;}
   .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;}
@@ -247,6 +248,7 @@
   .subhead.dept-toggle:hover{color:var(--tape);}
   .dept-caret{font-size:9px; width:10px; display:inline-block;}
   .dept-code{color:var(--tape); font-weight:700; letter-spacing:.6px;}
+  .dept-count{color:var(--muted); font-weight:400;}
   .dept-toggle-all{font-size:11px; color:var(--muted); text-align:right; margin-bottom:8px;}
   .dept-toggle-all span{cursor:pointer;}
   .dept-toggle-all span:hover{color:var(--tape);}
@@ -475,7 +477,7 @@
 </head>
 <body>
 <div class="topbar">
-  <button class="burger" onclick="toggleDrawer()" aria-label="Open menu"><span class="ic" style="width:16px;height:16px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span></button>
+  <button class="burger" onclick="toggleDrawer()" aria-label="Open menu"><span class="ic ic-lg" id="burgerIcon"></span></button>
   <span class="tb-dot"></span>
   <span class="tb-title" id="tbTitle">Call Sheets</span>
 </div>
@@ -484,8 +486,8 @@
   <aside class="side" id="side">
     <div class="brand"><span class="dot"></span><strong>Call Sheets</strong></div>
     <div class="side-label">Databases</div>
-    <div class="side-item" data-side="crew" onclick="goDatabase('crew')"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></span> Crew</div>
-    <div class="side-item" data-side="locations" onclick="goDatabase('locations')"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 1 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span> Locations</div>
+    <div class="side-item" data-side="crew" onclick="goDatabase('crew')"><span class="ic" id="sideIconCrew"></span> Crew</div>
+    <div class="side-item" data-side="locations" onclick="goDatabase('locations')"><span class="ic" id="sideIconLocations"></span> Locations</div>
     <div class="side-label">Projects</div>
     <div id="sideProjects"></div>
     <button class="side-new" onclick="goNewProject()">+ New project</button>
@@ -572,6 +574,53 @@ function suggestSubDepartment(role){
 /* single source of truth for department order — used for grouping crew lists AND ordering the final call sheet */
 function deptBucketKey(dept){ return DEPARTMENTS.includes(dept) ? dept : 'Other'; }
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
+/* group a crew list by department bucket, and list the departments actually present
+   in canonical order — the shape every department-grouped list in the app is built on
+   (project Crew tab, crew database, position assignments, crew pickers) */
+function bucketByDept(list){
+  const buckets = {};
+  list.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
+  return { buckets, deptsPresent: DEPARTMENTS.filter(d=>buckets[d] && buckets[d].length) };
+}
+/* ---- one canonical collapsible department group ----
+   Four screens rendered this exact header markup independently; they now share it,
+   so the caret, department code, name and count can never drift apart between them. */
+function deptHeaderHTML(dept, count, collapsed, onclickJS){
+  return `<div class="subhead dept-toggle" onclick="${onclickJS}">
+      <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[dept]||'')}</span> ${esc(dept)} <span class="dept-count">(${count})</span>
+    </div>`;
+}
+/* full header + collapsible body for each department present */
+function deptGroupsHTML(deptsPresent, buckets, collapsedSet, toggleJS, renderRow){
+  return deptsPresent.map(d=>{
+    const collapsed = collapsedSet.has(d);
+    return deptHeaderHTML(d, buckets[d].length, collapsed, toggleJS(d))
+      + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(renderRow).join('')}</div>`;
+  }).join('');
+}
+/* ---- the day-column header strip above any crewgrid matrix ----
+   Shared by the Crew tab (Days on site / Hotel / Travel) and the Locations tab day
+   grid, which each used to build their own copy. cols is [{label, title, align}];
+   the leading name column and trailing actions column are always implied. */
+function crewGridHeaderRow(cols, daycols, colWidth){
+  const widthVar = colWidth ? ` --daycolwidth:${colWidth};` : '';
+  return `<div class="crewgrid crewgrid-header-row" style="--daycols:${daycols||cols.length};${widthVar}">
+      <div class="crewgrid-header crewgrid-corner"></div>
+      ${cols.map(c=>`<div class="crewgrid-header"${c.title?` title="${c.title}"`:''}${c.align==='left'?' style="text-align:left;"':''}>${c.label}</div>`).join('')}
+      <div class="crewgrid-header"></div>
+    </div>`;
+}
+/* the shared day-column set — "D1, D2…" with a full date tooltip */
+const dayCols = days => days.map(d=>({ label:`D${esc(d.dayNum||'?')}`, title:`Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}` }));
+
+/* the "Expand all · Collapse all" strip — only worth showing with >1 group */
+function expandCollapseAllHTML(fnName, arg){
+  const a = arg===undefined ? '' : `, '${arg}'`;
+  return `<div class="dept-toggle-all">
+      <span onclick="${fnName}(false${a})">Expand all</span> ·
+      <span onclick="${fnName}(true${a})">Collapse all</span>
+    </div>`;
+}
 /* clickable department pill — lets you reassign a crew member's department without opening the full edit form */
 /* ---- merged Department / Sub-department picker ----
    One dropdown, Gmail-label style: sub-departments indented under their parent.
@@ -601,7 +650,7 @@ function deptPillSelect(c){
   return `<select class="pill-select ${empty?'empty':''}" onchange="quickSetDeptPath('${c.id}', this)" onclick="event.stopPropagation()" title="Department / sub-department">${opts}</select>`;
 }
 async function quickSetDeptPath(crewId, selectEl){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   const value = selectEl.value;
   if(value==='__addsub__'){
     if(!c.department){ alert('Pick a department first, then add a sub-department under it.'); refreshCrewScreen(); return; }
@@ -645,7 +694,7 @@ function roleAddPickerHTML(c){
   return `<select class="pill-select empty" onchange="addRoleToCrew('${c.id}', this)" onclick="event.stopPropagation()" title="Add a saved role">${opts}</select>`;
 }
 async function addRoleToCrew(crewId, selectEl){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   let value = selectEl.value;
   if(!value){ refreshCrewScreen(); return; }
   if(value==='__addrole__'){
@@ -665,7 +714,7 @@ async function addRoleToCrew(crewId, selectEl){
   refreshCrewScreen();
 }
 async function removeRoleFromCrew(crewId, rolePath){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   c.roles = (c.roles||[]).filter(r=>r!==rolePath);
   await saveDB('db:crew', crewDB);
   refreshCrewScreen();
@@ -675,7 +724,7 @@ async function removeRoleFromCrew(crewId, rolePath){
    day" pick: the day-override form (Position Assignments) offers the same saved list
    for a per-day-only switch without touching the database record. */
 async function setActiveRole(crewId, rolePath, skipSave){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
   c.role = roleName;
   if(!skipSave){ await saveDB('db:crew', crewDB); refreshCrewScreen(); }
@@ -684,7 +733,7 @@ async function setActiveRole(crewId, rolePath, skipSave){
    reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
    until the role is actually changed away from the original's. */
 async function duplicateCrew(crewId){
-  const src = crewDB.find(x=>x.id===crewId); if(!src) return;
+  const src = crewById(crewId); if(!src) return;
   const copy = Object.assign({}, src, { id: uid(), _copyOriginalRole: src.role||'' });
   crewDB.push(copy);
   await saveDB('db:crew', crewDB);
@@ -702,7 +751,7 @@ function coProPillSelect(c){
   return `<select class="pill-select copro ${empty?'empty':''}" onchange="quickSetCoPro('${c.id}', this)" onclick="event.stopPropagation()" title="Which company supplied this person">${opts}</select>`;
 }
 async function quickSetCoPro(crewId, selectEl){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   let value = selectEl.value;
   if(value==='__add__'){
     value = (prompt('Co-production company name:')||'').trim();
@@ -791,6 +840,49 @@ const esc = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').r
 const val = id => (document.getElementById(id)?.value || '').trim();
 const setv = (id,v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
 
+/* ---- canonical record lookups ----
+   Every screen reaches for the same four things: the open project, its shoot days
+   in day order, a crew member by id, a shoot day by id. These are the single place
+   that knows how to find each, so no screen re-derives it with its own inline
+   .find/.filter/.sort — which is what let sort order and fallbacks drift apart. */
+const projById = id => projectsDB.find(x=>x.id===id) || null;
+const currentProject = () => projById(currentProjectId);
+const crewById = id => crewDB.find(c=>c.id===id) || null;
+const dayById = id => shootDaysDB.find(d=>d.id===id) || null;
+const locById = id => locationsDB.find(l=>l.id===id) || null;
+const currentDay = () => dayById(currentShootDayId);
+/* shoot days of a project, always in day order — defaults to the open project */
+const projectDays = (projectId) => shootDaysDB
+  .filter(d=>d.projectId===(projectId||currentProjectId))
+  .sort((a,b)=>(Number(a.dayNum)||0)-(Number(b.dayNum)||0));
+/* crew records for a project, in the order they were added to it */
+const projectCrew = (p) => ((p||currentProject()||{}).crewIds||[]).map(crewById).filter(Boolean);
+
+/* the location currently picked in the Shoot Day form's primary-location select —
+   the day form's summary, hospital, parking and weather blocks all key off this */
+const selectedDayLocation = () => locById(document.getElementById('sdLocation')?.value);
+
+/* the discreet "Saved" flash the save buttons and autosave share */
+function flashStatus(elId, text){
+  const st = document.getElementById(elId); if(!st) return;
+  st.textContent = text || 'Saved';
+  setTimeout(()=>{ const e=document.getElementById(elId); if(e) e.textContent=''; }, 2000);
+}
+/* one clipboard path for every Copy button — async API with a textarea fallback
+   for browsers/contexts that block it. Pass a message to confirm, or omit to copy
+   silently (used where the button itself is feedback enough). */
+async function copyText(text, okMsg){
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=text;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }
+    catch(e2){ alert('Copy failed — select the text and copy manually.'); document.body.removeChild(ta); return; }
+    document.body.removeChild(ta);
+  }
+  if(okMsg) alert(okMsg);
+}
+
 /* ============================================================ MINIMAL LINE ICONS
    Small stroke-based SVGs (currentColor) used throughout the UI in place of emoji.
    Not used in the generated call-sheet text itself — that keeps its WhatsApp-style
@@ -816,6 +908,10 @@ const ICONS = {
   lock:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
 };
 function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
+/* the static chrome (sidebar nav, mobile burger) draws from the same ICONS table as
+   everything else, rather than keeping its own pasted copies of the same SVGs */
+[['sideIconCrew','crew'], ['sideIconLocations','location'], ['burgerIcon','menu']]
+  .forEach(([elId, name])=>{ const el=document.getElementById(elId); if(el) el.innerHTML = ICONS[name]||''; });
 
 /* Every read/write in the app already goes through these two functions, keyed by a
    string like 'db:crew'. Swapping the backend here is the only change needed —
@@ -888,9 +984,9 @@ document.addEventListener('keydown', function(e){
    Genuine on/off toggle: if everything for this person is already ticked, turn
    it all off; otherwise turn it all on. */
 async function toggleAllForPerson(crewId, kind){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   if(kind==='hotel'){
-    const p = projectsDB.find(x=>x.id===currentProjectId);
+    const p = currentProject();
     p.hotelNightBefore = p.hotelNightBefore || [];
     const allOn = p.hotelNightBefore.includes(crewId) && days.every(d=>(d.hotelNights||[]).includes(crewId));
     if(allOn){
@@ -916,7 +1012,7 @@ async function toggleAllForPerson(crewId, kind){
 }
 /* ---- toggle-all for one meal across every day, for one person (Catering) ---- */
 async function toggleAllMealForPerson(crewId, mealKey){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId);
+  const days = projectDays();
   const allOn = days.length>0 && days.every(d=>getCateringMeals(d.id, crewId)[mealKey]);
   days.forEach(d=>{
     d.cateringMeals = d.cateringMeals || {};
@@ -1639,7 +1735,7 @@ async function createProject(){
 
 /* ============================================================ PROJECT VIEW */
 function renderProject(m){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   if(!p){ route={screen:'welcome'}; renderMain(); return; }
   setTopbarTitle(p.title||'(untitled)');
   m.innerHTML = `
@@ -1670,8 +1766,8 @@ function renderProjectBody(){
 }
 
 function renderProjectOverview(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject();
+  const days = projectDays(p.id);
   body.innerHTML = `
     ${bareMinimumWarningsHTML(p, days)}
     <div class="section">
@@ -1708,7 +1804,7 @@ function renderProjectOverview(body){
 /* ---------- Tech (Phase M — split out of Overview: tech specs defaults + camera
    designations get their own dedicated space for future tech-related features) ---------- */
 function renderProjectTech(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const continuous = p.continuousNumbering!==false;
   body.innerHTML = `
@@ -1759,7 +1855,7 @@ function bareMinimumWarningsHTML(p, days){
   </div>`;
 }
 async function saveProjectTechSpecs(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   p.techSpecs = p.techSpecs || {};
   TECHSPEC_FIELDS.forEach(f=>{
     const v = val('pj'+f.charAt(0).toUpperCase()+f.slice(1));
@@ -1768,15 +1864,15 @@ async function saveProjectTechSpecs(){
   const numbering = document.getElementById('pjContinuousNumbering');
   if(numbering) p.continuousNumbering = numbering.value!=='reset';
   await saveDB('db:projects', projectsDB);
-  const st=document.getElementById('pjStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
+  flashStatus('pjStatus');
 }
 async function saveProjectOverview(silent){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   const client=val('ovClient'), title=val('ovTitle'), start=val('ovStart');
   if(!client||!title||!start){ if(!silent) alert('Client, working title and initial shoot date are required.'); return; }
   p.client=client; p.title=title; p.startDate=start; p.logline=val('ovLogline'); p.description=val('ovDescription');
   await saveDB('db:projects', projectsDB);
-  const st=document.getElementById('ovStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
+  flashStatus('ovStatus');
   renderSide();
   const h1=document.querySelector('.page-head h1'); if(h1) h1.textContent = p.title;
   const codeEl=document.querySelector('.page-head .code'); if(codeEl) codeEl.textContent = projCode(p);
@@ -1802,9 +1898,9 @@ function setAllProjectDeptsCollapsed(collapsed, deptsCSV){
 }
 function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
 function renderProjectCrew(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
-  const assigned = (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
+  const p = currentProject();
+  const days = projectDays();
+  const assigned = (p.crewIds||[]).map(id=>crewById(id)).filter(Boolean);
   const unassigned = crewDB.filter(c=>!(p.crewIds||[]).includes(c.id));
 
   const viewLabels = {roles:'Roles', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
@@ -1814,58 +1910,33 @@ function renderProjectCrew(body){
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
   if(assigned.length){
-    const buckets = {};
-    assigned.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
-    const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
-    const deptsCSV = deptsPresent.join(',');
-    const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
-        <span onclick="setAllProjectDeptsCollapsed(false, '${deptsCSV}')">Expand all</span> ·
-        <span onclick="setAllProjectDeptsCollapsed(true, '${deptsCSV}')">Collapse all</span>
-      </div>` : '';
+    const { buckets, deptsPresent } = bucketByDept(assigned);
+    const toggleJS = d => `toggleProjectDeptCollapse('${d}')`;
+    const toggleRow = deptsPresent.length>1
+      ? expandCollapseAllHTML('setAllProjectDeptsCollapsed', deptsPresent.join(','))
+      : '';
+    // the only thing that actually differs per view is the row renderer and the
+    // column-header strip above it — everything else is the same grouped scaffold
+    const rowRenderer =
+      crewGridView==='roles'    ? (c=>crewRolesRowHTML(c)) :
+      crewGridView==='travel'   ? (c=>crewTravelRowHTML(c, p)) :
+      crewGridView==='catering' ? (c=>crewCateringBlockHTML(c, days)) :
+                                  (c=>crewAssignRowHTML(c, days));
+    const groups = deptGroupsHTML(deptsPresent, buckets, collapsedProjectDepts, toggleJS, rowRenderer);
 
     if(crewGridView==='roles'){
       // department / sub-department / lead-company editing — no day columns, just one row per person
-      const deptGroupsHTML = deptsPresent.map(d=>{
-        const collapsed = collapsedProjectDepts.has(d);
-        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
-            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-          </div>
-          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewRolesRowHTML(c)).join('')}</div>`;
-      }).join('');
-      assignedHTML = toggleRow + deptGroupsHTML;
+      assignedHTML = toggleRow + groups;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
-      const travelHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:1; --daycolwidth:210px;">
-          <div class="crewgrid-header crewgrid-corner"></div>
-          <div class="crewgrid-header" style="text-align:left;">Travel method</div>
-          <div class="crewgrid-header"></div>
-        </div>`;
-      const deptGroupsHTML = deptsPresent.map(d=>{
-        const collapsed = collapsedProjectDepts.has(d);
-        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
-            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-          </div>
-          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewTravelRowHTML(c, p)).join('')}</div>`;
-      }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${travelHeaderRow}${deptGroupsHTML}</div>`;
+      assignedHTML = toggleRow + `<div class="tablewrap">${crewGridHeaderRow([{label:'Travel method', align:'left'}], '1', '210px')}${groups}</div>`;
     } else {
-      const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
-      const dayHeaderRow = days.length ? `
-        <div class="crewgrid crewgrid-header-row" style="--daycols:${colCount};">
-          <div class="crewgrid-header crewgrid-corner"></div>
-          ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
-          ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
-          <div class="crewgrid-header"></div>
-        </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
-      const deptGroupsHTML = deptsPresent.map(d=>{
-        const collapsed = collapsedProjectDepts.has(d);
-        return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${d}')">
-            <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-          </div>
-          <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
-      }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${dayHeaderRow}${deptGroupsHTML}</div>`;
+      const cols = (crewGridView==='hotel' ? [{label:'Pre', title:'Night before Day 1'}] : []).concat(dayCols(days));
+      const headerRow = days.length
+        ? crewGridHeaderRow(cols, cols.length)
+        : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
+      assignedHTML = toggleRow + `<div class="tablewrap">${headerRow}${groups}</div>`;
     }
   }
 
@@ -1923,7 +1994,7 @@ function roleQuickEditHTML(c){
   return `<span class="hint crew-ident-sub" style="cursor:pointer;" onclick="event.stopPropagation();quickEditRoleId='${c.id}';renderProjectBody();" title="Quick-edit role, no full form">${c.role?esc(c.role):'— set role —'} ${icon('edit')}</span>`;
 }
 async function saveQuickRole(crewId){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   const el = document.getElementById('qrRole_'+crewId);
   let value = (el?.value||'').trim();
   if(value==='__custom__') value = c.role||'';
@@ -1945,7 +2016,7 @@ function crewAssignRowHTML(c, days){
   const isEditing = editingCrewId===c.id;
   let preCell = '';
   if(crewGridView==='hotel' && days.length){
-    const p = projectsDB.find(x=>x.id===currentProjectId) || {};
+    const p = currentProject() || {};
     const inPre = (p.hotelNightBefore||[]).includes(c.id);
     preCell = `<div class="crewgrid-check" data-day="Pre"><input type="checkbox" ${inPre?'checked':''} onchange="toggleHotelPre('${c.id}',this.checked)" title="Night before Day 1"></div>`;
   }
@@ -2004,7 +2075,7 @@ function crewCateringBlockHTML(c, days){
   </div>`;
 }
 async function toggleHotelNight(crewId, dayId, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.hotelNights = d.hotelNights || [];
   if(checked){ if(!d.hotelNights.includes(crewId)) d.hotelNights.push(crewId); }
   else { d.hotelNights = d.hotelNights.filter(id=>id!==crewId); }
@@ -2012,7 +2083,7 @@ async function toggleHotelNight(crewId, dayId, checked){
   renderProjectBody();
 }
 async function toggleHotelPre(crewId, checked){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   p.hotelNightBefore = p.hotelNightBefore || [];
   if(checked){ if(!p.hotelNightBefore.includes(crewId)) p.hotelNightBefore.push(crewId); }
   else { p.hotelNightBefore = p.hotelNightBefore.filter(id=>id!==crewId); }
@@ -2020,8 +2091,8 @@ async function toggleHotelPre(crewId, checked){
   renderProjectBody();
 }
 function buildHotelExport(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject(); if(!p) return null;
+  const days = projectDays();
   if(!days.length) return null;
   // build a night → guests map (Pre night + each day)
   const nightLabels = [];
@@ -2071,17 +2142,17 @@ function copyHotelExport(){
   data.nights.forEach(n=>lines.push(`${n.label}: ${n.guests.length} room${n.guests.length>1?'s':''} — ${n.guests.join(', ')}`));
   lines.push('','ROOMING LIST');
   data.roomingList.forEach((n,i)=>lines.push(`${i+1}. ${n}`));
-  navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!')).catch(()=>alert('Copy failed — try manually.'));
+  copyText(lines.join('\n'), 'Copied!');
 }
 /* ---- Catering: breakfast / lunch / dinner per person per day ----
    Stored on each shoot day as cateringMeals: { crewId: {b:bool, l:bool, d:bool} } */
 function getCateringMeals(dayId, crewId){
-  const d = shootDaysDB.find(x=>x.id===dayId);
+  const d = dayById(dayId);
   if(!d || !d.cateringMeals || !d.cateringMeals[crewId]) return {b:false, l:false, d:false};
   return d.cateringMeals[crewId];
 }
 async function toggleMeal(crewId, dayId, meal, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.cateringMeals = d.cateringMeals || {};
   d.cateringMeals[crewId] = d.cateringMeals[crewId] || {b:false, l:false, d:false};
   d.cateringMeals[crewId][meal] = checked;
@@ -2091,8 +2162,8 @@ async function toggleMeal(crewId, dayId, meal, checked){
   renderProjectBody();
 }
 function buildCateringExport(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject(); if(!p) return null;
+  const days = projectDays();
   if(!days.length) return null;
   const perDay = days.map(d=>{
     const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
@@ -2151,7 +2222,7 @@ function copyCateringExport(){
     }
     lines.push('');
   });
-  navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!')).catch(()=>alert('Copy failed.'));
+  copyText(lines.join('\n'), 'Copied!');
 }
 function crewTravelRowHTML(c, p){
   const current = (p.travelMethods||{})[c.id] || '';
@@ -2169,7 +2240,7 @@ function crewTravelRowHTML(c, p){
 }
 async function setTravelMethod(crewId, selectEl){
   const value = selectEl.value;
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   p.travelMethods = p.travelMethods || {};
   if(value==='__add__'){
     const newOpt = (prompt('Add a new travel method:')||'').trim();
@@ -2185,7 +2256,7 @@ async function setTravelMethod(crewId, selectEl){
   renderProjectBody();
 }
 async function toggleCrewOnDay(crewId, dayId, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.positions = d.positions || [];
   if(checked){
     if(!d.positions.some(pos=>pos[0]===crewId)) d.positions.push([crewId, '', '', '', '']);
@@ -2202,7 +2273,15 @@ async function toggleCrewOnDay(crewId, dayId, checked){
 const TECHSPEC_FIELDS = ['frameRate','resolution','delivery','colorProfile','timecode','codec'];
 const TECHSPEC_DEFAULTS = { frameRate:'25p', resolution:'4K UHD', delivery:'1080p',
   colorProfile:'S-Log3 CineGamut3', timecode:'Time of Day', codec:'XAVC' };
-function projectOf(day){ return projectsDB.find(x=>x.id===(day&&day.projectId)) || null; }
+/* human labels for the tech spec keys — the Preview table, the copyable text block
+   and the Excel sheet all render the same rows, so they share one definition */
+const TECHSPEC_LABELS = { frameRate:'Frame rate', resolution:'Resolution', delivery:'Delivery format',
+  colorProfile:'Colour profile', timecode:'Timecode', codec:'Codec' };
+/* [label, value] pairs for the fields that actually have a value */
+function techSpecRows(ts){
+  return TECHSPEC_FIELDS.map(f=>[TECHSPEC_LABELS[f], (ts||{})[f]||'']).filter(([,v])=>v);
+}
+function projectOf(day){ return projById(day&&day.projectId) || null; }
 function resolveTechSpecs(day){
   const p = projectOf(day) || {};
   return Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{}, day && day.techSpecs || {});
@@ -2221,8 +2300,8 @@ const CAMERA_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N',
 function letterForIndex(i){ return CAMERA_LETTERS[i] || ('#'+(i+1)); }
 /* camera crew for a project — Cinematography department, in project crew-assignment order */
 function cinematographyCrew(projectId){
-  const p = projectsDB.find(x=>x.id===projectId); if(!p) return [];
-  return (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(c=>c && c.department==='Cinematography');
+  const p = projById(projectId); if(!p) return [];
+  return (p.crewIds||[]).map(id=>crewById(id)).filter(c=>c && c.department==='Cinematography');
 }
 /* brings a possibly-stale/legacy cams object up to the current shape:
    - migrates the old {assign:{crewId:{a,b,bodyA,bodyB}}} shape (sorted by its old
@@ -2239,7 +2318,7 @@ function normalizeCameras(cams, projectId){
     const order = entries.map(e=>e.cid);
     const camerasByOp = {};
     entries.forEach(e=>{
-      const crew = crewDB.find(c=>c.id===e.cid)||{};
+      const crew = crewById(e.cid)||{};
       const list = [{ body: e.bodyA!==undefined?e.bodyA:(crew.camera1||''), shorthand:'' }];
       if(e.hasB) list.push({ body: e.bodyB!==undefined?e.bodyB:(crew.camera2||crew.camera1||''), shorthand:'' });
       camerasByOp[e.cid] = list;
@@ -2254,7 +2333,7 @@ function normalizeCameras(cams, projectId){
   cams.order = cams.order.filter(cid=>crew.some(c=>c.id===cid));
   cams.order.forEach(cid=>{
     if(!cams.cameras[cid] || !cams.cameras[cid].length){
-      const c = crewDB.find(x=>x.id===cid)||{};
+      const c = crewById(cid)||{};
       cams.cameras[cid] = [{ body:c.camera1||'', shorthand:'' }];
     }
   });
@@ -2289,16 +2368,16 @@ function cameraFileTag(letter, cameraModel, name){
 function renderCameraDesignations(scope){
   const el = document.getElementById(scope==='project' ? 'cameraDesigListProject' : 'cameraDesigList');
   if(!el) return;
-  const day = scope==='day' ? shootDaysDB.find(x=>x.id===currentShootDayId) : null;
+  const day = scope==='day' ? currentDay() : null;
   if(scope==='day' && !day) return;
   const projectId = scope==='day' ? day.projectId : currentProjectId;
-  const cams = scope==='day' ? resolveCameras(day) : normalizeCameras((projectsDB.find(x=>x.id===projectId)||{}).cameras, projectId);
+  const cams = scope==='day' ? resolveCameras(day) : normalizeCameras((projById(projectId)||{}).cameras, projectId);
   let html = '';
   if(!cams.order.length){
     html += `<div class="empty-note">No one on this project is in the Cinematography department yet — add them via the Crew tab first.</div>`;
   } else {
     html += cams.order.map((cid,oi)=>{
-      const c = crewDB.find(x=>x.id===cid); if(!c) return '';
+      const c = crewById(cid); if(!c) return '';
       const baseLetter = letterForIndex(oi);
       const camList = cams.cameras[cid]||[];
       const tags = camList.map((cam,ci)=>cameraFileTag(baseLetter+String(ci+1).padStart(2,'0'), cam.body, c.name));
@@ -2363,11 +2442,11 @@ function renderCameraDesignations(scope){
 /* returns the cameras object to mutate, creating a day override on first day-scoped edit */
 function camerasForEdit(scope){
   if(scope==='project'){
-    const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
+    const p = currentProject(); if(!p) return null;
     p.cameras = normalizeCameras(p.cameras, currentProjectId);
     return { obj:p.cameras, key:'db:projects', arr:()=>projectsDB };
   }
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return null;
+  const day = currentDay(); if(!day) return null;
   if(!day.cameras){
     day.cameras = JSON.parse(JSON.stringify(resolveCameras(day)));   // fork the resolved (already-normalized) default
   } else {
@@ -2375,65 +2454,58 @@ function camerasForEdit(scope){
   }
   return { obj:day.cameras, key:'db:shootdays', arr:()=>shootDaysDB };
 }
+/* every camera edit ends the same way: persist, re-render the list, and (day scope
+   only) refresh the "differs from project defaults" banner */
+async function commitCameras(scope, t){
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
 async function moveOperator(scope, crewId, dir){
   const t = camerasForEdit(scope); if(!t) return;
   const order = t.obj.order;
   const i = order.indexOf(crewId), j = i+dir;
   if(i<0||j<0||j>=order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function addOperatorCamera(scope, crewId){
   const t = camerasForEdit(scope); if(!t) return;
   const list = t.obj.cameras[crewId] = t.obj.cameras[crewId] || [];
-  const c = crewDB.find(x=>x.id===crewId) || {};
+  const c = crewById(crewId) || {};
   const defaults = [c.camera1, c.camera2, c.camera3];
   list.push({ body: defaults[list.length]||'', shorthand:'' });
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function removeOperatorCamera(scope, crewId, index){
   const t = camerasForEdit(scope); if(!t) return;
   const list = t.obj.cameras[crewId]; if(!list) return;
   list.splice(index,1);
   if(!list.length) list.push({body:'',shorthand:''}); // keep at least one slot so the row stays editable
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function setOperatorCameraField(scope, crewId, index, field, value){
   const t = camerasForEdit(scope); if(!t) return;
   const list = t.obj.cameras[crewId]; if(!list || !list[index]) return;
   list[index][field] = value;
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function addUnnamedCamera(scope){
   const t = camerasForEdit(scope); if(!t) return;
   t.obj.unnamed = t.obj.unnamed || [];
   t.obj.unnamed.push({ body:'', note:'' });
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function removeUnnamedCamera(scope, index){
   const t = camerasForEdit(scope); if(!t) return;
   (t.obj.unnamed||[]).splice(index,1);
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function setUnnamedCameraField(scope, index, field, value){
   const t = camerasForEdit(scope); if(!t) return;
   const u = (t.obj.unnamed||[])[index]; if(!u) return;
   u[field] = value;
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function moveUnnamedCamera(scope, index, dir){
   const t = camerasForEdit(scope); if(!t) return;
@@ -2441,19 +2513,17 @@ async function moveUnnamedCamera(scope, index, dir){
   const j = index+dir;
   if(j<0||j>=list.length) return;
   [list[index], list[j]] = [list[j], list[index]];
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function resetDayTechSpecs(){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   delete day.techSpecs; delete day.cameras;
   await saveDB('db:shootdays', shootDaysDB);
   populateShootDay(day);
 }
 function refreshTechSpecsBanner(){
   const el = document.getElementById('techSpecsBanner'); if(!el) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const differs = techSpecsOverridden(day) || camerasOverridden(day);
   el.innerHTML = differs
     ? `<div class="ts-banner differs">This day differs from the project defaults.
@@ -2462,12 +2532,12 @@ function refreshTechSpecsBanner(){
 }
 async function addCrewToProject(){
   const id = val('addCrewPick'); if(!id) return;
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(id)) p.crewIds.push(id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeCrewFromProject(id){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.crewIds = (p.crewIds||[]).filter(x=>x!==id);
   shootDaysDB.forEach(d=>{ if(d.projectId===currentProjectId && d.positions) d.positions = d.positions.filter(pos=>pos[0]!==id); });
   await saveDB('db:projects', projectsDB); await saveDB('db:shootdays', shootDaysDB);
@@ -2476,10 +2546,10 @@ async function removeCrewFromProject(id){
 
 /* ---------- Project Locations ---------- */
 function renderProjectLocations(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const assigned = (p.locationIds||[]).map(id=>locationsDB.find(l=>l.id===id)).filter(Boolean);
+  const p = currentProject();
+  const assigned = (p.locationIds||[]).map(id=>locById(id)).filter(Boolean);
   const unassigned = locationsDB.filter(l=>!(p.locationIds||[]).includes(l.id));
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   body.innerHTML = `
     <div class="section">
       <h2>Locations on this project</h2>
@@ -2511,12 +2581,7 @@ function locDayGridHTML(assigned, days){
         <div class="actions"><button class="small danger" onclick="removeLocFromProject('${l.id}')">Remove</button></div>
       </div>`).join('') + `<div class="hint" style="margin-top:8px;">Add shoot days first, then tick which days each location is used.</div>`;
   }
-  const dayHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length};">
-      <div class="crewgrid-header crewgrid-corner"></div>
-      ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
-      <div class="crewgrid-header"></div>
-    </div>`;
-  return `<div class="tablewrap">${dayHeaderRow}${assigned.map(l=>locRowHTML(l, days)).join('')}</div>`;
+  return `<div class="tablewrap">${crewGridHeaderRow(dayCols(days))}${assigned.map(l=>locRowHTML(l, days)).join('')}</div>`;
 }
 function locRowHTML(l, days){
   const dayCells = days.map(d=>{
@@ -2532,7 +2597,7 @@ function locRowHTML(l, days){
   </div>`;
 }
 async function toggleLocOnDay(locId, dayId, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.additionalLocationIds = d.additionalLocationIds || [];
   if(checked){
     if(!d.locationId){ d.locationId = locId; }
@@ -2546,12 +2611,12 @@ async function toggleLocOnDay(locId, dayId, checked){
 }
 async function addLocToProject(){
   const id = val('addLocPick'); if(!id) return;
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(id)) p.locationIds.push(id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeLocFromProject(id){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.locationIds = (p.locationIds||[]).filter(x=>x!==id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
@@ -2564,7 +2629,7 @@ function dayTabsBarHTML(days){
     </div>`;
 }
 function renderProjectDays(body){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   if(!days.length){
     body.innerHTML = `
       <div class="section">
@@ -2586,22 +2651,24 @@ function renderProjectDays(body){
    collapsed (see pvBlockHTML) — collapsing is about scanning the page fast, not
    about hiding the one action you actually came here for. */
 let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, hotel:true, catering:true, excel:true };
-function togglePreviewBlock(key){
-  previewBlocks[key] = !previewBlocks[key];
-  const bodyEl = document.getElementById('pvb-'+key);
-  const caret = document.getElementById('pvc-'+key);
-  if(bodyEl) bodyEl.style.display = previewBlocks[key] ? '' : 'none';
-  if(caret) caret.textContent = previewBlocks[key] ? '▾' : '▸';
+/* ---- collapsible block plumbing, shared by Preview & Export and the Shoot Day editor ----
+   Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
+   only thing that differed between them was the id prefix, so that's the parameter. */
+function applyBlockState(state, prefix, key){
+  const bodyEl = document.getElementById(prefix+'b-'+key);
+  const caret  = document.getElementById(prefix+'c-'+key);
+  if(bodyEl) bodyEl.style.display = state[key] ? '' : 'none';
+  if(caret)  caret.textContent    = state[key] ? '▾' : '▸';
 }
-function setAllPreviewBlocksCollapsed(collapsed){
-  Object.keys(previewBlocks).forEach(key=>{
-    previewBlocks[key] = !collapsed;
-    const bodyEl = document.getElementById('pvb-'+key);
-    const caret = document.getElementById('pvc-'+key);
-    if(bodyEl) bodyEl.style.display = previewBlocks[key] ? '' : 'none';
-    if(caret) caret.textContent = previewBlocks[key] ? '▾' : '▸';
-  });
+function toggleBlock(state, prefix, key){
+  state[key] = !state[key];
+  applyBlockState(state, prefix, key);
 }
+function setAllBlocksCollapsed(state, prefix, collapsed){
+  Object.keys(state).forEach(key=>{ state[key] = !collapsed; applyBlockState(state, prefix, key); });
+}
+function togglePreviewBlock(key){ toggleBlock(previewBlocks, 'pv', key); }
+function setAllPreviewBlocksCollapsed(collapsed){ setAllBlocksCollapsed(previewBlocks, 'pv', collapsed); }
 function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = previewBlocks[key];
   return `<div class="section">
@@ -2613,17 +2680,14 @@ function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   </div>`;
 }
 function renderProjectPreview(body){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   if(!days.length){
     body.innerHTML = `<div class="section"><h2>Preview &amp; export</h2><div class="empty-note">No shoot days yet — add one under the Shoot Days tab first.</div></div>`;
     return;
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
   body.innerHTML = dayTabsBarHTML(days) + `
-    <div class="dept-toggle-all">
-      <span onclick="setAllPreviewBlocksCollapsed(false)">Expand all</span> ·
-      <span onclick="setAllPreviewBlocksCollapsed(true)">Collapse all</span>
-    </div>
+    ${expandCollapseAllHTML('setAllPreviewBlocksCollapsed')}
     <div class="card" id="previewCard"></div>
     ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
       `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
@@ -2651,7 +2715,7 @@ function makeShootDayRecord(projectId, p){
     hotelNights:[], cateringMeals:{} };
 }
 async function addShootDay(){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   const rec = makeShootDayRecord(currentProjectId, p);
   shootDaysDB.push(rec); await saveDB('db:shootdays', shootDaysDB);
   currentShootDayId = rec.id;
@@ -2667,8 +2731,8 @@ async function deleteShootDay(id){
    Shoot Days list. Growing it creates blank new days (same shape as + New day).
    Shrinking it never silently deletes — it always asks which day to lose. */
 async function syncShootDayCount(newCountStr){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
-  const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject(); if(!p) return;
+  const days = projectDays(p.id);
   const newCount = parseInt(newCountStr, 10);
   if(!Number.isFinite(newCount) || newCount < 0 || newCount === days.length){ renderProjectOverview(document.getElementById('projectBody')); return; }
   if(newCount > days.length){
@@ -2681,7 +2745,7 @@ async function syncShootDayCount(newCountStr){
     return;
   }
   // shrinking — ask which specific day(s) to lose rather than guessing
-  const dayLabel = d => `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locationsDB.find(l=>l.id===d.locationId)||{}).name||''):''}`;
+  const dayLabel = d => `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locById(d.locationId)||{}).name||''):''}`;
   let remaining = days.slice();
   const toRemove = [];
   const removeCount = days.length - newCount;
@@ -2768,21 +2832,11 @@ function renderCrewList(){
   if(!filtered.length){ list.innerHTML = '<div class="empty-note">No crew found.</div>'; return; }
   if(dept){ list.innerHTML = filtered.map(crewCardHTML).join(''); return; }
   // group by department when showing all; unknown/blank departments fall under "Other"
-  const buckets = {};
-  filtered.forEach(c=>{ const key = deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
-  const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
-  const deptsCSV = deptsPresent.join(',');
-  const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
-      <span onclick="setAllDeptsCollapsed(false, '${deptsCSV}')">Expand all</span> ·
-      <span onclick="setAllDeptsCollapsed(true, '${deptsCSV}')">Collapse all</span>
-    </div>` : '';
-  const html = deptsPresent.map(d=>{
-    const collapsed = collapsedDepts.has(d);
-    return `<div class="subhead dept-toggle" onclick="toggleDeptCollapse('${d}')">
-        <span class="dept-caret">${collapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span> ${esc(d)} <span style="color:var(--muted);font-weight:400">(${buckets[d].length})</span>
-      </div>
-      <div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(crewCardHTML).join('')}</div>`;
-  }).join('');
+  const { buckets, deptsPresent } = bucketByDept(filtered);
+  const toggleRow = deptsPresent.length>1
+    ? expandCollapseAllHTML('setAllDeptsCollapsed', deptsPresent.join(','))
+    : '';
+  const html = deptGroupsHTML(deptsPresent, buckets, collapsedDepts, d=>`toggleDeptCollapse('${d}')`, crewCardHTML);
   list.innerHTML = toggleRow + (html || filtered.map(crewCardHTML).join(''));
 }
 function crewFormHTML(c){
@@ -2966,14 +3020,14 @@ async function saveCrew(){
     generalNotes: val('ncGeneralNotes'), previousProjects: val('ncPrevProjects'),
     instagram: val('ncInstagram'), youtube: val('ncYouTube'), linkedin: val('ncLinkedIn'), coffeeOrder: val('ncCoffeeOrder'),
     rate: val('ncRate'), notes: val('ncNotes') };
-  const existing = crewDB.find(x=>x.id===id);
+  const existing = crewById(id);
   const merged = Object.assign({}, existing||{}, rec);
   const idx = crewDB.findIndex(x=>x.id===merged.id);
   if(idx>=0) crewDB[idx]=merged; else crewDB.push(merged);
   await saveDB('db:crew', crewDB);
   // if this was a brand-new person added from inside a project, put them on that project straight away
   if(!existing && route.screen==='project' && currentProjectId){
-    const p = projectsDB.find(x=>x.id===currentProjectId);
+    const p = currentProject();
     if(p){ p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(merged.id)) p.crewIds.push(merged.id); await saveDB('db:projects', projectsDB); }
   }
   editingCrewId = null; addingCrewNew = false;
@@ -3046,12 +3100,12 @@ function locFormHTML(l){
     <div class="section" style="margin-top:12px; background:var(--panel-2);">
       <h2 style="margin-bottom:8px;">Nearest parking</h2>
       <div id="nlParkingInfo" class="hint">${l.nearestParking?`${esc(l.nearestParking.name)} — ${esc(l.nearestParking.address||'')} (~${esc(l.nearestParking.distanceKm)}km)`:'Not looked up yet.'}</div>
-      <button class="small" onclick="lookupParkingForForm()" style="margin-top:8px;">${icon('car')} Find nearest parking</button>
+      <button class="small" onclick="lookupAmenityForForm('parking')" style="margin-top:8px;">${icon('car')} Find nearest parking</button>
     </div>
     <div class="section" style="margin-top:12px; background:var(--panel-2);">
       <h2 style="margin-bottom:8px;">Nearest hospital</h2>
       <div id="nlHospitalInfo" class="hint">${l.hospital?`${esc(l.hospital.name)} — ${esc(l.hospital.address||'')} (~${esc(l.hospital.distanceKm)}km)`:'Not looked up yet.'}</div>
-      <button class="small" onclick="lookupHospitalForForm()" style="margin-top:8px;">${icon('hospital')} Find nearest hospital</button>
+      <button class="small" onclick="lookupAmenityForForm('hospital')" style="margin-top:8px;">${icon('hospital')} Find nearest hospital</button>
     </div>
     <div class="toolbar" style="margin-top:12px;">
       <button class="primary" onclick="saveLocation()">Save location</button>
@@ -3064,7 +3118,7 @@ function toggleLocForm(projectId){
 }
 function closeLocForm(){ const w=document.getElementById('locFormWrap'); w.style.display='none'; w.innerHTML=''; locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=null; }
 function editLocation(id){
-  const l = locationsDB.find(x=>x.id===id); if(!l) return;
+  const l = locById(id); if(!l) return;
   locFormState = { lat: l.lat||null, lon: l.lon||null, hospital: l.hospital||null, parking: l.nearestParking||null }; locFormContext=null;
   const w=document.getElementById('locFormWrap'); w.innerHTML=locFormHTML(l); w.style.display='';
   updateMapPreview(); w.scrollIntoView({behavior:'smooth', block:'nearest'});
@@ -3075,13 +3129,13 @@ async function saveLocation(){
   const rec = { id:id||uid(), name, address:val('nlAddress'), lat:locFormState.lat, lon:locFormState.lon,
     onsiteContactName:val('nlContactName'), onsiteContactPhone:val('nlContactPhone'),
     accessInfo:val('nlAccess'), recceInfo:val('nlRecce'), parkingInfo:val('nlParking'), hospital:locFormState.hospital, nearestParking:locFormState.parking };
-  const existing = locationsDB.find(x=>x.id===id);
+  const existing = locById(id);
   const merged = Object.assign({}, existing||{}, rec);
   const idx = locationsDB.findIndex(x=>x.id===merged.id);
   if(idx>=0) locationsDB[idx]=merged; else locationsDB.push(merged);
   await saveDB('db:locations', locationsDB);
   if(locFormContext){
-    const p = projectsDB.find(x=>x.id===locFormContext);
+    const p = projById(locFormContext);
     if(p){ p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(merged.id)) p.locationIds.push(merged.id); await saveDB('db:projects', projectsDB); }
     closeLocForm(); renderProjectBody();
   } else {
@@ -3131,56 +3185,43 @@ function haversine(lat1,lon1,lat2,lon2){
   const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
-async function lookupHospitalForForm(){
-  if(locFormState.lat==null){ alert('Search and pick an address first so we have coordinates to search from.'); return; }
-  const infoEl=document.getElementById('nlHospitalInfo'); infoEl.textContent='Searching nearby hospitals…';
-  try{
-    const h = await findNearestHospital(locFormState.lat, locFormState.lon);
-    if(!h){ infoEl.textContent='No hospital found nearby.'; return; }
-    locFormState.hospital=h; infoEl.textContent=`${h.name} — ${h.address||'address not tagged'} (~${h.distanceKm}km)`;
-  }catch(e){ infoEl.textContent='Lookup failed — check your connection.'; }
-}
-async function findNearestHospital(lat,lon){
-  for(const r of [10000,25000]){
-    const query=`[out:json][timeout:20];node["amenity"="hospital"](around:${r},${lat},${lon});out;`;
+/* ---- nearest-amenity lookup (OpenStreetMap Overpass) ----
+   Hospitals and parking are the same query with a different amenity tag and search
+   radii — parking is far denser than hospitals, so it starts much tighter (1km) or
+   the nearest result is just noise. Radii are tried in order, widening only if the
+   tighter one found nothing. */
+const AMENITY_SEARCH = {
+  hospital: { tag:'hospital', radii:[10000,25000], noun:'hospital',  unnamed:'Unnamed hospital', field:'hospital',       stateKey:'hospital', elId:'nlHospitalInfo' },
+  parking:  { tag:'parking',  radii:[1000,3000,8000], noun:'parking', unnamed:'Unnamed parking', field:'nearestParking', stateKey:'parking',  elId:'nlParkingInfo' },
+};
+async function findNearestAmenity(kind, lat, lon){
+  const cfg = AMENITY_SEARCH[kind];
+  for(const r of cfg.radii){
+    const query=`[out:json][timeout:20];node["amenity"="${cfg.tag}"](around:${r},${lat},${lon});out;`;
     const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:query});
     const data=await res.json();
-    if(data.elements&&data.elements.length){
+    if(data.elements && data.elements.length){
       let best=null,bestD=Infinity;
       data.elements.forEach(el=>{ const dist=haversine(lat,lon,el.lat,el.lon); if(dist<bestD){bestD=dist;best=el;} });
       const t=best.tags||{};
       const addr=[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:postcode']].filter(Boolean).join(', ');
-      return { name:t.name||'Unnamed hospital', address:addr, phone:t.phone||t['contact:phone']||'', distanceKm:bestD.toFixed(1) };
+      return { name:t.name||cfg.unnamed, address:addr, phone:t.phone||t['contact:phone']||'', distanceKm:bestD.toFixed(1) };
     }
   }
   return null;
 }
-async function lookupParkingForForm(){
+/* the "Find nearest…" buttons on the location form — same flow for both kinds */
+async function lookupAmenityForForm(kind){
+  const cfg = AMENITY_SEARCH[kind];
+  const infoEl=document.getElementById(cfg.elId); if(!infoEl) return;
   if(locFormState.lat==null){ alert('Search and pick an address first so we have coordinates to search from.'); return; }
-  const infoEl=document.getElementById('nlParkingInfo'); infoEl.textContent='Searching nearby parking…';
+  infoEl.textContent=`Searching nearby ${cfg.noun}…`;
   try{
-    const pk = await findNearestParking(locFormState.lat, locFormState.lon);
-    if(!pk){ infoEl.textContent='No parking found nearby.'; return; }
-    locFormState.parking=pk; infoEl.textContent=`${pk.name} — ${pk.address||'address not tagged'} (~${pk.distanceKm}km)`;
+    const found = await findNearestAmenity(kind, locFormState.lat, locFormState.lon);
+    if(!found){ infoEl.textContent=`No ${cfg.noun} found nearby.`; return; }
+    locFormState[cfg.stateKey]=found;
+    infoEl.textContent=amenityLine(found);
   }catch(e){ infoEl.textContent='Lookup failed — check your connection.'; }
-}
-/* same Overpass approach as findNearestHospital, but with amenity=parking and
-   smaller search radii — parking is far denser than hospitals, so 10-25km would
-   just return noise */
-async function findNearestParking(lat,lon){
-  for(const r of [1000,3000,8000]){
-    const query=`[out:json][timeout:20];node["amenity"="parking"](around:${r},${lat},${lon});out;`;
-    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:query});
-    const data=await res.json();
-    if(data.elements&&data.elements.length){
-      let best=null,bestD=Infinity;
-      data.elements.forEach(el=>{ const dist=haversine(lat,lon,el.lat,el.lon); if(dist<bestD){bestD=dist;best=el;} });
-      const t=best.tags||{};
-      const addr=[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:postcode']].filter(Boolean).join(', ');
-      return { name:t.name||'Unnamed parking', address:addr, distanceKm:bestD.toFixed(1) };
-    }
-  }
-  return null;
 }
 
 /* ============================================================ SHOOT DAY EDITOR */
@@ -3190,22 +3231,8 @@ function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return 
    when you're working one concern at a time (e.g. schedules across the week),
    collapsing on Day 1 should stay collapsed when you move to Day 5. */
 let shootDayBlocks = { general:true, schedule:true, positions:true, tech:true };
-function toggleShootDayBlock(key){
-  shootDayBlocks[key] = !shootDayBlocks[key];
-  const body = document.getElementById('sdb-'+key);
-  const caret = document.getElementById('sdc-'+key);
-  if(body) body.style.display = shootDayBlocks[key] ? '' : 'none';
-  if(caret) caret.textContent = shootDayBlocks[key] ? '▾' : '▸';
-}
-function setAllShootDayBlocksCollapsed(collapsed){
-  Object.keys(shootDayBlocks).forEach(key=>{
-    shootDayBlocks[key] = !collapsed;
-    const body = document.getElementById('sdb-'+key);
-    const caret = document.getElementById('sdc-'+key);
-    if(body) body.style.display = shootDayBlocks[key] ? '' : 'none';
-    if(caret) caret.textContent = shootDayBlocks[key] ? '▾' : '▸';
-  });
-}
+function toggleShootDayBlock(key){ toggleBlock(shootDayBlocks, 'sd', key); }
+function setAllShootDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(shootDayBlocks, 'sd', collapsed); }
 function sdBlock(key, title, inner){
   const open = shootDayBlocks[key];
   return `<div class="sd-block">
@@ -3300,10 +3327,7 @@ function shootDayBuildHTML(){
       <div id="cameraDesigList"></div>
     </div>`;
 
-  return `<div class="dept-toggle-all">
-      <span onclick="setAllShootDayBlocksCollapsed(false)">Expand all</span> ·
-      <span onclick="setAllShootDayBlocksCollapsed(true)">Collapse all</span>
-    </div>`
+  return expandCollapseAllHTML('setAllShootDayBlocksCollapsed')
        + sdBlock('general','General information', general)
        + sdBlock('schedule','Schedule', schedule)
        + sdBlock('positions','Position assignments', positions)
@@ -3319,10 +3343,10 @@ function shootDayBuildHTML(){
           </div>`;
 }
 function projectCrewOptions(){
-  const day = shootDaysDB.find(d=>d.id===currentShootDayId); if(!day) return [];
-  const p = projectsDB.find(x=>x.id===day.projectId);
+  const day = currentDay(); if(!day) return [];
+  const p = projById(day.projectId);
   const ids = p ? (p.crewIds||[]) : [];
-  return ids.map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
+  return ids.map(id=>crewById(id)).filter(Boolean);
 }
 /* shared option-list builder for every location <select> on the Shoot Day screen —
    primary (#sdLocation) and each additional-location row (.sdaddloc-sel) — so both
@@ -3370,8 +3394,8 @@ async function quickAddLocationForDay(selectEl){
   }
   // the Locations-tab day-grid only lists locations in p.locationIds — make sure
   // this one is on the project so its row (and ticked checkbox) actually shows up
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId);
-  const proj = projectsDB.find(x=>x.id===(day&&day.projectId));
+  const day = currentDay();
+  const proj = projById(day&&day.projectId);
   if(proj){
     proj.locationIds = proj.locationIds||[];
     if(!proj.locationIds.includes(loc.id)){ proj.locationIds.push(loc.id); await saveDB('db:projects', projectsDB); }
@@ -3408,7 +3432,7 @@ function togglePosnDept(company, dept){
 /* pulls whatever call time is currently sitting in the DOM into the saved day object,
    so collapsing a group or adding/removing someone never discards an in-progress edit */
 function captureInProgressPositions(){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const container = document.getElementById('rows-posn'); if(!container) return;
   const currentRows = rowsOf('rows-posn', ['posn-crew','posn-call']);
   if(!currentRows.length && (day.positions||[]).length) return; // not rendered yet — don't wipe saved data
@@ -3420,7 +3444,7 @@ function captureInProgressPositions(){
 }
 function renderPositionAssignments(){
   const el = document.getElementById('rows-posn'); if(!el) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const positions = day.positions || [];
   if(!positions.length){ el.innerHTML = '<div class="empty-note">No one added to this day yet.</div>'; return; }
   const companies = {};
@@ -3441,17 +3465,15 @@ function renderPositionAssignments(){
     const totalCount = depts.reduce((sum,d)=>sum+deptMap[d].length,0);
     html += `<div class="posn-company-group">
       <div class="posn-company-header" onclick="togglePosnCompany('${esc(company)}')">
-        <span class="dept-caret">${companyCollapsed?'▸':'▾'}</span> ${esc(company)} <span style="color:var(--muted); font-weight:400;">(${totalCount})</span>
+        <span class="dept-caret">${companyCollapsed?'▸':'▾'}</span> ${esc(company)} <span class="dept-count">(${totalCount})</span>
       </div>
       <div class="posn-company-body" style="display:${companyCollapsed?'none':'block'}">`;
     depts.forEach(dept=>{
       const key = company+'||'+dept;
       const deptCollapsed = collapsedPosnDepts.has(key);
       const entries = deptMap[dept].slice().sort((a,b)=>(a.c.role||'').localeCompare(b.c.role||''));
-      html += `<div class="subhead dept-toggle" onclick="togglePosnDept('${esc(company)}','${esc(dept)}')">
-          <span class="dept-caret">${deptCollapsed?'▸':'▾'}</span> <span class="dept-code">${esc(DEPARTMENT_CODES[dept]||'')}</span> ${esc(dept)} <span style="color:var(--muted); font-weight:400;">(${entries.length})</span>
-        </div>
-        <div class="dept-group" style="display:${deptCollapsed?'none':'block'}">`;
+      html += deptHeaderHTML(dept, entries.length, deptCollapsed, `togglePosnDept('${esc(company)}','${esc(dept)}')`)
+        + `<div class="dept-group" style="display:${deptCollapsed?'none':'block'}">`;
       entries.forEach(en=>{
         const c = en.c;
         const isEditing = editingCrewId===en.cid;
@@ -3473,14 +3495,14 @@ function renderPositionAssignments(){
 }
 function refreshAddPosnPick(){
   const sel = document.getElementById('addPosnPick'); if(!sel) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const already = new Set((day.positions||[]).map(p=>p[0]));
   const crew = projectCrewOptions().filter(c=>!already.has(c.id));
   sel.innerHTML = '<option value="">— Select crew —</option>' + groupedCrewOptionsHTML(crew);
 }
 async function addPosnToDay(){
   const id = val('addPosnPick'); if(!id) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   captureInProgressPositions();
   day.positions = day.positions || [];
   if(!day.positions.some(p=>p[0]===id)) day.positions.push([id,'','','','']);
@@ -3489,7 +3511,7 @@ async function addPosnToDay(){
   refreshAddPosnPick();
 }
 async function removePosnRow(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   captureInProgressPositions();
   day.positions = (day.positions||[]).filter(p=>p[0]!==crewId);
   await saveDB('db:shootdays', shootDaysDB);
@@ -3630,27 +3652,30 @@ function populateShootDay(d){
 }
 function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); updateParkingLookupDisplay(); }
 function updateLocationSummary(){
-  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const l=selectedDayLocation();
   const el=document.getElementById('sdLocationSummary'); if(!el) return;
   if(!l){ el.textContent=''; return; }
   el.innerHTML=`${esc(l.address||'')}${l.accessInfo?('<br>Access: '+esc(l.accessInfo)):''}${l.onsiteContactName?('<br>On-site: '+esc(l.onsiteContactName)+(l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):'')):''}`;
   if(l.parkingInfo && !val('sdParking')) setv('sdParking', l.parkingInfo);
 }
-function updateHospitalDisplay(){
-  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
-  const el=document.getElementById('sdHospitalInfo'); if(!el) return;
-  if(!l){ el.textContent='Select a primary location to see its saved hospital.'; return; }
-  el.textContent = l.hospital?`${l.hospital.name} — ${l.hospital.address||''} (~${l.hospital.distanceKm}km)`:'No hospital saved for this location yet — add one in the Locations database.';
+/* Hospital and parking are the same shape ({name, address, distanceKm}) saved on the
+   location record, and read back the same way on the day form and in the location
+   form — so one formatter serves all of them. */
+function amenityLine(a){
+  return a ? `${a.name} — ${a.address||'address not tagged'} (~${a.distanceKm}km)` : '';
 }
-function updateParkingLookupDisplay(){
-  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
-  const el=document.getElementById('sdParkingLookupInfo'); if(!el) return;
-  if(!l){ el.textContent='Select a primary location to see its saved parking.'; return; }
-  el.textContent = l.nearestParking?`${l.nearestParking.name} — ${l.nearestParking.address||''} (~${l.nearestParking.distanceKm}km)`:'No parking saved for this location yet — add one in the Locations database.';
+/* both read-only day-form summaries are the same lookup with a different field/noun */
+function updateAmenityDisplay(elId, field, noun){
+  const el=document.getElementById(elId); if(!el) return;
+  const l=selectedDayLocation();
+  if(!l){ el.textContent=`Select a primary location to see its saved ${noun}.`; return; }
+  el.textContent = amenityLine(l[field]) || `No ${noun} saved for this location yet — add one in the Locations database.`;
 }
+function updateHospitalDisplay(){ updateAmenityDisplay('sdHospitalInfo','hospital','hospital'); }
+function updateParkingLookupDisplay(){ updateAmenityDisplay('sdParkingLookupInfo','nearestParking','parking'); }
 const WMO={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Dense drizzle',61:'Slight rain',63:'Rain',65:'Heavy rain',71:'Slight snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Violent showers',95:'Thunderstorm'};
 async function fetchWeatherForDay(){
-  const loc=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const loc=selectedDayLocation();
   const dateStr=val('sdDate'); const s=document.getElementById('weatherStatus');
   if(!loc||loc.lat==null){ s.textContent='Pick a primary location with saved coordinates first.'; return; }
   if(!dateStr){ s.textContent='Set the shoot date first.'; return; }
@@ -3697,19 +3722,19 @@ async function saveShootDay(thenGenerate){
   d.brief=val('sdBrief').split('\n').map(s=>s.trim()).filter(Boolean);
   d.parking=val('sdParking'); d.notes=val('sdNotes');
   await saveDB('db:shootdays',shootDaysDB);
-  const st=document.getElementById('sdStatus'); st.textContent='Saved'; setTimeout(()=>{const e=document.getElementById('sdStatus'); if(e)e.textContent='';},2000);
+  flashStatus('sdStatus');
   if(thenGenerate) goProjectTab('preview');
 }
 
 /* ---------- preview / export ---------- */
-function crewInfo(id){ return crewDB.find(c=>c.id===id)||{name:'(removed crew)',role:'',phone:''}; }
+function crewInfo(id){ return crewById(id)||{name:'(removed crew)',role:'',phone:''}; }
 /* ---- per-day crew overrides ----
    A shoot day may override someone's role / department / sub-department / lead company
    for that day only. Person-level facts (phone, email, dietary, sizes) always fall
    through to the crew database, so later database fixes propagate automatically. */
 const OVERRIDABLE_FIELDS = ['role','department','subDepartment','coProductionCompany'];
 function resolveCrewForDay(crewId, day){
-  const base = crewDB.find(c=>c.id===crewId) || {id:crewId, name:'(removed crew)', role:'', phone:''};
+  const base = crewById(crewId) || {id:crewId, name:'(removed crew)', role:'', phone:''};
   const ov = day && day.crewOverrides && day.crewOverrides[crewId];
   if(!ov || !Object.keys(ov).length) return base;
   return Object.assign({}, base, ov, {_overridden:true});
@@ -3719,8 +3744,8 @@ function hasOverride(crewId, day){
   return !!(ov && Object.keys(ov).length);
 }
 function dayOverrideFormHTML(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return '';
-  const base = crewDB.find(c=>c.id===crewId) || {};
+  const day = currentDay(); if(!day) return '';
+  const base = crewById(crewId) || {};
   const eff = resolveCrewForDay(crewId, day);
   const overridden = hasOverride(crewId, day);
   const currentPath = eff.subDepartment ? `${eff.department}/${eff.subDepartment}` : (eff.department||'');
@@ -3762,8 +3787,8 @@ function dayOverrideFormHTML(crewId){
   </div>`;
 }
 async function saveDayOverride(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
-  const base = crewDB.find(c=>c.id===crewId) || {};
+  const day = currentDay(); if(!day) return;
+  const base = crewById(crewId) || {};
   const pathVal = val('ovDept');
   const [dept, ...rest] = pathVal.split('/');
   const proposed = { role: val('ovRole'), department: dept||'', subDepartment: rest.join('/'), coProductionCompany: val('ovCoPro') };
@@ -3777,16 +3802,16 @@ async function saveDayOverride(crewId){
   renderPositionAssignments();
 }
 async function clearDayOverride(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   if(day.crewOverrides) delete day.crewOverrides[crewId];
   await saveDB('db:shootdays', shootDaysDB);
   editingCrewId = null;
   renderPositionAssignments();
 }
 function buildFullData(d){
-  const p=projectsDB.find(x=>x.id===d.projectId)||{};
-  const primary=locationsDB.find(l=>l.id===d.locationId);
-  const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locationsDB.find(x=>x.id===id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
+  const p=projById(d.projectId)||{};
+  const primary=locById(d.locationId);
+  const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locById(id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
   const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.role,name:c.name,call,phone:c.phone,department:c.department||'',subDepartment:c.subDepartment||'',coProductionCompany:c.coProductionCompany||''};});
   const positions = allPositions.filter(r=>!r.coProductionCompany).sort((a,b)=>deptRank(a.department)-deptRank(b.department));
   const coProBuckets = {};
@@ -3809,7 +3834,10 @@ function buildFullData(d){
   return { prodCompany:p.company||COMPANY, shootTitle:[p.client,p.title].filter(Boolean).join(' — '),
     dayNum:d.dayNum,dayTotal:d.dayTotal,shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
     primary,addLocs,positions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
-    techSpecs:d.techSpecs||{}, cameraDesignations };
+    // resolved, not raw: a day stores only what DIFFERS from the project defaults
+    // (saveShootDay deletes d.techSpecs entirely when nothing differs), so reading
+    // d.techSpecs directly exported blank tech specs for every day on the defaults.
+    techSpecs:resolveTechSpecs(d), cameraDesignations };
 }
 function generatePreview(d){
   const data=buildFullData(d);
@@ -3820,34 +3848,28 @@ function generatePreview(d){
 function renderTechSpecsSection(d){
   const el=document.getElementById('techSpecsSection'); if(!el) return;
   const ts=d.techSpecs||{};
-  const rows=[['Frame rate',ts.frameRate],['Resolution',ts.resolution],['Delivery format',ts.delivery],
-    ['Colour profile',ts.colorProfile],['Timecode',ts.timecode],['Codec',ts.codec]].filter(([,v])=>v);
+  const rows=techSpecRows(ts);
   const cams = d.cameraDesignations||[];
   const headerActions = `<button class="small" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
-  if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them in the Build tab.</div>'); return; }
+  if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them under Tech, or per-day under Shoot Days.</div>'); return; }
   let body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>`;
   if(rows.length) body += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
   if(cams.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>Shorthand</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td>${esc(cd.shorthand||'')}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
   el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
 }
 function copyTechSpecsText(){
-  const d=shootDaysDB.find(x=>x.id===currentShootDayId); if(!d) return '';
+  const d=currentDay(); if(!d) return '';
   const data=buildFullData(d); const ts=data.techSpecs||{};
   const dayLine=(data.dayNum||data.dayTotal)?`Day ${data.dayNum||'?'}${data.dayTotal?(' of '+data.dayTotal):''}`:'';
   const L=[`*TECH SPECS* — ${data.shootTitle||''} ${dayLine}`.trim()];
-  [['Frame rate',ts.frameRate],['Resolution',ts.resolution],['Delivery',ts.delivery],['Colour profile',ts.colorProfile],['Timecode',ts.timecode],['Codec',ts.codec]]
-    .forEach(([k,v])=>{ if(v) L.push(`${k}: ${v}`); });
+  techSpecRows(ts).forEach(([k,v])=>L.push(`${k}: ${v}`));
   if(data.cameraDesignations && data.cameraDesignations.length){
     L.push('','*CAMERA DESIGNATIONS*');
     data.cameraDesignations.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name}${cd.shorthand?(' ['+cd.shorthand+']'):''} (${cd.tag})`));
   }
   return L.join('\n');
 }
-async function copyTechSpecs(){
-  const text=copyTechSpecsText();
-  try{ await navigator.clipboard.writeText(text); }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
-}
+function copyTechSpecs(){ return copyText(copyTechSpecsText()); }
 function renderPreviewCard(d){
   const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
   const open = previewBlocks.callsheet;
@@ -3909,13 +3931,9 @@ function buildWAText(d){
   if(d.notes) L.push('','*NOTES*',d.notes);
   return L.join('\n');
 }
-async function copyWA(){
-  const text=document.getElementById('waText').textContent;
-  try{ await navigator.clipboard.writeText(text); }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
-}
+function copyWA(){ return copyText(document.getElementById('waText').textContent); }
 function downloadExcel(){
-  const d=shootDaysDB.find(x=>x.id===currentShootDayId); if(!d) return;
+  const d=currentDay(); if(!d) return;
   const data=buildFullData(d); const aoa=[];
   const dayLine=(data.dayNum||data.dayTotal)?`Day ${data.dayNum||'?'}${data.dayTotal?(' of '+data.dayTotal):''}`:'';
   aoa.push([data.prodCompany,data.shootTitle]); aoa.push([fmtDate(data.shootDate),dayLine,data.allCrewCall?('All-crew call: '+data.allCrewCall):'']); aoa.push([]);
@@ -3938,8 +3956,7 @@ function downloadExcel(){
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:12},{wch:24},{wch:24},{wch:14},{wch:16},{wch:20}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Call Sheet');
   const ts=data.techSpecs||{};
-  const tsRows=[['Frame rate',ts.frameRate||''],['Resolution',ts.resolution||''],['Delivery format',ts.delivery||''],
-    ['Colour profile',ts.colorProfile||''],['Timecode',ts.timecode||''],['Codec',ts.codec||'']];
+  const tsRows=techSpecRows(ts);
   const tsAoa=[['TECH SPECS — camera/technical crew reference'],[],...tsRows];
   if(data.cameraDesignations && data.cameraDesignations.length){
     tsAoa.push([]); tsAoa.push(['CAMERA DESIGNATIONS']); tsAoa.push(['Camera','Name','Shorthand','File tag']);
