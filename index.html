@@ -444,7 +444,11 @@
        The desktop layout is a wide matrix (one column per shoot day). On a phone that
        forces horizontal scrolling through tiny unlabelled checkboxes, so instead each
        person becomes a card and the day cells reflow into a labelled chip row. */
-    .crewgrid-header-row{display:none;}
+    /* the header strip carries BOTH .crewgrid and .crewgrid-header-row, so a plain
+       .crewgrid-header-row{display:none} ties on specificity with the .crewgrid rule
+       below and loses on source order — leaving a stray stack of D1/D2/D3… chips
+       above the cards. Doubling the class wins the tie without an !important. */
+    .crewgrid-header-row.crewgrid-header-row{display:none;}
     .crewgrid{
       display:block; border:1px solid var(--line); border-radius:10px;
       padding:12px; margin-bottom:10px; background:var(--panel);
@@ -3329,6 +3333,10 @@ let deptAdminOpen = false;   // "Departments & sub-departments" panel, collapsed
 function refreshCrewScreen(){
   if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
   else if(route.screen==='project' && currentProjectTab==='days'){ captureInProgressPositions(); renderPositionAssignments(); }
+  // the crew database screen needs a FULL re-render, not just renderCrewList():
+  // the add/edit form markup lives outside #crewList, so re-rendering only the
+  // list left "+ Add crew member" toggling its label but never showing a form.
+  else if(route.screen==='db-crew') renderCrewDatabase(document.getElementById('main'));
   else renderCrewList();
   renderGlobalOverlay();
 }
