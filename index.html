@@ -2909,6 +2909,7 @@ let viewingCrewId = null;
 function refreshCrewScreen(){
   if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
   else if(route.screen==='project' && currentProjectTab==='days'){ captureInProgressPositions(); renderPositionAssignments(); }
+  else if(route.screen==='db-crew') renderCrewDatabase(document.getElementById('main'));
   else renderCrewList();
 }
 function toggleCrewForm(){
