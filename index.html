@@ -83,6 +83,7 @@
      and stays clickable/visible on its own, including while the body is collapsed. */
   .sd-block-head-toggle{display:flex; align-items:center; gap:9px; cursor:pointer;}
   .sd-block-head-toggle:hover{color:var(--tape);}
+  .sd-block-head-toggle .dept-caret{color:var(--tape);}
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
   .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
@@ -2478,7 +2479,7 @@ function renderProjectDays(body){
    next day too. Each section's header keeps its Copy button visible even while
    collapsed (see pvBlockHTML) — collapsing is about scanning the page fast, not
    about hiding the one action you actually came here for. */
-let previewBlocks = { whatsapp:true, techspecs:true, hotel:true, catering:true, excel:true };
+let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, hotel:true, catering:true, excel:true };
 function togglePreviewBlock(key){
   previewBlocks[key] = !previewBlocks[key];
   const bodyEl = document.getElementById('pvb-'+key);
@@ -3739,8 +3740,15 @@ async function copyTechSpecs(){
 }
 function renderPreviewCard(d){
   const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
-  let h=`<div class="line1">${esc(d.prodCompany)}${d.shootTitle?(' · '+esc(d.shootTitle)):''}</div>`;
-  h+=`<div class="sub">${[fmtDate(d.shootDate),dayLine,d.allCrewCall?('All-crew call '+esc(d.allCrewCall)):''].filter(Boolean).join(' · ')}</div>`;
+  const open = previewBlocks.callsheet;
+  const header=`<div class="sd-block-head-toggle" onclick="togglePreviewBlock('callsheet')">
+      <span class="dept-caret" id="pvc-callsheet">${open?'▾':'▸'}</span>
+      <div>
+        <div class="line1">${esc(d.prodCompany)}${d.shootTitle?(' · '+esc(d.shootTitle)):''}</div>
+        <div class="sub">${[fmtDate(d.shootDate),dayLine,d.allCrewCall?('All-crew call '+esc(d.allCrewCall)):''].filter(Boolean).join(' · ')}</div>
+      </div>
+    </div>`;
+  let h='';
 
   /* ---- two-column key-info block at the top ---- */
   let col1='', col2='';
@@ -3766,7 +3774,7 @@ function renderPreviewCard(d){
         g.people.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td>${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`;
     });
   }
-  document.getElementById('previewCard').innerHTML=h;
+  document.getElementById('previewCard').innerHTML = header + `<div id="pvb-callsheet" style="display:${open?'':'none'}; margin-top:14px;">${h}</div>`;
 }
 function buildWAText(d){
   const L=[]; const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
