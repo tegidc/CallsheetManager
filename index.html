@@ -87,10 +87,15 @@
   .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
   label{display:block; font-family:var(--label); font-size:11px; letter-spacing:.3px; color:var(--muted); margin-bottom:4px; font-weight:500;}
-  /* Tech Specs: compact grid — values are short ("25p", "XAVC") so fields stay small */
-  .ts-grid{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px 14px;}
-  .ts-field label{margin-bottom:3px;}
-  .ts-field input{width:100%;}
+  /* Tech Specs: label sits BESIDE its box, and each box is sized to the value it
+     actually holds ("25p" gets a small box, "S-Log3 CineGamut3" a wider one) rather
+     than every field getting an identical full-width box under its label. Fields
+     flow and wrap naturally instead of being forced into a rigid 3-up grid. */
+  .ts-grid{display:flex; flex-wrap:wrap; gap:10px 20px; align-items:center;}
+  .ts-field{display:flex; align-items:center; gap:8px; min-width:0;}
+  .ts-field label{margin:0; white-space:nowrap; flex:0 0 auto;}
+  /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
+  .ts-field input[type=text]{width:var(--fw,120px); min-width:0; padding:6px 8px; font-size:13px;}
   .ts-banner{font-size:12px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
     border-radius:6px; padding:7px 10px; margin-bottom:12px;}
   .ts-banner.differs{background:rgba(1,119,86,.08); border-color:var(--tape); color:var(--text);}
@@ -104,13 +109,21 @@
   .cam-row:last-child{border-bottom:none;}
   .cam-who strong{font-family:var(--disp); font-weight:600; font-size:14px;}
   .cam-tags{font-family:var(--mono); font-size:10.5px; margin-top:4px; line-height:1.5;}
-  .cam-cams{display:flex; flex-direction:column; gap:6px; min-width:0;}
+  /* align-items:start stops "+ Add camera" stretching the full column width */
+  .cam-cams{display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0;}
+  .cam-cams > .cam-cam-line{align-self:stretch;}
   .cam-cam-line{display:flex; align-items:center; gap:6px;}
   .cam-badge{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:.3px; color:var(--tape);
     background:rgba(1,119,86,.1); border-radius:5px; padding:5px 7px; flex:0 0 auto; white-space:nowrap;}
   .cam-body-input, .cam-shorthand-input{font-size:12px; padding:5px 7px; min-height:0; width:auto; flex:1 1 0; min-width:0;}
   .cam-reorder{display:flex; flex-direction:column; gap:4px; align-items:center;}
   .cam-reorder .icon-btn[disabled]{opacity:.25; cursor:default;}
+  /* generic "label beside a right-sized control" row — the same shape as .ts-field,
+     for one-off fields whose control shouldn't stretch to the full section width */
+  .field-inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .field-inline > label{margin:0; white-space:nowrap; flex:0 0 auto;}
+  .field-inline > select, .field-inline > input[type=text]{width:auto; min-width:0; flex:0 1 auto;}
+  .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
   .req::after{content:' *'; color:var(--danger);}
   input[type=text], input[type=date], textarea, select{
     width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
@@ -129,6 +142,9 @@
     vertical-align:middle; margin-left:2px; line-height:1;}
   .icon-btn:hover{color:var(--tape); background:rgba(1,119,86,.1);}
   .icon-btn.active{color:var(--tape); background:rgba(1,119,86,.14);}
+  /* destructive icon button — stays quiet until hovered, so a row of controls
+     doesn't read as a row of warnings */
+  .icon-btn.danger-ic:hover{color:var(--danger); background:rgba(164,50,31,.10);}
   .ic{display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; vertical-align:-2px;}
   .ic-lg{width:16px; height:16px;}
   .side-item .ic{width:14px; height:14px; opacity:.85; flex:0 0 auto;}
@@ -267,8 +283,16 @@
   .crewrow-select{display:grid; grid-template-columns:46px 1fr 100px 34px; gap:8px; align-items:start; margin-bottom:8px; padding-top:6px;}
   .posn-dept-badge{font-family:var(--label); font-size:10px; font-weight:600; letter-spacing:.4px; color:var(--tape);
     background:rgba(1,119,86,.1); border-radius:5px; padding:6px 4px; text-align:center; align-self:center;}
-  /* shared crew identity block — used by every crew list in the app */
+  /* shared crew identity block — used by every crew list in the app.
+     --ident-gutter is DERIVED from the leading icon-button cluster rather than
+     eyeballed: two buttons (each --ident-btn wide + 2px margin) and the two 6px
+     flex gaps that follow them. Anything that should line up UNDER a crew member's
+     name indents by this, so sub-rows sit in the same vertical column as the names.
+     Because it's a calc over the button size, it stays correct when the buttons
+     grow to their 34px touch targets on mobile. */
+  :root{--ident-btn:22px; --ident-gutter:calc(2*var(--ident-btn) + 2*2px + 2*6px);}
   .crew-ident{min-width:0;}
+  .ident-subrow{margin-left:var(--ident-gutter);}
   .crew-ident-top{display:flex; align-items:center; gap:2px; flex-wrap:wrap;}
   .crew-ident-top strong{font-family:var(--disp); font-weight:600; font-size:15px; margin-left:4px;}
   .crew-ident-pills{display:flex; flex-wrap:wrap; gap:4px; margin:5px 0 3px;}
@@ -285,7 +309,7 @@
     text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   select.pill-select.copro{background-color:rgba(17,10,8,.06); color:var(--text);}
   select.pill-select.copro.empty{background-color:transparent; color:var(--muted);}
-  .crewgrid{display:grid; grid-template-columns:minmax(200px,1fr) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px; align-items:center; column-gap:6px;}
+  .crewgrid{display:grid; grid-template-columns:minmax(200px,1fr) repeat(var(--daycols), var(--daycolwidth, 38px)) 66px; align-items:center; column-gap:6px;}
   .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .crewgrid-header{font-family:var(--label); font-size:10.5px; font-weight:600; color:var(--muted); text-align:center; letter-spacing:.3px;}
   .crewgrid-row{padding:8px 0; border-bottom:1px solid var(--line);}
@@ -302,13 +326,15 @@
   .crewgrid-catering-person:last-child{border-bottom:none; margin-bottom:0;}
   .meal-subrow{margin-top:1px;}
   .meal-subrow .meal-cell input{width:13px; height:13px;}
-  .meal-row-label-wrap{display:flex; align-items:center; gap:8px; min-width:0; padding-left:2px;}
+  .roles-subrow{margin-top:6px; margin-bottom:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  /* Breakfast/Lunch/Dinner labels line up under the person's name, same gutter */
+  .meal-row-label-wrap{display:flex; align-items:center; gap:8px; min-width:0; padding-left:var(--ident-gutter);}
   .meal-row-label{font-family:var(--label); font-size:10.5px; font-weight:500; letter-spacing:.3px;
     color:var(--muted);}
   .meal-row-all{font-family:var(--label); font-size:10px; color:var(--muted);
     cursor:pointer; flex-shrink:0;}
   .meal-row-all:hover{color:var(--tape);}
-  .crewgrid-remove{text-align:right;}
+  .crewgrid-remove{display:flex; align-items:center; justify-content:flex-end; gap:2px;}
   .all-toggle-btn{padding:3px 8px; font-size:11px;}
   .crewgrid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:8px; padding:14px; background:var(--panel);}
 
@@ -367,6 +393,8 @@
 
     /* --- buttons: 44px minimum touch target --- */
     button{font-size:15px; padding:12px 16px; min-height:46px;}
+    /* keeps --ident-gutter in step with the bigger touch-target buttons */
+    :root{--ident-btn:34px;}
     .icon-btn{width:34px; height:34px; font-size:14px; min-height:0;}
     select.pill-select{font-size:12px; padding:5px 22px 5px 10px; max-width:150px;}
     button.small{font-size:14px; padding:10px 13px; min-height:44px;}
@@ -906,6 +934,7 @@ const ICONS = {
   cloud:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.7 1.6A3.5 3.5 0 0 0 7 18z"/></svg>',
   hospital:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>',
   lock:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  trash:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M10 11v6M14 11v6"/></svg>',
 };
 function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
 /* the static chrome (sidebar nav, mobile burger) draws from the same ICONS table as
@@ -954,30 +983,46 @@ async function initApp(){
 }
 initApp();
 
-/* ---- Grid ergonomics: arrow-key navigation ----
-   Tab and Space work natively. This adds arrow-key movement across
-   the checkbox/meal grids so you can fly through without a mouse. */
+/* ---- Grid ergonomics: keyboard navigation ----
+   The core interaction here is "move down a list answering yes/no", so it should be
+   possible without touching the mouse. Space toggles natively; this adds:
+     ← →      move along the row
+     ↑ ↓      move to the same column in the next/previous row
+     Home/End jump to the first/last checkbox in the row
+     Enter    toggle (same as Space — Enter is what the hand reaches for in a list)
+   Rows carrying no checkboxes (e.g. the name row above a person's catering meals)
+   are skipped rather than swallowing the keypress and stranding focus. */
+const GRID_ROW_SELECTOR = '.crewgrid-row, .meal-subrow';
+const checkboxesIn = row => [...row.querySelectorAll('input[type=checkbox]')];
 document.addEventListener('keydown', function(e){
-  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+  const keys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Enter'];
+  if(!keys.includes(e.key)) return;
   const active = document.activeElement;
-  if(!active || active.type!=='checkbox') return;
-  const cell = active.closest('.crewgrid-check');
-  if(!cell) return;
-  e.preventDefault();
-  const row = active.closest('.crewgrid-row, .meal-subrow');
+  if(!active || active.type!=='checkbox' || !active.closest('.crewgrid-check')) return;
+
+  // Enter toggles, matching Space — click() so the onchange handler still fires
+  if(e.key==='Enter'){ e.preventDefault(); active.click(); return; }
+
+  const row = active.closest(GRID_ROW_SELECTOR);
   if(!row) return;
-  const allInputs = [...row.querySelectorAll('input[type=checkbox]')];
-  const i = allInputs.indexOf(active);
-  if(e.key==='ArrowRight' && i<allInputs.length-1) { allInputs[i+1].focus(); return; }
-  if(e.key==='ArrowLeft' && i>0) { allInputs[i-1].focus(); return; }
-  // up/down: jump to same column index in the adjacent row (crewgrid-row or meal-subrow)
-  const allRows = [...document.querySelectorAll('.crewgrid-row, .meal-subrow')];
-  const ri = allRows.indexOf(row);
-  const targetRow = e.key==='ArrowDown' ? allRows[ri+1] : allRows[ri-1];
-  if(!targetRow) return;
-  const targetInputs = [...targetRow.querySelectorAll('input[type=checkbox]')];
-  const ti = Math.min(i, targetInputs.length-1);
-  if(targetInputs[ti]) targetInputs[ti].focus();
+  e.preventDefault();
+  const inRow = checkboxesIn(row);
+  const i = inRow.indexOf(active);
+
+  if(e.key==='Home'){ inRow[0]?.focus(); return; }
+  if(e.key==='End'){ inRow[inRow.length-1]?.focus(); return; }
+  if(e.key==='ArrowRight'){ if(i<inRow.length-1) inRow[i+1].focus(); return; }
+  if(e.key==='ArrowLeft'){ if(i>0) inRow[i-1].focus(); return; }
+
+  // up/down: same column index in the nearest row that actually has checkboxes
+  const allRows = [...document.querySelectorAll(GRID_ROW_SELECTOR)];
+  const step = e.key==='ArrowDown' ? 1 : -1;
+  for(let ri = allRows.indexOf(row) + step; ri >= 0 && ri < allRows.length; ri += step){
+    const targetInputs = checkboxesIn(allRows[ri]);
+    if(!targetInputs.length) continue;              // skip label-only rows
+    targetInputs[Math.min(i, targetInputs.length-1)].focus();
+    return;
+  }
 });
 
 /* ---- toggle-all per person: Days on site + Hotel (kind: 'days' | 'hotel') ----
@@ -1811,21 +1856,14 @@ function renderProjectTech(body){
     <div class="section">
       <h2>Tech specs — project defaults</h2>
       <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
-      <div class="ts-grid">
-        <div class="ts-field"><label>Frame rate</label><input type="text" id="pjFrameRate" value="${esc(projTS.frameRate||'')}" placeholder="25p"></div>
-        <div class="ts-field"><label>Resolution</label><input type="text" id="pjResolution" value="${esc(projTS.resolution||'')}" placeholder="4K UHD"></div>
-        <div class="ts-field"><label>Delivery</label><input type="text" id="pjDelivery" value="${esc(projTS.delivery||'')}" placeholder="1080p"></div>
-        <div class="ts-field"><label>Colour profile</label><input type="text" id="pjColorProfile" value="${esc(projTS.colorProfile||'')}" placeholder="S-Log3 CineGamut3"></div>
-        <div class="ts-field"><label>Timecode</label><input type="text" id="pjTimecode" value="${esc(projTS.timecode||'')}" placeholder="Time of Day"></div>
-        <div class="ts-field"><label>Codec</label><input type="text" id="pjCodec" value="${esc(projTS.codec||'')}" placeholder="XAVC"></div>
-      </div>
-      <div style="margin-top:14px;">
-        <label>Shot numbering</label>
+      ${techSpecFieldsHTML('pj')}
+      <div class="field-inline" style="margin-top:14px;">
+        <label for="pjContinuousNumbering">Shot numbering</label>
         <select id="pjContinuousNumbering">
           <option value="continuous" ${continuous?'selected':''}>Continuous numbering throughout shoot</option>
           <option value="reset" ${!continuous?'selected':''}>Reset numbers each day</option>
         </select>
-        <div class="hint" style="margin-top:4px;">Continuous gives a rough sense of which day footage is from just by the number.</div>
+        <span class="hint">Continuous gives a rough sense of which day footage is from just by the number.</span>
       </div>
       <div class="toolbar" style="margin-top:12px;">
         <button class="primary" onclick="saveProjectTechSpecs()">Save defaults</button>
@@ -1837,6 +1875,7 @@ function renderProjectTech(body){
       <div class="hint" style="margin-bottom:10px;">Only people on this project in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
       <div id="cameraDesigListProject"></div>
     </div>`;
+  setTechSpecFields('pj', projTS);
   renderCameraDesignations('project');
   body.oninput = () => scheduleAutosave('tech', () => saveProjectTechSpecs());
 }
@@ -1857,10 +1896,8 @@ function bareMinimumWarningsHTML(p, days){
 async function saveProjectTechSpecs(){
   const p = currentProject(); if(!p) return;
   p.techSpecs = p.techSpecs || {};
-  TECHSPEC_FIELDS.forEach(f=>{
-    const v = val('pj'+f.charAt(0).toUpperCase()+f.slice(1));
-    if(v) p.techSpecs[f] = v; else delete p.techSpecs[f];
-  });
+  const entered = readTechSpecFields('pj');
+  TECHSPEC_FIELDS.forEach(f=>{ if(entered[f]) p.techSpecs[f] = entered[f]; else delete p.techSpecs[f]; });
   const numbering = document.getElementById('pjContinuousNumbering');
   if(numbering) p.continuousNumbering = numbering.value!=='reset';
   await saveDB('db:projects', projectsDB);
@@ -1966,7 +2003,7 @@ function crewRolesRowHTML(c){
   const isEditing = editingCrewId===c.id;
   return `<div class="crewgrid-row ${isEditing?'crewgrid-row-editing':''}">
     ${crewIdentityHTML(c, {showPickers:true, oneLine:true, showPhone:true})}
-    <div style="margin:6px 0 2px 30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div class="ident-subrow roles-subrow">
       ${rolesTagListHTML(c)}${roleAddPickerHTML(c)}
     </div>
     ${crewExpansionHTML(c, 'crewgrid-editform')}
@@ -2031,13 +2068,18 @@ function crewAssignRowHTML(c, days){
   }).join('');
   const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
   const identOpts = {showPickers:false, oneLine:true, showPhone:false};
-  if(crewGridView==='days') identOpts.showRole = false; // role shown via the quick-edit control instead
+  if(crewGridView==='days'){
+    // role shown via the quick-edit control instead — passed in as extraLine so it
+    // sits on the SAME row as the name rather than wrapping underneath it
+    identOpts.showRole = false;
+    identOpts.extraLine = roleQuickEditHTML(c);
+  }
   return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${colCount};">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}${crewGridView==='days'?roleQuickEditHTML(c):''}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}</div>
     ${preCell}${dayCells}
     <div class="crewgrid-remove">
       ${(crewGridView==='hotel'||crewGridView==='days') ? `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${c.id}','${crewGridView}')" title="Toggle all on/off for this person">All</button>` : ''}
-      ${crewGridView==='days' ? `<button class="small danger" onclick="removeCrewFromProject('${c.id}')">Remove</button>` : ''}
+      ${crewGridView==='days' ? `<button class="icon-btn danger-ic" onclick="removeCrewFromProject('${c.id}')" title="Remove ${esc(c.name)} from this project" aria-label="Remove from project">${icon('trash')}</button>` : ''}
     </div>
     ${crewExpansionHTML(c, 'crewgrid-editform')}
   </div>`;
@@ -2280,6 +2322,39 @@ const TECHSPEC_LABELS = { frameRate:'Frame rate', resolution:'Resolution', deliv
 /* [label, value] pairs for the fields that actually have a value */
 function techSpecRows(ts){
   return TECHSPEC_FIELDS.map(f=>[TECHSPEC_LABELS[f], (ts||{})[f]||'']).filter(([,v])=>v);
+}
+/* placeholder + box width per field — the box is sized to the value it actually
+   holds, so "25p" doesn't get the same wide box as "S-Log3 CineGamut3" */
+const TECHSPEC_HINTS = {
+  frameRate:    { ph:'25p',                w:'62px'  },
+  resolution:   { ph:'4K UHD',             w:'96px'  },
+  delivery:     { ph:'1080p',              w:'112px' },
+  colorProfile: { ph:'S-Log3 CineGamut3',  w:'156px' },
+  timecode:     { ph:'Time of Day',        w:'124px' },
+  codec:        { ph:'XAVC',               w:'84px'  },
+};
+/* the DOM id for a tech spec field under a given form prefix */
+const techSpecFieldId = (prefix, f) => prefix + f.charAt(0).toUpperCase() + f.slice(1);
+/* fill / read the six inputs of either tech-spec form */
+function setTechSpecFields(prefix, ts){
+  TECHSPEC_FIELDS.forEach(f=>setv(techSpecFieldId(prefix,f), (ts||{})[f]));
+}
+function readTechSpecFields(prefix){
+  const out = {};
+  TECHSPEC_FIELDS.forEach(f=>{ out[f] = val(techSpecFieldId(prefix,f)); });
+  return out;
+}
+/* the six tech-spec inputs, rendered identically for the project defaults (prefix
+   'pj') and a shoot day's override (prefix 'ts') — previously written out twice */
+function techSpecFieldsHTML(prefix){
+  return `<div class="ts-grid">${TECHSPEC_FIELDS.map(f=>{
+    const h = TECHSPEC_HINTS[f];
+    const id = techSpecFieldId(prefix, f);
+    return `<div class="ts-field" style="--fw:${h.w};">
+      <label for="${id}">${TECHSPEC_LABELS[f]}</label>
+      <input type="text" id="${id}" placeholder="${esc(h.ph)}">
+    </div>`;
+  }).join('')}</div>`;
 }
 function projectOf(day){ return projById(day&&day.projectId) || null; }
 function resolveTechSpecs(day){
@@ -2578,7 +2653,7 @@ function locDayGridHTML(assigned, days){
     return assigned.map(l=>`
       <div class="list-card">
         <div class="meta"><strong>${esc(l.name)}</strong><div>${esc(l.address||'')}</div></div>
-        <div class="actions"><button class="small danger" onclick="removeLocFromProject('${l.id}')">Remove</button></div>
+        <div class="actions"><button class="small danger" onclick="removeLocFromProject('${l.id}')">${icon('trash')} Remove</button></div>
       </div>`).join('') + `<div class="hint" style="margin-top:8px;">Add shoot days first, then tick which days each location is used.</div>`;
   }
   return `<div class="tablewrap">${crewGridHeaderRow(dayCols(days))}${assigned.map(l=>locRowHTML(l, days)).join('')}</div>`;
@@ -2593,7 +2668,7 @@ function locRowHTML(l, days){
   return `<div class="crewgrid crewgrid-row" style="--daycols:${days.length};">
     <div class="crewgrid-row-name"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
     ${dayCells}
-    <div class="crewgrid-remove"><button class="small danger" onclick="removeLocFromProject('${l.id}')">Remove</button></div>
+    <div class="crewgrid-remove"><button class="icon-btn danger-ic" onclick="removeLocFromProject('${l.id}')" title="Remove ${esc(l.name)} from this project" aria-label="Remove from project">${icon('trash')}</button></div>
   </div>`;
 }
 async function toggleLocOnDay(locId, dayId, checked){
@@ -3314,14 +3389,7 @@ function shootDayBuildHTML(){
     <div class="section">
       <div class="hint" style="margin-bottom:8px;">Reference for camera &amp; technical crew only — stays off the main call sheet.</div>
       <div id="techSpecsBanner"></div>
-      <div class="ts-grid">
-        <div class="ts-field"><label>Frame rate</label><input type="text" id="tsFrameRate" placeholder="25p"></div>
-        <div class="ts-field"><label>Resolution</label><input type="text" id="tsResolution" placeholder="4K UHD"></div>
-        <div class="ts-field"><label>Delivery</label><input type="text" id="tsDelivery" placeholder="1080p"></div>
-        <div class="ts-field"><label>Colour profile</label><input type="text" id="tsColorProfile" placeholder="S-Log3 CineGamut3"></div>
-        <div class="ts-field"><label>Timecode</label><input type="text" id="tsTimecode" placeholder="Time of Day"></div>
-        <div class="ts-field"><label>Codec</label><input type="text" id="tsCodec" placeholder="XAVC"></div>
-      </div>
+      ${techSpecFieldsHTML('ts')}
       <div class="subhead" style="margin-top:18px;">Camera designations</div>
       <div class="hint" style="margin-bottom:10px;">Only people in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
       <div id="cameraDesigList"></div>
@@ -3642,8 +3710,7 @@ function populateShootDay(d){
   document.getElementById('rows-sched').innerHTML='<div class="row" style="border:none;padding:0;margin:0 0 2px;"><span></span><span></span><label>Time</label><label>Duration</label><label>Description</label><span></span></div>';
   (d.schedule&&d.schedule.length?d.schedule:[[],[]]).forEach(r=>addSchedRow(r));
   renderPositionAssignments(); refreshAddPosnPick();
-  const ts=resolveTechSpecs(d);
-  TECHSPEC_FIELDS.forEach(f=>setv('ts'+f.charAt(0).toUpperCase()+f.slice(1), ts[f]));
+  setTechSpecFields('ts', resolveTechSpecs(d));
   setv('sdBrief',(d.brief||[]).join('\n')); setv('sdParking',d.parking); setv('sdNotes',d.notes);
   updateHospitalDisplay();
   updateParkingLookupDisplay();
@@ -3713,11 +3780,9 @@ async function saveShootDay(thenGenerate){
   });
   // store only what actually differs from the project defaults, so later default changes flow through
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, (projectOf(d)||{}).techSpecs||{});
+  const entered = readTechSpecFields('ts');
   const tsOv = {};
-  TECHSPEC_FIELDS.forEach(f=>{
-    const v = val('ts'+f.charAt(0).toUpperCase()+f.slice(1));
-    if((v||'') !== (projTS[f]||'')) tsOv[f] = v;
-  });
+  TECHSPEC_FIELDS.forEach(f=>{ if((entered[f]||'') !== (projTS[f]||'')) tsOv[f] = entered[f]; });
   if(Object.keys(tsOv).length) d.techSpecs = tsOv; else delete d.techSpecs;
   d.brief=val('sdBrief').split('\n').map(s=>s.trim()).filter(Boolean);
   d.parking=val('sdParking'); d.notes=val('sdNotes');
