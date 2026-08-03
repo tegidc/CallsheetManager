@@ -633,7 +633,7 @@ function roleAddPickerHTML(c){
   return `<select class="pill-select empty" onchange="addRoleToCrew('${c.id}', this)" onclick="event.stopPropagation()" title="Add a saved role">${opts}</select>`;
 }
 async function addRoleToCrew(crewId, selectEl){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   let value = selectEl.value;
   if(!value){ refreshCrewScreen(); return; }
   if(value==='__addrole__'){ openAddRoleDialog(crewId); return; }
@@ -644,7 +644,7 @@ async function addRoleToCrew(crewId, selectEl){
   refreshCrewScreen();
 }
 async function removeRoleFromCrew(crewId, rolePath){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   if((c.roles||[]).length<=1){ alert('Every crew member needs at least one saved role — add a replacement before removing this one.'); return; }
   const wasActive = c.role && rolePath.endsWith('/'+c.role);
   c.roles = (c.roles||[]).filter(r=>r!==rolePath);
@@ -657,7 +657,7 @@ async function removeRoleFromCrew(crewId, rolePath){
    saved role declares its own department (item 1 of Phase R), so there is no separate
    department field to keep in sync — this is the one place department ever changes. */
 async function setActiveRole(crewId, rolePath, skipSave){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   const dept = departmentForRolePath(rolePath);
   const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
   c.role = roleName;
@@ -701,7 +701,7 @@ async function confirmAddRoleDialog(){
   const target = addRoleDialogFor;
   addRoleDialogFor = null;
   if(target && target!=='__new__'){
-    const c = crewDB.find(x=>x.id===target);
+    const c = crewById(target);
     if(c){
       c.roles = c.roles || [];
       if(!c.roles.includes(path)) c.roles.push(path);
@@ -723,7 +723,7 @@ function renderGlobalOverlay(){
    reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
    until the role is actually changed away from the original's. */
 async function duplicateCrew(crewId){
-  const src = crewDB.find(x=>x.id===crewId); if(!src) return;
+  const src = crewById(crewId); if(!src) return;
   const copy = Object.assign({}, src, { id: uid(), _copyOriginalRole: src.role||'' });
   crewDB.push(copy);
   await saveDB('db:crew', crewDB);
@@ -741,7 +741,7 @@ function coProPillSelect(c){
   return `<select class="pill-select copro ${empty?'empty':''}" onchange="quickSetCoPro('${c.id}', this)" onclick="event.stopPropagation()" title="Which company supplied this person">${opts}</select>`;
 }
 async function quickSetCoPro(crewId, selectEl){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   let value = selectEl.value;
   if(value==='__add__'){
     value = (prompt('Co-production company name:')||'').trim();
@@ -840,6 +840,50 @@ const esc = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').r
 const val = id => (document.getElementById(id)?.value || '').trim();
 const setv = (id,v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
 
+/* ---- canonical record lookups ----
+   Every screen reaches for the same handful of records. These are the single place
+   that knows how to find each, so no screen re-derives it with its own inline
+   .find/.filter/.sort — which is what lets sort order and fallbacks drift apart
+   between screens (and is how the tech-specs export bug went unnoticed). */
+const projById = id => projectsDB.find(x=>x.id===id) || null;
+const currentProject = () => projById(currentProjectId);
+const crewById = id => crewDB.find(c=>c.id===id) || null;
+const dayById = id => shootDaysDB.find(d=>d.id===id) || null;
+const locById = id => locationsDB.find(l=>l.id===id) || null;
+const currentDay = () => dayById(currentShootDayId);
+/* shoot days of a project, always in day order — defaults to the open project */
+const projectDays = (projectId) => shootDaysDB
+  .filter(d=>d.projectId===(projectId||currentProjectId))
+  .sort((a,b)=>(Number(a.dayNum)||0)-(Number(b.dayNum)||0));
+/* crew records for a project, in the order they were added to it */
+const projectCrew = (p) => ((p||currentProject()||{}).crewIds||[]).map(crewById).filter(Boolean);
+/* the location currently picked in the Shoot Day form's primary-location select */
+const selectedDayLocation = () => locById(document.getElementById('sdLocation')?.value);
+/* the whole Crew Database screen — the filter/sort/admin controls all live outside
+   #crewList, so they need a full re-render rather than renderCrewList() */
+const refreshCrewDatabase = () => renderCrewDatabase(document.getElementById('main'));
+
+/* the discreet "Saved" flash the save buttons and autosave share */
+function flashStatus(elId, text){
+  const st = document.getElementById(elId); if(!st) return;
+  st.textContent = text || 'Saved';
+  setTimeout(()=>{ const e=document.getElementById(elId); if(e) e.textContent=''; }, 2000);
+}
+/* one clipboard path for every Copy button — async API with a textarea fallback
+   for browsers/contexts that block it. Pass a message to confirm, or omit to copy
+   silently (used where the button itself is feedback enough). */
+async function copyText(text, okMsg){
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=text;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }
+    catch(e2){ alert('Copy failed — select the text and copy manually.'); document.body.removeChild(ta); return; }
+    document.body.removeChild(ta);
+  }
+  if(okMsg) alert(okMsg);
+}
+
 /* ============================================================ MINIMAL LINE ICONS
    Small stroke-based SVGs (currentColor) used throughout the UI in place of emoji.
    Not used in the generated call-sheet text itself — that keeps its WhatsApp-style
@@ -937,9 +981,9 @@ document.addEventListener('keydown', function(e){
    Genuine on/off toggle: if everything for this person is already ticked, turn
    it all off; otherwise turn it all on. */
 async function toggleAllForPerson(crewId, kind){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   if(kind==='hotel'){
-    const p = projectsDB.find(x=>x.id===currentProjectId);
+    const p = currentProject();
     p.hotelNightBefore = p.hotelNightBefore || [];
     const allOn = p.hotelNightBefore.includes(crewId) && days.every(d=>(d.hotelNights||[]).includes(crewId));
     if(allOn){
@@ -965,7 +1009,7 @@ async function toggleAllForPerson(crewId, kind){
 }
 /* ---- toggle-all for one meal across every day, for one person (Catering) ---- */
 async function toggleAllMealForPerson(crewId, mealKey){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId);
+  const days = projectDays();
   const allOn = days.length>0 && days.every(d=>getCateringMeals(d.id, crewId)[mealKey]);
   days.forEach(d=>{
     d.cateringMeals = d.cateringMeals || {};
@@ -1689,7 +1733,7 @@ async function createProject(){
 
 /* ============================================================ PROJECT VIEW */
 function renderProject(m){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   if(!p){ route={screen:'welcome'}; renderMain(); return; }
   setTopbarTitle(p.title||'(untitled)');
   m.innerHTML = `
@@ -1720,8 +1764,8 @@ function renderProjectBody(){
 }
 
 function renderProjectOverview(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject();
+  const days = projectDays(p.id);
   body.innerHTML = `
     ${bareMinimumWarningsHTML(p, days)}
     <div class="section">
@@ -1759,7 +1803,7 @@ function renderProjectOverview(body){
 /* ---------- Tech (Phase M — split out of Overview: tech specs defaults + camera
    designations get their own dedicated space for future tech-related features) ---------- */
 function renderProjectTech(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const continuous = p.continuousNumbering!==false;
   body.innerHTML = `
@@ -1810,7 +1854,7 @@ function bareMinimumWarningsHTML(p, days){
   </div>`;
 }
 async function saveProjectTechSpecs(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   p.techSpecs = p.techSpecs || {};
   TECHSPEC_FIELDS.forEach(f=>{
     const v = val('pj'+f.charAt(0).toUpperCase()+f.slice(1));
@@ -1819,15 +1863,15 @@ async function saveProjectTechSpecs(){
   const numbering = document.getElementById('pjContinuousNumbering');
   if(numbering) p.continuousNumbering = numbering.value!=='reset';
   await saveDB('db:projects', projectsDB);
-  const st=document.getElementById('pjStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
+  flashStatus('pjStatus');
 }
 async function saveProjectOverview(silent){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   const client=val('ovClient'), title=val('ovTitle'), start=val('ovStart');
   if(!client||!title||!start){ if(!silent) alert('Client, working title and initial shoot date are required.'); return; }
   p.client=client; p.title=title; p.startDate=start; p.logline=val('ovLogline'); p.description=val('ovDescription');
   await saveDB('db:projects', projectsDB);
-  const st=document.getElementById('ovStatus'); if(st){ st.textContent='Saved'; setTimeout(()=>{ if(st) st.textContent='';},2000); }
+  flashStatus('ovStatus');
   renderSide();
   const h1=document.querySelector('.page-head h1'); if(h1) h1.textContent = p.title;
   const codeEl=document.querySelector('.page-head .code'); if(codeEl) codeEl.textContent = projCode(p);
@@ -1988,7 +2032,7 @@ function toggleSelectAllFilteredCrew(idsCSV, checked){
 }
 function clearCrewSelection(){ projectCrewSelected.clear(); bulkEditOpen = false; renderProjectBody(); }
 async function bulkRemoveSelectedFromProject(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   const n = projectCrewSelected.size;
   if(!n || !confirm(`Remove ${n} crew member(s) from this project?`)) return;
   p.crewIds = (p.crewIds||[]).filter(id=>!projectCrewSelected.has(id));
@@ -2039,9 +2083,9 @@ function bulkActionBarHTML(){
   </div>${bulkEditPanelHTML()}`;
 }
 function renderProjectCrew(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
-  const assigned = (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
+  const p = currentProject();
+  const days = projectDays();
+  const assigned = (p.crewIds||[]).map(id=>crewById(id)).filter(Boolean);
   const unassigned = crewDB.filter(c=>!(p.crewIds||[]).includes(c.id));
   const filtered = assigned.filter(personMatchesProjectFilter);
 
@@ -2177,7 +2221,7 @@ function showAsQuickEditHTML(c){
   </span>`;
 }
 async function saveQuickShowAs(crewId){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   const el = document.getElementById('qsaShowAs_'+crewId);
   c.showAs = (el?.value||'').trim();
   await saveDB('db:crew', crewDB);
@@ -2197,7 +2241,7 @@ function crewAssignRowHTML(c, days){
   const isEditing = editingCrewId===c.id;
   let preCell = '';
   if(crewGridView==='hotel' && days.length){
-    const p = projectsDB.find(x=>x.id===currentProjectId) || {};
+    const p = currentProject() || {};
     const inPre = (p.hotelNightBefore||[]).includes(c.id);
     preCell = `<div class="crewgrid-check" data-day="Pre"><input type="checkbox" ${inPre?'checked':''} onchange="toggleHotelPre('${c.id}',this.checked)" title="Night before Day 1"></div>`;
   }
@@ -2257,7 +2301,7 @@ function crewCateringBlockHTML(c, days){
   </div>`;
 }
 async function toggleHotelNight(crewId, dayId, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.hotelNights = d.hotelNights || [];
   if(checked){ if(!d.hotelNights.includes(crewId)) d.hotelNights.push(crewId); }
   else { d.hotelNights = d.hotelNights.filter(id=>id!==crewId); }
@@ -2265,7 +2309,7 @@ async function toggleHotelNight(crewId, dayId, checked){
   renderProjectBody();
 }
 async function toggleHotelPre(crewId, checked){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   p.hotelNightBefore = p.hotelNightBefore || [];
   if(checked){ if(!p.hotelNightBefore.includes(crewId)) p.hotelNightBefore.push(crewId); }
   else { p.hotelNightBefore = p.hotelNightBefore.filter(id=>id!==crewId); }
@@ -2273,8 +2317,8 @@ async function toggleHotelPre(crewId, checked){
   renderProjectBody();
 }
 function buildHotelExport(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject(); if(!p) return null;
+  const days = projectDays();
   if(!days.length) return null;
   // build a night → guests map (Pre night + each day)
   const nightLabels = [];
@@ -2324,17 +2368,17 @@ function copyHotelExport(){
   data.nights.forEach(n=>lines.push(`${n.label}: ${n.guests.length} room${n.guests.length>1?'s':''} — ${n.guests.join(', ')}`));
   lines.push('','ROOMING LIST');
   data.roomingList.forEach((n,i)=>lines.push(`${i+1}. ${n}`));
-  navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!')).catch(()=>alert('Copy failed — try manually.'));
+  copyText(lines.join('\n'), 'Copied!');
 }
 /* ---- Catering: breakfast / lunch / dinner per person per day ----
    Stored on each shoot day as cateringMeals: { crewId: {b:bool, l:bool, d:bool} } */
 function getCateringMeals(dayId, crewId){
-  const d = shootDaysDB.find(x=>x.id===dayId);
+  const d = dayById(dayId);
   if(!d || !d.cateringMeals || !d.cateringMeals[crewId]) return {b:false, l:false, d:false};
   return d.cateringMeals[crewId];
 }
 async function toggleMeal(crewId, dayId, meal, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.cateringMeals = d.cateringMeals || {};
   d.cateringMeals[crewId] = d.cateringMeals[crewId] || {b:false, l:false, d:false};
   d.cateringMeals[crewId][meal] = checked;
@@ -2344,8 +2388,8 @@ async function toggleMeal(crewId, dayId, meal, checked){
   renderProjectBody();
 }
 function buildCateringExport(){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject(); if(!p) return null;
+  const days = projectDays();
   if(!days.length) return null;
   const perDay = days.map(d=>{
     const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
@@ -2404,7 +2448,7 @@ function copyCateringExport(){
     }
     lines.push('');
   });
-  navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!')).catch(()=>alert('Copy failed.'));
+  copyText(lines.join('\n'), 'Copied!');
 }
 function crewTravelRowHTML(c, p){
   const current = (p.travelMethods||{})[c.id] || '';
@@ -2422,7 +2466,7 @@ function crewTravelRowHTML(c, p){
 }
 async function setTravelMethod(crewId, selectEl){
   const value = selectEl.value;
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
+  const p = currentProject(); if(!p) return;
   p.travelMethods = p.travelMethods || {};
   if(value==='__add__'){
     const newOpt = (prompt('Add a new travel method:')||'').trim();
@@ -2438,7 +2482,7 @@ async function setTravelMethod(crewId, selectEl){
   renderProjectBody();
 }
 async function toggleCrewOnDay(crewId, dayId, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.positions = d.positions || [];
   if(checked){
     if(!d.positions.some(pos=>pos[0]===crewId)) d.positions.push([crewId, '', '', '', '']);
@@ -2463,7 +2507,7 @@ const TECHSPEC_LABELS = { frameRate:'Frame rate', resolution:'Resolution', deliv
 function techSpecRows(ts){
   return TECHSPEC_FIELDS.map(f=>[TECHSPEC_LABELS[f], (ts||{})[f]||'']).filter(([,v])=>v);
 }
-function projectOf(day){ return projectsDB.find(x=>x.id===(day&&day.projectId)) || null; }
+function projectOf(day){ return projById(day && day.projectId); }
 function resolveTechSpecs(day){
   const p = projectOf(day) || {};
   return Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{}, day && day.techSpecs || {});
@@ -2482,8 +2526,8 @@ const CAMERA_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N',
 function letterForIndex(i){ return CAMERA_LETTERS[i] || ('#'+(i+1)); }
 /* camera crew for a project — Cinematography department, in project crew-assignment order */
 function cinematographyCrew(projectId){
-  const p = projectsDB.find(x=>x.id===projectId); if(!p) return [];
-  return (p.crewIds||[]).map(id=>crewDB.find(c=>c.id===id)).filter(c=>c && c.department==='Cinematography');
+  const p = projById(projectId); if(!p) return [];
+  return (p.crewIds||[]).map(id=>crewById(id)).filter(c=>c && c.department==='Cinematography');
 }
 /* brings a possibly-stale/legacy cams object up to the current shape:
    - migrates the old {assign:{crewId:{a,b,bodyA,bodyB}}} shape (sorted by its old
@@ -2500,7 +2544,7 @@ function normalizeCameras(cams, projectId){
     const order = entries.map(e=>e.cid);
     const camerasByOp = {};
     entries.forEach(e=>{
-      const crew = crewDB.find(c=>c.id===e.cid)||{};
+      const crew = crewById(e.cid)||{};
       const list = [{ body: e.bodyA!==undefined?e.bodyA:(crew.camera1||''), shorthand:'' }];
       if(e.hasB) list.push({ body: e.bodyB!==undefined?e.bodyB:(crew.camera2||crew.camera1||''), shorthand:'' });
       camerasByOp[e.cid] = list;
@@ -2515,7 +2559,7 @@ function normalizeCameras(cams, projectId){
   cams.order = cams.order.filter(cid=>crew.some(c=>c.id===cid));
   cams.order.forEach(cid=>{
     if(!cams.cameras[cid] || !cams.cameras[cid].length){
-      const c = crewDB.find(x=>x.id===cid)||{};
+      const c = crewById(cid)||{};
       cams.cameras[cid] = [{ body:c.camera1||'', shorthand:'' }];
     }
   });
@@ -2550,16 +2594,16 @@ function cameraFileTag(letter, cameraModel, name){
 function renderCameraDesignations(scope){
   const el = document.getElementById(scope==='project' ? 'cameraDesigListProject' : 'cameraDesigList');
   if(!el) return;
-  const day = scope==='day' ? shootDaysDB.find(x=>x.id===currentShootDayId) : null;
+  const day = scope==='day' ? currentDay() : null;
   if(scope==='day' && !day) return;
   const projectId = scope==='day' ? day.projectId : currentProjectId;
-  const cams = scope==='day' ? resolveCameras(day) : normalizeCameras((projectsDB.find(x=>x.id===projectId)||{}).cameras, projectId);
+  const cams = scope==='day' ? resolveCameras(day) : normalizeCameras((projById(projectId)||{}).cameras, projectId);
   let html = '';
   if(!cams.order.length){
     html += `<div class="empty-note">No one on this project is in the Cinematography department yet — add them via the Crew tab first.</div>`;
   } else {
     html += cams.order.map((cid,oi)=>{
-      const c = crewDB.find(x=>x.id===cid); if(!c) return '';
+      const c = crewById(cid); if(!c) return '';
       const baseLetter = letterForIndex(oi);
       const camList = cams.cameras[cid]||[];
       const tags = camList.map((cam,ci)=>cameraFileTag(baseLetter+String(ci+1).padStart(2,'0'), cam.body, c.name));
@@ -2624,11 +2668,11 @@ function renderCameraDesignations(scope){
 /* returns the cameras object to mutate, creating a day override on first day-scoped edit */
 function camerasForEdit(scope){
   if(scope==='project'){
-    const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return null;
+    const p = currentProject(); if(!p) return null;
     p.cameras = normalizeCameras(p.cameras, currentProjectId);
     return { obj:p.cameras, key:'db:projects', arr:()=>projectsDB };
   }
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return null;
+  const day = currentDay(); if(!day) return null;
   if(!day.cameras){
     day.cameras = JSON.parse(JSON.stringify(resolveCameras(day)));   // fork the resolved (already-normalized) default
   } else {
@@ -2636,65 +2680,58 @@ function camerasForEdit(scope){
   }
   return { obj:day.cameras, key:'db:shootdays', arr:()=>shootDaysDB };
 }
+/* every camera edit ends the same way: persist, re-render the list, and (day scope
+   only) refresh the "differs from project defaults" banner */
+async function commitCameras(scope, t){
+  await saveDB(t.key, t.arr());
+  renderCameraDesignations(scope);
+  if(scope==='day') refreshTechSpecsBanner();
+}
 async function moveOperator(scope, crewId, dir){
   const t = camerasForEdit(scope); if(!t) return;
   const order = t.obj.order;
   const i = order.indexOf(crewId), j = i+dir;
   if(i<0||j<0||j>=order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function addOperatorCamera(scope, crewId){
   const t = camerasForEdit(scope); if(!t) return;
   const list = t.obj.cameras[crewId] = t.obj.cameras[crewId] || [];
-  const c = crewDB.find(x=>x.id===crewId) || {};
+  const c = crewById(crewId) || {};
   const defaults = [c.camera1, c.camera2, c.camera3];
   list.push({ body: defaults[list.length]||'', shorthand:'' });
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function removeOperatorCamera(scope, crewId, index){
   const t = camerasForEdit(scope); if(!t) return;
   const list = t.obj.cameras[crewId]; if(!list) return;
   list.splice(index,1);
   if(!list.length) list.push({body:'',shorthand:''}); // keep at least one slot so the row stays editable
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function setOperatorCameraField(scope, crewId, index, field, value){
   const t = camerasForEdit(scope); if(!t) return;
   const list = t.obj.cameras[crewId]; if(!list || !list[index]) return;
   list[index][field] = value;
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function addUnnamedCamera(scope){
   const t = camerasForEdit(scope); if(!t) return;
   t.obj.unnamed = t.obj.unnamed || [];
   t.obj.unnamed.push({ body:'', note:'' });
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function removeUnnamedCamera(scope, index){
   const t = camerasForEdit(scope); if(!t) return;
   (t.obj.unnamed||[]).splice(index,1);
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function setUnnamedCameraField(scope, index, field, value){
   const t = camerasForEdit(scope); if(!t) return;
   const u = (t.obj.unnamed||[])[index]; if(!u) return;
   u[field] = value;
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function moveUnnamedCamera(scope, index, dir){
   const t = camerasForEdit(scope); if(!t) return;
@@ -2702,19 +2739,17 @@ async function moveUnnamedCamera(scope, index, dir){
   const j = index+dir;
   if(j<0||j>=list.length) return;
   [list[index], list[j]] = [list[j], list[index]];
-  await saveDB(t.key, t.arr());
-  renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
+  await commitCameras(scope, t);
 }
 async function resetDayTechSpecs(){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   delete day.techSpecs; delete day.cameras;
   await saveDB('db:shootdays', shootDaysDB);
   populateShootDay(day);
 }
 function refreshTechSpecsBanner(){
   const el = document.getElementById('techSpecsBanner'); if(!el) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const differs = techSpecsOverridden(day) || camerasOverridden(day);
   el.innerHTML = differs
     ? `<div class="ts-banner differs">This day differs from the project defaults.
@@ -2723,12 +2758,12 @@ function refreshTechSpecsBanner(){
 }
 async function addCrewToProject(){
   const id = val('addCrewPick'); if(!id) return;
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(id)) p.crewIds.push(id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeCrewFromProject(id){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.crewIds = (p.crewIds||[]).filter(x=>x!==id);
   shootDaysDB.forEach(d=>{ if(d.projectId===currentProjectId && d.positions) d.positions = d.positions.filter(pos=>pos[0]!==id); });
   await saveDB('db:projects', projectsDB); await saveDB('db:shootdays', shootDaysDB);
@@ -2737,10 +2772,10 @@ async function removeCrewFromProject(id){
 
 /* ---------- Project Locations ---------- */
 function renderProjectLocations(body){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
-  const assigned = (p.locationIds||[]).map(id=>locationsDB.find(l=>l.id===id)).filter(Boolean);
+  const p = currentProject();
+  const assigned = (p.locationIds||[]).map(id=>locById(id)).filter(Boolean);
   const unassigned = locationsDB.filter(l=>!(p.locationIds||[]).includes(l.id));
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   body.innerHTML = `
     <div class="section">
       <h2>Locations on this project</h2>
@@ -2793,7 +2828,7 @@ function locRowHTML(l, days){
   </div>`;
 }
 async function toggleLocOnDay(locId, dayId, checked){
-  const d = shootDaysDB.find(x=>x.id===dayId); if(!d) return;
+  const d = dayById(dayId); if(!d) return;
   d.additionalLocationIds = d.additionalLocationIds || [];
   if(checked){
     if(!d.locationId){ d.locationId = locId; }
@@ -2807,12 +2842,12 @@ async function toggleLocOnDay(locId, dayId, checked){
 }
 async function addLocToProject(){
   const id = val('addLocPick'); if(!id) return;
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(id)) p.locationIds.push(id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeLocFromProject(id){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   p.locationIds = (p.locationIds||[]).filter(x=>x!==id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
@@ -2825,7 +2860,7 @@ function dayTabsBarHTML(days){
     </div>`;
 }
 function renderProjectDays(body){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   if(!days.length){
     body.innerHTML = `
       <div class="section">
@@ -2874,7 +2909,7 @@ function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   </div>`;
 }
 function renderProjectPreview(body){
-  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const days = projectDays();
   if(!days.length){
     body.innerHTML = `<div class="section"><h2>Preview &amp; export</h2><div class="empty-note">No shoot days yet — add one under the Shoot Days tab first.</div></div>`;
     return;
@@ -2912,7 +2947,7 @@ function makeShootDayRecord(projectId, p){
     hotelNights:[], cateringMeals:{} };
 }
 async function addShootDay(){
-  const p = projectsDB.find(x=>x.id===currentProjectId);
+  const p = currentProject();
   const rec = makeShootDayRecord(currentProjectId, p);
   shootDaysDB.push(rec); await saveDB('db:shootdays', shootDaysDB);
   currentShootDayId = rec.id;
@@ -2930,10 +2965,10 @@ async function deleteShootDay(id){
    (shootDayReductionPending) so the specific day(s) to lose can be ticked,
    rather than a sequence of native prompt() popups (Phase T item 1). */
 let shootDayReductionPending = null;   // { removeCount, selected:Set() } while picking which day(s) to remove
-function shootDayLabel(d){ return `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locationsDB.find(l=>l.id===d.locationId)||{}).name||''):''}`; }
+function shootDayLabel(d){ return `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locById(d.locationId)||{}).name||''):''}`; }
 async function syncShootDayCount(newCountStr){
-  const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
-  const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
+  const p = currentProject(); if(!p) return;
+  const days = projectDays(p.id);
   const newCount = parseInt(newCountStr, 10);
   shootDayReductionPending = null;
   if(!Number.isFinite(newCount) || newCount < 0 || newCount === days.length){ renderProjectOverview(document.getElementById('projectBody')); return; }
@@ -2994,20 +3029,20 @@ let crewDbFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent
 let crewDbFilterOpen = false;
 let crewSearchQuery = '';   // kept outside the DOM so filter-panel re-renders don't clear the search box
 function personMatchesCrewDbFilter(c){ return matchesCrewFilterState(c, crewDbFilter); }
-function toggleCrewDbFilterPanel(){ crewDbFilterOpen = !crewDbFilterOpen; renderCrewDatabase(document.getElementById('main')); }
+function toggleCrewDbFilterPanel(){ crewDbFilterOpen = !crewDbFilterOpen; refreshCrewDatabase(); }
 function toggleCrewDbFilterDept(dept, checked){
   if(checked) crewDbFilter.depts.add(dept); else crewDbFilter.depts.delete(dept);
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
 function toggleCrewDbFilterRole(rolePath, checked){
   if(checked) crewDbFilter.roles.add(rolePath); else crewDbFilter.roles.delete(rolePath);
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
-function setCrewDbFilterField(field, value){ crewDbFilter[field] = value; renderCrewDatabase(document.getElementById('main')); }
-function toggleCrewDbFilterFlag(field, checked){ crewDbFilter[field] = checked; renderCrewDatabase(document.getElementById('main')); }
+function setCrewDbFilterField(field, value){ crewDbFilter[field] = value; refreshCrewDatabase(); }
+function toggleCrewDbFilterFlag(field, checked){ crewDbFilter[field] = checked; refreshCrewDatabase(); }
 function clearCrewDbFilter(){
   crewDbFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept' };
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
 function crewDbActiveFilterCount(){
   const f = crewDbFilter;
@@ -3066,7 +3101,7 @@ function renderCrewDatabase(m){
     </div>`;
   renderCrewList();
 }
-function toggleDeptAdminPanel(){ deptAdminOpen = !deptAdminOpen; renderCrewDatabase(document.getElementById('main')); }
+function toggleDeptAdminPanel(){ deptAdminOpen = !deptAdminOpen; refreshCrewDatabase(); }
 /* "Departments & sub-departments" admin panel — an at-a-glance view of every
    department's sub-departments and roster, with Heads of Department pinned to
    the top of each department's crew list (not flat/alphabetical). */
@@ -3101,7 +3136,7 @@ async function addSubDeptAdmin(dept){
   SUBDEPARTMENTS_BY_DEPT[dept] = SUBDEPARTMENTS_BY_DEPT[dept] || [];
   if(!SUBDEPARTMENTS_BY_DEPT[dept].includes(sd)) SUBDEPARTMENTS_BY_DEPT[dept].push(sd);
   await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
 async function renameSubDeptAdmin(dept, oldSd){
   const newSd = (prompt(`Rename "${oldSd}" to:`, oldSd)||'').trim();
@@ -3112,7 +3147,7 @@ async function renameSubDeptAdmin(dept, oldSd){
   crewDB.forEach(c=>{ if(c.department===dept && c.subDepartment===oldSd) c.subDepartment = newSd; });
   await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
   await saveDB('db:crew', crewDB);
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
 async function removeSubDeptAdmin(dept, sd){
   const affected = crewDB.filter(c=>c.department===dept && c.subDepartment===sd).length;
@@ -3121,13 +3156,13 @@ async function removeSubDeptAdmin(dept, sd){
   crewDB.forEach(c=>{ if(c.department===dept && c.subDepartment===sd) c.subDepartment = ''; });
   await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
   await saveDB('db:crew', crewDB);
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
 async function toggleHoD(crewId){
-  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  const c = crewById(crewId); if(!c) return;
   c.isHoD = !c.isHoD;
   await saveDB('db:crew', crewDB);
-  renderCrewDatabase(document.getElementById('main'));
+  refreshCrewDatabase();
 }
 function crewSearchBlob(c){
   return [c.name, c.role, c.showAs, c.department, c.subDepartment, c.coProductionCompany, c.skills, c.camera1, c.camera2, c.camera3, c.cameraExtras, c.dietary,
@@ -3336,7 +3371,7 @@ function refreshCrewScreen(){
   // the crew database screen needs a FULL re-render, not just renderCrewList():
   // the add/edit form markup lives outside #crewList, so re-rendering only the
   // list left "+ Add crew member" toggling its label but never showing a form.
-  else if(route.screen==='db-crew') renderCrewDatabase(document.getElementById('main'));
+  else if(route.screen==='db-crew') refreshCrewDatabase();
   else renderCrewList();
   renderGlobalOverlay();
 }
@@ -3384,7 +3419,7 @@ function crewViewHTML(c){
 async function saveCrew(){
   const name = val('ncName'); if(!name){ alert('Name is required'); return; }
   const id = val('crewEditId');
-  const existing = crewDB.find(x=>x.id===id);
+  const existing = crewById(id);
   if(!existing && !pendingNewCrewRole){ alert('Pick a role — every crew member needs at least one saved role.'); return; }
   const rec = { id: id||uid(), name,
     subDepartment: val('ncSubDept'), showAs: val('ncShowAs'), coProductionCompany: val('ncCoPro'),
@@ -3409,7 +3444,7 @@ async function saveCrew(){
   await saveDB('db:crew', crewDB);
   // if this was a brand-new person added from inside a project, put them on that project straight away
   if(!existing && route.screen==='project' && currentProjectId){
-    const p = projectsDB.find(x=>x.id===currentProjectId);
+    const p = currentProject();
     if(p){ p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(merged.id)) p.crewIds.push(merged.id); await saveDB('db:projects', projectsDB); }
   }
   pendingNewCrewRole = '';
@@ -3501,7 +3536,7 @@ function toggleLocForm(projectId){
 }
 function closeLocForm(){ const w=document.getElementById('locFormWrap'); w.style.display='none'; w.innerHTML=''; locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=null; }
 function editLocation(id){
-  const l = locationsDB.find(x=>x.id===id); if(!l) return;
+  const l = locById(id); if(!l) return;
   locFormState = { lat: l.lat||null, lon: l.lon||null, hospital: l.hospital||null, parking: l.nearestParking||null }; locFormContext=null;
   const w=document.getElementById('locFormWrap'); w.innerHTML=locFormHTML(l); w.style.display='';
   updateMapPreview(); w.scrollIntoView({behavior:'smooth', block:'nearest'});
@@ -3512,13 +3547,13 @@ async function saveLocation(){
   const rec = { id:id||uid(), name, address:val('nlAddress'), lat:locFormState.lat, lon:locFormState.lon,
     onsiteContactName:val('nlContactName'), onsiteContactPhone:val('nlContactPhone'),
     accessInfo:val('nlAccess'), recceInfo:val('nlRecce'), parkingInfo:val('nlParking'), hospital:locFormState.hospital, nearestParking:locFormState.parking };
-  const existing = locationsDB.find(x=>x.id===id);
+  const existing = locById(id);
   const merged = Object.assign({}, existing||{}, rec);
   const idx = locationsDB.findIndex(x=>x.id===merged.id);
   if(idx>=0) locationsDB[idx]=merged; else locationsDB.push(merged);
   await saveDB('db:locations', locationsDB);
   if(locFormContext){
-    const p = projectsDB.find(x=>x.id===locFormContext);
+    const p = projById(locFormContext);
     if(p){ p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(merged.id)) p.locationIds.push(merged.id); await saveDB('db:projects', projectsDB); }
     closeLocForm(); renderProjectBody();
   } else {
@@ -3756,10 +3791,10 @@ function shootDayBuildHTML(){
           </div>`;
 }
 function projectCrewOptions(){
-  const day = shootDaysDB.find(d=>d.id===currentShootDayId); if(!day) return [];
-  const p = projectsDB.find(x=>x.id===day.projectId);
+  const day = currentDay(); if(!day) return [];
+  const p = projById(day.projectId);
   const ids = p ? (p.crewIds||[]) : [];
-  return ids.map(id=>crewDB.find(c=>c.id===id)).filter(Boolean);
+  return ids.map(id=>crewById(id)).filter(Boolean);
 }
 /* shared option-list builder for every location <select> on the Shoot Day screen —
    primary (#sdLocation) and each additional-location row (.sdaddloc-sel) — so both
@@ -3807,8 +3842,8 @@ async function quickAddLocationForDay(selectEl){
   }
   // the Locations-tab day-grid only lists locations in p.locationIds — make sure
   // this one is on the project so its row (and ticked checkbox) actually shows up
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId);
-  const proj = projectsDB.find(x=>x.id===(day&&day.projectId));
+  const day = currentDay();
+  const proj = projById(day&&day.projectId);
   if(proj){
     proj.locationIds = proj.locationIds||[];
     if(!proj.locationIds.includes(loc.id)){ proj.locationIds.push(loc.id); await saveDB('db:projects', projectsDB); }
@@ -3845,7 +3880,7 @@ function togglePosnDept(company, dept){
 /* pulls whatever call time is currently sitting in the DOM into the saved day object,
    so collapsing a group or adding/removing someone never discards an in-progress edit */
 function captureInProgressPositions(){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const container = document.getElementById('rows-posn'); if(!container) return;
   const currentRows = rowsOf('rows-posn', ['posn-crew','posn-call']);
   if(!currentRows.length && (day.positions||[]).length) return; // not rendered yet — don't wipe saved data
@@ -3857,7 +3892,7 @@ function captureInProgressPositions(){
 }
 function renderPositionAssignments(){
   const el = document.getElementById('rows-posn'); if(!el) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const positions = day.positions || [];
   if(!positions.length){ el.innerHTML = '<div class="empty-note">No one added to this day yet.</div>'; return; }
   const companies = {};
@@ -3910,14 +3945,14 @@ function renderPositionAssignments(){
 }
 function refreshAddPosnPick(){
   const sel = document.getElementById('addPosnPick'); if(!sel) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   const already = new Set((day.positions||[]).map(p=>p[0]));
   const crew = projectCrewOptions().filter(c=>!already.has(c.id));
   sel.innerHTML = '<option value="">— Select crew —</option>' + groupedCrewOptionsHTML(crew);
 }
 async function addPosnToDay(){
   const id = val('addPosnPick'); if(!id) return;
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   captureInProgressPositions();
   day.positions = day.positions || [];
   if(!day.positions.some(p=>p[0]===id)) day.positions.push([id,'','','','']);
@@ -3926,7 +3961,7 @@ async function addPosnToDay(){
   refreshAddPosnPick();
 }
 async function removePosnRow(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   captureInProgressPositions();
   day.positions = (day.positions||[]).filter(p=>p[0]!==crewId);
   await saveDB('db:shootdays', shootDaysDB);
@@ -4067,27 +4102,27 @@ function populateShootDay(d){
 }
 function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); updateParkingLookupDisplay(); }
 function updateLocationSummary(){
-  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const l=selectedDayLocation();
   const el=document.getElementById('sdLocationSummary'); if(!el) return;
   if(!l){ el.textContent=''; return; }
   el.innerHTML=`${esc(l.address||'')}${l.accessInfo?('<br>Access: '+esc(l.accessInfo)):''}${l.onsiteContactName?('<br>On-site: '+esc(l.onsiteContactName)+(l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):'')):''}`;
   if(l.parkingInfo && !val('sdParking')) setv('sdParking', l.parkingInfo);
 }
 function updateHospitalDisplay(){
-  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const l=selectedDayLocation();
   const el=document.getElementById('sdHospitalInfo'); if(!el) return;
   if(!l){ el.textContent='Select a primary location to see its saved hospital.'; return; }
   el.textContent = l.hospital?`${l.hospital.name} — ${l.hospital.address||''} (~${l.hospital.distanceKm}km)`:'No hospital saved for this location yet — add one in the Locations database.';
 }
 function updateParkingLookupDisplay(){
-  const l=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const l=selectedDayLocation();
   const el=document.getElementById('sdParkingLookupInfo'); if(!el) return;
   if(!l){ el.textContent='Select a primary location to see its saved parking.'; return; }
   el.textContent = l.nearestParking?`${l.nearestParking.name} — ${l.nearestParking.address||''} (~${l.nearestParking.distanceKm}km)`:'No parking saved for this location yet — add one in the Locations database.';
 }
 const WMO={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Dense drizzle',61:'Slight rain',63:'Rain',65:'Heavy rain',71:'Slight snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Violent showers',95:'Thunderstorm'};
 async function fetchWeatherForDay(){
-  const loc=locationsDB.find(x=>x.id===document.getElementById('sdLocation').value);
+  const loc=selectedDayLocation();
   const dateStr=val('sdDate'); const s=document.getElementById('weatherStatus');
   if(!loc||loc.lat==null){ s.textContent='Pick a primary location with saved coordinates first.'; return; }
   if(!dateStr){ s.textContent='Set the shoot date first.'; return; }
@@ -4134,19 +4169,19 @@ async function saveShootDay(thenGenerate){
   d.brief=val('sdBrief').split('\n').map(s=>s.trim()).filter(Boolean);
   d.parking=val('sdParking'); d.notes=val('sdNotes');
   await saveDB('db:shootdays',shootDaysDB);
-  const st=document.getElementById('sdStatus'); st.textContent='Saved'; setTimeout(()=>{const e=document.getElementById('sdStatus'); if(e)e.textContent='';},2000);
+  flashStatus('sdStatus');
   if(thenGenerate) goProjectTab('preview');
 }
 
 /* ---------- preview / export ---------- */
-function crewInfo(id){ return crewDB.find(c=>c.id===id)||{name:'(removed crew)',role:'',phone:''}; }
+function crewInfo(id){ return crewById(id)||{name:'(removed crew)',role:'',phone:''}; }
 /* ---- per-day crew overrides ----
    A shoot day may override someone's role / department / sub-department / lead company
    for that day only. Person-level facts (phone, email, dietary, sizes) always fall
    through to the crew database, so later database fixes propagate automatically. */
 const OVERRIDABLE_FIELDS = ['role','department','subDepartment','coProductionCompany'];
 function resolveCrewForDay(crewId, day){
-  const base = crewDB.find(c=>c.id===crewId) || {id:crewId, name:'(removed crew)', role:'', phone:''};
+  const base = crewById(crewId) || {id:crewId, name:'(removed crew)', role:'', phone:''};
   const ov = day && day.crewOverrides && day.crewOverrides[crewId];
   if(!ov || !Object.keys(ov).length) return base;
   return Object.assign({}, base, ov, {_overridden:true});
@@ -4156,8 +4191,8 @@ function hasOverride(crewId, day){
   return !!(ov && Object.keys(ov).length);
 }
 function dayOverrideFormHTML(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return '';
-  const base = crewDB.find(c=>c.id===crewId) || {};
+  const day = currentDay(); if(!day) return '';
+  const base = crewById(crewId) || {};
   const eff = resolveCrewForDay(crewId, day);
   const overridden = hasOverride(crewId, day);
   const currentPath = eff.subDepartment ? `${eff.department}/${eff.subDepartment}` : (eff.department||'');
@@ -4199,8 +4234,8 @@ function dayOverrideFormHTML(crewId){
   </div>`;
 }
 async function saveDayOverride(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
-  const base = crewDB.find(c=>c.id===crewId) || {};
+  const day = currentDay(); if(!day) return;
+  const base = crewById(crewId) || {};
   const pathVal = val('ovDept');
   const [dept, ...rest] = pathVal.split('/');
   const proposed = { role: val('ovRole'), department: dept||'', subDepartment: rest.join('/'), coProductionCompany: val('ovCoPro') };
@@ -4214,16 +4249,16 @@ async function saveDayOverride(crewId){
   renderPositionAssignments();
 }
 async function clearDayOverride(crewId){
-  const day = shootDaysDB.find(x=>x.id===currentShootDayId); if(!day) return;
+  const day = currentDay(); if(!day) return;
   if(day.crewOverrides) delete day.crewOverrides[crewId];
   await saveDB('db:shootdays', shootDaysDB);
   editingCrewId = null;
   renderPositionAssignments();
 }
 function buildFullData(d){
-  const p=projectsDB.find(x=>x.id===d.projectId)||{};
-  const primary=locationsDB.find(l=>l.id===d.locationId);
-  const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locationsDB.find(x=>x.id===id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
+  const p=projById(d.projectId)||{};
+  const primary=locById(d.locationId);
+  const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locById(id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
   const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.showAs||c.role,name:c.name,call,phone:c.phone,department:c.department||'',subDepartment:c.subDepartment||'',coProductionCompany:c.coProductionCompany||''};});
   const positions = allPositions.filter(r=>!r.coProductionCompany).sort((a,b)=>deptRank(a.department)-deptRank(b.department));
   const coProBuckets = {};
@@ -4270,7 +4305,7 @@ function renderTechSpecsSection(d){
   el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
 }
 function copyTechSpecsText(){
-  const d=shootDaysDB.find(x=>x.id===currentShootDayId); if(!d) return '';
+  const d=currentDay(); if(!d) return '';
   const data=buildFullData(d); const ts=data.techSpecs||{};
   const dayLine=(data.dayNum||data.dayTotal)?`Day ${data.dayNum||'?'}${data.dayTotal?(' of '+data.dayTotal):''}`:'';
   const L=[`*TECH SPECS* — ${data.shootTitle||''} ${dayLine}`.trim()];
@@ -4281,11 +4316,7 @@ function copyTechSpecsText(){
   }
   return L.join('\n');
 }
-async function copyTechSpecs(){
-  const text=copyTechSpecsText();
-  try{ await navigator.clipboard.writeText(text); }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
-}
+function copyTechSpecs(){ return copyText(copyTechSpecsText()); }
 function renderPreviewCard(d){
   const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
   const open = previewBlocks.callsheet;
@@ -4347,13 +4378,9 @@ function buildWAText(d){
   if(d.notes) L.push('','*NOTES*',d.notes);
   return L.join('\n');
 }
-async function copyWA(){
-  const text=document.getElementById('waText').textContent;
-  try{ await navigator.clipboard.writeText(text); }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
-}
+function copyWA(){ return copyText(document.getElementById('waText').textContent); }
 function downloadExcel(){
-  const d=shootDaysDB.find(x=>x.id===currentShootDayId); if(!d) return;
+  const d=currentDay(); if(!d) return;
   const data=buildFullData(d); const aoa=[];
   const dayLine=(data.dayNum||data.dayTotal)?`Day ${data.dayNum||'?'}${data.dayTotal?(' of '+data.dayTotal):''}`:'';
   aoa.push([data.prodCompany,data.shootTitle]); aoa.push([fmtDate(data.shootDate),dayLine,data.allCrewCall?('All-crew call: '+data.allCrewCall):'']); aoa.push([]);
