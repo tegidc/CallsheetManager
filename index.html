@@ -2451,6 +2451,14 @@ async function toggleCrewOnDay(crewId, dayId, checked){
 const TECHSPEC_FIELDS = ['frameRate','resolution','delivery','colorProfile','timecode','codec'];
 const TECHSPEC_DEFAULTS = { frameRate:'25p', resolution:'4K UHD', delivery:'1080p',
   colorProfile:'S-Log3 CineGamut3', timecode:'Time of Day', codec:'XAVC' };
+/* human labels for the tech spec keys — the Preview table, the copyable text block
+   and the Excel sheet all render the same rows, so they share one definition */
+const TECHSPEC_LABELS = { frameRate:'Frame rate', resolution:'Resolution', delivery:'Delivery format',
+  colorProfile:'Colour profile', timecode:'Timecode', codec:'Codec' };
+/* [label, value] pairs for the fields that actually have a value */
+function techSpecRows(ts){
+  return TECHSPEC_FIELDS.map(f=>[TECHSPEC_LABELS[f], (ts||{})[f]||'']).filter(([,v])=>v);
+}
 function projectOf(day){ return projectsDB.find(x=>x.id===(day&&day.projectId)) || null; }
 function resolveTechSpecs(day){
   const p = projectOf(day) || {};
@@ -4230,7 +4238,10 @@ function buildFullData(d){
   return { prodCompany:p.company||COMPANY, shootTitle:[p.client,p.title].filter(Boolean).join(' — '),
     dayNum:d.dayNum,dayTotal:d.dayTotal,shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
     primary,addLocs,positions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
-    techSpecs:d.techSpecs||{}, cameraDesignations };
+    // resolved, not raw: a day stores only what DIFFERS from the project defaults
+    // (saveShootDay deletes d.techSpecs entirely when nothing differs), so reading
+    // d.techSpecs directly exported blank tech specs for every day on the defaults.
+    techSpecs:resolveTechSpecs(d), cameraDesignations };
 }
 function generatePreview(d){
   const data=buildFullData(d);
@@ -4241,11 +4252,10 @@ function generatePreview(d){
 function renderTechSpecsSection(d){
   const el=document.getElementById('techSpecsSection'); if(!el) return;
   const ts=d.techSpecs||{};
-  const rows=[['Frame rate',ts.frameRate],['Resolution',ts.resolution],['Delivery format',ts.delivery],
-    ['Colour profile',ts.colorProfile],['Timecode',ts.timecode],['Codec',ts.codec]].filter(([,v])=>v);
+  const rows=techSpecRows(ts);
   const cams = d.cameraDesignations||[];
   const headerActions = `<button class="small" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
-  if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them in the Build tab.</div>'); return; }
+  if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them under Tech, or per-day under Shoot Days.</div>'); return; }
   let body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>`;
   if(rows.length) body += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
   if(cams.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>Shorthand</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td>${esc(cd.shorthand||'')}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
@@ -4256,8 +4266,7 @@ function copyTechSpecsText(){
   const data=buildFullData(d); const ts=data.techSpecs||{};
   const dayLine=(data.dayNum||data.dayTotal)?`Day ${data.dayNum||'?'}${data.dayTotal?(' of '+data.dayTotal):''}`:'';
   const L=[`*TECH SPECS* — ${data.shootTitle||''} ${dayLine}`.trim()];
-  [['Frame rate',ts.frameRate],['Resolution',ts.resolution],['Delivery',ts.delivery],['Colour profile',ts.colorProfile],['Timecode',ts.timecode],['Codec',ts.codec]]
-    .forEach(([k,v])=>{ if(v) L.push(`${k}: ${v}`); });
+  techSpecRows(ts).forEach(([k,v])=>L.push(`${k}: ${v}`));
   if(data.cameraDesignations && data.cameraDesignations.length){
     L.push('','*CAMERA DESIGNATIONS*');
     data.cameraDesignations.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name}${cd.shorthand?(' ['+cd.shorthand+']'):''} (${cd.tag})`));
@@ -4359,8 +4368,7 @@ function downloadExcel(){
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:12},{wch:24},{wch:24},{wch:14},{wch:16},{wch:20}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Call Sheet');
   const ts=data.techSpecs||{};
-  const tsRows=[['Frame rate',ts.frameRate||''],['Resolution',ts.resolution||''],['Delivery format',ts.delivery||''],
-    ['Colour profile',ts.colorProfile||''],['Timecode',ts.timecode||''],['Codec',ts.codec||'']];
+  const tsRows=techSpecRows(ts);
   const tsAoa=[['TECH SPECS — camera/technical crew reference'],[],...tsRows];
   if(data.cameraDesignations && data.cameraDesignations.length){
     tsAoa.push([]); tsAoa.push(['CAMERA DESIGNATIONS']); tsAoa.push(['Camera','Name','Shorthand','File tag']);
