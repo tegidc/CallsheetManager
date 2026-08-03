@@ -72,12 +72,17 @@
      information / Schedule / Position assignments / Tech specs & cameras).
      Headline-weight so they read as clear page divisions, not another field label. */
   .sd-block{margin-bottom:4px;}
-  .sd-block-head{display:flex; align-items:center; gap:9px; cursor:pointer; user-select:none;
+  .sd-block-head{display:flex; align-items:center; justify-content:space-between; gap:9px; cursor:pointer; user-select:none;
     font-family:var(--disp); font-weight:700; font-size:20px; letter-spacing:.2px;
     color:var(--text); margin:26px 0 12px; padding-bottom:9px; border-bottom:2px solid var(--tape);}
   .sd-block:first-child .sd-block-head{margin-top:0;}
   .sd-block-head .dept-caret{font-size:13px; color:var(--tape);}
   .sd-block-head:hover{color:var(--tape);}
+  /* Preview & Export section headers reuse the same look, but only the caret+title
+     span toggles collapse — the header action (e.g. a Copy button) sits alongside it
+     and stays clickable/visible on its own, including while the body is collapsed. */
+  .sd-block-head-toggle{display:flex; align-items:center; gap:9px; cursor:pointer;}
+  .sd-block-head-toggle:hover{color:var(--tape);}
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
   .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
@@ -142,12 +147,14 @@
   .rows-sched .row{grid-template-columns:24px 30px 100px 90px 1fr 34px; position:relative;}
   .rows-sched .row .sc-select{align-self:center; width:16px; height:16px;}
   /* hover between schedule rows to insert a new blank row at that point, instead of
-     only being able to append at the bottom */
-  .sched-insert-hint{position:absolute; top:-13px; left:0; right:0; height:16px;
+     only being able to append at the bottom — sits just left of the Time column,
+     since that's the column you're navigating in when you'd reach for this */
+  .sched-insert-hint{position:absolute; top:-10px; left:50px; width:18px; height:18px;
     display:flex; align-items:center; justify-content:center; opacity:0; z-index:2;
     cursor:pointer; transition:opacity .12s ease;}
-  .sched-insert-hint span{font-family:var(--label); font-size:9.5px; letter-spacing:.5px; text-transform:uppercase;
-    color:var(--tape-ink); background:var(--tape); border-radius:20px; padding:2px 9px; white-space:nowrap;}
+  .sched-insert-hint span{font-family:var(--label); font-size:13px; font-weight:600; line-height:1;
+    color:var(--tape-ink); background:var(--tape); border-radius:50%; width:18px; height:18px;
+    display:flex; align-items:center; justify-content:center;}
   .rows-sched .row:hover .sched-insert-hint, .sched-insert-hint:hover{opacity:1;}
   .sc-move{display:flex; flex-direction:column; align-self:center; gap:0;}
   .sc-move .icon-btn{width:20px; height:14px;}
@@ -2017,8 +2024,9 @@ function buildHotelExport(){
 function renderHotelExport(){
   const el = document.getElementById('hotelExportSection'); if(!el) return;
   const data = buildHotelExport();
-  if(!data){ el.innerHTML='<div class="empty-note">No hotel nights ticked yet — fill them in on the Crew tab Hotel view.</div>'; return; }
-  let h = `<div class="card" style="padding:16px;">
+  const headerActions = `<button class="small" onclick="copyHotelExport()">${icon('copy')} Copy booking summary</button>`;
+  if(!data){ el.innerHTML = pvBlockHTML('hotel', 'Hotel booking', headerActions, '<div class="empty-note">No hotel nights ticked yet — fill them in on the Crew tab Hotel view.</div>'); return; }
+  const body = `<div class="card" style="padding:16px;">
     <div class="line1" style="font-size:15px;"><strong>${esc(data.summary)}</strong></div>
     <div class="hint" style="margin:6px 0 12px;">One room per person. Send this to the hotel alongside the rooming list below.</div>
     <h4 style="margin:12px 0 6px;">Per-night breakdown</h4>
@@ -2027,11 +2035,8 @@ function renderHotelExport(){
     </table>
     <h4 style="margin:14px 0 6px;">Rooming list</h4>
     <ol>${data.roomingList.map(n=>`<li>${esc(n)}</li>`).join('')}</ol>
-    <div class="toolbar" style="margin-top:10px;">
-      <button class="small" onclick="copyHotelExport()">${icon('copy')} Copy booking summary</button>
-    </div>
   </div>`;
-  el.innerHTML = h;
+  el.innerHTML = pvBlockHTML('hotel', 'Hotel booking', headerActions, body);
 }
 function copyHotelExport(){
   const data = buildHotelExport(); if(!data) return;
@@ -2085,10 +2090,11 @@ function buildCateringExport(){
 function renderCateringExport(){
   const el = document.getElementById('cateringExportSection'); if(!el) return;
   const data = buildCateringExport();
-  if(!data){ el.innerHTML='<div class="empty-note">No catering selections yet — fill them in on the Crew tab Catering view.</div>'; return; }
-  let h = '';
+  const headerActions = `<button class="small" onclick="copyCateringExport()">${icon('copy')} Copy catering order</button>`;
+  if(!data){ el.innerHTML = pvBlockHTML('catering', 'Catering order', headerActions, '<div class="empty-note">No catering selections yet — fill them in on the Crew tab Catering view.</div>'); return; }
+  let body = '';
   data.forEach(day=>{
-    h += `<div class="card" style="padding:14px; margin-bottom:10px;">
+    body += `<div class="card" style="padding:14px; margin-bottom:10px;">
       <div class="line1" style="font-size:14px;"><strong>${esc(day.label)}</strong></div>
       <table style="margin-top:8px;">
         <tr><th>Meal</th><th>Count</th></tr>
@@ -2102,8 +2108,7 @@ function renderCateringExport(){
       </table>` : ''}
     </div>`;
   });
-  h += `<div class="toolbar"><button class="small" onclick="copyCateringExport()">${icon('copy')} Copy catering order</button></div>`;
-  el.innerHTML = h;
+  el.innerHTML = pvBlockHTML('catering', 'Catering order', headerActions, body);
 }
 function copyCateringExport(){
   const data = buildCateringExport(); if(!data) return;
@@ -2468,6 +2473,38 @@ function renderProjectDays(body){
   populateShootDay(d);
   body.oninput = () => scheduleAutosave('shootday', () => saveShootDay(false));
 }
+/* Collapse state for Preview & Export sections — same GLOBAL-not-per-day rule as
+   shootDayBlocks: collapsing one day's Tech specs, say, keeps it collapsed on the
+   next day too. Each section's header keeps its Copy button visible even while
+   collapsed (see pvBlockHTML) — collapsing is about scanning the page fast, not
+   about hiding the one action you actually came here for. */
+let previewBlocks = { whatsapp:true, techspecs:true, hotel:true, catering:true, excel:true };
+function togglePreviewBlock(key){
+  previewBlocks[key] = !previewBlocks[key];
+  const bodyEl = document.getElementById('pvb-'+key);
+  const caret = document.getElementById('pvc-'+key);
+  if(bodyEl) bodyEl.style.display = previewBlocks[key] ? '' : 'none';
+  if(caret) caret.textContent = previewBlocks[key] ? '▾' : '▸';
+}
+function setAllPreviewBlocksCollapsed(collapsed){
+  Object.keys(previewBlocks).forEach(key=>{
+    previewBlocks[key] = !collapsed;
+    const bodyEl = document.getElementById('pvb-'+key);
+    const caret = document.getElementById('pvc-'+key);
+    if(bodyEl) bodyEl.style.display = previewBlocks[key] ? '' : 'none';
+    if(caret) caret.textContent = previewBlocks[key] ? '▾' : '▸';
+  });
+}
+function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
+  const open = previewBlocks[key];
+  return `<div class="section">
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="togglePreviewBlock('${key}')"><span class="dept-caret" id="pvc-${key}">${open?'▾':'▸'}</span> ${title}</span>
+      ${headerActionsHTML||''}
+    </div>
+    <div id="pvb-${key}" style="display:${open?'':'none'}">${bodyInnerHTML}</div>
+  </div>`;
+}
 function renderProjectPreview(body){
   const days = shootDaysDB.filter(d=>d.projectId===currentProjectId).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
   if(!days.length){
@@ -2476,16 +2513,19 @@ function renderProjectPreview(body){
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
   body.innerHTML = dayTabsBarHTML(days) + `
+    <div class="dept-toggle-all">
+      <span onclick="setAllPreviewBlocksCollapsed(false)">Expand all</span> ·
+      <span onclick="setAllPreviewBlocksCollapsed(true)">Collapse all</span>
+    </div>
     <div class="card" id="previewCard"></div>
-    <div class="section"><h2>WhatsApp text</h2><pre id="waText"></pre>
-      <button class="primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>
-      <p class="hint">This is the version for the full crew — tech specs are kept out of it.</p></div>
-    <div class="section" id="techSpecsSection"></div>
-    <div class="section"><h2>Hotel booking</h2><div id="hotelExportSection"></div></div>
-    <div class="section"><h2>Catering order</h2><div id="cateringExportSection"></div></div>
-    <div class="section"><h2>Excel export</h2>
+    ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
+      `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
+    <div id="techSpecsSection"></div>
+    <div id="hotelExportSection"></div>
+    <div id="cateringExportSection"></div>
+    ${pvBlockHTML('excel', 'Excel export', '', `
       <button class="primary" onclick="downloadExcel()">${icon('download')} Download .xlsx</button>
-      <p class="hint">Opens in Excel, Numbers, or Google Sheets (File → Import). Includes a separate Tech Specs sheet.</p></div>`;
+      <p class="hint">Opens in Excel, Numbers, or Google Sheets (File → Import). Includes a separate Tech Specs sheet.</p>`)}`;
   const d = days.find(x=>x.id===currentShootDayId);
   generatePreview(d);
   renderHotelExport();
@@ -3049,6 +3089,15 @@ function toggleShootDayBlock(key){
   if(body) body.style.display = shootDayBlocks[key] ? '' : 'none';
   if(caret) caret.textContent = shootDayBlocks[key] ? '▾' : '▸';
 }
+function setAllShootDayBlocksCollapsed(collapsed){
+  Object.keys(shootDayBlocks).forEach(key=>{
+    shootDayBlocks[key] = !collapsed;
+    const body = document.getElementById('sdb-'+key);
+    const caret = document.getElementById('sdc-'+key);
+    if(body) body.style.display = shootDayBlocks[key] ? '' : 'none';
+    if(caret) caret.textContent = shootDayBlocks[key] ? '▾' : '▸';
+  });
+}
 function sdBlock(key, title, inner){
   const open = shootDayBlocks[key];
   return `<div class="sd-block">
@@ -3144,7 +3193,11 @@ function shootDayBuildHTML(){
       <div class="toolbar" style="margin-top:8px;"><button class="small" onclick="addUnnamedCamera('day')">+ Add unnamed camera</button></div>
     </div>`;
 
-  return sdBlock('general','General information', general)
+  return `<div class="dept-toggle-all">
+      <span onclick="setAllShootDayBlocksCollapsed(false)">Expand all</span> ·
+      <span onclick="setAllShootDayBlocksCollapsed(true)">Collapse all</span>
+    </div>`
+       + sdBlock('general','General information', general)
        + sdBlock('schedule','Schedule', schedule)
        + sdBlock('positions','Position assignments', positions)
        + sdBlock('tech','Tech specs &amp; cameras', tech)
@@ -3338,7 +3391,7 @@ async function removePosnRow(crewId){
 }
 function addSchedRow(vals, insertBeforeEl){
   const c=document.getElementById('rows-sched'); const row=document.createElement('div'); row.className='row';
-  row.innerHTML=`<div class="sched-insert-hint" onclick="insertSchedRowBefore(this)" title="Insert a row here"><span>+ Insert row here</span></div><input type="checkbox" class="sc-select" title="Select for bulk time shift"><span class="sc-move"><button class="icon-btn" onclick="moveSchedRow(this,-1)" title="Move up" aria-label="Move up">${icon('up')}</button><button class="icon-btn" onclick="moveSchedRow(this,1)" title="Move down" aria-label="Move down">${icon('down')}</button></span><input type="text" class="sc-time" placeholder="08:00" oninput="onScheduleTimeInput(this)"><input type="text" class="sc-dur" placeholder="4hrs" oninput="onScheduleDurationInput(this)"><input type="text" class="sc-desc" placeholder="Description"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
+  row.innerHTML=`<div class="sched-insert-hint" onclick="insertSchedRowBefore(this)" title="Insert a row here"><span>+</span></div><input type="checkbox" class="sc-select" title="Select for bulk time shift"><span class="sc-move"><button class="icon-btn" onclick="moveSchedRow(this,-1)" title="Move up" aria-label="Move up">${icon('up')}</button><button class="icon-btn" onclick="moveSchedRow(this,1)" title="Move down" aria-label="Move down">${icon('down')}</button></span><input type="text" class="sc-time" placeholder="08:00" oninput="onScheduleTimeInput(this)"><input type="text" class="sc-dur" placeholder="4hrs" oninput="onScheduleDurationInput(this)"><input type="text" class="sc-desc" placeholder="Description"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
   if(insertBeforeEl && insertBeforeEl.parentNode===c){ c.insertBefore(row, insertBeforeEl); }
   else { c.appendChild(row); }
   if(vals){ row.querySelector('.sc-time').value=vals[0]||''; row.querySelector('.sc-dur').value=vals[1]||''; row.querySelector('.sc-desc').value=vals[2]||''; }
@@ -3659,13 +3712,12 @@ function renderTechSpecsSection(d){
   const rows=[['Frame rate',ts.frameRate],['Resolution',ts.resolution],['Delivery format',ts.delivery],
     ['Colour profile',ts.colorProfile],['Timecode',ts.timecode],['Codec',ts.codec]].filter(([,v])=>v);
   const cams = d.cameraDesignations||[];
-  if(!rows.length && !cams.length){ el.innerHTML=`<h2>Tech specs</h2><div class="empty-note">No tech specs set for this day yet — add them in the Build tab.</div>`; return; }
-  let h = `<h2>Tech specs</h2>
-    <div class="hint" style="margin:-4px 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>`;
-  if(rows.length) h += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
-  if(cams.length) h += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
-  h += `<div class="toolbar" style="margin-top:12px;"><button onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button></div>`;
-  el.innerHTML = h;
+  const headerActions = `<button class="small" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
+  if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them in the Build tab.</div>'); return; }
+  let body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>`;
+  if(rows.length) body += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
+  if(cams.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
+  el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
 }
 function copyTechSpecsText(){
   const d=shootDaysDB.find(x=>x.id===currentShootDayId); if(!d) return '';
