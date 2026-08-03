@@ -71,9 +71,13 @@
      information / Schedule / Position assignments / Tech specs & cameras).
      Headline-weight so they read as clear page divisions, not another field label. */
   .sd-block{margin-bottom:4px;}
-  .sd-block-head{display:flex; align-items:center; justify-content:space-between; gap:9px; cursor:pointer; user-select:none;
+  /* flex-start + margin-left:auto on any trailing action, NOT space-between: with
+     space-between a header that has no action (every Shoot Day block) pushed its
+     own title to the far right, away from its caret. */
+  .sd-block-head{display:flex; align-items:center; justify-content:flex-start; gap:9px; cursor:pointer; user-select:none;
     font-family:var(--disp); font-weight:700; font-size:20px; letter-spacing:.2px;
     color:var(--text); margin:26px 0 12px; padding-bottom:9px; border-bottom:2px solid var(--tape);}
+  .sd-block-head > button{margin-left:auto; flex:0 0 auto;}
   .sd-block:first-child .sd-block-head{margin-top:0;}
   .sd-block-head .dept-caret{font-size:13px; color:var(--tape);}
   .sd-block-head:hover{color:var(--tape);}
@@ -394,8 +398,8 @@
     /* --- buttons: 44px minimum touch target --- */
     button{font-size:15px; padding:12px 16px; min-height:46px;}
     /* keeps --ident-gutter in step with the bigger touch-target buttons */
-    :root{--ident-btn:34px;}
-    .icon-btn{width:34px; height:34px; font-size:14px; min-height:0;}
+    :root{--ident-btn:40px;}
+    .icon-btn{width:40px; height:40px; font-size:14px; min-height:0;}
     select.pill-select{font-size:12px; padding:5px 22px 5px 10px; max-width:150px;}
     button.small{font-size:14px; padding:10px 13px; min-height:44px;}
     .toolbar{gap:10px;}
@@ -421,10 +425,21 @@
       grid-column:1/-1; justify-self:stretch; width:100%;
     }
 
-    /* --- tabs scroll horizontally rather than wrapping into stacks --- */
-    .tabs{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+    /* --- tabs scroll horizontally rather than wrapping into stacks ---
+       The scrollbar is hidden, so without a cue a cut-off tab just looks clipped.
+       The wrapper fades the right edge to signal "there's more this way", and the
+       fade is hidden once you've scrolled to the end (.tabscroll-end, set in JS). */
+    .tabs{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+      scroll-snap-type:x proximity;}
     .tabs::-webkit-scrollbar{display:none;}
-    .tab{padding:12px 15px; font-size:13.5px; white-space:nowrap; flex:0 0 auto;}
+    .tab{padding:12px 15px; font-size:13.5px; white-space:nowrap; flex:0 0 auto; scroll-snap-align:start;}
+    .tabscroll{position:relative;}
+    .tabscroll::after{
+      content:''; position:absolute; top:0; right:0; bottom:1px; width:34px; pointer-events:none;
+      background:linear-gradient(90deg, rgba(255,255,255,0), var(--bg) 78%);
+      opacity:1; transition:opacity .15s ease;
+    }
+    .tabscroll.tabscroll-end::after{opacity:0;}
 
     /* --- cards / lists --- */
     .section{padding:14px 13px;}
@@ -440,28 +455,89 @@
        The desktop layout is a wide matrix (one column per shoot day). On a phone that
        forces horizontal scrolling through tiny unlabelled checkboxes, so instead each
        person becomes a card and the day cells reflow into a labelled chip row. */
-    .crewgrid-header-row{display:none;}
+    /* the header strip carries BOTH .crewgrid and .crewgrid-header-row, so a plain
+       .crewgrid-header-row{display:none} ties on specificity with the .crewgrid rule
+       below and loses on source order — leaving a stray stack of D1/D2/D3… chips
+       above the cards. Doubling the class wins the tie without an !important. */
+    .crewgrid-header-row.crewgrid-header-row{display:none;}
     .crewgrid{
       display:block; border:1px solid var(--line); border-radius:10px;
       padding:12px; margin-bottom:10px; background:var(--panel);
     }
     .crewgrid-row-name{margin-bottom:8px;}
+    /* The whole chip IS the toggle: the native checkbox is stretched invisibly over
+       it (still focusable, still fires change), and state is read from the chip's
+       own fill plus a tick. That removes the redundant box-next-to-a-label, roughly
+       halves each chip's width, and gives a full 44px tap target on the chip. */
     .crewgrid-check{
-      display:inline-flex; align-items:center; gap:7px; justify-content:flex-start;
-      border:1px solid var(--line); border-radius:20px; padding:7px 12px;
-      margin:0 6px 6px 0; background:var(--panel-2); min-height:38px;
+      position:relative; display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--line); border-radius:20px; padding:0 13px;
+      margin:0 6px 6px 0; background:var(--panel-2); min-height:44px; min-width:52px;
+      transition:background .12s ease, border-color .12s ease;
     }
     .crewgrid-check::before{
-      content:attr(data-day); font-family:var(--label); font-size:12px;
+      content:attr(data-day); font-family:var(--label); font-size:13px;
       font-weight:500; letter-spacing:.4px; color:var(--muted);
     }
-    .crewgrid-check:has(input:checked){background:rgba(1,119,86,.12); border-color:var(--tape);}
+    /* tick appears only when on, and reserves no space when off */
+    .crewgrid-check::after{
+      content:'✓'; font-size:13px; font-weight:700; color:var(--tape);
+      width:0; overflow:hidden; opacity:0; transition:width .12s ease, opacity .12s ease;
+    }
+    .crewgrid-check:has(input:checked){background:rgba(1,119,86,.14); border-color:var(--tape);}
     .crewgrid-check:has(input:checked)::before{color:var(--tape); font-weight:600;}
-    .crewgrid-check input{width:18px; height:18px; accent-color:var(--tape);}
-    .crewgrid-remove{text-align:left; margin-top:4px;}
+    .crewgrid-check:has(input:checked)::after{width:1.1em; opacity:1; margin-left:5px;}
+    /* invisible but real — keeps keyboard focus, change events and a11y intact */
+    /* inset:-1px, not 0 — absolute children position against the PADDING box, so
+       inset:0 would leave the chip's 1px border ring untappable */
+    .crewgrid-check input{
+      position:absolute; inset:-1px; width:auto; height:auto; margin:0;
+      opacity:0; cursor:pointer; appearance:none; -webkit-appearance:none;
+    }
+    .crewgrid-check:has(input:focus-visible){outline:2px solid var(--tape); outline-offset:2px;}
+    /* once the row is a card, the per-person actions belong on the left under the
+       day chips, not floated to the right edge of an empty row */
+    .crewgrid-remove{justify-content:flex-start; gap:8px; margin-top:8px;
+      padding-top:8px; border-top:1px solid var(--line);}
+    .crewgrid-remove:empty{display:none;}
     .crewgrid-editform{margin-top:10px;}
     /* the crew grid no longer needs to scroll sideways once it's stacked */
     .tablewrap:has(.crewgrid){overflow-x:visible;}
+
+    /* --- schedule rows ---
+       Desktop squeezes the reorder arrows into a stacked 20x14 pair; 14px tall is
+       unusable on touch. Rather than just stacking everything (which made each row
+       nearly a full screen tall), the card uses explicit grid areas: one compact
+       control strip along the top, then the three fields. */
+    .rows-sched .row{
+      display:grid;
+      grid-template-columns:auto auto 1fr auto auto;
+      grid-template-areas:
+        "ins  move .    rm   sel"
+        "time time time time time"
+        "dur  dur  dur  dur  dur"
+        "desc desc desc desc desc";
+      gap:9px; align-items:center;
+    }
+    .rows-sched .row .sched-insert-hint{grid-area:ins;}
+    .rows-sched .row .sc-move{grid-area:move;}
+    .rows-sched .row .sc-select{grid-area:sel;}
+    .rows-sched .row .sc-time{grid-area:time;}
+    .rows-sched .row .sc-dur{grid-area:dur;}
+    .rows-sched .row .sc-desc{grid-area:desc;}
+    /* the delete button rides in the control strip, not as a full-width bar */
+    .rows-sched .row .rm{grid-area:rm; justify-self:end;
+      width:auto; min-width:44px; padding:10px 12px;}
+    .sc-move{flex-direction:row; gap:8px;}
+    .sc-move .icon-btn{width:44px; height:44px; border:1px solid var(--line); background:var(--panel);}
+    .sc-move .ic{width:16px; height:16px;}
+    .rows-sched .row .sc-select{width:24px; height:24px; accent-color:var(--tape); justify-self:end; margin:0;}
+    /* "insert a row here" is hover-revealed on desktop, which touch can never do —
+       so on mobile it becomes a permanently visible button in the control strip
+       rather than being dropped. Keeps mid-schedule insertion available on a phone. */
+    .sched-insert-hint{position:static; opacity:1; width:44px; height:44px;}
+    .sched-insert-hint span{width:26px; height:26px; font-size:17px;}
+    .sched-shift{flex-wrap:wrap; width:100%; justify-content:flex-start;}
 
     /* --- position assignment rows (stacking handled by the shared rule above) --- */
     .posn-dept-badge{justify-self:start; padding:5px 10px;}
@@ -1103,12 +1179,35 @@ function closeDrawer(){
   s.classList.remove('open'); sc.classList.remove('open');
   document.body.style.overflow = '';
 }
+/* ---- horizontally scrollable tab strips (mobile) ----
+   Wraps any .tabs that actually overflows in a .tabscroll so the edge-fade cue
+   appears, and clears the cue once scrolled to the end. Re-run after any render
+   that produces tabs; it is idempotent and a no-op when nothing overflows. */
+function refreshTabScrollCues(){
+  document.querySelectorAll('.tabs').forEach(tabs=>{
+    const overflows = tabs.scrollWidth > tabs.clientWidth + 1;
+    let wrap = tabs.parentElement;
+    if(!wrap || !wrap.classList.contains('tabscroll')){
+      if(!overflows) return;                       // nothing to signal
+      wrap = document.createElement('div');
+      wrap.className = 'tabscroll';
+      tabs.parentNode.insertBefore(wrap, tabs);
+      wrap.appendChild(tabs);
+      tabs.addEventListener('scroll', ()=>{
+        const atEnd = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 2;
+        wrap.classList.toggle('tabscroll-end', atEnd);
+      }, {passive:true});
+    }
+    wrap.classList.toggle('tabscroll-end', !overflows ||
+      tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 2);
+  });
+}
 /* keeps the mobile top bar showing where you are */
 function setTopbarTitle(t){
   const el=document.getElementById('tbTitle'); if(el) el.textContent = t || 'Call Sheets';
 }
 /* if the window grows back to desktop while the drawer is open, clear the locked scroll */
-window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer(); });
+window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer(); refreshTabScrollCues(); });
 
 /* ============================================================ ROUTER */
 function goDatabase(which){ route={screen:'db-'+which}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
@@ -1118,6 +1217,7 @@ function goProjectTab(tab){ currentProjectTab=tab; renderMain(); window.scrollTo
 
 function renderMain(){
   const m = document.getElementById('main');
+  setTimeout(refreshTabScrollCues, 0);   // after this frame's innerHTML lands
   if(route.screen==='welcome') return renderWelcome(m);
   if(route.screen==='db-crew') return renderCrewDatabase(m);
   if(route.screen==='db-locations') return renderLocationsDatabase(m);
@@ -1802,6 +1902,7 @@ function renderProject(m){
 }
 function renderProjectBody(){
   const body = document.getElementById('projectBody');
+  setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
   if(currentProjectTab==='locations') return renderProjectLocations(body);
