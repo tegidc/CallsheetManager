@@ -276,6 +276,12 @@
   .crew-ident.one-line .crew-ident-sub{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
   .crew-ident.one-line select.pill-select{max-width:150px;}
   .crew-ident.one-line .icon-btn{flex:0 0 auto;}
+  /* roles row: same "one row per person" block as one-line, but wraps onto
+     further lines instead of clipping — used where a saved-roles taglist
+     needs to sit alongside the dept/company pickers */
+  .crew-ident.one-line.wrap-row{flex-wrap:wrap;}
+  .crew-ident.one-line.wrap-row .crew-ident-sub{white-space:normal; overflow:visible; text-overflow:clip;}
+  .crew-ident.one-line.wrap-row .roles-inline{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:2px;}
   .override-dot{color:var(--tape); font-size:9px; flex:0 0 auto; cursor:help;}
   .posn-row-overridden{background:rgba(1,119,86,.045); border-radius:8px;}
   .day-override-form{border:1px solid var(--line); border-radius:8px; padding:14px; background:rgba(1,119,86,.03);}
@@ -572,6 +578,8 @@ function suggestSubDepartment(role){
 /* single source of truth for department order — used for grouping crew lists AND ordering the final call sheet */
 function deptBucketKey(dept){ return DEPARTMENTS.includes(dept) ? dept : 'Other'; }
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
+/* Heads of Department (c.isHoD) pinned to the top of any department roster, then alphabetical */
+function sortHoDFirst(list){ return list.slice().sort((a,b)=> (b.isHoD?1:0)-(a.isHoD?1:0) || (a.name||'').localeCompare(b.name||'')); }
 /* clickable department pill — lets you reassign a crew member's department without opening the full edit form */
 /* ---- merged Department / Sub-department picker ----
    One dropdown, Gmail-label style: sub-departments indented under their parent.
@@ -729,8 +737,9 @@ function crewIdentityHTML(c, opts){
   // quiet "copy" badge: shows only until the duplicate's role is actually changed
   const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
   if(opts.oneLine){
-    // compact: everything on a single row
-    return `<div class="crew-ident one-line">
+    // compact: everything on a single row (or wrapped onto further lines
+    // within the same person-block, when opts.wrap is set)
+    return `<div class="crew-ident one-line${opts.wrap?' wrap-row':''}">
       ${buttons}<strong>${esc(c.name)}</strong>${copyBadge}
       ${opts.showPickers ? `${deptPillSelect(c)}${coProPillSelect(c)}` : deptLabelHTML(c)}
       ${bits?`<span class="hint crew-ident-sub">${bits}</span>`:''}
@@ -1816,6 +1825,7 @@ function renderProjectCrew(body){
   if(assigned.length){
     const buckets = {};
     assigned.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
+    Object.keys(buckets).forEach(d=>{ buckets[d] = sortHoDFirst(buckets[d]); });
     const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
     const deptsCSV = deptsPresent.join(',');
     const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
@@ -1893,11 +1903,9 @@ function renderProjectCrew(body){
    what Days on site is for). */
 function crewRolesRowHTML(c){
   const isEditing = editingCrewId===c.id;
+  const rolesInline = `<span class="roles-inline">${rolesTagListHTML(c)}${roleAddPickerHTML(c)}</span>`;
   return `<div class="crewgrid-row ${isEditing?'crewgrid-row-editing':''}">
-    ${crewIdentityHTML(c, {showPickers:true, oneLine:true, showPhone:true})}
-    <div style="margin:6px 0 2px 30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      ${rolesTagListHTML(c)}${roleAddPickerHTML(c)}
-    </div>
+    ${crewIdentityHTML(c, {showPickers:true, oneLine:true, wrap:true, showPhone:true, extraLine:rolesInline})}
     ${crewExpansionHTML(c, 'crewgrid-editform')}
   </div>`;
 }
@@ -2706,6 +2714,12 @@ function renderCrewDatabase(m){
   m.innerHTML = `
     <div class="page-head"><div class="eyebrow">Database</div><h1>Crew</h1></div>
     <div class="section">
+      <h2 class="dept-toggle" style="cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="toggleDeptAdminPanel()">
+        <span class="dept-caret">${deptAdminOpen?'▾':'▸'}</span> Departments &amp; sub-departments
+      </h2>
+      ${deptAdminOpen ? renderDeptAdminPanel() : '<div class="hint">Manage department structure and Heads of Department at a glance.</div>'}
+    </div>
+    <div class="section">
       <h2>All crew</h2>
       <div class="grid g2" style="margin-bottom:10px;">
         <input type="text" id="crewSearch" placeholder="Search name, role, skills, camera gear…" oninput="renderCrewList()">
@@ -2719,6 +2733,69 @@ function renderCrewDatabase(m){
       ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
     </div>`;
   renderCrewList();
+}
+function toggleDeptAdminPanel(){ deptAdminOpen = !deptAdminOpen; renderCrewDatabase(document.getElementById('main')); }
+/* "Departments & sub-departments" admin panel — an at-a-glance view of every
+   department's sub-departments and roster, with Heads of Department pinned to
+   the top of each department's crew list (not flat/alphabetical). */
+function renderDeptAdminPanel(){
+  return DEPARTMENTS.map(d=>{
+    const subs = subDeptsFor(d);
+    const roster = sortHoDFirst(crewDB.filter(c=>deptBucketKey(c.department)===d));
+    return `<div class="dept-admin-block" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span><strong>${esc(d)}</strong>
+        <span class="hint">(${roster.length})</span>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div class="hint" style="margin-bottom:4px;">Sub-departments</div>
+        <div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
+          ${subs.length ? subs.map(sd=>`<span class="pill dept">${esc(sd)}
+              <span onclick="renameSubDeptAdmin('${esc(d)}','${esc(sd)}')" style="margin-left:5px;cursor:pointer;" title="Rename">✎</span>
+              <span onclick="removeSubDeptAdmin('${esc(d)}','${esc(sd)}')" style="margin-left:3px;opacity:.65;cursor:pointer;" title="Remove">✕</span>
+            </span>`).join('') : '<span class="hint">None yet.</span>'}
+          <span class="pill" style="cursor:pointer;" onclick="addSubDeptAdmin('${esc(d)}')">+ Add</span>
+        </div>
+      </div>
+      ${roster.length ? `<div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:rgba(1,119,86,.28);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`).join('')}
+      </div>` : '<div class="hint">No crew assigned to this department yet.</div>'}
+    </div>`;
+  }).join('');
+}
+async function addSubDeptAdmin(dept){
+  const sd = (prompt(`New sub-department under ${dept}:`)||'').trim();
+  if(!sd) return;
+  SUBDEPARTMENTS_BY_DEPT[dept] = SUBDEPARTMENTS_BY_DEPT[dept] || [];
+  if(!SUBDEPARTMENTS_BY_DEPT[dept].includes(sd)) SUBDEPARTMENTS_BY_DEPT[dept].push(sd);
+  await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
+  renderCrewDatabase(document.getElementById('main'));
+}
+async function renameSubDeptAdmin(dept, oldSd){
+  const newSd = (prompt(`Rename "${oldSd}" to:`, oldSd)||'').trim();
+  if(!newSd || newSd===oldSd) return;
+  const list = SUBDEPARTMENTS_BY_DEPT[dept] || [];
+  const i = list.indexOf(oldSd);
+  if(i>-1) list[i] = newSd;
+  crewDB.forEach(c=>{ if(c.department===dept && c.subDepartment===oldSd) c.subDepartment = newSd; });
+  await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
+  await saveDB('db:crew', crewDB);
+  renderCrewDatabase(document.getElementById('main'));
+}
+async function removeSubDeptAdmin(dept, sd){
+  const affected = crewDB.filter(c=>c.department===dept && c.subDepartment===sd).length;
+  if(!confirm(`Remove "${sd}"${affected?` — ${affected} crew member(s) will have their sub-department cleared`:''}?`)) return;
+  SUBDEPARTMENTS_BY_DEPT[dept] = (SUBDEPARTMENTS_BY_DEPT[dept]||[]).filter(x=>x!==sd);
+  crewDB.forEach(c=>{ if(c.department===dept && c.subDepartment===sd) c.subDepartment = ''; });
+  await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
+  await saveDB('db:crew', crewDB);
+  renderCrewDatabase(document.getElementById('main'));
+}
+async function toggleHoD(crewId){
+  const c = crewDB.find(x=>x.id===crewId); if(!c) return;
+  c.isHoD = !c.isHoD;
+  await saveDB('db:crew', crewDB);
+  renderCrewDatabase(document.getElementById('main'));
 }
 function crewSearchBlob(c){
   return [c.name, c.role, c.department, c.subDepartment, c.coProductionCompany, c.skills, c.camera1, c.camera2, c.camera3, c.cameraExtras, c.dietary,
@@ -2766,10 +2843,11 @@ function renderCrewList(){
   let filtered = crewDB.filter(c => !q || crewSearchBlob(c).includes(q));
   if(dept) filtered = filtered.filter(c => (c.department||'Other')===dept);
   if(!filtered.length){ list.innerHTML = '<div class="empty-note">No crew found.</div>'; return; }
-  if(dept){ list.innerHTML = filtered.map(crewCardHTML).join(''); return; }
+  if(dept){ list.innerHTML = sortHoDFirst(filtered).map(crewCardHTML).join(''); return; }
   // group by department when showing all; unknown/blank departments fall under "Other"
   const buckets = {};
   filtered.forEach(c=>{ const key = deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
+  Object.keys(buckets).forEach(d=>{ buckets[d] = sortHoDFirst(buckets[d]); });
   const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
   const deptsCSV = deptsPresent.join(',');
   const toggleRow = deptsPresent.length>1 ? `<div class="dept-toggle-all">
@@ -2906,6 +2984,7 @@ function toggleCarFields(){
 let addingCrewNew = false;
 let editingCrewId = null;
 let viewingCrewId = null;
+let deptAdminOpen = false;   // "Departments & sub-departments" panel, collapsed by default
 function refreshCrewScreen(){
   if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
   else if(route.screen==='project' && currentProjectTab==='days'){ captureInProgressPositions(); renderPositionAssignments(); }

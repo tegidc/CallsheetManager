@@ -24,7 +24,8 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `renderProjectCrew()` — renders the project Crew tab, including the grid-view switcher (Roles/Days/Hotel/Travel/Catering) — [Crew]
   - `crewGridView` switch renders one of: roles grid, days-on-site grid, hotel grid, travel grid, catering grid
 - `setCrewGridView()` — switches which crew matrix (days/hotel/travel/catering) is shown and re-renders — [Crew]
-- `crewRolesRowHTML()` / `roleQuickEditHTML()` / `saveQuickRole()` — render and save the inline quick-edit for a crew member's active role — [Crew]
+- `crewRolesRowHTML()` — renders one person's row in the Roles grid: identity, dept/sub-dept picker, lead-company picker and saved-roles taglist all on one wrapped row (via `crewIdentityHTML`'s `wrap`/`extraLine` options) — [Crew]
+- `roleQuickEditHTML()` / `saveQuickRole()` — render and save the inline quick-edit for a crew member's active role (Days on site grid) — [Crew]
 - `groupedCrewOptionsHTML()` — builds `<option>` groups (by department) for crew-picker selects — [Crew]
 - `crewAssignRowHTML()` — renders one crew row in the "days on site" grid — [Crew]
 - `toggleCrewOnDay()` — toggles a crew member's assignment to a given shoot day — [Crew]
@@ -156,3 +157,6 @@ Entries are anchored to function/variable names (not line numbers, which go stal
 - `crewFormHTML()` / `onCrewRoleInput()` / `toggleCarFields()` — render the add/edit crew form and react to role-input and "has car" toggling — [Crew]
 - `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view — [Crew]
 - `saveCrew()` / `deleteCrew()` — persist and delete a crew record — [Crew]
+- `renderDeptAdminPanel()` / `toggleDeptAdminPanel()` — collapsible "Departments & sub-departments" panel on the Crew database screen: one block per department showing its sub-departments (add/rename/remove) and its roster, Heads of Department pinned to the top — [Crew]
+- `addSubDeptAdmin()` / `renameSubDeptAdmin()` / `removeSubDeptAdmin()` — add, rename (updates any crew already on it) and remove (clears it off any crew) a sub-department from the admin panel — [Crew]
+- `toggleHoD()` — toggles a crew member's `isHoD` flag (Head of Department), used to pin them to the top of their department's roster in the admin panel and, via `crewRolesRowHTML`/roster sorts, elsewhere — [Crew]
