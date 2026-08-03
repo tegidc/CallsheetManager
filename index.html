@@ -1734,6 +1734,7 @@ function renderProjectOverview(body){
         <div><label>Shoot days</label><input type="text" id="ovDayCount" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
         <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Shoot Days tab — both stay in sync.</div></div>
       </div>
+      ${shootDayReductionPanelHTML(days)}
       <label>Log line</label>
       <input type="text" id="ovLogline" value="${esc(p.logline)}" style="margin-bottom:10px;">
       <label>Production description</label>
@@ -1851,11 +1852,14 @@ function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
    One shared filter state across every view-switcher tab (Roles/Days on
    site/Hotel/Travel/Catering) — it's a module-level global, so switching
    tabs via setCrewGridView() never resets it. */
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept' };
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
 let projectCrewFilterOpen = false;
 let projectCrewSelected = new Set();
 /* shared by both filter panels (Crew on this project + Crew database) — each
-   keeps its own filter-state object but the matching rules are identical */
+   keeps its own filter-state object but the matching rules are identical.
+   The Days filter (Phase T item 3) is NOT part of this shared function — the
+   Crew database screen has no project/shoot-day context, so it's applied as
+   a separate check only for the project screen, see personMatchesProjectFilter. */
 function matchesCrewFilterState(c, f){
   if(f.depts.size && !f.depts.has(deptBucketKey(c.department))) return false;
   if(f.company && (c.coProductionCompany||'')!==f.company) return false;
@@ -1864,7 +1868,18 @@ function matchesCrewFilterState(c, f){
   if(f.excludeOtherCompanies && (c.coProductionCompany||'')) return false;
   return true;
 }
-function personMatchesProjectFilter(c){ return matchesCrewFilterState(c, projectCrewFilter); }
+/* Days filter (Phase T item 3) — multiselect shoot days, with an OR/AND toggle:
+   OR = on any of the selected days, AND = on every one of the selected days.
+   "On" a day means they have a position assignment on it (same definition the
+   Days on site grid itself uses). */
+function personMatchesProjectDayFilter(c){
+  const f = projectCrewFilter;
+  if(!f.days.size) return true;
+  const days = shootDaysDB.filter(d=>d.projectId===currentProjectId && f.days.has(d.id));
+  const onDay = d => (d.positions||[]).some(pos=>pos[0]===c.id);
+  return f.daysMode==='and' ? days.every(onDay) : days.some(onDay);
+}
+function personMatchesProjectFilter(c){ return matchesCrewFilterState(c, projectCrewFilter) && personMatchesProjectDayFilter(c); }
 function personHasHotel(c, p, days){
   if(((p&&p.hotelNightBefore)||[]).includes(c.id)) return true;
   return days.some(d=>(d.hotelNights||[]).includes(c.id));
@@ -1893,17 +1908,21 @@ function toggleProjectFilterRole(rolePath, checked){
   if(checked) projectCrewFilter.roles.add(rolePath); else projectCrewFilter.roles.delete(rolePath);
   renderProjectBody();
 }
+function toggleProjectFilterDay(dayId, checked){
+  if(checked) projectCrewFilter.days.add(dayId); else projectCrewFilter.days.delete(dayId);
+  renderProjectBody();
+}
 function setProjectFilterField(field, value){ projectCrewFilter[field] = value; renderProjectBody(); }
 function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = checked; renderProjectBody(); }
 function clearProjectCrewFilter(){
-  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept' };
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
   renderProjectBody();
 }
 function projectCrewActiveFilterCount(){
   const f = projectCrewFilter;
-  return f.depts.size + f.roles.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0);
+  return f.depts.size + f.roles.size + f.days.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0);
 }
-function projectCrewFilterPanelHTML(assignedAll){
+function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
   const companies = [...new Set(assignedAll.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const rolesInUse = [...new Set(assignedAll.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
@@ -1913,6 +1932,9 @@ function projectCrewFilterPanelHTML(assignedAll){
       const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
       return `<label><input type="checkbox" ${f.roles.has(rp)?'checked':''} onchange="toggleProjectFilterRole('${esc(rp)}', this.checked)"> ${esc(name)}</label>`;
     }).join('') : '<span class="hint">No saved roles on this project yet.</span>';
+  const dayChecks = (days||[]).length ? (days||[]).map(d=>
+      `<label><input type="checkbox" ${f.days.has(d.id)?'checked':''} onchange="toggleProjectFilterDay('${d.id}', this.checked)"> Day ${esc(d.dayNum||'?')}</label>`
+    ).join('') : '<span class="hint">No shoot days yet.</span>';
   return `<div class="filter-panel">
     <div><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks||'<span class="hint">—</span>'}</div></div>
     <div class="grid g3" style="margin-top:10px;">
@@ -1930,6 +1952,16 @@ function projectCrewFilterPanelHTML(assignedAll){
       </select></div>
     </div>
     <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Roles</div><div class="filter-chips">${roleChecks}</div></div>
+    <div style="margin-top:10px;">
+      <div class="hint" style="margin-bottom:4px;">Days <span style="text-transform:none;">(who's on which shoot day)</span></div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div class="filter-chips">${dayChecks}</div>
+        ${f.days.size>1 ? `<select onchange="setProjectFilterField('daysMode', this.value)" style="width:auto;">
+          <option value="or" ${f.daysMode==='or'?'selected':''}>Any of these days</option>
+          <option value="and" ${f.daysMode==='and'?'selected':''}>All of these days</option>
+        </select>` : ''}
+      </div>
+    </div>
     <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
       <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
@@ -1939,6 +1971,15 @@ function projectCrewFilterPanelHTML(assignedAll){
 }
 function toggleCrewSelected(id, checked){
   if(checked) projectCrewSelected.add(id); else projectCrewSelected.delete(id);
+  renderProjectBody();
+}
+/* Select all (Phase T item 2) — idsCSV is always exactly the currently-filtered/visible
+   crew ids (see renderProjectCrew), never the full project roster, so this only ever
+   selects what the active filter is showing right now. */
+function toggleSelectAllFilteredCrew(idsCSV, checked){
+  const ids = idsCSV ? idsCSV.split(',') : [];
+  if(checked) ids.forEach(id=>projectCrewSelected.add(id));
+  else ids.forEach(id=>projectCrewSelected.delete(id));
   renderProjectBody();
 }
 function clearCrewSelection(){ projectCrewSelected.clear(); bulkEditOpen = false; renderProjectBody(); }
@@ -2007,7 +2048,7 @@ function renderProjectCrew(body){
   const filterCount = projectCrewActiveFilterCount();
   const filterToggleHTML = `<div class="filter-toggle" onclick="toggleProjectCrewFilterPanel()">
     <span class="dept-caret">${projectCrewFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}
-  </div>${projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned) : ''}`;
+  </div>${projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned, days) : ''}`;
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
   if(assigned.length && !filtered.length){
@@ -2015,10 +2056,16 @@ function renderProjectCrew(body){
   } else if(filtered.length){
     const groups = buildProjectCrewGroups(filtered, p, days);
     const groupsCSV = groups.map(g=>g.key).join(',');
-    const toggleRow = groups.length>1 ? `<div class="dept-toggle-all">
-        <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> ·
-        <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>
-      </div>` : '';
+    // Select all (item 2) only ever acts on `filtered` — whatever the active filter
+    // is currently showing, never every crew member on the project.
+    const filteredIdsCSV = filtered.map(c=>c.id).join(',');
+    const allFilteredSelected = filtered.every(c=>projectCrewSelected.has(c.id));
+    const selectAllHTML = `<label style="cursor:pointer;">
+        <input type="checkbox" ${allFilteredSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${filteredIdsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
+      </label>`;
+    const toggleRow = `<div class="dept-toggle-all">
+        ${selectAllHTML}${groups.length>1 ? ` · <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> · <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>` : ''}
+      </div>`;
     const groupHeaderHTML = g => {
       const collapsed = collapsedProjectDepts.has(g.key);
       return `<div class="subhead dept-toggle" onclick="toggleProjectDeptCollapse('${g.key}')">
@@ -2867,11 +2914,16 @@ async function deleteShootDay(id){
 }
 /* Overview "shoot days" count field — kept in sync both ways with the actual
    Shoot Days list. Growing it creates blank new days (same shape as + New day).
-   Shrinking it never silently deletes — it always asks which day to lose. */
+   Shrinking it never silently deletes — it expands an inline checkbox picker
+   (shootDayReductionPending) so the specific day(s) to lose can be ticked,
+   rather than a sequence of native prompt() popups (Phase T item 1). */
+let shootDayReductionPending = null;   // { removeCount, selected:Set() } while picking which day(s) to remove
+function shootDayLabel(d){ return `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locationsDB.find(l=>l.id===d.locationId)||{}).name||''):''}`; }
 async function syncShootDayCount(newCountStr){
   const p = projectsDB.find(x=>x.id===currentProjectId); if(!p) return;
   const days = shootDaysDB.filter(d=>d.projectId===p.id).sort((a,b)=>(a.dayNum||0)-(b.dayNum||0));
   const newCount = parseInt(newCountStr, 10);
+  shootDayReductionPending = null;
   if(!Number.isFinite(newCount) || newCount < 0 || newCount === days.length){ renderProjectOverview(document.getElementById('projectBody')); return; }
   if(newCount > days.length){
     for(let i=days.length; i<newCount; i++){
@@ -2882,24 +2934,44 @@ async function syncShootDayCount(newCountStr){
     renderProjectOverview(document.getElementById('projectBody'));
     return;
   }
-  // shrinking — ask which specific day(s) to lose rather than guessing
-  const dayLabel = d => `Day ${d.dayNum||'?'}${d.date?' — '+fmtDate(d.date):''}${d.locationId?' — '+((locationsDB.find(l=>l.id===d.locationId)||{}).name||''):''}`;
-  let remaining = days.slice();
-  const toRemove = [];
-  const removeCount = days.length - newCount;
-  for(let i=0; i<removeCount; i++){
-    const list = remaining.map((d,idx)=>`${idx+1}. ${dayLabel(d)}`).join('\n');
-    const choice = prompt(`Which shoot day have we lost?\n\n${list}\n\nEnter a number (1-${remaining.length}), or Cancel to leave the count as-is:`);
-    if(choice===null){ renderProjectOverview(document.getElementById('projectBody')); return; }
-    const idx = parseInt(choice, 10) - 1;
-    if(!Number.isFinite(idx) || idx<0 || idx>=remaining.length){ renderProjectOverview(document.getElementById('projectBody')); return; }
-    toRemove.push(remaining[idx].id);
-    remaining = remaining.filter((d,i2)=>i2!==idx);
-  }
-  shootDaysDB = shootDaysDB.filter(d=>!toRemove.includes(d.id));
-  if(toRemove.includes(currentShootDayId)) currentShootDayId = null;
+  // shrinking — expand an inline checkbox picker instead of deciding for the user
+  shootDayReductionPending = { removeCount: days.length - newCount, selected: new Set() };
+  renderProjectOverview(document.getElementById('projectBody'));
+}
+function toggleShootDayReductionPick(dayId, checked){
+  if(!shootDayReductionPending) return;
+  if(checked) shootDayReductionPending.selected.add(dayId); else shootDayReductionPending.selected.delete(dayId);
+  renderProjectOverview(document.getElementById('projectBody'));
+}
+function cancelShootDayReduction(){
+  shootDayReductionPending = null;
+  renderProjectOverview(document.getElementById('projectBody'));
+}
+async function confirmShootDayReduction(){
+  const pend = shootDayReductionPending;
+  if(!pend || pend.selected.size!==pend.removeCount) return;
+  shootDaysDB = shootDaysDB.filter(d=>!pend.selected.has(d.id));
+  if(pend.selected.has(currentShootDayId)) currentShootDayId = null;
+  shootDayReductionPending = null;
   await saveDB('db:shootdays', shootDaysDB);
   renderProjectOverview(document.getElementById('projectBody'));
+}
+function shootDayReductionPanelHTML(days){
+  const pend = shootDayReductionPending; if(!pend) return '';
+  const rows = days.map(d=>`<label style="display:flex; align-items:center; gap:8px; padding:5px 0;">
+      <input type="checkbox" ${pend.selected.has(d.id)?'checked':''} onchange="toggleShootDayReductionPick('${d.id}', this.checked)">
+      ${esc(shootDayLabel(d))}
+    </label>`).join('');
+  const n = pend.selected.size, need = pend.removeCount;
+  return `<div class="formgroup" style="margin-top:10px;">
+    <div class="fg-title">Select ${need} day${need===1?'':'s'} to remove</div>
+    ${rows}
+    <div class="toolbar" style="margin-top:10px; align-items:center;">
+      <button class="danger" ${n===need?'':'disabled'} onclick="confirmShootDayReduction()">Remove ${n||''} selected</button>
+      <button onclick="cancelShootDayReduction()">Cancel</button>
+      <span class="hint">${n} of ${need} selected</span>
+    </div>
+  </div>`;
 }
 
 /* ============================================================ CREW DATABASE */
