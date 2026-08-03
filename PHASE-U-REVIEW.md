@@ -1,5 +1,22 @@
 # Phase U — code quality & elegance pass: review sheet
 
+> ## ⚠️ THIS BRANCH IS BUILT ON A STALE BASE — DO NOT MERGE AS-IS
+>
+> This work was built on `328dee0`, which was **five phases behind `origin/main`**
+> (Phases I, J, R, S, T were already pushed and had not been pulled locally).
+>
+> Upstream **removed 8 functions this branch still calls**: `deptPath`,
+> `deptPillSelect`, `onCrewRoleInput`, `quickSetDeptPath`, `roleQuickEditHTML`,
+> `saveQuickRole`, `suggestDepartment`, `suggestSubDepartment`. A naive merge
+> produces a broken file.
+>
+> **The analysis below is still valid** — 8 of its 9 findings were re-checked against
+> current `origin/main` and still apply, including the high-severity tech-specs export
+> bug (B-1), which is a one-line fix portable to `main` on its own.
+>
+> Recommended: re-apply this pass on top of current `main` rather than merging.
+> See the Phase U entry in the Notion build log for the full situation.
+
 For a human review pass. Rollback point: `git tag phase-u-start` (commit `1ac976a`).
 
 Three commits:
