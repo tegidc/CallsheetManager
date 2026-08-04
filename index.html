@@ -276,6 +276,18 @@
   .filter-toggle{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;
     font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;}
   .filter-toggle:hover{color:var(--tape);}
+  /* Crew tab header row (Phase V) — Select all + Filter left-aligned, Expand/Collapse
+     all + Summary right-aligned, all sharing one font/size so nothing reads as bolder
+     or bigger than its neighbours. The Filter panel itself renders below this row,
+     not inside it, so opening it can't distort the row's alignment. */
+  .crew-header-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    gap:6px 16px; font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--muted); margin-bottom:8px;}
+  .crew-header-left, .crew-header-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
+  .crew-header-row label:hover, .crew-header-row span:hover{color:var(--tape);}
+  .crew-header-selectall input{margin:0;}
+  .expandall-caret{display:inline-block; transition:transform .15s;}
   .filter-panel{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
   .filter-chips label{font-size:12px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
@@ -2116,6 +2128,14 @@ function setAllProjectDeptsCollapsed(collapsed, deptsCSV){
   collapsedProjectDepts = collapsed ? new Set(deptsPresent) : new Set();
   renderProjectBody();
 }
+/* single Expand-all/Collapse-all toggle (Phase V item 4) — flips based on current
+   state instead of offering two separate always-on links: if every group present
+   is collapsed, expand them all; otherwise (any expanded), collapse them all. */
+function toggleAllProjectDeptsCollapsed(deptsCSV){
+  const deptsPresent = deptsCSV.split(',');
+  const allCollapsed = deptsPresent.every(k=>collapsedProjectDepts.has(k));
+  setAllProjectDeptsCollapsed(!allCollapsed, deptsCSV);
+}
 function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
 /* ---- Crew-on-project filter/group/sort + bulk select ----
    One shared filter state across every view-switcher tab (Roles/Days on
@@ -2315,11 +2335,17 @@ function renderProjectCrew(body){
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
   const filterCount = projectCrewActiveFilterCount();
-  const filterToggleHTML = `<div class="filter-toggle" onclick="toggleProjectCrewFilterPanel()">
+  // Filter toggle sits in the shared header row (item 1/3); the panel itself, once
+  // opened, renders as its own block below the row rather than inside it — the panel
+  // is a full-width block (chips, selects, day checkboxes) and letting it live inside
+  // the flex row would distort the row's left/right alignment every time it opens.
+  const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleProjectCrewFilterPanel()">
     <span class="dept-caret">${projectCrewFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}
-  </div>${projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned, days) : ''}`;
+  </span>`;
+  const filterPanelHTML = projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned, days) : '';
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
+  let selectAllHTML = '', rightHeaderHTML = '';
   if(assigned.length && !filtered.length){
     assignedHTML = '<div class="empty-note">No crew match the current filter.</div>';
   } else if(filtered.length){
@@ -2329,14 +2355,20 @@ function renderProjectCrew(body){
     // is currently showing, never every crew member on the project.
     const filteredIdsCSV = filtered.map(c=>c.id).join(',');
     const allFilteredSelected = filtered.every(c=>projectCrewSelected.has(c.id));
-    const selectAllHTML = `<label style="cursor:pointer;">
+    selectAllHTML = `<label class="crew-header-selectall">
         <input type="checkbox" ${allFilteredSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${filteredIdsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
       </label>`;
-    const summaryLinkHTML = crewGridView==='hotel' ? ` · <span onclick="jumpToHotelSummary()">Summary</span>`
-      : crewGridView==='catering' ? ` · <span onclick="jumpToCateringSummary()">Summary</span>` : '';
-    const toggleRow = `<div class="dept-toggle-all">
-        ${selectAllHTML}${groups.length>1 ? ` · <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> · <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>` : ''}${summaryLinkHTML}
-      </div>`;
+    const summaryLinkHTML = crewGridView==='hotel' ? `<span onclick="jumpToHotelSummary()">Summary</span>`
+      : crewGridView==='catering' ? `<span onclick="jumpToCateringSummary()">Summary</span>` : '';
+    // Expand/Collapse all (item 4): one toggle, not two separate links — a single
+    // chevron that flips 180° between "some/all collapsed → expand all" and
+    // "all expanded → collapse all", with "All" next to it either way.
+    let expandAllHTML = '';
+    if(groups.length>1){
+      const allCollapsed = groups.every(g=>collapsedProjectDepts.has(g.key));
+      expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')" title="${allCollapsed?'Expand all':'Collapse all'}"><span class="dept-caret expandall-caret" style="transform:rotate(${allCollapsed?0:180}deg);">▾</span> All</span>`;
+    }
+    rightHeaderHTML = `${expandAllHTML}${summaryLinkHTML}`;
     const groupHeaderHTML = g => deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
       `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
@@ -2354,7 +2386,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewRolesRowHTML(c)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
@@ -2367,7 +2399,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewTravelRowHTML(c, p)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${travelHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${travelHeaderRow}${groupsHTML}</div>`;
     } else {
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const dayHeaderRow = days.length ? `
@@ -2381,15 +2413,20 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
       }).join('');
-      assignedHTML = toggleRow + `<div class="tablewrap">${dayHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${dayHeaderRow}${groupsHTML}</div>`;
     }
   }
+
+  const headerRow = `<div class="crew-header-row">
+      <div class="crew-header-left">${selectAllHTML}${filterToggleSpan}</div>
+      <div class="crew-header-right">${rightHeaderHTML}</div>
+    </div>${filterPanelHTML}`;
 
   body.innerHTML = `
     <div class="section">
       <h2>Crew on this project</h2>
       ${viewSwitcher}
-      ${filterToggleHTML}
+      ${headerRow}
       ${bulkActionBarHTML()}
       ${assignedHTML}
     </div>
