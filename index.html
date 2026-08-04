@@ -2557,7 +2557,7 @@ function buildHotelSummary(){
   const summary = `${maxRooms} room${maxRooms>1?'s':''} max, ${active.length} night${active.length>1?'s':''}, ${dateRange}`;
   return { summary, perNight, roomBooking };
 }
-let hotelSummaryOpen = true; // collapsible state for the T-2.3 hotel summary block (Phase O)
+let hotelSummaryOpen = false; // collapsible state for the T-2.3 hotel summary block (Phase O) — collapsed by default
 function toggleHotelSummaryBlock(){
   hotelSummaryOpen = !hotelSummaryOpen;
   applyBlockState({summary:hotelSummaryOpen}, 'hsm', 'summary');
