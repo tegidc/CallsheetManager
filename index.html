@@ -2359,7 +2359,8 @@ function renderProjectCrew(body){
         <input type="checkbox" ${allFilteredSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${filteredIdsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
       </label>`;
     const summaryLinkHTML = crewGridView==='hotel' ? `<span onclick="jumpToHotelSummary()">Summary</span>`
-      : crewGridView==='catering' ? `<span onclick="jumpToCateringSummary()">Summary</span>` : '';
+      : crewGridView==='catering' ? `<span onclick="jumpToCateringSummary()">Summary</span>`
+      : crewGridView==='travel' ? `<span onclick="jumpToTransportSummary()">Summary</span>` : '';
     // Expand/Collapse all (item 4): one toggle, not two separate links — a single
     // chevron that flips 180° between "some/all collapsed → expand all" and
     // "all expanded → collapse all", with "All" next to it either way.
@@ -2432,6 +2433,7 @@ function renderProjectCrew(body){
     </div>
     ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
     ${crewGridView==='catering' ? cateringSummaryHTML() : ''}
+    ${crewGridView==='travel' ? transportSummaryHTML() : ''}
     <div class="section">
       <h2>Add from crew database</h2>
       ${unassigned.length ? `
@@ -2445,6 +2447,8 @@ function renderProjectCrew(body){
     </div>`;
   body.oninput = crewGridView==='catering'
     ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); renderCateringSummaryGridSection(); })
+    : crewGridView==='travel'
+    ? () => scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); })
     : null;
 }
 /* Roles tab row (Phase S) — tidy grid columns: CONTROLS | Name | Role | Department | Show as.
@@ -2896,6 +2900,115 @@ async function setTravelMethod(crewId, selectEl){
   }
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
+}
+/* ---- Travel tab's own summary (Phase W) ----
+   Travel method is stored once per person per PROJECT (p.travelMethods), not per day —
+   there's no day dimension on it. The per-day breakdown below is derived by crossing
+   each person's single travel method with the days they're actually on site (same
+   on-day signal used by the Days-on-site grid: a position entry for that day), so
+   "how many on public transport on Day 2" means people whose travel method is Public
+   transport AND who have a position on Day 2. Costing only applies to the two methods
+   that have a rate: 'Own car' (mileage, charged once per on-site day — "per use") and
+   'Public transport' (a flat per-day rate); other methods (Train, Flying, Production
+   transport, any custom ones) are counted but not costed. Same collapsed-by-default
+   pattern as the Hotel/Catering summary blocks (Phase O/P2), positioned below "Crew on
+   this project". */
+function getTransportCosts(p){
+  const c = (p && p.transportCosts) || {};
+  return { publicPerDay: Number(c.publicPerDay)||0, mileage: Number(c.mileage)||0 };
+}
+async function saveTransportCosts(){
+  const p = currentProject(); if(!p) return;
+  p.transportCosts = {
+    publicPerDay: Number(val('tsCostPublic'))||0,
+    mileage: Number(val('tsCostMileage'))||0
+  };
+  await saveDB('db:projects', projectsDB);
+}
+function buildTransportSummary(){
+  const p = currentProject(); if(!p) return null;
+  const days = projectDays();
+  if(!days.length) return null;
+  const costs = getTransportCosts(p);
+  const travelMethods = p.travelMethods || {};
+  const assigned = p.crewIds || [];
+  // only show methods actually chosen by someone on this project, in travelMethodsList order
+  const usedMethods = travelMethodsList.filter(m=>assigned.some(id=>travelMethods[id]===m));
+  if(!usedMethods.length) return null;
+  const cols = days.map(d=>{
+    const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
+    const onSite = assigned.filter(id=>(d.positions||[]).some(pos=>pos[0]===id));
+    const counts = {};
+    usedMethods.forEach(m=>counts[m]=0);
+    onSite.forEach(id=>{
+      const m = travelMethods[id];
+      if(m && counts.hasOwnProperty(m)) counts[m]++;
+    });
+    const carCount = counts['Own car']||0;
+    const publicCount = counts['Public transport']||0;
+    const dailyCost = (carCount*costs.mileage) + (publicCount*costs.publicPerDay);
+    return { dayNum:d.dayNum, label, counts, dailyCost };
+  });
+  const totalCost = cols.reduce((sum,c)=>sum+c.dailyCost, 0);
+  return { costs, usedMethods, cols, totalCost };
+}
+function transportSummaryGridBodyHTML(){
+  const data = buildTransportSummary();
+  if(!data) return '<div class="empty-note">Add shoot days and set travel methods first, then fill in Travel on the grid above.</div>';
+  const fmt = n => (n||0).toFixed(2);
+  return `<div class="tablewrap">
+    <table>
+      <tr><th></th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
+      ${data.usedMethods.map(m=>`<tr><td>${esc(m)}</td>${data.cols.map(c=>`<td>${c.counts[m]}</td>`).join('')}</tr>`).join('')}
+      <tr><td><strong>Daily cost</strong></td>${data.cols.map(c=>`<td><strong>${fmt(c.dailyCost)}</strong></td>`).join('')}</tr>
+    </table>
+  </div>
+  <div class="hint" style="margin-top:8px;">Total transport cost: ${fmt(data.totalCost)}</div>`;
+}
+function renderTransportSummaryGridSection(){
+  const el = document.getElementById('tsmGridWrap'); if(!el) return;
+  el.innerHTML = transportSummaryGridBodyHTML();
+}
+let transportSummaryOpen = false; // collapsible state for the T-2.4 transport summary block (Phase W) — collapsed by default, same as Hotel/Catering's
+function toggleTransportSummaryBlock(){
+  transportSummaryOpen = !transportSummaryOpen;
+  applyBlockState({summary:transportSummaryOpen}, 'tsm', 'summary');
+}
+function transportSummaryHTML(){
+  const p = currentProject();
+  const costs = getTransportCosts(p);
+  const open = transportSummaryOpen;
+  const costFieldHTML = (id, label, value) => `<div class="field-inline">
+      <label for="${id}">${label}</label>
+      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
+    </div>`;
+  const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
+      ${costFieldHTML('tsCostPublic', 'Est. public transport cost/day', costs.publicPerDay)}
+      ${costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', costs.mileage)}
+    </div>`;
+  const inner = `${fieldsHTML}<div id="tsmGridWrap">${transportSummaryGridBodyHTML()}</div>
+    <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyTransportSummary()">${icon('copy')} Copy transport summary</button></div>`;
+  return `<div class="section" id="transportSummarySection">
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="toggleTransportSummaryBlock()"><span class="dept-caret" id="tsmc-summary">${open?'▾':'▸'}</span> Transport summary</span>
+    </div>
+    <div id="tsmb-summary" style="display:${open?'':'none'}">${inner}</div>
+  </div>`;
+}
+function jumpToTransportSummary(){
+  if(!transportSummaryOpen) toggleTransportSummaryBlock();
+  document.getElementById('transportSummarySection')?.scrollIntoView({block:'start'});
+}
+function copyTransportSummary(){
+  const data = buildTransportSummary(); if(!data) return;
+  const fmt = n => (n||0).toFixed(2);
+  const lines = ['TRANSPORT SUMMARY', ''];
+  data.cols.forEach(c=>{
+    const parts = data.usedMethods.map(m=>`${m} ${c.counts[m]}`).join(', ');
+    lines.push(`${c.label}: ${parts} — Daily cost ${fmt(c.dailyCost)}`);
+  });
+  lines.push('', `Total transport cost: ${fmt(data.totalCost)}`);
+  copyText(lines.join('\n'), 'Copied!');
 }
 async function toggleCrewOnDay(crewId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
