@@ -3174,6 +3174,7 @@ function renderProjectPreview(body){
     <div class="card" id="previewCard"></div>
     ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
       `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
+    ${hotelSummaryHTML()}
     <div id="techSpecsSection"></div>
     <div id="cateringExportSection"></div>
     ${pvBlockHTML('excel', 'Excel export', '', `

@@ -61,7 +61,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `toggleHotelNight()` / `toggleHotelPre()` — toggle whether a crew member is booked a hotel room for a shoot night / the night before — [Crew]
 - `abbreviateName()` — "first initial + last name" display form (e.g. "A. Shaw"), used by the per-night table's Names column — [Crew]
 - `buildHotelSummary()` (Phase O, replaces the old Preview-tab `buildHotelExport`) — per-person hotel aggregation: resolves each person's actual booked-night dates (incl. "night before Day 1") into a check-in/check-out range and total-nights count, sorted earliest check-in first then most nights first (`orderIndex`), and reused by the per-night table's Names ordering so both views stay in the same person order — [Crew]
-- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block below the person × night matrix on the Hotel sub-tab (T-2.3, moved out of Preview & Export in Phase O): room-booking table (Room No./Name/Date from–to/Total nights) first, per-night table (Night/Rooms/Names) below it. No separate rooming list — the room-booking table covers that — [Crew]
+- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: room-booking table (Room No./Name/Date from–to/Total nights) first, per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-6.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once — [Crew, Preview & Export]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
 - `addCrewToProject()` / `removeCrewFromProject()` — add/remove a crew member from the current project's roster — [Crew]
 - `crewInfo()` — looks up a crew member's basic display info by id, with a fallback for removed crew — [Crew]
@@ -259,6 +259,7 @@ coarse information first, finest detail last.
 | **T-6** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
 | T-6.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
 | T-6.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) — same Client/Positions/Talent/co-production ordering as T-6.1 | `buildWAText()` |
+| T-6.2b | · Hotel summary | Same room-booking table + per-night table as T-2.3's Hotel summary, shown again here below the WhatsApp text | `hotelSummaryHTML()` |
 | T-6.3 | · Tech specs | Camera/technical crew reference + camera designations | `renderTechSpecsSection()` |
 | T-6.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
 | T-6.6 | · Excel export | Multi-sheet .xlsx (Call Sheet + Tech Specs) — same Client/Positions/Talent/co-production ordering as T-6.1 | `downloadExcel()` |
