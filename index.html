@@ -1981,13 +1981,29 @@ function renderProjectOverview(body){
 }
 /* ---------- Tech (Phase M — split out of Overview: tech specs defaults + camera
    designations get their own dedicated space for future tech-related features) ---------- */
+/* Collapse state for the Tech tab's sections — same GLOBAL, all-open-by-default rule
+   as shootDayBlocks/previewBlocks, except the roundup starts collapsed (matches the
+   Hotel summary block's collapsed-by-default behaviour). */
+let techBlocks = { defaults:true, cameras:true, roundup:false };
+function toggleTechBlock(key){ toggleBlock(techBlocks, 'tt', key); }
+function setAllTechBlocksCollapsed(collapsed){ setAllBlocksCollapsed(techBlocks, 'tt', collapsed); }
+function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
+  const open = techBlocks[key];
+  return `<div class="section">
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="toggleTechBlock('${key}')"><span class="dept-caret" id="ttc-${key}">${open?'▾':'▸'}</span> ${title}</span>
+      ${headerActionsHTML||''}
+    </div>
+    <div id="ttb-${key}" style="display:${open?'':'none'}">${bodyInnerHTML}</div>
+  </div>`;
+}
 function renderProjectTech(body){
   const p = currentProject();
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const continuous = p.continuousNumbering!==false;
   body.innerHTML = `
-    <div class="section">
-      <h2>Tech specs — project defaults</h2>
+    ${expandCollapseAllHTML('setAllTechBlocksCollapsed')}
+    ${techBlockHTML('defaults', 'Tech specs — project defaults', '', `
       <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
       ${techSpecFieldsHTML('pj')}
       <div class="field-inline" style="margin-top:14px;">
@@ -2001,17 +2017,47 @@ function renderProjectTech(body){
       <div class="toolbar" style="margin-top:12px;">
         <button class="primary" onclick="saveProjectTechSpecs()">Save defaults</button>
         <span class="status" id="pjStatus"></span>
-      </div>
-    </div>
-    <div class="section">
-      <h2>Camera designations</h2>
+      </div>`)}
+    ${techBlockHTML('cameras', 'Camera designations', '', `
       <div class="hint" style="margin-bottom:10px;">Only people on this project in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
-      <div id="cameraDesigListProject"></div>
-    </div>`;
+      <div id="cameraDesigListProject"></div>`)}
+    <div id="techSpecsRoundupSection"></div>`;
   setTechSpecFields('pj', projTS);
   renderCameraDesignations('project');
-  body.oninput = () => scheduleAutosave('tech', () => saveProjectTechSpecs());
+  renderTechSpecsRoundup();
+  body.oninput = () => scheduleAutosave('tech', () => { saveProjectTechSpecs(); renderTechSpecsRoundup(); });
 }
+/* project-level version of the Preview & Export "Tech specs" roundup (T-6.3) — same
+   rows/camera-designations tables, but resolved from the project defaults rather than
+   a specific (possibly-overriding) shoot day, since the Tech tab has no day context */
+function projectTechRoundupData(){
+  const p = currentProject(); if(!p) return null;
+  const ts = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
+  const cams = normalizeCameras(p.cameras, p.id);
+  return { shootTitle:[p.client,p.title].filter(Boolean).join(' — '), rows:techSpecRows(ts), camRows:cameraDesignationRows(cams) };
+}
+function renderTechSpecsRoundup(){
+  const el = document.getElementById('techSpecsRoundupSection'); if(!el) return;
+  const data = projectTechRoundupData();
+  const headerActions = `<button class="small" onclick="copyProjectTechSpecs()">${icon('copy')} Copy tech specs</button>`;
+  if(!data || (!data.rows.length && !data.camRows.length)){
+    el.innerHTML = techBlockHTML('roundup', 'Tech specs roundup', '', '<div class="empty-note">No tech specs set yet — fill in the project defaults above.</div>');
+    return;
+  }
+  const body = techSpecsRoundupBodyHTML(data.rows, data.camRows);
+  el.innerHTML = techBlockHTML('roundup', 'Tech specs roundup', headerActions, body);
+}
+function copyProjectTechSpecsText(){
+  const data = projectTechRoundupData(); if(!data) return '';
+  const L = [`*TECH SPECS* — ${data.shootTitle||''}`.trim()];
+  data.rows.forEach(([k,v])=>L.push(`${k}: ${v}`));
+  if(data.camRows.length){
+    L.push('','*CAMERA DESIGNATIONS*');
+    data.camRows.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name}${cd.shorthand?(' ['+cd.shorthand+']'):''} (${cd.tag})`));
+  }
+  return L.join('\n');
+}
+function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
 /* Overview "bare minimums" — visual nudges only, never a hard blocker. Each one
    jumps straight to where it can be fixed. */
 function bareMinimumWarningsHTML(p, days){
@@ -2768,6 +2814,31 @@ function resolveTechSpecs(day){
   return Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{}, day && day.techSpecs || {});
 }
 function techSpecsOverridden(day){ return !!(day && day.techSpecs && Object.keys(day.techSpecs).length); }
+/* flattened camera-designation rows ({letter,name,shorthand,tag}) for a normalized
+   cams object — shared by the per-day Preview export (buildFullData) and the
+   project-level Tech tab roundup (projectTechRoundupData) */
+function cameraDesignationRows(cams){
+  return cams.order.map((cid,oi)=>{
+    const c = crewInfo(cid); const baseLetter = letterForIndex(oi);
+    return (cams.cameras[cid]||[]).map((cam,ci)=>{
+      const letter = baseLetter+String(ci+1).padStart(2,'0');
+      return { letter, name:c.name, shorthand:cam.shorthand||'', tag:cameraFileTag(letter,cam.body,c.name) };
+    });
+  }).flat().concat(
+    (cams.unnamed||[]).map((u,ui)=>{
+      const letter = 'UM_'+letterForIndex(ui);
+      return { letter, name:'Unassigned'+(u.note?(' — '+u.note):''), shorthand:'', tag:cameraFileTag(letter,u.body,'') };
+    })
+  );
+}
+/* the tech-specs rows table + camera-designations table, shared by the Preview & Export
+   "Tech specs" block (T-6.3) and the Tech tab's roundup (T-4.4) */
+function techSpecsRoundupBodyHTML(rows, camRows){
+  let body = '';
+  if(rows.length) body += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
+  if(camRows.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>Shorthand</th><th>File tag</th></tr>${camRows.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td>${esc(cd.shorthand||'')}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
+  return body;
+}
 /* ---- Camera Designations (Phase K) ----
    cameras: {
      order: [crewId, ...],                 // operator order — index determines base letter A,B,C...
@@ -2941,6 +3012,7 @@ async function commitCameras(scope, t){
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
   if(scope==='day') refreshTechSpecsBanner();
+  else renderTechSpecsRoundup();
 }
 async function moveOperator(scope, crewId, dir){
   const t = camerasForEdit(scope); if(!t) return;
@@ -4499,18 +4571,7 @@ function buildFullData(d){
   const coProductionGroups = Object.keys(coProBuckets).sort((a,b)=>a.localeCompare(b))
     .map(company=>({ company, people: coProBuckets[company].sort(positionOutputCompare) }));
   const cams = resolveCameras(d);
-  const cameraDesignations = cams.order.map((cid,oi)=>{
-    const c = crewInfo(cid); const baseLetter = letterForIndex(oi);
-    return (cams.cameras[cid]||[]).map((cam,ci)=>{
-      const letter = baseLetter+String(ci+1).padStart(2,'0');
-      return { letter, name:c.name, shorthand:cam.shorthand||'', tag:cameraFileTag(letter,cam.body,c.name) };
-    });
-  }).flat().concat(
-    (cams.unnamed||[]).map((u,ui)=>{
-      const letter = 'UM_'+letterForIndex(ui);
-      return { letter, name:'Unassigned'+(u.note?(' — '+u.note):''), shorthand:'', tag:cameraFileTag(letter,u.body,'') };
-    })
-  );
+  const cameraDesignations = cameraDesignationRows(cams);
   return { prodCompany:p.company||COMPANY, shootTitle:[p.client,p.title].filter(Boolean).join(' — '),
     dayNum:d.dayNum,dayTotal:d.dayTotal,shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
     primary,addLocs,positions,clientPositions,talentPositions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
@@ -4532,9 +4593,7 @@ function renderTechSpecsSection(d){
   const cams = d.cameraDesignations||[];
   const headerActions = `<button class="small" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
   if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them under Tech, or per-day under Shoot Days.</div>'); return; }
-  let body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>`;
-  if(rows.length) body += `<table>${rows.map(([k,v])=>`<tr><th style="width:140px;">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
-  if(cams.length) body += `<h3 style="margin-top:14px;">Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>Shorthand</th><th>File tag</th></tr>${cams.map(cd=>`<tr><td>${esc(cd.letter)}</td><td>${esc(cd.name)}</td><td>${esc(cd.shorthand||'')}</td><td style="font-family:var(--mono);">${esc(cd.tag)}</td></tr>`).join('')}</table>`;
+  const body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>` + techSpecsRoundupBodyHTML(rows, cams);
   el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
 }
 function copyTechSpecsText(){
