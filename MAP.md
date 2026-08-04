@@ -321,6 +321,22 @@ of text to paste back for follow-up phases. Sections: Typography, Colors, Spacin
 Component behaviors, Icons (existing), Icons (candidates). Purely diagnostic — makes
 no changes to `index.html` or app styling itself.
 
+## Fonts & Icons review page (Phase Fonts)
+
+`style-audit-fonts.html` — second review page, same click-to-pick + notes + "Export all
+decisions" system as `style-audit.html`, also standalone at the repo root and not
+linked from `index.html`. Copies the app's CSS and its `ICONS` object verbatim so every
+example and every icon is the real thing. Ten sections: font families, size ladder,
+weights vs what's actually loaded, sizing/alignment, input boxes & dropdowns,
+checkboxes, general section rules, the Crew "All" controls, icons, and secondary
+colour. 16 decisions.
+
+Two defects it documents, both checkable against the font request on line 8 of
+`index.html`:
+- **Fraunces 500 is loaded but never used** — every `--disp` rule renders at 700.
+- **Jost 700 is used but not loaded** — `.dept-code` and the mobile checkbox tick ask
+  for it, so the browser synthesises a fake bold. Jost is requested at 400/500/600.
+
 ## The design system, as decided (Phase Style Review)
 
 The audit's exported decisions are now applied to `index.html`. This is the reference

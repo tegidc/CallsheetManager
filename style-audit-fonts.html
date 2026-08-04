@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fonts &amp; Icons Review &mdash; Call Sheet App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Jost:wght@400;500;600;700&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PART A - the app's OWN stylesheet, copied verbatim from index.html
+   so every example below is styled by the app's real rules.
+   ============================================================ */
+
+  /*
+    BRAND NOTE: Moret and Futura PT are paid/licensed fonts not available on Google Fonts.
+    Using closest free equivalents: Fraunces (warm rounded serif, stands in for Moret) for
+    headings, and Jost (geometric sans in the Futura family) for body copy. Oswald (the
+    real brand font) is used as specified for uppercase labels and project codes/numbers.
+    Swap the font-family values below for the real Moret/Futura PT files if you get access
+    to hosted versions.
+  */
+  :root{
+    --bg:#FFFFFF;            /* White (was Ivory #FFFFF5) — matches --panel for a seamless flat feel */
+    --panel:#FFFFFF; --panel-2:#EEF5F2; --line:rgba(17,10,8,.14);
+    --tape:#017756;          /* Sea Green — primary brand accent */
+    --tape-ink:#FFFFF5;      /* Ivory text on Sea Green */
+    --danger:#a4321f;
+    --text:#110A08;          /* Black */
+    --muted:#6f6a63;
+    --mono:ui-monospace, monospace;                     /* browser default mono — no webfont loaded (Style Review) */
+    --disp:'Fraunces', Georgia, serif;                  /* stands in for Moret */
+    --label:'Oswald', sans-serif;                       /* brand utility font — kept as-is */
+    --body:'Jost', 'Futura PT', sans-serif;              /* stands in for Futura PT */
+    /* Brand-green background tints. Style Review collapsed nine hand-written rgba()
+       values down to four tokens — two "barely there" levels for panels vs editing
+       states, then medium/strong for badges and active controls. */
+    --tint-1:var(--tint-1);   /* panels: filter, bulk-edit, formgroup, day-override */
+    --tint-2:var(--tint-2);   /* editing / overridden row states */
+    --tint-3:var(--tint-3);   /* badges, hover fills, bulk action bar */
+    --tint-4:var(--tint-4);   /* active controls — must stay distinct from tint-3 */
+    /* Default box: white fill, 8px radius, 10px padding (Style Review) */
+    --box-radius:8px; --box-pad:10px;
+    --field-label-w:104px;   /* label column for inline fields — keeps rows aligned */
+    --sidew:230px;
+    --side-bg:#110A08; --side-text:#FFFFF5; --side-line:rgba(255,255,245,.14); --side-hover:rgba(255,255,245,.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; height:100%;}
+  body{background:var(--bg); color:var(--text); font-family:var(--body); -webkit-font-smoothing:antialiased;}
+
+  .app{display:flex; min-height:100vh;}
+  .side{width:var(--sidew); flex:0 0 var(--sidew); background:var(--side-bg); border-right:1px solid var(--side-line);
+    padding:16px 12px; position:sticky; top:0; height:100vh; overflow-y:auto;}
+  .main{flex:1; min-width:0; padding:20px 22px 90px; max-width:840px; margin:0 auto;}
+
+  /* top bar + scrim: only ever visible on mobile */
+  .topbar{display:none;}
+  .scrim{display:none;}
+
+  .brand{display:flex; align-items:center; gap:8px; margin-bottom:18px;}
+  .brand .dot{width:10px; height:10px; border-radius:2px; background:var(--tape); transform:rotate(45deg);}
+  .brand strong{font-family:var(--disp); font-size:16px; letter-spacing:.3px; color:var(--side-text);}
+
+  .side-label{font-family:var(--label); font-size:10.5px; letter-spacing:1.6px; color:rgba(255,255,245,.55);
+    text-transform:uppercase; margin:16px 6px 6px;}
+  .side-item{padding:8px 10px; border-radius:7px; font-size:13.5px; cursor:pointer; color:var(--side-text);
+    display:flex; align-items:center; gap:8px; margin-bottom:2px;}
+  .side-item:hover{background:var(--side-hover);}
+  /* Sidebar accents use the brand green directly — Style Review removed the drifted
+     mint #5fd6ac in favour of brand-only colour. Note this is a deliberate contrast
+     trade: #017756 on the near-black sidebar measures ~3.5:1, below the 4.5:1 AA
+     minimum for 13px text. Flagged and chosen knowingly; revisit if it reads too dim. */
+  .side-item.active{background:var(--side-hover); color:var(--tape); font-weight:600;}
+  .side-item .ico{opacity:.85; font-size:13px;}
+  .side-proj{padding:7px 10px; border-radius:7px; font-size:13px; cursor:pointer; margin-bottom:2px; color:var(--side-text);}
+  .side-proj:hover{background:var(--side-hover);}
+  .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:var(--tape); font-weight:600; border-left:2px solid var(--tape); padding-left:8px;}
+  .side-proj .code{font-family:var(--label); letter-spacing:.5px; font-size:11px; color:rgba(255,255,245,.5); display:block;}
+  .side-proj.active .code{color:var(--tape); opacity:.9;}
+  .side-new{margin-top:6px; width:100%; text-align:left; font-size:12.5px; color:rgba(255,255,245,.6); background:transparent; border:1px dashed var(--side-line);}
+  .side-new:hover{color:var(--tape); border-color:var(--tape);}
+  .side-empty{font-size:12px; color:rgba(255,255,245,.45); padding:4px 10px; font-style:italic;}
+
+  .section{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:14px;}
+  /* PATTERN A — the one tab-entry heading style (Style Review).
+     Fraunces 700 15px, brand green, with a thin grey rule that starts after the
+     words and sits on the text's vertical centre. Green at rest, black on hover
+     (the inverse of the old behaviour, per the review). Every tab-entry heading,
+     shoot-day block, summary block and company group now uses this. */
+  .section h2{font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px; text-transform:none;
+    color:var(--tape); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+  .section h2::after{content:''; flex:1; height:1px; background:var(--line);}
+  .sd-block{margin-bottom:4px;}
+  /* flex-start + margin-left:auto on any trailing action, NOT space-between: with
+     space-between a header that has no action (every Shoot Day block) pushed its
+     own title to the far right, away from its caret. */
+  .sd-block-head{display:flex; align-items:center; justify-content:flex-start; gap:8px; cursor:pointer; user-select:none;
+    font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
+    color:var(--tape); margin:26px 0 12px; padding-bottom:0; border-bottom:none;}
+  .sd-block:first-child .sd-block-head{margin-top:0;}
+  .sd-block-head .dept-caret{font-size:11px; color:inherit;}
+  .sd-block-head > button{margin-left:12px; flex:0 0 auto;}
+  .sd-block-head:hover{color:var(--text);}
+  /* The rule fills the gap between title and any trailing action. When a
+     .sd-block-head-toggle is present the rule belongs to it, so it sits between
+     the title and the button rather than after the button. */
+  .sd-block-head:not(:has(.sd-block-head-toggle))::after{content:''; flex:1; height:1px; background:var(--line);}
+  /* Preview & Export section headers reuse the same look, but only the caret+title
+     span toggles collapse — the header action (e.g. a Copy button) sits alongside it
+     and stays clickable/visible on its own, including while the body is collapsed. */
+  .sd-block-head-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; flex:1; min-width:0;}
+  .sd-block-head-toggle::after{content:''; flex:1; height:1px; background:var(--line);}
+  .sd-block-head-toggle:hover{color:var(--text);}
+  .sd-block-head-toggle .dept-caret{color:inherit;}
+  .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
+  .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
+
+  label{display:block; font-family:var(--label); font-size:11px; letter-spacing:.3px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+
+  /* FIELDS SIT ON A LINE, NOT STACKED (Style Review).
+     In a one- or two-up grid — where a short value used to get a needlessly
+     full-width box — the label moves beside its control, in a fixed label column
+     so rows line up down the page. Anything after the label (hint, second control)
+     stacks inside the control column rather than wrapping under the label.
+     Deliberately NOT applied to .g3/.g4: those cells are already narrow, and a
+     104px label column there leaves ~55px for the control, which clips dates and
+     times. Dense rows keep the label above, where the control gets the full cell.
+     Bare labels outside a .grid — log line, notes, descriptions — stay full-width
+     stacked, which is what long text wants. Below 900px everything reverts to
+     stacked (see mobile block). */
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child){display:grid;
+    grid-template-columns:var(--field-label-w) minmax(0,1fr);
+    align-items:center; column-gap:10px; row-gap:4px;}
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child) > label{margin:0; line-height:1.25; align-self:center;}
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child) > *:not(label){grid-column:2;}
+  /* textareas are tall — pin the label to the first line instead of centring it */
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea){align-items:start;}
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea) > label{padding-top:9px;}
+
+  /* One inline-field pattern. .ts-field was a Tech-Specs-only duplicate of
+     .field-inline; the Style Review merged them, so both names share these rules.
+     Label beside a control that's sized to the value it holds ("25p" gets a small
+     box, "S-Log3 CineGamut3" a wider one) rather than stretching to full width. */
+  .ts-grid{display:flex; flex-wrap:wrap; gap:10px 20px; align-items:center;}
+  .ts-field, .field-inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;}
+  .ts-field > label, .field-inline > label{margin:0; white-space:nowrap; flex:0 0 auto;}
+  .ts-field > select, .ts-field > input[type=text],
+  .field-inline > select, .field-inline > input[type=text]{width:auto; min-width:0; flex:0 1 auto;}
+  /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
+  .ts-field input[type=text]{width:152px; padding:6px 8px; font-size:13px;}
+  .ts-field > .hint, .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
+  .ts-banner{font-size:12px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
+    border-radius:6px; padding:7px 10px; margin-bottom:12px;}
+  .ts-banner.differs{background:var(--tint-3); border-color:var(--tape); color:var(--text);}
+  .ts-banner span{color:var(--tape); cursor:pointer; text-decoration:underline; margin-left:6px;}
+  /* Camera designations: name+tags | stacked per-camera lines | reorder, left-aligned
+     columns, not pushed to the right. File-naming tags live under the operator's
+     name, not per camera column — each camera line is its own left-to-right unit
+     (designation, body, shorthand), stacked rather than column-aligned across cameras. */
+  .cam-row{display:grid; grid-template-columns:minmax(150px,1fr) minmax(0,2fr) 60px; gap:10px; align-items:start;
+    padding:11px 0; border-bottom:1px solid var(--line);}
+  .cam-row:last-child{border-bottom:none;}
+  .cam-who strong{font-family:var(--body); font-weight:600; font-size:14px;}
+  .cam-tags{font-family:var(--mono); font-size:10.5px; margin-top:4px; line-height:1.5;}
+  /* align-items:flex-start stops "+ Add camera" stretching the full column width */
+  .cam-cams{display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0;}
+  .cam-cams > .cam-cam-line{align-self:stretch;}
+  .cam-cam-line{display:flex; align-items:center; gap:6px;}
+  .cam-badge{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:.3px; color:var(--tape);
+    background:var(--tint-3); border-radius:5px; padding:5px 7px; flex:0 0 auto; white-space:nowrap;}
+  .cam-body-input, .cam-shorthand-input{font-size:12px; padding:5px 7px; min-height:0; width:auto; flex:1 1 0; min-width:0;}
+  .cam-reorder{display:flex; flex-direction:column; gap:4px; align-items:center;}
+  .cam-reorder .icon-btn[disabled]{opacity:.25; cursor:default;}
+  .req::after{content:' *'; color:var(--danger);}
+  input[type=text], input[type=date], textarea, select{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
+    color:var(--text); padding:8px 9px; font-family:var(--body); font-size:13.5px;}
+  input:focus, textarea:focus, select:focus{outline:none; border-color:var(--tape);}
+  input[readonly]{opacity:.7;}
+  textarea{resize:vertical; min-height:56px; line-height:1.5;}
+
+  button{font-family:var(--body); font-weight:600; font-size:13px; cursor:pointer; border-radius:7px;
+    border:1px solid var(--line); background:var(--panel-2); color:var(--text); padding:8px 13px;}
+  button:hover{border-color:var(--tape);} button:active{transform:translateY(1px);}
+  button.primary{background:var(--tape); color:var(--tape-ink); border-color:var(--tape);}
+  button.danger{color:var(--danger);} button.small{padding:5px 9px; font-size:12px;}
+  .icon-btn{display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0;
+    border:none; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; border-radius:5px;
+    vertical-align:middle; margin-left:2px; line-height:1;}
+  .icon-btn:hover{color:var(--tape); background:var(--tint-3);}
+  .icon-btn.active{color:var(--tape); background:var(--tint-4);}
+  /* destructive icon button — stays quiet until hovered, so a row of controls
+     doesn't read as a row of warnings */
+  .icon-btn.danger-ic:hover{color:var(--danger); background:rgba(164,50,31,.10);}
+  .ic{display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; vertical-align:-2px;}
+  .ic svg{display:block; width:100%; height:100%;}
+  .icon-btn .ic{width:14px; height:14px; vertical-align:middle;}
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;}
+  .status{font-size:12px; color:var(--muted);}
+
+  /* Page headline follows the preview-card pattern picked in the Style Review:
+     a large all-caps display title, with upper-and-lower-case sub information
+     in the body font beneath it (not an uppercase eyebrow above it). */
+  .page-head{margin-bottom:16px;}
+  .page-head h1{font-family:var(--disp); font-weight:700; font-size:22px; letter-spacing:.4px;
+    text-transform:uppercase; margin:0; color:var(--text);}
+  .page-head .eyebrow{font-family:var(--body); font-size:13px; letter-spacing:0; color:var(--muted);
+    text-transform:none; margin-top:2px;}
+  .page-head .code{font-family:var(--label); letter-spacing:.5px; font-size:12.5px; color:var(--tape); margin-top:4px;}
+
+  .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:12.5px; letter-spacing:.8px;
+    color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;}
+  .tab.active{color:var(--tape); border-color:var(--tape);}
+  .tabs.daytabs{margin-bottom:14px;}
+  .tabs.daytabs .tab{padding:7px 13px; font-size:11.5px;}
+  .tab.daytab-add{color:var(--tape); opacity:.85;}
+  .tab.daytab-add:hover{opacity:1;}
+
+  .row{display:grid; gap:8px; align-items:end; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--line);}
+  .row:last-child{border-bottom:none;}
+  .rows-sched .row{grid-template-columns:24px 30px 100px 90px 1fr 34px; position:relative;}
+  .rows-sched .row .sc-select{align-self:center; width:16px; height:16px;}
+  /* hover between schedule rows to insert a new blank row at that point, instead of
+     only being able to append at the bottom — sits just left of the Time column,
+     since that's the column you're navigating in when you'd reach for this */
+  .sched-insert-hint{position:absolute; top:-10px; left:50px; width:18px; height:18px;
+    display:flex; align-items:center; justify-content:center; opacity:0; z-index:2;
+    cursor:pointer; transition:opacity .12s ease;}
+  .sched-insert-hint span{font-family:var(--label); font-size:13px; font-weight:600; line-height:1;
+    color:var(--tape-ink); background:var(--tape); border-radius:50%; width:18px; height:18px;
+    display:flex; align-items:center; justify-content:center;}
+  .rows-sched .row:hover .sched-insert-hint, .sched-insert-hint:hover{opacity:1;}
+  .sc-move{display:flex; flex-direction:column; align-self:center; gap:0;}
+  .sc-move .icon-btn{width:20px; height:14px;}
+  .sc-move .ic{width:11px; height:11px;}
+  .sched-tools{align-items:center;}
+  .sched-shift{display:inline-flex; align-items:center; gap:6px; padding:4px 8px;
+    border:1px solid var(--line); border-radius:8px; background:var(--panel-2);}
+  .sched-shift select{width:auto; padding:5px 7px; font-size:12px;}
+  .sched-shift .hint{margin:0; white-space:nowrap;}
+  .rows-add .row{grid-template-columns:1fr 1fr 34px;}
+
+  .list-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:8px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+  .list-card.list-card-editing{border-color:var(--tape); background:var(--tint-2); margin-bottom:0; border-radius:8px 8px 0 0;}
+  .crew-entry{margin-bottom:8px;}
+  .crew-entry .list-card{margin-bottom:0;}
+  .inline-form-card{border:1px solid var(--tape); border-top:none; border-radius:0 0 var(--box-radius) var(--box-radius); padding:var(--box-pad); margin-bottom:8px; background:var(--panel);}
+  /* Names and record titles: geometric sans (--body) at 14px everywhere (Style Review) */
+  .list-card .meta strong{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text);}
+  .list-card .meta div{color:var(--muted); font-size:12.5px; margin-top:2px;}
+  .list-card .actions{display:flex; gap:6px; flex-wrap:wrap;}
+  .empty-note{color:var(--muted); font-size:13px; font-style:italic;}
+
+  .searchresults{position:relative;}
+  .srlist{border:1px solid var(--line); border-radius:6px; background:var(--panel-2); margin-top:4px; max-height:200px; overflow:auto;}
+  .sritem{padding:7px 9px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--line);}
+  .sritem:last-child{border-bottom:none;} .sritem:hover{background:var(--panel-2);}
+  .mapembed{width:100%; height:220px; border:1px solid var(--line); border-radius:8px; margin-top:8px;}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; margin-bottom:16px;}
+  .card h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; color:var(--tape); margin:16px 0 8px; text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;}
+  .card h3::after{content:''; flex:1; height:1px; background:var(--line);}
+  .card h3:first-child{margin-top:0;}
+  .card .line1{font-family:var(--disp); font-weight:700; font-size:22px; color:var(--text);}
+  .card .sub{color:var(--muted); font-size:13px; margin-top:2px;}
+  .card table{width:100%; border-collapse:collapse; font-size:13px;}
+  /* two-column key-info block at top of call sheet preview */
+  .key-info-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px 28px; margin:16px 0 20px;
+    padding:14px 16px; background:var(--panel-2); border-radius:8px; border:1px solid var(--line);}
+  .ki-col{display:flex; flex-direction:column; gap:12px;}
+  .ki-item h4{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--tape); margin:0 0 4px;}
+  .ki-item{font-size:13px; line-height:1.5;}
+  .ki-item ul{margin:4px 0 0; padding-left:18px;}
+  .card td, .card th{padding:5px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
+  .card th{color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;}
+  .card ul{margin:4px 0; padding-left:18px;}
+  .section table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  .section td, .section th{padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
+  .section th{color:var(--tape); font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;}
+  pre#waText{white-space:pre-wrap; word-break:break-word; font-family:var(--mono); font-size:12.5px;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:14px; line-height:1.6; max-height:420px; overflow:auto;}
+  .hint{font-size:12px; color:var(--muted); margin-top:6px;}
+  .pill{display:inline-block; font-family:var(--label); font-size:10px; font-weight:500; padding:2px 8px; border-radius:20px;
+    background:#EEF5F2; color:var(--muted); letter-spacing:.4px; vertical-align:middle;}
+  .pill.dept{background:var(--tint-3); color:var(--tape);}
+  select.pill-select{
+    appearance:none; -webkit-appearance:none; -moz-appearance:none;
+    background-color:var(--tint-3); color:var(--tape); border:1px solid transparent;
+    border-radius:20px; font-family:var(--label); font-size:10px; font-weight:500; letter-spacing:.4px;
+    padding:2px 20px 2px 9px; cursor:pointer; vertical-align:middle; margin-left:2px; max-width:180px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23017756' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat; background-position:right 6px center; background-size:9px;
+  }
+  select.pill-select:hover{border-color:var(--tape);}
+  select.pill-select:focus{outline:none; border-color:var(--tape);}
+  select.pill-select.empty{
+    background-color:var(--panel-2); color:var(--muted);
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236f6a63' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  }
+  /* LABEL FAMILY (Style Review) — one look for every small uppercase label:
+     Oswald 11px, 1.2px tracking, brand green, no bottom border. Block-level
+     section labels also get the Pattern A rule (starts after the words, sits on
+     their vertical centre); column and table headers get the type but no rule. */
+  .subhead{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--tape); margin:14px 0 8px; padding-bottom:0; border-bottom:none;
+    display:flex; align-items:center; gap:8px;}
+  .subhead::after{content:''; flex:1; height:1px; background:var(--line);}
+  .subhead:first-child{margin-top:0;}
+  .subhead.dept-toggle{cursor:pointer; user-select:none; display:flex; align-items:center; gap:4px;}
+  /* Company groups adopt Pattern A too — same job as a summary block header. */
+  .posn-company-header{
+    display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
+    font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
+    color:var(--tape); margin:16px 0 8px; padding-bottom:0; border-bottom:none;
+  }
+  .posn-company-header::after{content:''; flex:1; height:1px; background:var(--line);}
+  .posn-company-group:first-child .posn-company-header{margin-top:0;}
+  .posn-company-header:hover{color:var(--text);}
+  .posn-company-body{margin-left:2px;}
+  .posn-name{font-size:13px; display:flex; flex-direction:column; gap:1px;}
+  .subhead.dept-toggle:hover{color:var(--tape);}
+  .dept-caret{font-size:9px; width:10px; display:inline-block;}
+  .dept-code{color:var(--tape); font-weight:700; letter-spacing:.6px;}
+  .dept-count{color:var(--muted); font-weight:400;}
+  /* Same label type as the Crew tab's Select all / Filter row, so every header
+     control across the app reads at one weight and size (Style Review). */
+  .dept-toggle-all{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--muted); text-align:right; margin-bottom:8px;}
+  .dept-toggle-all span{cursor:pointer;}
+  .dept-toggle-all span:hover{color:var(--tape);}
+  /* filter panel — shared look for the Crew database and Crew-on-project filters */
+  .filter-toggle{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;
+    font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;}
+  .filter-toggle:hover{color:var(--tape);}
+  /* Crew tab header row (Phase V) — Select all + Filter left-aligned, Expand/Collapse
+     all + Summary right-aligned, all sharing one font/size so nothing reads as bolder
+     or bigger than its neighbours. The Filter panel itself renders below this row,
+     not inside it, so opening it can't distort the row's alignment. */
+  .crew-header-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    gap:6px 16px; font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--muted); margin-bottom:8px;}
+  .crew-header-left, .crew-header-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
+  .crew-header-row label:hover, .crew-header-row span:hover{color:var(--tape);}
+  .crew-header-selectall input{margin:0;}
+  .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
+  .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
+  .filter-chips label{font-size:12px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
+  .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--tint-3);
+    border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;}
+  .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
+  .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
+  /* Roles tab (Phase S) — proper tidy columns instead of one packed inline row.
+     Controls | Name | Role | Department (reference-only) | Show as. */
+  .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 92px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
+  .roles-grid-header{font-family:var(--label); font-size:11px; font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
+  .roles-grid-row{padding:8px 0; border-bottom:1px solid var(--line);}
+  .roles-grid-row:last-child{border-bottom:none;}
+  .roles-grid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
+  .roles-grid-controls{display:flex; align-items:center; gap:0;}
+  .roles-grid-name{min-width:0; font-family:var(--body); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .roles-grid-cell{min-width:0;}
+  .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
+  .modal-overlay{position:fixed; inset:0; background:rgba(17,10,8,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
+  .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
+  .modal-box h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;
+    display:flex; align-items:center; gap:8px;}
+  .modal-box h3::after{content:''; flex:1; height:1px; background:var(--line);}
+  .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
+  .formgroup{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
+  .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;}
+  .formgroup > .fg-title::after{content:''; flex:1; height:1px; background:var(--line);}
+  /* collapsible crew-form sections */
+  summary.fg-title{cursor:pointer; user-select:none; list-style:none; display:flex; align-items:center; gap:6px;}
+  summary.fg-title::-webkit-details-marker{display:none;}
+  summary.fg-title::before{content:'▸'; font-size:9px; transition:transform .15s ease; display:inline-block;}
+  details[open] > summary.fg-title::before{transform:rotate(90deg);}
+  summary.fg-title:hover{opacity:.75;}
+  .private-note{font-size:11px; color:var(--muted); background:rgba(164,50,31,.08); border:1px solid rgba(164,50,31,.28);
+    border-radius:6px; padding:6px 9px; margin-bottom:8px;}
+  .private-note b{color:var(--danger);}
+  .taglist{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
+  .crewrow-select{display:grid; grid-template-columns:46px 1fr 100px 34px; gap:8px; align-items:start; margin-bottom:8px; padding-top:6px;}
+  .posn-dept-badge{font-family:var(--label); font-size:10px; font-weight:600; letter-spacing:.4px; color:var(--tape);
+    background:var(--tint-3); border-radius:5px; padding:6px 4px; text-align:center; align-self:center;}
+  /* shared crew identity block — used by every crew list in the app */
+  .crew-ident{min-width:0;}
+  .crew-ident-top{display:flex; align-items:center; gap:2px; flex-wrap:wrap;}
+  .crew-ident-top strong{font-family:var(--body); font-weight:600; font-size:14px; margin-left:4px;}
+  .crew-ident-pills{display:flex; flex-wrap:wrap; gap:4px; margin:5px 0 3px;}
+  /* compact single-row variant — everything on one line */
+  .crew-ident.one-line{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-width:0;}
+  .crew-ident.one-line strong{font-family:var(--body); font-weight:600; font-size:14px; white-space:nowrap;}
+  .crew-ident.one-line .crew-ident-sub{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+  .crew-ident.one-line select.pill-select{max-width:150px;}
+  .crew-ident.one-line .icon-btn{flex:0 0 auto;}
+  /* roles row: same "one row per person" block as one-line, but wraps onto
+     further lines instead of clipping — used where a saved-roles taglist
+     needs to sit alongside the dept/company pickers */
+  .crew-ident.one-line.wrap-row{flex-wrap:wrap;}
+  .crew-ident.one-line.wrap-row .crew-ident-sub{white-space:normal; overflow:visible; text-overflow:clip;}
+  .crew-ident.one-line.wrap-row .roles-inline{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:2px;}
+  .override-dot{color:var(--tape); font-size:9px; flex:0 0 auto; cursor:help;}
+  .posn-row-overridden{background:var(--tint-2); border-radius:8px;}
+  .day-override-form{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--tint-1);}
+  .day-override-form .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
+  select.pill-select.copro{background-color:rgba(17,10,8,.06); color:var(--text);}
+  select.pill-select.copro.empty{background-color:transparent; color:var(--muted);}
+  .crewgrid{display:grid; grid-template-columns:minmax(200px,1fr) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px; align-items:center; column-gap:6px;}
+  .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
+  .crewgrid-header{font-family:var(--label); font-size:11px; font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
+  .crewgrid-row{padding:8px 0; border-bottom:1px solid var(--line);}
+  .crewgrid-row:last-child{border-bottom:none;}
+  .crewgrid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
+  .crewgrid-row-name{min-width:0;}
+  .crewgrid-row-name .icon-btn{margin-left:0; margin-right:2px;}
+  .crewgrid-check{display:flex; justify-content:center;}
+  .crewview-tabs{margin-bottom:12px;}
+  .crewgrid-check input{width:16px; height:16px; accent-color:var(--tape);}
+  /* catering: three stacked rows per person (Breakfast/Lunch/Dinner), kept compact
+     so three rows don't feel like three times the space of one */
+  .crewgrid-catering-person{border-bottom:1px solid var(--line); padding-bottom:4px; margin-bottom:4px;}
+  .crewgrid-catering-person:last-child{border-bottom:none; margin-bottom:0;}
+  .meal-subrow{margin-top:1px;}
+  .meal-subrow .meal-cell input{width:13px; height:13px;}
+  .meal-row-label-wrap{display:flex; align-items:center; gap:8px; min-width:0; padding-left:2px;}
+  .meal-row-label{font-family:var(--label); font-size:11px; font-weight:500; letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--tape);}
+  .meal-row-all{font-family:var(--label); font-size:10px; color:var(--muted);
+    cursor:pointer; flex-shrink:0;}
+  .meal-row-all:hover{color:var(--tape);}
+  .crewgrid-remove{display:flex; align-items:center; justify-content:flex-end; gap:2px;}
+  .all-toggle-btn{padding:3px 8px; font-size:11px;}
+  .crewgrid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
+
+  /* scrollable wrapper for wide preview tables */
+  .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -2px;}
+  .tablewrap table{min-width:520px;}
+
+  /* ============================================================
+     MOBILE / TABLET
+     ============================================================ */
+  @media(max-width:900px){
+    /* --- slide-out drawer nav --- */
+    .topbar{
+      display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:40;
+      background:var(--side-bg); color:var(--side-text); padding:10px 12px;
+      border-bottom:1px solid var(--side-line);
+    }
+    .topbar .burger{
+      background:transparent; border:1px solid var(--side-line); color:var(--side-text);
+      width:44px; height:44px; min-width:44px; border-radius:9px; font-size:17px; line-height:1;
+      display:flex; align-items:center; justify-content:center; padding:0;
+    }
+    .topbar .burger:hover{border-color:var(--tape);}
+    .topbar .tb-title{font-family:var(--disp); font-weight:700; font-size:16px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis;}
+    .topbar .tb-dot{width:9px; height:9px; border-radius:2px; background:var(--tape); transform:rotate(45deg); flex:0 0 auto;}
+
+    .app{display:block;}
+    .side{
+      position:fixed; top:0; left:0; bottom:0; z-index:60;
+      width:82vw; max-width:300px; height:100vh; height:100dvh;
+      transform:translateX(-102%); transition:transform .22s ease;
+      border-right:1px solid var(--side-line); padding:16px 14px 40px;
+      box-shadow:4px 0 24px rgba(0,0,0,.3);
+    }
+    .side.open{transform:translateX(0);}
+    .scrim{
+      display:block; position:fixed; inset:0; z-index:50;
+      background:rgba(17,10,8,.5); opacity:0; pointer-events:none; transition:opacity .22s ease;
+    }
+    .scrim.open{opacity:1; pointer-events:auto;}
+    .main{padding:14px 13px 96px;}
+
+    /* bigger tap targets throughout the drawer */
+    .side-item, .side-proj{padding:11px 12px; font-size:15px;}
+    .side-proj .code{font-size:12px; margin-top:2px;}
+    .side-new{padding:11px 12px; font-size:14px;}
+    .side-label{font-size:11px; margin:18px 6px 7px;}
+
+    /* --- form controls: 16px stops iOS auto-zoom on focus --- */
+    input[type=text], input[type=date], textarea, select{
+      font-size:16px; padding:11px 11px; min-height:46px;
+    }
+    textarea{min-height:80px;}
+    label{font-size:12px; margin-bottom:5px;}
+    /* Inline label columns go back to stacked on narrow screens — a fixed 104px
+       label column leaves too little room for the control on a phone. */
+    .grid:not(.g3):not(.g4) > div:has(> label:first-child){display:block;}
+    .grid:not(.g3):not(.g4) > div:has(> label:first-child) > label{margin-bottom:5px;}
+    .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea) > label{padding-top:0;}
+
+    /* --- buttons: 44px minimum touch target --- */
+    button{font-size:15px; padding:12px 16px; min-height:46px;}
+    .icon-btn{width:40px; height:40px; font-size:14px; min-height:0;}
+    select.pill-select{font-size:12px; padding:5px 22px 5px 10px; max-width:150px;}
+    button.small{font-size:14px; padding:10px 13px; min-height:44px;}
+    .toolbar{gap:10px;}
+    .toolbar button{flex:1 1 auto;}
+
+    /* --- everything in one column --- */
+    .grid.g2, .grid.g3, .grid.g4{grid-template-columns:1fr;}
+    /* tech specs + camera rows stack on mobile */
+    /* .ts-grid already flows and wraps; nothing to override on mobile */
+    .cam-row{grid-template-columns:1fr; gap:8px;}
+
+    /* --- schedule / location / crew rows become stacked cards --- */
+    .rows-sched .row, .rows-add .row, .crewrow-select{
+      grid-template-columns:1fr; gap:9px;
+      border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:10px;
+      background:var(--panel-2);
+    }
+    /* Desktop squeezes the reorder arrows into a stacked 20x14 pair; 14px tall is
+       unusable on touch. Rather than just stacking everything (which made each row
+       nearly a full screen tall), the card uses explicit grid areas: one compact
+       control strip along the top, then the three fields. */
+    .rows-sched .row{
+      display:grid;
+      grid-template-columns:auto auto 1fr auto auto;
+      grid-template-areas:
+        "ins  move .    rm   sel"
+        "time time time time time"
+        "dur  dur  dur  dur  dur"
+        "desc desc desc desc desc";
+      gap:9px; align-items:center;
+      border-bottom:1px solid var(--line);
+    }
+    .rows-sched .row .sched-insert-hint{grid-area:ins;}
+    .rows-sched .row .sc-move{grid-area:move;}
+    .rows-sched .row .sc-select{grid-area:sel;}
+    .rows-sched .row .sc-time{grid-area:time;}
+    .rows-sched .row .sc-dur{grid-area:dur;}
+    .rows-sched .row .sc-desc{grid-area:desc;}
+    .sc-move{flex-direction:row; gap:8px;}
+    .sc-move .icon-btn{width:44px; height:44px; border:1px solid var(--line); background:var(--panel);}
+    .sc-move .ic{width:16px; height:16px;}
+    .rows-sched .row .sc-select{width:24px; height:24px; accent-color:var(--tape); justify-self:end; margin:0;}
+    /* "insert a row here" is hover-revealed on desktop, which touch can never do —
+       so on mobile it becomes a permanently visible button in the control strip
+       rather than being dropped. Keeps mid-schedule insertion available on a phone. */
+    .sched-insert-hint{position:static; opacity:1; width:44px; height:44px;}
+    .sched-insert-hint span{width:26px; height:26px; font-size:17px;}
+    .sched-shift{flex-wrap:wrap; width:100%; justify-content:flex-start;}
+    /* the schedule header row of labels is meaningless once stacked */
+    .rows-sched .row:first-child{display:none;}
+    .rows-add .row .rm, .crewrow-select .rm{
+      grid-column:1/-1; justify-self:stretch; width:100%;
+    }
+    /* the schedule delete button rides in the control strip, not as a full-width bar */
+    .rows-sched .row .rm{grid-area:rm; justify-self:end; width:auto; min-width:44px; padding:10px 12px;}
+
+    /* --- tabs scroll horizontally rather than wrapping into stacks --- */
+    /* The scrollbar is hidden, so without a cue a cut-off tab just looks clipped.
+       The wrapper fades the right edge to signal "there's more this way", and the
+       fade clears once you've scrolled to the end (.tabscroll-end, set in JS). */
+    .tabs{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+      scroll-snap-type:x proximity;}
+    .tabs::-webkit-scrollbar{display:none;}
+    .tab{padding:12px 15px; font-size:13.5px; white-space:nowrap; flex:0 0 auto; scroll-snap-align:start;}
+    .tabscroll{position:relative;}
+    .tabscroll::after{
+      content:''; position:absolute; top:0; right:0; bottom:1px; width:34px; pointer-events:none;
+      background:linear-gradient(90deg, rgba(255,255,255,0), var(--bg) 78%);
+      opacity:1; transition:opacity .15s ease;
+    }
+    .tabscroll.tabscroll-end::after{opacity:0;}
+
+    /* --- cards / lists --- */
+    .section{padding:14px 13px;}
+    .card{padding:16px 14px;}
+    .list-card{align-items:flex-start; padding:12px;}
+    .list-card .actions{width:100%; margin-top:4px;}
+    .list-card .actions button{flex:1 1 auto;}
+    .page-head h1{font-size:22px; line-height:1.2;}
+    .page-head{margin-bottom:14px;}
+
+
+    /* --- crew day-grid becomes stacked cards with labelled day chips on mobile ---
+       The desktop layout is a wide matrix (one column per shoot day). On a phone that
+       forces horizontal scrolling through tiny unlabelled checkboxes, so instead each
+       person becomes a card and the day cells reflow into a labelled chip row. */
+    /* the header strip carries BOTH .crewgrid and .crewgrid-header-row, so a plain
+       .crewgrid-header-row{display:none} ties on specificity with the .crewgrid rule
+       below and loses on source order — leaving a stray stack of D1/D2/D3… chips
+       above the cards. Doubling the class wins the tie without an !important. */
+    .crewgrid-header-row.crewgrid-header-row{display:none;}
+    .crewgrid{
+      display:block; border:1px solid var(--line); border-radius:10px;
+      padding:12px; margin-bottom:10px; background:var(--panel);
+    }
+    .crewgrid-row-name{margin-bottom:8px;}
+    /* The whole chip IS the toggle: the native checkbox is stretched invisibly over
+       it (still focusable, still fires change), and state is read from the chip's
+       own fill plus a tick. That removes the redundant box-next-to-a-label, roughly
+       halves each chip's width, and gives a full 44px tap target on the chip. */
+    .crewgrid-check{
+      position:relative; display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--line); border-radius:20px; padding:0 13px;
+      margin:0 6px 6px 0; background:var(--panel-2); min-height:44px; min-width:52px;
+      transition:background .12s ease, border-color .12s ease;
+    }
+    .crewgrid-check::before{
+      content:attr(data-day); font-family:var(--label); font-size:13px;
+      font-weight:500; letter-spacing:.4px; color:var(--muted);
+    }
+    /* tick appears only when on, and reserves no space when off */
+    .crewgrid-check::after{
+      content:'✓'; font-size:13px; font-weight:700; color:var(--tape);
+      width:0; overflow:hidden; opacity:0; transition:width .12s ease, opacity .12s ease;
+    }
+    .crewgrid-check:has(input:checked){background:var(--tint-4); border-color:var(--tape);}
+    .crewgrid-check:has(input:checked)::before{color:var(--tape); font-weight:600;}
+    .crewgrid-check:has(input:checked)::after{width:1.1em; opacity:1; margin-left:5px;}
+    /* inset:-1px, not 0 — absolute children position against the PADDING box, so
+       inset:0 would leave the chip's 1px border ring untappable */
+    .crewgrid-check input{
+      position:absolute; inset:-1px; width:auto; height:auto; margin:0;
+      opacity:0; cursor:pointer; appearance:none; -webkit-appearance:none;
+    }
+    .crewgrid-check:has(input:focus-visible){outline:2px solid var(--tape); outline-offset:2px;}
+    /* once the row is a card, the per-person actions belong on the left under the
+       day chips, not floated to the right edge of an empty row */
+    .crewgrid-remove{justify-content:flex-start; gap:8px; margin-top:8px;
+      padding-top:8px; border-top:1px solid var(--line);}
+    .crewgrid-remove:empty{display:none;}
+    .crewgrid-editform{margin-top:10px;}
+    /* Roles tab grid collapses the same way — stacked cards, labelled fields.
+       Two classes (not one) so this reliably beats .roles-grid's display:block
+       regardless of source order — same specificity-tie trap as .crewgrid-header-row. */
+    .roles-grid.roles-grid-header-row{display:none;}
+    .roles-grid{
+      display:block; border:1px solid var(--line); border-radius:10px;
+      padding:12px; margin-bottom:10px; background:var(--panel);
+    }
+    .roles-grid-controls{margin-bottom:6px;}
+    .roles-grid-cell{margin-bottom:8px;}
+    .roles-grid-cell::before{
+      content:attr(data-label); display:block; font-family:var(--label); font-size:10.5px;
+      font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:3px;
+    }
+    .roles-grid-showas{white-space:normal;}
+    .roles-grid-editform{margin-top:10px;}
+    .tablewrap:has(.roles-grid){overflow-x:visible;}
+    /* the crew grid no longer needs to scroll sideways once it's stacked */
+    .tablewrap:has(.crewgrid){overflow-x:visible;}
+
+    /* --- position assignment rows (stacking handled by the shared rule above) --- */
+    .posn-dept-badge{justify-self:start; padding:5px 10px;}
+    .posn-row .posn-call{max-width:160px;}
+
+    /* --- crew identity pills wrap instead of squashing --- */
+    .crew-ident-pills{gap:5px;}
+    select.pill-select{max-width:100%;}
+
+    /* --- preview tables scroll instead of squashing --- */
+    .card table{font-size:13px;}
+    .key-info-grid{grid-template-columns:1fr; gap:14px;}
+    pre#waText{font-size:13px; max-height:340px;}
+    .mapembed{height:200px;}
+
+    /* --- misc readability --- */
+    .formgroup{padding:13px 11px;}
+    .hint{font-size:13px;}
+    .empty-note{font-size:14px;}
+    .private-note{font-size:12.5px; padding:9px 11px;}
+    .srlist{max-height:250px;}
+    .sritem{padding:12px 11px; font-size:14px;}
+    .subhead{font-size:12px;}
+
+    /* --- sticky save bar on the shoot-day editor --- */
+    .toolbar.sticky-actions{
+      position:sticky; bottom:0; z-index:30; margin:16px -13px 0;
+      padding:11px 13px calc(11px + env(safe-area-inset-bottom));
+      background:var(--bg); border-top:1px solid var(--line);
+      box-shadow:0 -4px 16px rgba(17,10,8,.08);
+    }
+  }
+
+  @media(max-width:420px){
+    .page-head h1{font-size:20px;}
+    .card .line1{font-size:19px;}
+    .main{padding:12px 11px 96px;}
+    .section{padding:13px 11px;}
+  }
+
+</style>
+<style>
+/* ============================================================
+   PART B - this review page's own chrome. Defined after Part A
+   so it wins where the two overlap.
+   ============================================================ */
+  body{background:#faf9f7;}
+  .aud-wrap{max-width:1080px; margin:0 auto; padding:0 22px 120px;}
+  .aud-top{background:var(--side-bg); color:var(--side-text); padding:18px 22px; margin-bottom:0;
+    position:sticky; top:0; z-index:50; box-shadow:0 2px 14px rgba(17,10,8,.18);}
+  .aud-top-inner{max-width:1080px; margin:0 auto;}
+  .aud-top h1{font-family:var(--disp); font-weight:700; font-size:19px; margin:0; color:var(--side-text);
+    display:flex; align-items:center; gap:9px;}
+  .aud-top h1 .dot{width:10px; height:10px; border-radius:2px; background:var(--tape); transform:rotate(45deg);}
+  .aud-top .sub{font-family:var(--label); font-size:10.5px; letter-spacing:1.6px; text-transform:uppercase;
+    color:rgba(255,255,245,.5); margin-top:3px;}
+  .aud-nav{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:12px;}
+  .aud-nav a{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:rgba(255,255,245,.62); text-decoration:none;}
+  .aud-nav a:hover{color:#fff;}
+
+  .aud-panel{background:var(--side-bg); color:var(--side-text); border-radius:12px; padding:22px 24px; margin:26px 0 30px;}
+  .aud-panel h2{font-family:var(--disp); font-weight:700; font-size:20px; margin:0 0 4px; color:var(--side-text);}
+  .aud-panel p{font-size:14px; line-height:1.65; color:rgba(255,255,245,.8); margin:10px 0 0;}
+  .aud-panel .count{float:right; font-family:var(--label); font-size:11px; letter-spacing:1.2px;
+    text-transform:uppercase; color:#7fd8b4;}
+  .aud-bar{height:3px; background:rgba(255,255,245,.16); border-radius:2px; margin:12px 0 0; overflow:hidden;}
+  .aud-bar span{display:block; height:100%; background:#7fd8b4; width:0; transition:width .25s ease;}
+  .aud-panel-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;}
+  .aud-btn{font-family:var(--body); font-weight:600; font-size:13px; padding:10px 16px; border-radius:8px;
+    border:1px solid rgba(255,255,245,.3); background:transparent; color:var(--side-text); cursor:pointer;}
+  .aud-btn:hover{border-color:#7fd8b4; color:#7fd8b4;}
+  .aud-btn-primary{background:var(--tape); border-color:var(--tape); color:#fff;}
+  .aud-btn-primary:hover{background:#02684b; color:#fff; border-color:#02684b;}
+
+  .aud-section{padding-top:26px; margin-top:26px; border-top:1px solid rgba(17,10,8,.12);}
+  .aud-section > .num{font-family:var(--label); font-size:11px; letter-spacing:1.6px; color:var(--tape);}
+  .aud-section > h2{font-family:var(--disp); font-weight:700; font-size:27px; margin:2px 0 8px; color:var(--text);}
+  .aud-section > .lede{font-size:14.5px; line-height:1.65; color:#4a4540; max-width:760px; margin:0 0 4px;}
+
+  .aud-q{border:1px dashed var(--tape); border-radius:10px; padding:18px 20px; margin:24px 0 14px; background:rgba(1,119,86,.035);}
+  .aud-q h3{font-family:var(--disp); font-weight:700; font-size:17px; margin:0 0 8px; color:var(--text);}
+  .aud-q .prob{font-size:13.5px; line-height:1.65; color:#4a4540; margin:0 0 12px;}
+  .aud-q .prob code{font-family:var(--mono); font-size:12px; background:rgba(17,10,8,.06); padding:1px 5px; border-radius:4px;}
+  .aud-opt{display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:8px;
+    padding:10px 13px; margin-bottom:7px; background:#fff; cursor:pointer; font-size:13.5px; font-weight:500;}
+  .aud-opt:hover{border-color:var(--tape);}
+  .aud-opt.on{border-color:var(--tape); background:rgba(1,119,86,.07);}
+  .aud-opt .radio{width:15px; height:15px; border-radius:50%; border:2px solid #bdb8b2; flex:0 0 auto; position:relative;}
+  .aud-opt.on .radio{border-color:var(--tape);}
+  .aud-opt.on .radio::after{content:''; position:absolute; inset:2.5px; border-radius:50%; background:var(--tape);}
+  .aud-chosen{font-family:var(--label); font-size:11px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--tape); margin:12px 0 6px;}
+  .aud-note-l{font-family:var(--label); font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--tape); display:block; margin:12px 0 5px;}
+  .aud-q textarea{width:100%; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px;
+    font-family:var(--body); font-size:13.5px; min-height:62px; color:var(--text);}
+  .aud-q textarea:focus{outline:none; border-color:var(--tape);}
+
+  .aud-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(268px,1fr)); gap:14px; margin:16px 0 6px;}
+  .aud-demo{border:1px solid var(--line); border-radius:10px; background:#fff; overflow:hidden; position:relative;}
+  .aud-demo.pick{cursor:pointer;}
+  .aud-demo.pick:hover{border-color:var(--tape); box-shadow:0 2px 12px rgba(1,119,86,.1);}
+  .aud-demo.on{border-color:var(--tape); border-width:2px; box-shadow:0 2px 14px rgba(1,119,86,.16);}
+  .aud-demo.on::after{content:'\2713'; position:absolute; top:9px; right:9px; width:21px; height:21px; border-radius:50%;
+    background:var(--tape); color:#fff; font-size:12px; display:flex; align-items:center; justify-content:center;}
+  .aud-render{padding:17px 18px; background:#fff; border-bottom:1px solid var(--line);}
+  .aud-render.dark{background:var(--side-bg);}
+  .aud-render.paper{background:#fffdf7;}
+  .aud-meta{padding:9px 13px; background:#f6f5f3;}
+  .aud-meta .name{font-family:var(--label); font-size:10.5px; letter-spacing:.9px; text-transform:uppercase; color:var(--text);}
+  .aud-meta .spec{font-family:var(--mono); font-size:10.5px; color:#6f6a63; margin-top:3px; line-height:1.5;}
+  .aud-tag{display:inline-block; font-family:var(--label); font-size:9px; letter-spacing:.7px; text-transform:uppercase;
+    padding:1px 6px; border-radius:4px; margin-left:5px; vertical-align:1px;}
+  .aud-tag.warn{background:rgba(164,50,31,.12); color:var(--danger);}
+  .aud-tag.ok{background:rgba(1,119,86,.12); color:var(--tape);}
+
+  table.aud-tbl{width:100%; border-collapse:collapse; font-size:12.5px; margin:14px 0 6px; background:#fff;}
+  table.aud-tbl th{font-family:var(--label); font-size:10.5px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--tape); text-align:left; padding:8px 9px; border-bottom:1.5px solid var(--line);}
+  table.aud-tbl td{padding:7px 9px; border-bottom:1px solid rgba(17,10,8,.09); vertical-align:top;}
+  table.aud-tbl td.mono{font-family:var(--mono); font-size:11.5px; color:#4a4540;}
+  .aud-scroll{overflow-x:auto;}
+  .aud-callout{border-left:3px solid var(--tape); background:rgba(1,119,86,.06); padding:12px 15px;
+    border-radius:0 8px 8px 0; font-size:13.5px; line-height:1.65; margin:16px 0;}
+  .aud-callout.warn{border-left-color:var(--danger); background:rgba(164,50,31,.06);}
+  .aud-callout b{color:var(--tape);} .aud-callout.warn b{color:var(--danger);}
+
+  .aud-fab{position:fixed; right:20px; bottom:20px; background:var(--tape); color:#fff; border:none;
+    border-radius:26px; padding:13px 20px; font-family:var(--label); font-size:11.5px; letter-spacing:1.2px;
+    text-transform:uppercase; cursor:pointer; box-shadow:0 6px 22px rgba(1,119,86,.34); z-index:60;}
+  .aud-out{position:fixed; inset:0; background:rgba(17,10,8,.55); display:none; align-items:center;
+    justify-content:center; padding:24px; z-index:100;}
+  .aud-out.open{display:flex;}
+  .aud-out-box{background:#fff; border-radius:12px; padding:22px; max-width:800px; width:100%; max-height:86vh; display:flex; flex-direction:column;}
+  .aud-out-box h3{font-family:var(--disp); font-weight:700; font-size:19px; margin:0 0 10px;}
+  .aud-out-box textarea{flex:1; min-height:340px; font-family:var(--mono); font-size:12px; padding:13px;
+    border:1px solid var(--line); border-radius:8px; background:#faf9f7; color:var(--text); resize:none;}
+
+  /* ---- ruled "paper form" demo styles (proposals, not the app's current CSS) ---- */
+  .pf-rule{background:#fff;}
+  .pf-rule .row{display:grid; grid-template-columns:104px 1fr; align-items:center; gap:10px;
+    border-bottom:1px solid rgba(17,10,8,.18); padding:7px 0;}
+  .pf-rule .row:last-child{border-bottom:none;}
+  .pf-rule label{margin:0; color:#6f6a63;}
+  .pf-rule .val{font-family:var(--body); font-size:13.5px; padding:2px 0;}
+  .pf-box .row{display:grid; grid-template-columns:104px 1fr; align-items:center; gap:10px; padding:5px 0;}
+  .pf-box .cell{border:1px solid rgba(17,10,8,.28); border-radius:3px; padding:6px 8px; background:#fff; font-size:13.5px;}
+  .pf-tint .row{display:grid; grid-template-columns:104px 1fr; align-items:center; gap:10px; padding:5px 0;}
+  .pf-tint .cell{border:1px solid var(--line); border-radius:6px; padding:8px 9px; background:var(--panel-2); font-size:13.5px;}
+
+  /* ---- checkbox proposals ---- */
+  .cbx{display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px;
+    border:1.5px solid #8d8880; border-radius:3px; background:#fff; position:relative; cursor:pointer;}
+  .cbx input{position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer;}
+  .cbx::after{content:''; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--body); font-weight:600; font-size:13px; line-height:1; color:var(--text); opacity:0;}
+  .cbx:has(input:checked)::after{content:'\00D7'; opacity:1; font-size:17px;}
+  .cbx:has(input:focus-visible){outline:2px solid var(--tape); outline-offset:2px;}
+  .cbx.ink:has(input:checked)::after{color:var(--text);}
+  .cbx.green:has(input:checked)::after{color:var(--tape);}
+  .cbx.heavy{border-color:var(--text);}
+  .cbx.round{border-radius:50%;}
+  .cbx-row{display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
+  .cbx-lbl{display:inline-flex; align-items:center; gap:7px; font-size:13px;}
+
+  @media(max-width:760px){
+    .aud-wrap{padding:0 14px 110px;}
+    .aud-section > h2{font-size:22px;}
+    .aud-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="aud-top">
+  <div class="aud-top-inner">
+    <h1><span class="dot"></span> Fonts &amp; Icons Review</h1>
+    <div class="sub">Call Sheet App &middot; Little Film Productions</div>
+    <div class="aud-nav">
+      <a href="#families">Families</a><a href="#ladder">Size ladder</a><a href="#weights">Weights</a>
+      <a href="#align">Alignment</a><a href="#inputs">Inputs</a><a href="#checkboxes">Checkboxes</a>
+      <a href="#rules">Section rules</a><a href="#crewall">Crew "All"</a><a href="#icons">Icons</a>
+      <a href="#secondary">Secondary colour</a>
+    </div>
+  </div>
+</div>
+
+<div class="aud-wrap">
+
+  <div class="aud-panel" id="panel">
+    <span class="count"><span id="cnt">0</span>/<span id="tot">0</span> answered</span>
+    <h2>Your decisions</h2>
+    <div class="aud-bar"><span id="bar"></span></div>
+    <p>Same as last time: <b>click the example you want to keep</b> (or pick an option), and <b>add notes</b>
+    for anything that needs nuance. Hit <b>Export all decisions</b> when you're done and paste the result back.
+    Every example is rendered with the app's real CSS, and every spec line quotes the actual class and value
+    from <code>index.html</code>, so your answers map straight onto code.</p>
+    <div class="aud-panel-actions">
+      <button class="aud-btn" onclick="review()">Review answers</button>
+      <button class="aud-btn aud-btn-primary" onclick="exportDecisions()">Export all decisions</button>
+    </div>
+  </div>
+
+  <!-- ============ 1. FAMILIES ============ -->
+  <div class="aud-section" id="families">
+    <div class="num">01</div>
+    <h2>The three families</h2>
+    <p class="lede">Four font variables are declared. Here's what each one is actually doing right now,
+    counted from the stylesheet: <b>Fraunces</b> 6 rules, <b>Oswald</b> 24 rules, <b>Jost</b> everything else,
+    <b>monospace</b> 2 rules. The split itself is sound &mdash; the problem is that Oswald has quietly become
+    the biggest family in the app.</p>
+
+    <div class="aud-grid">
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="page-head" style="margin:0;"><h1 style="margin:0;">ROW 2026 London</h1></div>
+          <div class="section" style="margin:14px 0 0; padding:0; border:none;"><h2 style="margin:0;">Project details</h2></div>
+        </div>
+        <div class="aud-meta"><div class="name">Fraunces &mdash; <code>--disp</code> <span class="aud-tag ok">6 rules</span></div>
+        <div class="spec">Display headings only. 700 weight, sizes 22 / 16 / 15px.<br>.page-head h1 &middot; .section h2 &middot; .sd-block-head &middot; .posn-company-header &middot; .card .line1 &middot; .brand strong</div></div>
+      </div>
+
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="subhead" style="margin:0 0 10px;">Day details</div>
+          <div class="crew-header-row" style="margin:0 0 10px;"><div class="crew-header-left"><span>Select all</span><span>Filter</span></div><div class="crew-header-right"><span>Collapse all</span></div></div>
+          <span class="pill dept">Camera</span> <span class="posn-dept-badge" style="display:inline-block;">CAM</span>
+        </div>
+        <div class="aud-meta"><div class="name">Oswald &mdash; <code>--label</code> <span class="aud-tag warn">24 rules</span></div>
+        <div class="spec">Labels, badges, pills, tabs, column headers, controls.<br>Sizes 10 / 10.5 / 11 / 12.5px &middot; weights 400 / 500 / 600 &middot; tracking .3 / .4 / .5 / .8 / 1.2 / 1.6px</div></div>
+      </div>
+
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="list-card" style="margin:0;"><div class="meta"><strong>Alex Ovaida</strong><div>1st AC &middot; Camera</div></div></div>
+          <div class="hint" style="margin-top:9px;">Pre-filled from the location's saved parking.</div>
+        </div>
+        <div class="aud-meta"><div class="name">Jost &mdash; <code>--body</code></div>
+        <div class="spec">Body copy, names, buttons, inputs, hints &mdash; everything not covered above.<br>Sizes 9 / 11 / 11.5 / 12 / 12.5 / 13 / 13.5 / 14px &middot; weights 400 / 600 / 700</div></div>
+      </div>
+
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="cam-tags">A_CAM_001 &middot; ROW26_A001</div>
+          <pre style="margin:8px 0 0; font-family:var(--mono); font-size:12.5px; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px;">CREW CALL 08:00
+Location: The Organ Factory</pre>
+        </div>
+        <div class="aud-meta"><div class="name">Monospace &mdash; <code>--mono</code> <span class="aud-tag ok">2 rules</span></div>
+        <div class="spec">WhatsApp preview + camera file-naming tags. Now plain ui-monospace &mdash; no webfont loaded.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-callout"><b>The observation:</b> Oswald is carrying 24 rules across 4 sizes, 3 weights and
+    6 different letter-spacings. It started as the brand's utility font for small uppercase labels and has spread
+    into tabs, pills, badges, column headers and controls &mdash; each with slightly different settings. That's
+    where most of the "too many styles" feeling is coming from.</div>
+
+    <div class="aud-q" data-q="font-roles">
+      <h3>Are the three roles right?</h3>
+      <div class="prob">Right now: Fraunces = display headings, Oswald = anything small and uppercase,
+      Jost = everything else. The roles are clear, but Oswald's territory is very wide.</div>
+    </div>
+  </div>
+
+  <!-- ============ 2. SIZE LADDER ============ -->
+  <div class="aud-section" id="ladder">
+    <div class="num">02</div>
+    <h2>The size ladder</h2>
+    <p class="lede">Every distinct font-size in the base stylesheet, grouped by family. Sizes that sit within
+    0.5px of each other are almost certainly doing the same job.</p>
+
+    <div class="aud-scroll">
+    <table class="aud-tbl">
+      <tr><th>Family</th><th>Sizes in use</th><th>Count</th><th>Read</th></tr>
+      <tr><td>Fraunces</td><td class="mono">22 &middot; 16 &middot; 15</td><td>3</td><td>Clean. 22 page/card title, 15 section heading, 16 brand mark.</td></tr>
+      <tr><td>Oswald</td><td class="mono">12.5 &middot; 11 &middot; 10.5 &middot; 10</td><td>4</td><td>10 vs 10.5 is invisible. 12.5 is only the tab row and page code.</td></tr>
+      <tr><td>Jost</td><td class="mono">14 &middot; 13.5 &middot; 13 &middot; 12.5 &middot; 12 &middot; 11.5 &middot; 11 &middot; 9</td><td>8</td><td>Eight sizes for body text. 13 / 13.5 and 12 / 12.5 are indistinguishable.</td></tr>
+    </table>
+    </div>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="ladder-tight" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="font-size:14px; margin-bottom:6px;">14px &mdash; names, primary rows</div>
+          <div style="font-size:12px; margin-bottom:6px; color:#6f6a63;">12px &mdash; secondary / hints</div>
+          <div style="font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);">11px &mdash; all labels</div>
+        </div>
+        <div class="aud-meta"><div class="name">Tight &mdash; 3 body sizes</div><div class="spec">14 / 12 body, 11 label. Everything else snaps to the nearest. Most disciplined; some density is lost.</div></div>
+      </div>
+      <div class="aud-demo pick" data-card="ladder-mid" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="font-size:14px; margin-bottom:5px;">14px &mdash; names</div>
+          <div style="font-size:13px; margin-bottom:5px;">13px &mdash; body / table cells</div>
+          <div style="font-size:12px; margin-bottom:5px; color:#6f6a63;">12px &mdash; hints, meta</div>
+          <div style="font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);">11px &mdash; all labels</div>
+        </div>
+        <div class="aud-meta"><div class="name">Middle &mdash; 4 body sizes <span class="aud-tag ok">suggested</span></div><div class="spec">14 / 13 / 12 body, 11 label. Kills the .5px pairs but keeps a real distinction between a row, its content and its footnote.</div></div>
+      </div>
+      <div class="aud-demo pick" data-card="ladder-keep" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="font-size:14px;">14</div><div style="font-size:13.5px;">13.5</div><div style="font-size:13px;">13</div>
+          <div style="font-size:12.5px;">12.5</div><div style="font-size:12px;">12</div><div style="font-size:11.5px;">11.5</div>
+          <div style="font-size:11px;">11</div>
+        </div>
+        <div class="aud-meta"><div class="name">Keep all eight</div><div class="spec">Leave the ladder alone. Choose this if the fine gradations are load-bearing somewhere I haven't spotted.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="size-ladder">
+      <h3>How tight should the body size ladder be?</h3>
+      <div class="prob">Jost currently runs eight sizes from 9px to 14px. Several pairs differ by half a pixel,
+      which no one can see but which makes the CSS look deliberate when it isn't.</div>
+    </div>
+
+    <div class="aud-q" data-q="label-size">
+      <h3>And the Oswald label sizes and tracking?</h3>
+      <div class="prob">Four sizes (10 / 10.5 / 11 / 12.5) and six letter-spacings (.3 / .4 / .5 / .8 / 1.2 / 1.6px).
+      The Style Review already unified most <i>section</i> labels to 11px / 1.2px, but pills, badges, tabs and
+      the sidebar still each do their own thing.</div>
+    </div>
+  </div>
+
+  <!-- ============ 3. WEIGHTS ============ -->
+  <div class="aud-section" id="weights">
+    <div class="num">03</div>
+    <h2>Weights &amp; what's actually loaded</h2>
+    <p class="lede">Two genuine defects here &mdash; both checkable against the Google Fonts request in
+    <code>index.html</code> line 8 versus the weights the CSS asks for.</p>
+
+    <div class="aud-scroll">
+    <table class="aud-tbl">
+      <tr><th>Family</th><th>Loaded</th><th>Used by CSS</th><th>Verdict</th></tr>
+      <tr><td>Fraunces</td><td class="mono">500, 700</td><td class="mono">700</td><td><b>500 is loaded but never used.</b> Dead weight in the request.</td></tr>
+      <tr><td>Jost</td><td class="mono">400, 500, 600</td><td class="mono">400, 600, <b>700</b></td><td><b>700 is used but not loaded</b> &mdash; the browser fakes it.</td></tr>
+      <tr><td>Oswald</td><td class="mono">400, 500, 600</td><td class="mono">400, 500, 600</td><td>Correct.</td></tr>
+    </table>
+    </div>
+
+    <div class="aud-callout warn"><b>Synthetic bold:</b> <code>.dept-code</code> (the department code on group headers)
+    and the mobile checkbox tick both ask for Jost 700, which isn't in the font request. The browser smears the
+    600 to fake it, so those two elements render slightly differently from every other bold in the app.</div>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="w-add700" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);">Camera</div>
+          <div style="margin-top:7px;"><span style="color:var(--tape); font-weight:700; letter-spacing:.6px;">CAM</span>
+          <span style="color:#6f6a63;">&middot; 7 people</span></div>
+        </div>
+        <div class="aud-meta"><div class="name">Add Jost 700 to the request</div><div class="spec">Keeps .dept-code bold as designed, gets a real cut instead of a fake one. Costs one more font file.</div></div>
+      </div>
+      <div class="aud-demo pick" data-card="w-use600" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);">Camera</div>
+          <div style="margin-top:7px;"><span style="color:var(--tape); font-weight:600; letter-spacing:.6px;">CAM</span>
+          <span style="color:#6f6a63;">&middot; 7 people</span></div>
+        </div>
+        <div class="aud-meta"><div class="name">Drop to 600 <span class="aud-tag ok">suggested</span></div><div class="spec">Use the 600 that's already loaded. No new file, and 600 is already the app's "bold" everywhere else.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="jost-700">
+      <h3>Fix the synthetic bold by adding 700, or by dropping to 600?</h3>
+      <div class="prob">Only two elements are affected, and 600 is already what every other bold in the app uses.</div>
+    </div>
+
+    <div class="aud-q" data-q="fraunces-500">
+      <h3>Drop the unused Fraunces 500 from the font request?</h3>
+      <div class="prob">Fraunces is requested at 500 and 700 but only ever rendered at 700. Removing 500 makes
+      the page load slightly less font data and makes the request honest about what's in use.</div>
+    </div>
+  </div>
+
+  <!-- ============ 4. ALIGNMENT ============ -->
+  <div class="aud-section" id="align">
+    <div class="num">04</div>
+    <h2>Sizing &amp; alignment</h2>
+    <p class="lede">Where things line up, and where they don't. The Style Review fixed the label column in
+    one- and two-up forms; these are what's left.</p>
+
+    <div class="aud-grid">
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="grid g2" style="gap:10px;">
+            <div style="display:grid; grid-template-columns:104px 1fr; align-items:center; column-gap:10px;">
+              <label style="margin:0;">Client</label><input type="text" value="OFTV"></div>
+            <div style="display:grid; grid-template-columns:104px 1fr; align-items:center; column-gap:10px;">
+              <label style="margin:0;">Working title</label><input type="text" value="ROW 2026 London"></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">Two-up form &mdash; aligned <span class="aud-tag ok">fixed</span></div>
+        <div class="spec">104px label column, controls start on a common left edge. This is the pattern to extend.</div></div>
+      </div>
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="ts-grid">
+            <div class="ts-field"><label>Frame rate</label><input type="text" value="25p" style="width:80px;"></div>
+            <div class="ts-field"><label>Codec</label><input type="text" value="XAVC" style="width:96px;"></div>
+            <div class="ts-field"><label>Colour</label><input type="text" value="S-Log3" style="width:120px;"></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">Tech specs &mdash; flows, doesn't align</div>
+        <div class="spec">.ts-grid is a flex wrap, so labels land wherever the previous field ended. Nothing lines up vertically.</div></div>
+      </div>
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="roles-grid" style="grid-template-columns:56px 1fr 1fr 92px;">
+            <div class="roles-grid-header">&nbsp;</div><div class="roles-grid-header">Name</div>
+            <div class="roles-grid-header">Role</div><div class="roles-grid-header">Dept</div>
+          </div>
+          <div class="roles-grid roles-grid-row" style="grid-template-columns:56px 1fr 1fr 92px;">
+            <div></div><div class="roles-grid-name">Alex Ovaida</div><div>1st AC</div><div><span class="pill dept">CAM</span></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">Grid rows &mdash; aligned</div>
+        <div class="spec">Fixed column template, header and body share it. Works well; the model for other tables.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="ts-align">
+      <h3>Should Tech Specs align to a column grid like the rest?</h3>
+      <div class="prob">Tech Specs is the only form that flows rather than aligns. It was built that way deliberately
+      &mdash; short values like "25p" get small boxes &mdash; but it means the one screen with the most fields is
+      also the one where nothing lines up.</div>
+    </div>
+  </div>
+
+  <!-- ============ 5. INPUTS ============ -->
+  <div class="aud-section" id="inputs">
+    <div class="num">05</div>
+    <h2>Input boxes &amp; dropdowns</h2>
+    <p class="lede">You said inputs still feel too big and too green, and that the app should read like a cleanly
+    printed paper form. Here's what they're actually set to, and three directions.</p>
+
+    <div class="aud-callout"><b>Current:</b> <code>background:var(--panel-2)</code> which is
+    <b>#EEF5F2</b> &mdash; a pale mint, not white. Plus <code>padding:8px 9px</code>, <code>border-radius:6px</code>
+    (out of step with the 8px box radius), <code>font-size:13.5px</code>, and <code>width:100%</code>.
+    On mobile they grow to 16px / 11px padding / 46px min-height. The mint fill on every field is most of the
+    "too green" feeling.</div>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="in-current" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div class="pf-tint">
+            <div class="row"><label>Client</label><div class="cell">OFTV</div></div>
+            <div class="row"><label>Working title</label><div class="cell">ROW 2026 London</div></div>
+            <div class="row"><label>Shoot days</label><div class="cell">6</div></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">A &mdash; current (mint fill)</div>
+        <div class="spec">#EEF5F2 fill &middot; 1px line border &middot; 6px radius &middot; 8px/9px padding. Every field reads as a filled chip.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="in-ruled" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <div class="pf-rule">
+            <div class="row"><label>Client</label><div class="val">OFTV</div></div>
+            <div class="row"><label>Working title</label><div class="val">ROW 2026 London</div></div>
+            <div class="row"><label>Shoot days</label><div class="val">6</div></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">B &mdash; ruled lines <span class="aud-tag ok">most paper-like</span></div>
+        <div class="spec">No fill, no box. One rule under each row, like a printed form. Fields show their box only on hover/focus.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="in-outline" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <div class="pf-box">
+            <div class="row"><label>Client</label><div class="cell">OFTV</div></div>
+            <div class="row"><label>Working title</label><div class="cell">ROW 2026 London</div></div>
+            <div class="row"><label>Shoot days</label><div class="cell">6</div></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">C &mdash; white boxes, ink border</div>
+        <div class="spec">White fill, darker 1px border, 3px radius, tighter padding. Reads like boxes ruled onto a form.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="input-fill">
+      <h3>Which direction for text inputs?</h3>
+      <div class="prob">B is the most paper-like but relies on hover/focus to show the field boundary, which can
+      hurt discoverability. C keeps a visible box but drops the green. A is what's there now.</div>
+    </div>
+
+    <div class="aud-q" data-q="input-size">
+      <h3>And the size?</h3>
+      <div class="prob">Currently 13.5px text in 8px/9px padding on desktop, growing to 16px / 11px / 46px-min-height
+      on mobile (16px is deliberate &mdash; anything smaller makes iOS zoom on focus).</div>
+    </div>
+
+    <div class="aud-callout warn"><b>Two different dropdowns exist.</b> A normal <code>&lt;select&gt;</code> looks
+    like a text input &mdash; mint fill, 6px radius, 13.5px. But <code>select.pill-select</code> (used for
+    department and company pickers) is a green pill &mdash; tinted background, green text, Oswald 10px, 20px radius.
+    Same control, two completely different appearances.</div>
+
+    <div class="aud-grid">
+      <div class="aud-demo">
+        <div class="aud-render"><select style="max-width:220px;"><option>Cinematography</option></select></div>
+        <div class="aud-meta"><div class="name">Normal select</div><div class="spec">select &middot; --panel-2 fill &middot; 13.5px Jost &middot; 6px radius</div></div>
+      </div>
+      <div class="aud-demo">
+        <div class="aud-render"><select class="pill-select"><option>Camera</option></select>
+        <select class="pill-select empty" style="margin-left:6px;"><option>Company</option></select></div>
+        <div class="aud-meta"><div class="name">Pill select</div><div class="spec">select.pill-select &middot; tint-3 fill &middot; 10px Oswald &middot; 20px radius</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="select-unify">
+      <h3>Unify the two dropdown styles?</h3>
+      <div class="prob">The pill version reads as a tag you can change; the normal one reads as a form field.
+      That distinction may be worth keeping &mdash; or it may just be two things that drifted apart.</div>
+    </div>
+  </div>
+
+  <!-- ============ 6. CHECKBOXES ============ -->
+  <div class="aud-section" id="checkboxes">
+    <div class="num">06</div>
+    <h2>Checkboxes</h2>
+    <p class="lede">You asked for an <b>X instead of a tick</b>, and for the <b>background not to change</b>.
+    Both are straightforward &mdash; these are live, click them.</p>
+
+    <div class="aud-callout"><b>Current:</b> desktop uses the native checkbox with
+    <code>accent-color:var(--tape)</code>, so checking it fills the box solid green with a white tick.
+    On mobile (&le;900px) the cell also gains <code>background:var(--tint-4)</code> &mdash; a green wash behind
+    the whole cell &mdash; and draws a <code>&#x2713;</code> via <code>::before</code>. So today a checked box changes
+    both its mark <i>and</i> two background layers.</div>
+
+    <div class="aud-grid">
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div class="cbx-row">
+            <label class="cbx-lbl"><input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--tape);"> Day 1</label>
+            <label class="cbx-lbl"><input type="checkbox" style="width:16px;height:16px;accent-color:var(--tape);"> Day 2</label>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">Current &mdash; native green tick</div><div class="spec">accent-color:var(--tape) &middot; solid green fill when checked</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="cb-ink" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div class="cbx-row">
+            <label class="cbx-lbl"><span class="cbx ink"><input type="checkbox" checked></span> Day 1</label>
+            <label class="cbx-lbl"><span class="cbx ink"><input type="checkbox"></span> Day 2</label>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">A &mdash; black X, white box <span class="aud-tag ok">most paper-like</span></div><div class="spec">Box never changes fill. Only the X appears. Reads exactly like a ticked paper form.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="cb-green" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div class="cbx-row">
+            <label class="cbx-lbl"><span class="cbx green"><input type="checkbox" checked></span> Day 1</label>
+            <label class="cbx-lbl"><span class="cbx green"><input type="checkbox"></span> Day 2</label>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">B &mdash; green X, white box</div><div class="spec">Same, but the X carries the brand green so checked cells still scan green down a long grid.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="cb-heavy" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div class="cbx-row">
+            <label class="cbx-lbl"><span class="cbx ink heavy"><input type="checkbox" checked></span> Day 1</label>
+            <label class="cbx-lbl"><span class="cbx ink heavy"><input type="checkbox"></span> Day 2</label>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">C &mdash; black X, ink-black box</div><div class="spec">Heavier border. Strongest "printed form" feel; slightly noisier in a dense 6-day grid.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-callout"><b>Worth knowing:</b> in the Days / Hotel / Catering grids there can be 40+ checkboxes
+    on screen at once. With no background change, the only signal is the X itself &mdash; so its weight and colour
+    matter more than usual. Option B keeps the green scan-ability you have now without the fill.</div>
+
+    <div class="aud-q" data-q="checkbox-mark">
+      <h3>Which X treatment?</h3>
+      <div class="prob">All three drop the fill entirely, so the background never changes &mdash; as asked.
+      The difference is the X colour and the border weight.</div>
+    </div>
+  </div>
+
+  <!-- ============ 7. SECTION RULES ============ -->
+  <div class="aud-section" id="rules">
+    <div class="num">07</div>
+    <h2>General rules for sections</h2>
+    <p class="lede">You asked whether we can agree general rules for how a section looks, rather than deciding
+    case by case. Here's a proposed rule set, and three ways of drawing the divisions &mdash; with the dividing
+    lines made visible so you can see the structure.</p>
+
+    <div class="aud-scroll">
+    <table class="aud-tbl">
+      <tr><th>Level</th><th>What it is</th><th>Proposed rule</th></tr>
+      <tr><td><b>1 &mdash; Page</b></td><td>Screen title</td><td>Fraunces 700 22px uppercase + sub line beneath. One per screen.</td></tr>
+      <tr><td><b>2 &mdash; Section</b></td><td>A bordered card</td><td>Fraunces 700 15px green + rule to the right edge. White box, 8px radius, 10px padding.</td></tr>
+      <tr><td><b>3 &mdash; Sub-section</b></td><td>Division inside a card</td><td>Oswald 11px / 1.2px uppercase green + rule. No box &mdash; the rule alone divides.</td></tr>
+      <tr><td><b>4 &mdash; Field label</b></td><td>Names one control</td><td>Oswald 11px grey, no rule, in the 104px label column.</td></tr>
+      <tr><td><b>5 &mdash; Row</b></td><td>One record</td><td>Jost 14px/600 name, 12px grey meta. Divided by a 1px rule, not a box.</td></tr>
+    </table>
+    </div>
+
+    <p class="lede" style="margin-top:18px;">The principle: <b>one box per section, rules for everything inside it.</b>
+    Nesting boxes inside boxes is what makes the app feel busy &mdash; a printed form uses a single frame and
+    then rules.</p>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="sec-rules" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <div style="border:1px solid rgba(17,10,8,.28); border-radius:8px; padding:12px; background:#fff;">
+            <div class="section" style="margin:0; padding:0; border:none; background:none;"><h2 style="margin:0 0 10px;">General information</h2></div>
+            <div class="subhead" style="margin:0 0 7px;">Day details</div>
+            <div class="pf-rule">
+              <div class="row"><label>Day #</label><div class="val">1 of 6</div></div>
+              <div class="row"><label>Shoot date</label><div class="val">26 / 04 / 2026</div></div>
+            </div>
+            <div class="subhead" style="margin:14px 0 7px;">Production notes</div>
+            <div class="pf-rule"><div class="row"><label>Notes</label><div class="val">Security on site from 17:00.</div></div></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">A &mdash; one box, rules inside <span class="aud-tag ok">suggested</span></div><div class="spec">Single frame per section. Sub-sections and rows divided by rules only. Closest to a printed form.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="sec-boxes" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div class="section" style="margin:0;">
+            <h2 style="margin:0 0 10px;">General information</h2>
+            <div class="formgroup" style="margin-bottom:8px;"><div class="fg-title">Day details</div>
+              <div style="font-size:13px;">1 of 6 &middot; 26/04/2026</div></div>
+            <div class="formgroup" style="margin-bottom:0;"><div class="fg-title">Production notes</div>
+              <div style="font-size:13px;">Security on site from 17:00.</div></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">B &mdash; nested boxes (current)</div><div class="spec">A box per sub-section inside the section box. Clear grouping, but boxes within boxes within boxes.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="sec-flat" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <div class="section" style="margin:0; padding:0; border:none; background:none;"><h2 style="margin:0 0 10px;">General information</h2></div>
+          <div class="subhead" style="margin:0 0 7px;">Day details</div>
+          <div class="pf-rule"><div class="row"><label>Day #</label><div class="val">1 of 6</div></div></div>
+          <div class="subhead" style="margin:14px 0 7px;">Production notes</div>
+          <div class="pf-rule"><div class="row"><label>Notes</label><div class="val">Security on site from 17:00.</div></div></div>
+        </div>
+        <div class="aud-meta"><div class="name">C &mdash; no box at all</div><div class="spec">Sections divided purely by their heading rule. Lightest and most paper-like, but sections can run together on a long screen.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="section-rules">
+      <h3>Which structural model?</h3>
+      <div class="prob">This is the big one &mdash; it decides how every screen is built from here.
+      A is the compromise: keep one frame so sections are still discrete objects, but use rules for everything inside.</div>
+    </div>
+
+    <div class="aud-q" data-q="dividers">
+      <h3>How heavy should the dividing rules be?</h3>
+      <div class="prob">Currently three weights are in use: <code>1px solid var(--line)</code> at 14% opacity for
+      most rows, <code>1px dashed</code> for schedule rows, and the heading rules. A printed form would typically
+      use one consistent hairline, slightly darker than the 14% currently used.</div>
+    </div>
+  </div>
+
+  <!-- ============ 8. CREW "ALL" ============ -->
+  <div class="aud-section" id="crewall">
+    <div class="num">08</div>
+    <h2>The "All" controls in Crew</h2>
+    <p class="lede">There are four bulk controls on the Crew tab and they're all built differently &mdash;
+    different elements, sizes, and positions.</p>
+
+    <div class="aud-scroll">
+    <table class="aud-tbl">
+      <tr><th>Control</th><th>Built as</th><th>Type</th><th>Where it sits</th></tr>
+      <tr><td><b>Select all</b></td><td class="mono">&lt;label&gt; + checkbox</td><td class="mono">Oswald 11px</td><td>Header row, left</td></tr>
+      <tr><td><b>Expand / Collapse all</b></td><td class="mono">&lt;span&gt;</td><td class="mono">Oswald 11px</td><td>Header row, right</td></tr>
+      <tr><td><b>All</b> (per person)</td><td class="mono">&lt;button class="small"&gt;</td><td class="mono">Jost 11px</td><td>End of each row, <b>right</b></td></tr>
+      <tr><td><b>All</b> (per meal)</td><td class="mono">&lt;span&gt;</td><td class="mono">Oswald 10px</td><td>Beside meal label, <b>left</b></td></tr>
+    </table>
+    </div>
+
+    <div class="aud-callout warn"><b>The clash:</b> the two row-level "All" controls do the same job &mdash;
+    toggle this whole row on or off &mdash; but one is a bordered button on the right of the row (Days on site,
+    Hotel) and the other is a small text link on the left (Catering). Same function, opposite ends of the row,
+    different element, different font.</div>
+
+    <div class="aud-grid">
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div style="display:grid; grid-template-columns:1fr 30px 30px 30px 60px; align-items:center; gap:6px; font-size:13px;">
+            <div><b style="font-family:var(--body); font-weight:600;">Alex Ovaida</b></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div style="text-align:right;"><button class="small all-toggle-btn">All</button></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">Days / Hotel &mdash; button, right</div><div class="spec">.all-toggle-btn &middot; bordered button &middot; Jost 11px &middot; after the last day column</div></div>
+      </div>
+      <div class="aud-demo">
+        <div class="aud-render">
+          <div style="display:grid; grid-template-columns:1fr 30px 30px 30px 60px; align-items:center; gap:6px; font-size:13px;">
+            <div class="meal-row-label-wrap"><span class="meal-row-label">Lunch</span><span class="meal-row-all">All</span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">Catering &mdash; text link, left</div><div class="spec">.meal-row-all &middot; plain span &middot; Oswald 10px &middot; immediately after the meal label</div></div>
+      </div>
+    </div>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="all-right" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="display:grid; grid-template-columns:1fr 30px 30px 30px 54px; align-items:center; gap:6px; font-size:13px;">
+            <div><b style="font-family:var(--body); font-weight:600;">Alex Ovaida</b></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div style="text-align:right; font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); cursor:pointer;">All</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 30px 30px 30px 54px; align-items:center; gap:6px; font-size:13px; margin-top:7px;">
+            <div class="meal-row-label-wrap"><span class="meal-row-label">Lunch</span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div style="text-align:right; font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); cursor:pointer;">All</div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">A &mdash; text link, always right <span class="aud-tag ok">suggested</span></div><div class="spec">Same element, same Oswald 11px as Select all / Collapse all, always in a fixed final column. The row's own "All" lines up down the page.</div></div>
+      </div>
+      <div class="aud-demo pick" data-card="all-left" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div style="display:grid; grid-template-columns:1fr 30px 30px 30px; align-items:center; gap:6px; font-size:13px;">
+            <div style="display:flex; align-items:center; gap:8px;"><b style="font-family:var(--body); font-weight:600;">Alex Ovaida</b>
+              <span style="font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); cursor:pointer;">All</span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 30px 30px 30px; align-items:center; gap:6px; font-size:13px; margin-top:7px;">
+            <div class="meal-row-label-wrap"><span class="meal-row-label">Lunch</span><span class="meal-row-all">All</span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox" checked></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+            <div style="text-align:center;"><span class="cbx ink"><input type="checkbox"></span></div>
+          </div>
+        </div>
+        <div class="aud-meta"><div class="name">B &mdash; text link, always left</div><div class="spec">Sits next to the thing it acts on, which is arguably clearer, but it moves with the name length so it never lines up.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="crew-all">
+      <h3>Where should the row-level "All" live, and what should it be?</h3>
+      <div class="prob">Both options make it one element and one type. The choice is fixed-right (aligns down the
+      page, further from what it acts on) versus left (adjacent to the label, never aligns).</div>
+    </div>
+  </div>
+
+  <!-- ============ 9. ICONS ============ -->
+  <div class="aud-section" id="icons">
+    <div class="num">09</div>
+    <h2>Icons</h2>
+    <p class="lede">The full set, rendered from the app's real <code>ICONS</code> object. Nineteen icons, all
+    the same drawing style: 24&times;24 viewBox, 1.8px stroke, round caps and joins, no fills.</p>
+    <div id="iconGrid" class="aud-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));"></div>
+
+    <div class="aud-callout"><b>In context:</b> icons render at 13&times;13px inside <code>.ic</code>, or 14&times;14px
+    inside an <code>.icon-btn</code> (a 22&times;22px hit area, 40&times;40px on mobile). They inherit
+    <code>currentColor</code>, so they take the colour of whatever they sit in.</div>
+
+    <div class="aud-render" style="border:1px solid var(--line); border-radius:8px; margin-top:14px;">
+      <div class="list-card" style="margin:0;">
+        <div class="meta"><strong>The Organ Factory</strong><div>St Peter's Square, London, E2 7AF</div></div>
+        <div class="actions">
+          <button class="icon-btn" title="View"><span class="ic" id="ic-demo-view"></span></button>
+          <button class="icon-btn" title="Edit"><span class="ic" id="ic-demo-edit"></span></button>
+          <button class="icon-btn danger-ic" title="Delete"><span class="ic" id="ic-demo-trash"></span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="icons">
+      <h3>Anything wrong with the icon set?</h3>
+      <div class="prob">Three of the nineteen (<code>crew</code>, <code>location</code>, <code>menu</code>) are
+      defined but never called &mdash; you already said to leave them. Otherwise: are any of these unclear,
+      and is 13px the right size?</div>
+    </div>
+  </div>
+
+  <!-- ============ 10. SECONDARY COLOUR ============ -->
+  <div class="aud-section" id="secondary">
+    <div class="num">10</div>
+    <h2>A secondary colour</h2>
+    <p class="lede">You're right that one green isn't enough. Here's the actual problem, measured.</p>
+
+    <div class="aud-callout warn"><b>The bind:</b> the brand green <code>#017756</code> measures
+    <b>5.56:1</b> on white &mdash; comfortably readable &mdash; but only <b>3.52:1</b> on the near-black sidebar,
+    below the 4.5:1 minimum for small text. The mint it replaced was the opposite: 10.93:1 on the sidebar but
+    <b>1.79:1</b> on white, effectively invisible. <b>No single colour works on both backgrounds.</b></div>
+
+    <div class="aud-scroll">
+    <table class="aud-tbl">
+      <tr><th>Colour</th><th>On white</th><th>On sidebar</th><th>Usable for</th></tr>
+      <tr><td class="mono">#017756 brand green</td><td class="mono">5.56:1</td><td class="mono">3.52:1</td><td>Light backgrounds only</td></tr>
+      <tr><td class="mono">#0FA47A lighter green</td><td class="mono">3.18:1</td><td class="mono">6.17:1</td><td>Dark backgrounds; large text on light</td></tr>
+      <tr><td class="mono">#5fd6ac mint</td><td class="mono">1.79:1</td><td class="mono">10.93:1</td><td>Dark backgrounds only</td></tr>
+      <tr><td class="mono">#2E5E4E deep forest</td><td class="mono">7.43:1</td><td class="mono">2.64:1</td><td>Light backgrounds; stronger than brand green</td></tr>
+      <tr><td class="mono">#B07A2E amber</td><td class="mono">3.70:1</td><td class="mono">5.29:1</td><td>Both, at larger sizes</td></tr>
+      <tr><td class="mono">#8C6A3F ochre</td><td class="mono">4.94:1</td><td class="mono">3.97:1</td><td>Light backgrounds</td></tr>
+      <tr><td class="mono">#1E5F74 slate teal</td><td class="mono">7.13:1</td><td class="mono">2.75:1</td><td>Light backgrounds</td></tr>
+    </table>
+    </div>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="sec-pair" onclick="pickCard(this)">
+        <div class="aud-render"><div style="color:#017756; font-weight:600; font-size:14px;">Crew on this project</div>
+          <div style="font-size:12px; color:#6f6a63; margin-top:3px;">brand green on white &mdash; 5.56:1</div></div>
+        <div class="aud-render dark" style="border-top:1px solid rgba(255,255,245,.15);">
+          <div style="color:#0FA47A; font-weight:600; font-size:14px;">ROW 2026 London</div>
+          <div style="font-size:12px; color:rgba(255,255,245,.5); margin-top:3px;">lighter green on sidebar &mdash; 6.17:1</div></div>
+        <div class="aud-meta"><div class="name">A &mdash; one green, two tones <span class="aud-tag ok">suggested</span></div><div class="spec">--tape for light backgrounds, --tape-light for dark. Not a new colour, just the same hue at the right lightness for each surface. Fixes the sidebar without adding a second identity.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="sec-amber" onclick="pickCard(this)">
+        <div class="aud-render"><span class="pill" style="background:rgba(176,122,46,.14); color:#8C6A3F;">Talent</span>
+          <span class="pill dept" style="margin-left:6px;">Camera</span>
+          <div style="font-size:12px; color:#6f6a63; margin-top:8px;">amber marks a different <i>kind</i> of thing</div></div>
+        <div class="aud-meta"><div class="name">B &mdash; add a warm second hue</div><div class="spec">Green stays the primary; amber/ochre distinguishes a second category (Talent vs Crew, co-production vs lead company). A real second colour, not just a tint.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="sec-both" onclick="pickCard(this)">
+        <div class="aud-render"><div style="color:#017756; font-weight:600; font-size:14px;">Crew on this project</div>
+          <span class="pill" style="background:rgba(176,122,46,.14); color:#8C6A3F; margin-top:7px;">Talent</span></div>
+        <div class="aud-render dark" style="border-top:1px solid rgba(255,255,245,.15);">
+          <div style="color:#0FA47A; font-weight:600; font-size:14px;">ROW 2026 London</div></div>
+        <div class="aud-meta"><div class="name">C &mdash; both</div><div class="spec">Light/dark green pair to fix contrast, plus a warm hue for categorisation. Most flexible, most to keep consistent.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="secondary-colour">
+      <h3>What kind of secondary colour do you actually want?</h3>
+      <div class="prob">These are two different problems wearing the same hat: a <i>technical</i> one (green is
+      unreadable on the dark sidebar) and a <i>design</i> one (there's no way to mark a second category).
+      A solves the first, B solves the second, C solves both.</div>
+    </div>
+
+    <div class="aud-q" data-q="secondary-hue">
+      <h3>If you want a warm second hue, which?</h3>
+      <div class="prob">Amber <code>#B07A2E</code>, ochre <code>#8C6A3F</code>, or clay <code>#7A4B2A</code> &mdash;
+      or name something else. Note the existing <code>--danger</code> is a red <code>#a4321f</code>, so a warm
+      secondary needs to stay clearly distinct from it.</div>
+    </div>
+  </div>
+
+</div>
+
+<button class="aud-fab" onclick="exportDecisions()">Decisions <span id="fabCount">0/0</span></button>
+<div class="aud-out" id="out" onclick="if(event.target===this)closeOut()">
+  <div class="aud-out-box">
+    <h3>Your decisions</h3>
+    <textarea id="outText" readonly></textarea>
+    <div class="aud-panel-actions">
+      <button class="aud-btn aud-btn-primary" onclick="copyOut()" style="color:#fff;">Copy to clipboard</button>
+      <button class="aud-btn" style="color:var(--text); border-color:var(--line);" onclick="closeOut()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  crew:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
+  location:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 1 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>',
+  view:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  up:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6"/></svg>',
+  down:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10l6 6 6-6"/></svg>',
+  edit:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L8 20H4v-4z"/></svg>',
+  close:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 6.2"/><path d="M20 5v6h-6"/></svg>',
+  menu:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
+  camera:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h6L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg>',
+  car:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3l2-4h12l2 4v3"/><path d="M4 16h16"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg>',
+  dietary: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v7M9 2v7M12 2v7M6 9c0 2 1.5 3 3 3s3-1 3-3M9 12v10"/></svg>',
+  save:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h8V4M8 20v-6h8v6"/></svg>',
+  download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M8 11l4 4 4-4M5 19h14"/></svg>',
+  copy:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V5a1.5 1.5 0 0 1 1.5-1.5H15"/></svg>',
+  cloud:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.7 1.6A3.5 3.5 0 0 0 7 18z"/></svg>',
+  hospital:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>',
+  lock:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  trash:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M10 11v6M14 11v6"/></svg>',
+};
+
+/* Questions answered by clicking a demo card above them */
+const CARD_Q = {
+  'ladder-tight':'size-ladder','ladder-mid':'size-ladder','ladder-keep':'size-ladder',
+  'w-add700':'jost-700','w-use600':'jost-700',
+  'in-current':'input-fill','in-ruled':'input-fill','in-outline':'input-fill',
+  'cb-ink':'checkbox-mark','cb-green':'checkbox-mark','cb-heavy':'checkbox-mark',
+  'sec-rules':'section-rules','sec-boxes':'section-rules','sec-flat':'section-rules',
+  'all-right':'crew-all','all-left':'crew-all',
+  'sec-pair':'secondary-colour','sec-amber':'secondary-colour','sec-both':'secondary-colour'
+};
+
+/* Questions answered by radio options rendered into the block */
+const OPTIONS = {
+  'font-roles':[
+    ['roles-keep','Keep the three roles as they are'],
+    ['roles-shrink','Keep them, but shrink Oswald back to labels only'],
+    ['roles-other','Something else (describe in notes)']],
+  'label-size':[
+    ['lbl-one','One size and one tracking for every Oswald label (11px / 1.2px)'],
+    ['lbl-two','Two: 11px for section labels, 10px for pills and badges'],
+    ['lbl-keep','Leave the label sizes as they are']],
+  'fraunces-500':[
+    ['fr-drop','Drop the unused 500 from the font request'],
+    ['fr-keep','Keep it loaded in case we want a lighter display weight later']],
+  'ts-align':[
+    ['ts-align-yes','Align Tech Specs to a column grid like everything else'],
+    ['ts-align-no','Leave it flowing — the short values justify it'],
+    ['ts-align-part','Align the labels but keep the boxes value-sized']],
+  'input-size':[
+    ['sz-tighter','Tighter — 13px text, 6px/8px padding'],
+    ['sz-keep','Keep 13.5px text and 8px/9px padding'],
+    ['sz-bigger','Roomier than now']],
+  'select-unify':[
+    ['sel-unify','Make both dropdowns look the same'],
+    ['sel-keep','Keep them distinct — pill means "editable tag", box means "form field"'],
+    ['sel-pill-calmer','Keep the distinction but make the pill much calmer (less green)']],
+  'dividers':[
+    ['div-one','One hairline weight everywhere, slightly darker than now'],
+    ['div-keep','Keep the three weights as they are'],
+    ['div-two','Two: a hairline for rows, a heavier rule for section headings']],
+  'secondary-hue':[
+    ['hue-amber','Amber #B07A2E'],
+    ['hue-ochre','Ochre #8C6A3F'],
+    ['hue-clay','Clay #7A4B2A'],
+    ['hue-none','No warm hue — the green pair is enough']]
+};
+
+const QTEXT = {};
+const state = {};
+
+function init(){
+  document.querySelectorAll('.aud-q').forEach(q=>{
+    const id = q.dataset.q;
+    state[id] = {pick:null, pickLabel:null, notes:''};
+    QTEXT[id] = {
+      q: (q.querySelector('h3')||{}).textContent || id,
+      prob: (q.querySelector('.prob')||{}).textContent || ''
+    };
+    if(OPTIONS[id]){
+      const wrap = document.createElement('div');
+      OPTIONS[id].forEach(([oid,label])=>{
+        const d = document.createElement('div');
+        d.className='aud-opt'; d.dataset.opt=oid; d.dataset.for=id;
+        d.innerHTML = '<span class="radio"></span><span>'+label+'</span>';
+        d.onclick = ()=>pickOption(id,oid,label);
+        wrap.appendChild(d);
+      });
+      q.appendChild(wrap);
+    }
+    const chosen = document.createElement('div');
+    chosen.className='aud-chosen'; chosen.id='chosen-'+id; chosen.style.display='none';
+    q.appendChild(chosen);
+    const nl = document.createElement('label');
+    nl.className='aud-note-l'; nl.textContent='Notes (optional)';
+    const ta = document.createElement('textarea');
+    ta.placeholder='Anything that needs nuance…';
+    ta.oninput = e=>{ state[id].notes = e.target.value; refresh(); };
+    q.appendChild(nl); q.appendChild(ta);
+  });
+  renderIcons();
+  document.getElementById('tot').textContent = Object.keys(state).length;
+  refresh();
+}
+
+function pickOption(qid, oid, label){
+  state[qid].pick = oid; state[qid].pickLabel = label;
+  document.querySelectorAll('.aud-opt[data-for="'+qid+'"]').forEach(el=>{
+    el.classList.toggle('on', el.dataset.opt===oid);
+  });
+  showChosen(qid); refresh();
+}
+
+function pickCard(el){
+  const cid = el.dataset.card, qid = CARD_Q[cid];
+  if(!qid) return;
+  const label = (el.querySelector('.aud-meta .name')||{}).textContent.trim() || cid;
+  state[qid].pick = cid; state[qid].pickLabel = label;
+  Object.keys(CARD_Q).filter(k=>CARD_Q[k]===qid).forEach(k=>{
+    const c = document.querySelector('.aud-demo[data-card="'+k+'"]');
+    if(c) c.classList.toggle('on', k===cid);
+  });
+  showChosen(qid); refresh();
+}
+
+function showChosen(qid){
+  const c = document.getElementById('chosen-'+qid);
+  if(!c) return;
+  c.style.display='block';
+  c.textContent = '\u2713 Selected: ' + state[qid].pickLabel;
+}
+
+function answered(id){ const s=state[id]; return !!(s && (s.pick || (s.notes||'').trim())); }
+
+function refresh(){
+  const ids = Object.keys(state);
+  const n = ids.filter(answered).length;
+  document.getElementById('cnt').textContent = n;
+  document.getElementById('fabCount').textContent = n+'/'+ids.length;
+  document.getElementById('bar').style.width = (ids.length? (n/ids.length*100):0)+'%';
+}
+
+function renderIcons(){
+  const g = document.getElementById('iconGrid');
+  if(!g) return;
+  g.innerHTML = Object.keys(ICONS).map(k=>
+    '<div class="aud-demo"><div class="aud-render" style="text-align:center; padding:16px 8px;">'+
+    '<span style="display:inline-flex; width:22px; height:22px; color:var(--text);">'+ICONS[k]+'</span></div>'+
+    '<div class="aud-meta" style="text-align:center;"><div class="name" style="font-family:var(--mono); text-transform:none; letter-spacing:0;">'+k+'</div></div></div>'
+  ).join('');
+  [['ic-demo-view','view'],['ic-demo-edit','edit'],['ic-demo-trash','trash']].forEach(([elId,name])=>{
+    const el = document.getElementById(elId); if(el) el.innerHTML = ICONS[name]||'';
+  });
+}
+
+function review(){
+  const first = Object.keys(state).find(id=>!answered(id));
+  if(!first){ exportDecisions(); return; }
+  const q = document.querySelector('.aud-q[data-q="'+first+'"]');
+  if(q){ q.scrollIntoView({behavior:'smooth', block:'center'});
+    q.style.transition='box-shadow .3s'; q.style.boxShadow='0 0 0 4px rgba(1,119,86,.18)';
+    setTimeout(()=>q.style.boxShadow='', 1400); }
+}
+
+function exportDecisions(){
+  const lines = ['# Fonts & Icons Review — Decisions',''];
+  Object.keys(state).forEach(id=>{
+    const s = state[id], t = QTEXT[id]||{};
+    lines.push('## '+id);
+    if(t.prob) lines.push('**Problem:** '+t.prob.trim());
+    if(t.q) lines.push('**Question:** '+t.q.trim());
+    lines.push('**Decision:** '+(s.pickLabel || '(not answered)'));
+    if((s.notes||'').trim()) lines.push('**Notes:** '+s.notes.trim());
+    lines.push('');
+  });
+  document.getElementById('outText').value = lines.join('\n');
+  document.getElementById('out').classList.add('open');
+}
+function closeOut(){ document.getElementById('out').classList.remove('open'); }
+function copyOut(){
+  const t = document.getElementById('outText'); t.select();
+  navigator.clipboard.writeText(t.value).then(()=>{
+    const b = event.target; const o=b.textContent; b.textContent='Copied';
+    setTimeout(()=>b.textContent=o,1400);
+  }).catch(()=>document.execCommand('copy'));
+}
+
+init();
+</script>
+</body>
+</html>
