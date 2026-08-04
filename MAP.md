@@ -331,13 +331,29 @@ weights vs what's actually loaded, sizing/alignment, input boxes & dropdowns,
 checkboxes, general section rules, dividing lines, the Crew "All" controls, icons, and
 secondary colour. 18 decisions.
 
-The dividing-lines section carries measured counts of rendered divisions per screen
-(form-control borders excluded) taken from the ROW 2026 sample project — 66 crew, 11
-departments, 6 days. Shoot Days divides with headings (21 heading rules, 13 row lines);
-Crew does the opposite (11 department headings but 55 row lines on Days on site and
-121 on Catering, where each of 66 people has a divider plus three meal sub-rows);
-Preview & Export puts a bottom border on all 174 `td`/`th` cells. Re-measure with the
-counting snippet rather than assuming these numbers still hold.
+The dividing-lines section counts only **lines drawn on to divide** — a rule added
+under each item in a list that is already grouped. It deliberately excludes the row
+structure of things that genuinely function as a table, column-header rules, the
+reorderable schedule rows, and form-control borders; the user drew that distinction
+explicitly and it changes the conclusion. Measured on the ROW 2026 sample project
+(66 crew, 11 departments, 6 days):
+
+| Screen | Drawn dividers | Heading rules |
+|---|---|---|
+| Overview | 0 | 2 |
+| Preview & Export | 0 | 8 |
+| Shoot Days | 8 (`.cam-row`) | 21 |
+| Tech | 8 (`.cam-row`) | 4 |
+| Crew — Roles | 55 (`.roles-grid-row`) | 13 |
+| Crew — Days on site | 55 (`.crewgrid-row`) | 13 |
+| Crew — Catering | 121 | 14 |
+
+So drawn-on dividers are almost entirely a **Crew tab** problem. Preview & Export draws
+none — its 165 lines are all real table structure on a document that gets printed.
+Shoot Days reads well because it runs 21 heading rules against 8 drawn lines; Crew
+inverts that ratio and repeats grouping the department heading already states.
+Catering doubles up: each person gets a `.crewgrid-catering-person` rule *and* sits
+inside `.crewgrid-row`. Re-measure rather than assuming these numbers still hold.
 
 Two defects it documents, both checkable against the font request on line 8 of
 `index.html`:
