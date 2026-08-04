@@ -682,6 +682,32 @@ let ROLES_BY_DEPT = {
   'Post Production':   ['Editor','Colourist','DIT','Assistant Editor'],
 };
 function rolesFor(dept){ return ROLES_BY_DEPT[dept] || []; }
+/* per-role seniority rank within a department (e.g. DOP outranks 1st AC outranks
+   Camera Operator), used to order Position Assignments and the call sheet output
+   within a department — extensible at runtime, persisted to db:roleseniority.
+   Keyed by "Department/Role" path. Falls back to the role's position in
+   ROLES_BY_DEPT[dept] (so freshly-added canonical roles sort sensibly with no
+   admin action needed), then Infinity for a role not found at all. */
+let ROLE_SENIORITY = {};
+function roleSeniorityRank(dept, role){
+  if(!role) return Infinity;
+  const key = dept+'/'+role;
+  if(ROLE_SENIORITY[key]!=null) return ROLE_SENIORITY[key];
+  const i = (ROLES_BY_DEPT[dept]||[]).indexOf(role);
+  return i===-1 ? Infinity : i*10;
+}
+/* move a role up/down in its department's seniority order (dir -1 = more senior,
+   +1 = less senior), then renumber every role in that department sequentially so
+   ranks stay dense and comparable */
+async function moveRoleSeniority(dept, role, dir){
+  const roles = (ROLES_BY_DEPT[dept]||[]).slice().sort((a,b)=>roleSeniorityRank(dept,a)-roleSeniorityRank(dept,b));
+  const i = roles.indexOf(role), j = i+dir;
+  if(i===-1 || j<0 || j>=roles.length) return;
+  [roles[i],roles[j]] = [roles[j],roles[i]];
+  roles.forEach((r,idx)=>{ ROLE_SENIORITY[dept+'/'+r] = idx*10; });
+  await saveDB('db:roleseniority', ROLE_SENIORITY);
+  refreshCrewDatabase();
+}
 /* department for a "Department/Role" saved-role path — the single source of
    truth for a person's department once they have a saved role (see setActiveRole) */
 function departmentForRolePath(rolePath){ const i = rolePath.indexOf('/'); return i>=0 ? rolePath.slice(0,i) : ''; }
@@ -1022,10 +1048,11 @@ function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
 async function loadDB(key){
   try{
     const { data, error } = await sb.from('app_data').select('value').eq('key', key).maybeSingle();
-    if(error){ console.error('Supabase load failed ('+key+'):', error.message); return key==='db:subdepartments' ? {} : []; }
-    if(!data) return key==='db:subdepartments' ? {} : [];
+    const isObjKey = key==='db:subdepartments' || key==='db:roleseniority';
+    if(error){ console.error('Supabase load failed ('+key+'):', error.message); return isObjKey ? {} : []; }
+    if(!data) return isObjKey ? {} : [];
     return data.value;
-  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return key==='db:subdepartments' ? {} : []; }
+  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return key==='db:subdepartments'||key==='db:roleseniority' ? {} : []; }
 }
 async function saveDB(key, value){
   try{
@@ -1045,6 +1072,8 @@ async function initApp(){
   if(savedSubDepts && !Array.isArray(savedSubDepts) && Object.keys(savedSubDepts).length) SUBDEPARTMENTS_BY_DEPT = savedSubDepts;
   const savedRoles = await loadDB('db:roles');
   if(savedRoles && !Array.isArray(savedRoles) && Object.keys(savedRoles).length) ROLES_BY_DEPT = savedRoles;
+  const savedRoleSeniority = await loadDB('db:roleseniority');
+  if(savedRoleSeniority && !Array.isArray(savedRoleSeniority) && Object.keys(savedRoleSeniority).length) ROLE_SENIORITY = savedRoleSeniority;
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
     await saveDB('db:travelmethods', travelMethodsList);
@@ -3278,6 +3307,7 @@ function renderDeptAdminPanel(){
   return DEPARTMENTS.map(d=>{
     const subs = subDeptsFor(d);
     const roster = sortHoDFirst(crewDB.filter(c=>deptBucketKey(c.department)===d));
+    const roles = rolesFor(d).slice().sort((a,b)=>roleSeniorityRank(d,a)-roleSeniorityRank(d,b));
     return `<div class="dept-admin-block" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
         <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span><strong>${esc(d)}</strong>
@@ -3292,6 +3322,18 @@ function renderDeptAdminPanel(){
             </span>`).join('') : '<span class="hint">None yet.</span>'}
           <span class="pill" style="cursor:pointer;" onclick="addSubDeptAdmin('${esc(d)}')">+ Add</span>
         </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div class="hint" style="margin-bottom:4px;">Role seniority order (top = most senior)</div>
+        ${roles.length ? `<div style="display:flex;flex-direction:column;gap:2px;max-width:320px;">
+          ${roles.map((r,idx)=>`<span class="pill" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span>${esc(r)}</span>
+              <span style="display:flex;gap:2px;">
+                <button class="icon-btn" ${idx===0?'disabled':''} onclick="moveRoleSeniority('${esc(d)}','${esc(r)}',-1)" title="More senior">${icon('up')}</button>
+                <button class="icon-btn" ${idx===roles.length-1?'disabled':''} onclick="moveRoleSeniority('${esc(d)}','${esc(r)}',1)" title="Less senior">${icon('down')}</button>
+              </span>
+            </span>`).join('')}
+        </div>` : '<span class="hint">No saved roles yet.</span>'}
       </div>
       ${roster.length ? `<div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
         ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:rgba(1,119,86,.28);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`).join('')}
@@ -3831,32 +3873,29 @@ function sdBlock(key, title, inner){
 }
 function shootDayBuildHTML(){
   const general = `
-    <div class="section"><h2>Day details</h2>
+    <div class="section">
+      <div class="subhead">Day details</div>
       <div class="grid g4">
         <div><label>Day #</label><input type="text" id="sdDayNum"></div>
         <div><label>of (total)</label><input type="text" id="sdDayTotal"></div>
         <div><label>Shoot date</label><input type="date" id="sdDate" onchange="onDayChanged()"></div>
         <div><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
       </div>
-    </div>
-    <div class="section"><h2>Production brief</h2>
+      <div class="subhead">Production brief</div>
       <label>The scenes / setups being shot today — one per line</label>
       <textarea id="sdBrief"></textarea>
-    </div>
-    <div class="section"><h2>Parking / arrival (this day)</h2>
+      <div class="subhead">Parking / arrival (this day)</div>
       <textarea id="sdParking"></textarea>
       <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
-    </div>
-    <div class="section"><h2>Production notes</h2><textarea id="sdNotes"></textarea></div>
-    <div class="section"><h2>Primary location</h2>
+      <div class="subhead">Production notes</div>
+      <textarea id="sdNotes"></textarea>
+      <div class="subhead">Primary location</div>
       <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
       <div id="sdLocationSummary" class="hint" style="margin-top:8px;"></div>
-    </div>
-    <div class="section"><h2>Additional locations</h2>
+      <div class="subhead">Additional locations</div>
       <div class="rows-add" id="rows-sdaddloc"></div>
       <button class="small" onclick="addSdLocRow()">+ Add location</button>
-    </div>
-    <div class="section"><h2>Weather</h2>
+      <div class="subhead">Weather</div>
       <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch weather for this date &amp; location</button>
       <div id="weatherStatus" class="hint" style="margin-top:6px;"></div>
       <div class="grid g4" style="margin-top:10px;">
@@ -3865,9 +3904,11 @@ function shootDayBuildHTML(){
         <div><label>Condition</label><input type="text" id="wxCond"></div>
         <div><label>Sunrise/Sunset</label><input type="text" id="wxSun"></div>
       </div>
-    </div>
-    <div class="section"><h2>Nearest hospital</h2><div id="sdHospitalInfo" class="hint"></div></div>
-    <div class="section"><h2>Nearest parking</h2><div id="sdParkingLookupInfo" class="hint"></div></div>`;
+      <div class="subhead">Nearest hospital</div>
+      <div id="sdHospitalInfo" class="hint"></div>
+      <div class="subhead">Nearest parking</div>
+      <div id="sdParkingLookupInfo" class="hint"></div>
+    </div>`;
 
   const schedule = `
     <div class="section">
@@ -4051,7 +4092,7 @@ function renderPositionAssignments(){
     depts.forEach(dept=>{
       const key = company+'||'+dept;
       const deptCollapsed = collapsedPosnDepts.has(key);
-      const entries = deptMap[dept].slice().sort((a,b)=>(a.c.role||'').localeCompare(b.c.role||''));
+      const entries = deptMap[dept].slice().sort((a,b)=>roleSeniorityRank(dept,a.c.role)-roleSeniorityRank(dept,b.c.role) || (a.c.role||'').localeCompare(b.c.role||'') || (a.c.name||'').localeCompare(b.c.name||''));
       html += deptHeaderHTML(dept, entries.length, deptCollapsed, `togglePosnDept('${esc(company)}','${esc(dept)}')`)
         + `<div class="dept-group" style="display:${deptCollapsed?'none':'block'}">`;
       entries.forEach(en=>{
@@ -4379,16 +4420,32 @@ async function clearDayOverride(crewId){
   editingCrewId = null;
   renderPositionAssignments();
 }
+/* shared ordering for every position list in the call sheet output: department
+   (canonical order), then role seniority within that department, then role text,
+   then name — role.role is the display text (showAs||role), role.canonicalRole is
+   the raw saved role used to look up seniority (showAs is free text and usually
+   won't match a saved role, so it can't be used for ranking) */
+function positionOutputCompare(a,b){
+  return deptRank(a.department)-deptRank(b.department)
+    || roleSeniorityRank(deptBucketKey(a.department), a.canonicalRole)-roleSeniorityRank(deptBucketKey(b.department), b.canonicalRole)
+    || (a.role||'').localeCompare(b.role||'')
+    || (a.name||'').localeCompare(b.name||'');
+}
 function buildFullData(d){
   const p=projById(d.projectId)||{};
   const primary=locById(d.locationId);
   const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locById(id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
-  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.showAs||c.role,name:c.name,call,phone:c.phone,department:c.department||'',subDepartment:c.subDepartment||'',coProductionCompany:c.coProductionCompany||''};});
-  const positions = allPositions.filter(r=>!r.coProductionCompany).sort((a,b)=>deptRank(a.department)-deptRank(b.department));
+  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',subDepartment:c.subDepartment||'',coProductionCompany:c.coProductionCompany||''};});
+  const crewOnly = allPositions.filter(r=>!r.coProductionCompany);
+  // Client and Talent stand apart from the crew departments (Phase N item 3) — pulled
+  // out of the canonical-department-order crew list into their own dedicated blocks
+  const positions = crewOnly.filter(r=>!['Client','Talent'].includes(deptBucketKey(r.department))).sort(positionOutputCompare);
+  const clientPositions = crewOnly.filter(r=>deptBucketKey(r.department)==='Client').sort(positionOutputCompare);
+  const talentPositions = crewOnly.filter(r=>deptBucketKey(r.department)==='Talent').sort(positionOutputCompare);
   const coProBuckets = {};
   allPositions.filter(r=>r.coProductionCompany).forEach(r=>{ (coProBuckets[r.coProductionCompany]=coProBuckets[r.coProductionCompany]||[]).push(r); });
   const coProductionGroups = Object.keys(coProBuckets).sort((a,b)=>a.localeCompare(b))
-    .map(company=>({ company, people: coProBuckets[company].sort((a,b)=>deptRank(a.department)-deptRank(b.department)) }));
+    .map(company=>({ company, people: coProBuckets[company].sort(positionOutputCompare) }));
   const cams = resolveCameras(d);
   const cameraDesignations = cams.order.map((cid,oi)=>{
     const c = crewInfo(cid); const baseLetter = letterForIndex(oi);
@@ -4404,7 +4461,7 @@ function buildFullData(d){
   );
   return { prodCompany:p.company||COMPANY, shootTitle:[p.client,p.title].filter(Boolean).join(' — '),
     dayNum:d.dayNum,dayTotal:d.dayTotal,shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
-    primary,addLocs,positions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
+    primary,addLocs,positions,clientPositions,talentPositions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
     // resolved, not raw: a day stores only what DIFFERS from the project defaults
     // (saveShootDay deletes d.techSpecs entirely when nothing differs), so reading
     // d.techSpecs directly exported blank tech specs for every day on the defaults.
@@ -4441,6 +4498,13 @@ function copyTechSpecsText(){
   return L.join('\n');
 }
 function copyTechSpecs(){ return copyText(copyTechSpecsText()); }
+/* one Dept/Position/Name/Call/Phone table, shared by Client, Talent and the main
+   Position assignments block on the call sheet preview */
+function positionsTableHTML(title, people, subtitle){
+  if(!people || !people.length) return '';
+  return `<h3>${esc(title)}${subtitle?` <span style="color:var(--muted); text-transform:none; font-weight:400;">${subtitle}</span>`:''}</h3><div class="tablewrap"><table><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th></tr>`+
+    people.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td>${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`;
+}
 function renderPreviewCard(d){
   const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
   const open = previewBlocks.callsheet;
@@ -4470,14 +4534,24 @@ function renderPreviewCard(d){
 
   if(d.addLocs.length) h+=`<h3>Additional locations</h3><ul>`+d.addLocs.map(l=>`<li>${esc(l.name)} — ${esc(l.address||'')}${l.note?(' ('+esc(l.note)+')'):''}</li>`).join('')+`</ul>`;
   if(d.schedule.length){ h+=`<h3>Schedule</h3><div class="tablewrap"><table><tr><th>Time</th><th>Duration</th><th>Description</th></tr>`+d.schedule.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')+`</table></div>`; }
-  if(d.positions.length){ h+=`<h3>Position assignments</h3><div class="tablewrap"><table><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th></tr>`+d.positions.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td>${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`; }
+  // Client stands apart, ahead of the crew list; Talent stands apart, right after it (Phase N item 3)
+  h += positionsTableHTML('Client', d.clientPositions);
+  h += positionsTableHTML('Position assignments', d.positions);
+  h += positionsTableHTML('Talent', d.talentPositions);
   if(d.coProductionGroups && d.coProductionGroups.length){
     d.coProductionGroups.forEach(g=>{
-      h+=`<h3>${esc(g.company)} <span style="color:var(--muted); text-transform:none; font-weight:400;">(co-production)</span></h3><div class="tablewrap"><table><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th></tr>`+
-        g.people.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td>${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`;
+      h += positionsTableHTML(g.company, g.people, '(co-production)');
     });
   }
   document.getElementById('previewCard').innerHTML = header + `<div id="pvb-callsheet" style="display:${open?'':'none'}; margin-top:14px;">${h}</div>`;
+}
+/* pushes a "*HEADING*" line then one "*Role* — Name" / "Call · phone" pair per
+   person — the shared WhatsApp-text block for Client, Position assignments,
+   Talent and each co-production group */
+function pushPeopleLines(L, heading, people){
+  if(!people || !people.length) return;
+  L.push('', `*${heading}*`);
+  people.forEach(r=>{ L.push(`*${r.role||'Crew'}* — ${r.name||''}`); const bits=[r.call&&('Call '+r.call),r.phone].filter(Boolean).join(' · '); if(bits)L.push(bits); });
 }
 function buildWAText(d){
   const L=[]; const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
@@ -4490,12 +4564,11 @@ function buildWAText(d){
   if(d.addLocs.length){ L.push('','*ADDITIONAL LOCATIONS*'); d.addLocs.forEach(l=>L.push(`- ${l.name} — ${l.address||''}${l.note?(' ('+l.note+')'):''}`)); }
   if(d.hospital) L.push('','*NEAREST HOSPITAL*',`${d.hospital.name} — ${d.hospital.address||''} (~${d.hospital.distanceKm}km)`);
   if(d.schedule.length){ L.push('','*SCHEDULE*'); d.schedule.forEach(r=>L.push(`${r[0]}${r[1]?(' ('+r[1]+')'):''} — ${r[2]}`)); }
-  if(d.positions.length){ L.push('','*POSITIONS*'); d.positions.forEach(r=>{ L.push(`*${r.role||'Crew'}* — ${r.name||''}`); const bits=[r.call&&('Call '+r.call),r.phone].filter(Boolean).join(' · '); if(bits)L.push(bits); }); }
+  pushPeopleLines(L, 'CLIENT', d.clientPositions);
+  pushPeopleLines(L, 'POSITIONS', d.positions);
+  pushPeopleLines(L, 'TALENT', d.talentPositions);
   if(d.coProductionGroups && d.coProductionGroups.length){
-    d.coProductionGroups.forEach(g=>{
-      L.push('',`*${g.company.toUpperCase()} (CO-PRODUCTION)*`);
-      g.people.forEach(r=>{ L.push(`*${r.role||'Crew'}* — ${r.name||''}`); const bits=[r.call&&('Call '+r.call),r.phone].filter(Boolean).join(' · '); if(bits)L.push(bits); });
-    });
+    d.coProductionGroups.forEach(g=>pushPeopleLines(L, `${g.company.toUpperCase()} (CO-PRODUCTION)`, g.people));
   }
   if(d.brief.length){ L.push('','*PRODUCTION BRIEF*'); d.brief.forEach(l=>L.push(`- ${l}`)); }
   if(d.parking) L.push('','*PARKING / ARRIVAL*',d.parking);
@@ -4503,6 +4576,14 @@ function buildWAText(d){
   return L.join('\n');
 }
 function copyWA(){ return copyText(document.getElementById('waText').textContent); }
+/* pushes a heading row, a Dept/Position/Name/Call/Phone header row, and one row per
+   person — the shared Excel block for Client, Position assignments, Talent and each
+   co-production group */
+function pushPeopleRows(aoa, heading, people){
+  if(!people || !people.length) return;
+  aoa.push([heading]); aoa.push(['Dept','Position','Name','Call','Phone']);
+  people.forEach(r=>aoa.push([DEPARTMENT_CODES[deptBucketKey(r.department)]||'',r.role,r.name,r.call,r.phone])); aoa.push([]);
+}
 function downloadExcel(){
   const d=currentDay(); if(!d) return;
   const data=buildFullData(d); const aoa=[];
@@ -4514,12 +4595,11 @@ function downloadExcel(){
   if(data.addLocs.length){ aoa.push(['ADDITIONAL LOCATIONS']); aoa.push(['Name','Address','Note']); data.addLocs.forEach(l=>aoa.push([l.name,l.address,l.note])); aoa.push([]); }
   if(data.hospital){ aoa.push(['NEAREST HOSPITAL']); aoa.push([data.hospital.name,data.hospital.address,data.hospital.distanceKm+'km']); aoa.push([]); }
   if(data.schedule.length){ aoa.push(['SCHEDULE']); aoa.push(['Time','Duration','Description']); data.schedule.forEach(r=>aoa.push(r)); aoa.push([]); }
-  if(data.positions.length){ aoa.push(['POSITION ASSIGNMENTS']); aoa.push(['Dept','Position','Name','Call','Phone']); data.positions.forEach(r=>aoa.push([DEPARTMENT_CODES[deptBucketKey(r.department)]||'',r.role,r.name,r.call,r.phone])); aoa.push([]); }
+  pushPeopleRows(aoa, 'CLIENT', data.clientPositions);
+  pushPeopleRows(aoa, 'POSITION ASSIGNMENTS', data.positions);
+  pushPeopleRows(aoa, 'TALENT', data.talentPositions);
   if(data.coProductionGroups && data.coProductionGroups.length){
-    data.coProductionGroups.forEach(g=>{
-      aoa.push([`${g.company.toUpperCase()} (CO-PRODUCTION)`]); aoa.push(['Dept','Position','Name','Call','Phone']);
-      g.people.forEach(r=>aoa.push([DEPARTMENT_CODES[deptBucketKey(r.department)]||'',r.role,r.name,r.call,r.phone])); aoa.push([]);
-    });
+    data.coProductionGroups.forEach(g=>pushPeopleRows(aoa, `${g.company.toUpperCase()} (CO-PRODUCTION)`, g.people));
   }
   if(data.brief.length){ aoa.push(['PRODUCTION BRIEF']); data.brief.forEach(l=>aoa.push([l])); aoa.push([]); }
   if(data.parking){ aoa.push(['PARKING / ARRIVAL']); aoa.push([data.parking]); aoa.push([]); }
