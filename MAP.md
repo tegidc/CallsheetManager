@@ -60,8 +60,8 @@ Every screen needs the same handful of records. These are the single place that 
 - `crewTravelRowHTML()` / `setTravelMethod()` — render and update a crew member's travel method row. Department/Lead Company hidden, role display is Show-as-or-role, display-only (Phase S) — [Crew]
 - `toggleHotelNight()` / `toggleHotelPre()` — toggle whether a crew member is booked a hotel room for a shoot night / the night before — [Crew]
 - `abbreviateName()` — "first initial + last name" display form (e.g. "A. Shaw"), used by the per-night table's Names column — [Crew]
-- `buildHotelSummary()` (Phase O, replaces the old Preview-tab `buildHotelExport`) — per-person hotel aggregation: resolves each person's actual booked-night dates (incl. "night before Day 1") into a check-in/check-out range and total-nights count, sorted earliest check-in first then most nights first (`orderIndex`), and reused by the per-night table's Names ordering so all three views stay in the same person order — [Crew]
-- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block at the TOP of the Hotel sub-tab (T-2.3, moved out of Preview & Export in Phase O): per-night table (Night/Rooms/Names), rooming list (numbered full names), and room-booking table (Room No./Name/Date from–to/Total nights) — [Crew]
+- `buildHotelSummary()` (Phase O, replaces the old Preview-tab `buildHotelExport`) — per-person hotel aggregation: resolves each person's actual booked-night dates (incl. "night before Day 1") into a check-in/check-out range and total-nights count, sorted earliest check-in first then most nights first (`orderIndex`), and reused by the per-night table's Names ordering so both views stay in the same person order — [Crew]
+- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block at the TOP of the Hotel sub-tab (T-2.3, moved out of Preview & Export in Phase O): room-booking table (Room No./Name/Date from–to/Total nights) first, per-night table (Night/Rooms/Names) below it. No separate rooming list — the room-booking table covers that — [Crew]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
 - `addCrewToProject()` / `removeCrewFromProject()` — add/remove a crew member from the current project's roster — [Crew]
 - `crewInfo()` — looks up a crew member's basic display info by id, with a fallback for removed crew — [Crew]
@@ -235,7 +235,7 @@ coarse information first, finest detail last.
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
 | T-2.1 | · Roles | Name / Role / Department / Show as, one tidy row per person | `crewRolesRowHTML()` |
 | T-2.2 | · Days on site | Person × day checkbox matrix | `crewAssignRowHTML()` |
-| T-2.3 | · Hotel | Collapsible hotel summary (per-night table, rooming list, room-booking table — Phase O) atop the person × night matrix, incl. the night before Day 1 | `hotelSummaryHTML()` / `toggleHotelNight()` / `toggleHotelPre()` |
+| T-2.3 | · Hotel | Collapsible hotel summary (room-booking table, per-night table — Phase O) atop the person × night matrix, incl. the night before Day 1 | `hotelSummaryHTML()` / `toggleHotelNight()` / `toggleHotelPre()` |
 | T-2.4 | · Travel | One travel method per person per project | `crewTravelRowHTML()` |
 | T-2.5 | · Catering | Breakfast / Lunch / Dinner per person per day | `crewCateringBlockHTML()` |
 | T-2.6 | · Filter panel | Departments, roles, lead company, days (OR/AND), exclusions, sort, group-by | `projectCrewFilterPanelHTML()` |
