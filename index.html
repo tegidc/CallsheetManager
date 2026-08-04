@@ -2388,6 +2388,7 @@ function renderProjectCrew(body){
       ${assignedHTML}
     </div>
     ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
+    ${crewGridView==='catering' ? cateringSummaryHTML() : ''}
     <div class="section">
       <h2>Add from crew database</h2>
       ${unassigned.length ? `
@@ -2399,6 +2400,9 @@ function renderProjectCrew(body){
       <div class="hint">Need someone new? <span style="color:var(--tape);cursor:pointer" onclick="toggleCrewForm()">Add them here</span> — they'll be saved to the Crew database and assigned to this project.</div>
       ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
+  body.oninput = crewGridView==='catering'
+    ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); renderCateringSummaryGridSection(); })
+    : null;
 }
 /* Roles tab row (Phase S) — tidy grid columns: CONTROLS | Name | Role | Department | Show as.
    Department is read-only reference (implied by the active saved role — see setActiveRole).
@@ -2715,6 +2719,100 @@ function copyCateringExport(){
     }
     lines.push('');
   });
+  copyText(lines.join('\n'), 'Copied!');
+}
+/* ---- Catering tab's own grid-format summary (Phase P2) ----
+   Distinct from buildCateringExport() above (Preview & Export's per-day list with
+   dietary notes, left as-is there per Phase P2 item 1) — this is Breakfast/Lunch/Dinner
+   as ROWS, Day 1/2/3… as COLUMNS, plus a Daily cost row. Same collapsed-by-default
+   pattern as the Hotel summary block (T-2.3), positioned below "Crew on this project". */
+function getCateringCosts(p){
+  const c = (p && p.cateringCosts) || {};
+  return { b:Number(c.b)||0, l:Number(c.l)||0, d:Number(c.d)||0, delivery:Number(c.delivery)||0 };
+}
+async function saveCateringCosts(){
+  const p = currentProject(); if(!p) return;
+  p.cateringCosts = {
+    b: Number(val('ccCostB'))||0,
+    l: Number(val('ccCostL'))||0,
+    d: Number(val('ccCostD'))||0,
+    delivery: Number(val('ccCostDelivery'))||0
+  };
+  await saveDB('db:projects', projectsDB);
+}
+/* delivery is charged once per meal occasion (breakfast/lunch/dinner) per day, and only
+   when that meal's count is >0 that day — a day with zero breakfasts pays no breakfast
+   delivery fee, even though a delivery cost is set */
+function buildCateringSummaryGrid(){
+  const p = currentProject(); if(!p) return null;
+  const days = projectDays();
+  if(!days.length) return null;
+  const costs = getCateringCosts(p);
+  const cols = days.map(d=>{
+    const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
+    const meals = d.cateringMeals || {};
+    let b=0, l=0, dd=0;
+    Object.values(meals).forEach(m=>{ if(m.b) b++; if(m.l) l++; if(m.d) dd++; });
+    const deliveryFee = (b>0?costs.delivery:0) + (l>0?costs.delivery:0) + (dd>0?costs.delivery:0);
+    const dailyCost = (b*costs.b) + (l*costs.l) + (dd*costs.d) + deliveryFee;
+    return { dayNum:d.dayNum, label, b, l, d:dd, dailyCost };
+  });
+  const totalCost = cols.reduce((sum,c)=>sum+c.dailyCost, 0);
+  return { costs, cols, totalCost };
+}
+function cateringSummaryGridBodyHTML(){
+  const data = buildCateringSummaryGrid();
+  if(!data) return '<div class="empty-note">Add shoot days first, then fill in catering on the grid above.</div>';
+  const fmt = n => (n||0).toFixed(2);
+  return `<div class="tablewrap">
+    <table>
+      <tr><th></th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
+      <tr><td>Breakfast</td>${data.cols.map(c=>`<td>${c.b}</td>`).join('')}</tr>
+      <tr><td>Lunch</td>${data.cols.map(c=>`<td>${c.l}</td>`).join('')}</tr>
+      <tr><td>Dinner</td>${data.cols.map(c=>`<td>${c.d}</td>`).join('')}</tr>
+      <tr><td><strong>Daily cost</strong></td>${data.cols.map(c=>`<td><strong>${fmt(c.dailyCost)}</strong></td>`).join('')}</tr>
+    </table>
+  </div>
+  <div class="hint" style="margin-top:8px;">Total catering cost: ${fmt(data.totalCost)}</div>`;
+}
+function renderCateringSummaryGridSection(){
+  const el = document.getElementById('csmGridWrap'); if(!el) return;
+  el.innerHTML = cateringSummaryGridBodyHTML();
+}
+let cateringSummaryOpen = false; // collapsible state for the T-2.5 catering summary block — collapsed by default, same as Hotel's
+function toggleCateringSummaryBlock(){
+  cateringSummaryOpen = !cateringSummaryOpen;
+  applyBlockState({summary:cateringSummaryOpen}, 'csm', 'summary');
+}
+function cateringSummaryHTML(){
+  const p = currentProject();
+  const costs = getCateringCosts(p);
+  const open = cateringSummaryOpen;
+  const costFieldHTML = (id, label, value) => `<div class="field-inline">
+      <label for="${id}">${label}</label>
+      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
+    </div>`;
+  const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
+      ${costFieldHTML('ccCostB', 'Est. cost per Breakfast', costs.b)}
+      ${costFieldHTML('ccCostL', 'Est. cost per Lunch', costs.l)}
+      ${costFieldHTML('ccCostD', 'Est. cost per Dinner', costs.d)}
+      ${costFieldHTML('ccCostDelivery', 'Delivery cost', costs.delivery)}
+    </div>`;
+  const inner = `${fieldsHTML}<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
+    <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyCateringSummaryGrid()">${icon('copy')} Copy catering summary</button></div>`;
+  return `<div class="section">
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="toggleCateringSummaryBlock()"><span class="dept-caret" id="csmc-summary">${open?'▾':'▸'}</span> Catering summary</span>
+    </div>
+    <div id="csmb-summary" style="display:${open?'':'none'}">${inner}</div>
+  </div>`;
+}
+function copyCateringSummaryGrid(){
+  const data = buildCateringSummaryGrid(); if(!data) return;
+  const fmt = n => (n||0).toFixed(2);
+  const lines = ['CATERING SUMMARY', ''];
+  data.cols.forEach(c=>lines.push(`${c.label}: Breakfast ${c.b}, Lunch ${c.l}, Dinner ${c.d} — Daily cost ${fmt(c.dailyCost)}`));
+  lines.push('', `Total catering cost: ${fmt(data.totalCost)}`);
   copyText(lines.join('\n'), 'Copied!');
 }
 function crewTravelRowHTML(c, p){
