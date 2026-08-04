@@ -834,7 +834,7 @@
     <div class="aud-nav">
       <a href="#families">Families</a><a href="#ladder">Size ladder</a><a href="#weights">Weights</a>
       <a href="#align">Alignment</a><a href="#inputs">Inputs</a><a href="#checkboxes">Checkboxes</a>
-      <a href="#rules">Section rules</a><a href="#crewall">Crew "All"</a><a href="#icons">Icons</a>
+      <a href="#rules">Section rules</a><a href="#lines">Dividing lines</a><a href="#crewall">Crew "All"</a><a href="#icons">Icons</a>
       <a href="#secondary">Secondary colour</a>
     </div>
   </div>
@@ -1304,17 +1304,133 @@ Location: The Organ Factory</pre>
       A is the compromise: keep one frame so sections are still discrete objects, but use rules for everything inside.</div>
     </div>
 
-    <div class="aud-q" data-q="dividers">
-      <h3>How heavy should the dividing rules be?</h3>
-      <div class="prob">Currently three weights are in use: <code>1px solid var(--line)</code> at 14% opacity for
-      most rows, <code>1px dashed</code> for schedule rows, and the heading rules. A printed form would typically
-      use one consistent hairline, slightly darker than the 14% currently used.</div>
+  </div>
+
+
+  <!-- ============ 8. DIVIDING LINES ============ -->
+  <div class="aud-section" id="lines">
+    <div class="num">08</div>
+    <h2>Dividing lines</h2>
+    <p class="lede">You said some screens get this right &mdash; Shoot Days &mdash; and that you don't need a line
+    between every name on every feature. That's measurable, so I measured it. These are counts of actual rendered
+    dividing lines on the ROW 2026 project (66 crew, 11 departments, 6 shoot days), with form-control borders
+    excluded so it's only real divisions.</p>
+
+    <div class="aud-scroll">
+    <table class="aud-tbl">
+      <tr><th>Screen</th><th>Row lines</th><th>Table cell lines</th><th>Heading rules</th><th>How it divides</th></tr>
+      <tr><td><b>Overview</b></td><td class="mono">0</td><td class="mono">0</td><td class="mono">2</td><td>Headings only. Calm.</td></tr>
+      <tr><td><b>Shoot Days</b> <span class="aud-tag ok">good</span></td><td class="mono">13</td><td class="mono">0</td><td class="mono">21</td><td><b>Heading-led.</b> 15 sub-heads carry the structure; lines are used sparingly.</td></tr>
+      <tr><td><b>Crew &mdash; Days on site</b></td><td class="mono">55</td><td class="mono">0</td><td class="mono">13</td><td>A line under every person, <i>on top of</i> department grouping.</td></tr>
+      <tr><td><b>Crew &mdash; Catering</b> <span class="aud-tag warn">worst</span></td><td class="mono">121</td><td class="mono">0</td><td class="mono">14</td><td>66 people &times; 3 meal sub-rows = 198 rows, most of them ruled.</td></tr>
+      <tr><td><b>Preview &amp; Export</b></td><td class="mono">0</td><td class="mono">174</td><td class="mono">8</td><td>Every single <code>td</code> and <code>th</code> carries a bottom border.</td></tr>
+    </table>
+    </div>
+
+    <div class="aud-callout"><b>Why Shoot Days works:</b> it divides with <i>headings</i> &mdash; 21 heading rules
+    against only 13 row lines. The heading tells you a new thing has started, and the rows inside it are just
+    allowed to sit there. Crew does the opposite: 11 department headings but 55&ndash;121 row lines, so the grouping
+    is stated twice and the lines stop meaning anything.</div>
+
+    <div class="aud-callout warn"><b>The Catering number is the real outlier.</b> Each person gets a
+    <code>.crewgrid-catering-person</code> divider <i>and</i> three meal sub-rows. On a 66-person project that's
+    121 horizontal lines in one scroll &mdash; roughly one every 30 pixels.</div>
+
+    <p class="lede" style="margin-top:20px;">Three ways to handle the crew grids. The department headings stay in
+    all three &mdash; the question is what happens <i>between people</i>.</p>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="lines-group" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <div class="subhead" style="margin:0 0 6px;">Camera</div>
+          <div style="font-size:13px; padding:5px 0;">Alex Ovaida <span style="color:#6f6a63;">&middot; 1st AC</span></div>
+          <div style="font-size:13px; padding:5px 0;">Sam Iyer <span style="color:#6f6a63;">&middot; Focus Puller</span></div>
+          <div style="font-size:13px; padding:5px 0;">Nia Okonkwo <span style="color:#6f6a63;">&middot; DIT</span></div>
+          <div class="subhead" style="margin:14px 0 6px;">Sound</div>
+          <div style="font-size:13px; padding:5px 0;">Tom Reilly <span style="color:#6f6a63;">&middot; Mixer</span></div>
+        </div>
+        <div class="aud-meta"><div class="name">A &mdash; group headings only <span class="aud-tag ok">suggested</span></div>
+        <div class="spec">No line between people. The department heading and its rule do all the dividing &mdash; the Shoot Days model applied to Crew. Cuts Days-on-site from 55 lines to 11.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="lines-zebra" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <div class="subhead" style="margin:0 0 6px;">Camera</div>
+          <div style="font-size:13px; padding:5px 6px; background:rgba(17,10,8,.035);">Alex Ovaida <span style="color:#6f6a63;">&middot; 1st AC</span></div>
+          <div style="font-size:13px; padding:5px 6px;">Sam Iyer <span style="color:#6f6a63;">&middot; Focus Puller</span></div>
+          <div style="font-size:13px; padding:5px 6px; background:rgba(17,10,8,.035);">Nia Okonkwo <span style="color:#6f6a63;">&middot; DIT</span></div>
+          <div style="font-size:13px; padding:5px 6px;">Tom Reilly <span style="color:#6f6a63;">&middot; Mixer</span></div>
+        </div>
+        <div class="aud-meta"><div class="name">B &mdash; alternating row tint</div>
+        <div class="spec">No lines at all; a very faint stripe keeps your eye on the row across a wide 6-day grid. Helps tracking, but adds a fill back in &mdash; the opposite of the paper direction.</div></div>
+      </div>
+
+      <div class="aud-demo pick" data-card="lines-keep" onclick="pickCard(this)">
+        <div class="aud-render">
+          <div class="subhead" style="margin:0 0 6px;">Camera</div>
+          <div style="font-size:13px; padding:5px 0; border-bottom:1px solid var(--line);">Alex Ovaida <span style="color:#6f6a63;">&middot; 1st AC</span></div>
+          <div style="font-size:13px; padding:5px 0; border-bottom:1px solid var(--line);">Sam Iyer <span style="color:#6f6a63;">&middot; Focus Puller</span></div>
+          <div style="font-size:13px; padding:5px 0; border-bottom:1px solid var(--line);">Nia Okonkwo <span style="color:#6f6a63;">&middot; DIT</span></div>
+          <div style="font-size:13px; padding:5px 0;">Tom Reilly <span style="color:#6f6a63;">&middot; Mixer</span></div>
+        </div>
+        <div class="aud-meta"><div class="name">C &mdash; keep a line per person (current)</div>
+        <div class="spec">What's there now. Easiest to track across a wide grid; also what produces the 55 and 121 counts above.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="lines-crew">
+      <h3>What divides one person from the next in the crew grids?</h3>
+      <div class="prob">This is the "I don't need lines between every name" decision. Worth knowing: these grids run
+      up to 6 day-columns wide, so whatever replaces the line still has to let you track along a row without
+      losing which person you're on. A is calmest, B is best for tracking, C is what you have.</div>
+    </div>
+
+    <p class="lede" style="margin-top:22px;">And the tables in Preview &amp; Export &mdash; 174 cell borders on one screen.</p>
+
+    <div class="aud-grid">
+      <div class="aud-demo pick" data-card="tbl-header" onclick="pickCard(this)">
+        <div class="aud-render paper">
+          <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+            <tr><th style="text-align:left; padding:5px 4px; border-bottom:1.5px solid rgba(17,10,8,.4); font-family:var(--label); font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--tape);">Name</th><th style="text-align:left; padding:5px 4px; border-bottom:1.5px solid rgba(17,10,8,.4); font-family:var(--label); font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--tape);">Role</th><th style="text-align:left; padding:5px 4px; border-bottom:1.5px solid rgba(17,10,8,.4); font-family:var(--label); font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--tape);">Call</th></tr>
+            <tr><td style="padding:4px;">Alex Ovaida</td><td style="padding:4px;">1st AC</td><td style="padding:4px;">08:00</td></tr>
+            <tr><td style="padding:4px;">Sam Iyer</td><td style="padding:4px;">Focus Puller</td><td style="padding:4px;">08:00</td></tr>
+            <tr><td style="padding:4px;">Nia Okonkwo</td><td style="padding:4px;">DIT</td><td style="padding:4px;">08:30</td></tr>
+          </table>
+        </div>
+        <div class="aud-meta"><div class="name">A &mdash; rule under the header only <span class="aud-tag ok">suggested</span></div>
+        <div class="spec">One rule separating headings from data, nothing between rows. How a printed call sheet actually looks. 174 lines becomes about 8.</div></div>
+      </div>
+      <div class="aud-demo pick" data-card="tbl-all" onclick="pickCard(this)">
+        <div class="aud-render">
+          <table class="aud-tbl" style="margin:0;">
+            <tr><th>Name</th><th>Role</th><th>Call</th></tr>
+            <tr><td>Alex Ovaida</td><td>1st AC</td><td>08:00</td></tr>
+            <tr><td>Sam Iyer</td><td>Focus Puller</td><td>08:00</td></tr>
+            <tr><td>Nia Okonkwo</td><td>DIT</td><td>08:30</td></tr>
+          </table>
+        </div>
+        <div class="aud-meta"><div class="name">B &mdash; line under every row (current)</div>
+        <div class="spec">What's there now. On the printed/exported call sheet this may genuinely help &mdash; it's the one place lines earn their keep.</div></div>
+      </div>
+    </div>
+
+    <div class="aud-q" data-q="lines-tables">
+      <h3>And the Preview &amp; Export tables?</h3>
+      <div class="prob">This is the screen that becomes a printed document, so the answer might legitimately differ
+      from the rest of the app &mdash; a real call sheet on paper often does rule every row.</div>
+    </div>
+
+    <div class="aud-q" data-q="lines-weight">
+      <h3>How heavy should a dividing line be?</h3>
+      <div class="prob">Currently <code>var(--line)</code> is <code>rgba(17,10,8,.14)</code> &mdash; 14% black.
+      Schedule rows use <code>1px dashed</code> instead, which you've already said should stay (it's the one
+      uniquely reorderable list). If lines become rarer, each one can afford to be slightly darker.</div>
     </div>
   </div>
 
-  <!-- ============ 8. CREW "ALL" ============ -->
+  <!-- ============ 9. CREW "ALL" ============ -->
   <div class="aud-section" id="crewall">
-    <div class="num">08</div>
+    <div class="num">09</div>
     <h2>The "All" controls in Crew</h2>
     <p class="lede">There are four bulk controls on the Crew tab and they're all built differently &mdash;
     different elements, sizes, and positions.</p>
@@ -1408,9 +1524,9 @@ Location: The Organ Factory</pre>
     </div>
   </div>
 
-  <!-- ============ 9. ICONS ============ -->
+  <!-- ============ 10. ICONS ============ -->
   <div class="aud-section" id="icons">
-    <div class="num">09</div>
+    <div class="num">10</div>
     <h2>Icons</h2>
     <p class="lede">The full set, rendered from the app's real <code>ICONS</code> object. Nineteen icons, all
     the same drawing style: 24&times;24 viewBox, 1.8px stroke, round caps and joins, no fills.</p>
@@ -1439,9 +1555,9 @@ Location: The Organ Factory</pre>
     </div>
   </div>
 
-  <!-- ============ 10. SECONDARY COLOUR ============ -->
+  <!-- ============ 11. SECONDARY COLOUR ============ -->
   <div class="aud-section" id="secondary">
-    <div class="num">10</div>
+    <div class="num">11</div>
     <h2>A secondary colour</h2>
     <p class="lede">You're right that one green isn't enough. Here's the actual problem, measured.</p>
 
@@ -1549,7 +1665,9 @@ const CARD_Q = {
   'cb-ink':'checkbox-mark','cb-green':'checkbox-mark','cb-heavy':'checkbox-mark',
   'sec-rules':'section-rules','sec-boxes':'section-rules','sec-flat':'section-rules',
   'all-right':'crew-all','all-left':'crew-all',
-  'sec-pair':'secondary-colour','sec-amber':'secondary-colour','sec-both':'secondary-colour'
+  'sec-pair':'secondary-colour','sec-amber':'secondary-colour','sec-both':'secondary-colour',
+  'lines-group':'lines-crew','lines-zebra':'lines-crew','lines-keep':'lines-crew',
+  'tbl-header':'lines-tables','tbl-all':'lines-tables'
 };
 
 /* Questions answered by radio options rendered into the block */
@@ -1581,6 +1699,10 @@ const OPTIONS = {
     ['div-one','One hairline weight everywhere, slightly darker than now'],
     ['div-keep','Keep the three weights as they are'],
     ['div-two','Two: a hairline for rows, a heavier rule for section headings']],
+  'lines-weight':[
+    ['lw-darker','Rarer but darker — one hairline at ~22% black'],
+    ['lw-keep','Keep 14% black as it is'],
+    ['lw-lighter','Lighter still — barely-there at ~10%']],
   'secondary-hue':[
     ['hue-amber','Amber #B07A2E'],
     ['hue-ochre','Ochre #8C6A3F'],

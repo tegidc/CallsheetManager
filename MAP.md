@@ -326,10 +326,18 @@ no changes to `index.html` or app styling itself.
 `style-audit-fonts.html` — second review page, same click-to-pick + notes + "Export all
 decisions" system as `style-audit.html`, also standalone at the repo root and not
 linked from `index.html`. Copies the app's CSS and its `ICONS` object verbatim so every
-example and every icon is the real thing. Ten sections: font families, size ladder,
+example and every icon is the real thing. Eleven sections: font families, size ladder,
 weights vs what's actually loaded, sizing/alignment, input boxes & dropdowns,
-checkboxes, general section rules, the Crew "All" controls, icons, and secondary
-colour. 16 decisions.
+checkboxes, general section rules, dividing lines, the Crew "All" controls, icons, and
+secondary colour. 18 decisions.
+
+The dividing-lines section carries measured counts of rendered divisions per screen
+(form-control borders excluded) taken from the ROW 2026 sample project — 66 crew, 11
+departments, 6 days. Shoot Days divides with headings (21 heading rules, 13 row lines);
+Crew does the opposite (11 department headings but 55 row lines on Days on site and
+121 on Catering, where each of 66 people has a divider plus three meal sub-rows);
+Preview & Export puts a bottom border on all 174 `td`/`th` cells. Re-measure with the
+counting snippet rather than assuming these numbers still hold.
 
 Two defects it documents, both checkable against the font request on line 8 of
 `index.html`:
