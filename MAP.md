@@ -310,9 +310,13 @@ coarse information first, finest detail last.
 
 ## Style audit — pattern names (Phase Style Review)
 
-`style-audit.html` is a standalone diagnostic page at the repo root (not linked from
-`index.html`'s nav — open it directly). It copies the app's real CSS verbatim from
-`index.html` (Part A) and renders it against live markup so every example is styled
-by the app's actual rules, not a re-implementation. Used to review the design system
-in isolation before making styling changes elsewhere. Sections: Typography, Colors,
-Spacing, Component behaviors, Icons (existing), Icons (candidates).
+`style-audit.html` is a standalone interactive decision tool at the repo root (not
+linked from `index.html`'s nav — open it directly). It copies the app's real CSS
+verbatim from `index.html` so every example is styled by the app's actual rules, not
+a re-implementation. For each flagged inconsistency (heading styles, eyebrow labels,
+box styles, dividers, expand/collapse patterns, dead icons, etc.) it lets you
+click-to-pick a preferred option and/or add a notes field, then an "Export all
+decisions" button (`exportDecisions()`) compiles the picks/notes into a single block
+of text to paste back for follow-up phases. Sections: Typography, Colors, Spacing,
+Component behaviors, Icons (existing), Icons (candidates). Purely diagnostic — makes
+no changes to `index.html` or app styling itself.

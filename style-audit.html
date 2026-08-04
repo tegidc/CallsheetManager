@@ -3,15 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Style Audit &mdash; Call Sheet App</title>
+<title>Style Audit — Call Sheet App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* ============================================================
-   PART A — the app's OWN stylesheet, copied verbatim from index.html
-   (unmodified) so every rendered example below uses the app's real
-   CSS rules, not a re-implementation of them.
-   ============================================================ */
 /*
     BRAND NOTE: Moret and Futura PT are paid/licensed fonts not available on Google Fonts.
     Using closest free equivalents: Fraunces (warm rounded serif, stands in for Moret) for
@@ -628,13 +623,6 @@
     .section{padding:13px 11px;}
   }
 
-/* ============================================================
-   PART B — this audit page's own chrome. Every rule here is
-   prefixed .aud-/ic- so it can never collide with, override, or be
-   overridden by Part A above. Nothing in this block describes the
-   app — it's just the frame around the exhibits.
-   ============================================================ */
-
   .aud-topbar{position:sticky; top:0; z-index:50; background:var(--side-bg); color:var(--side-text);
     padding:14px 26px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 20px;
     border-bottom:1px solid var(--side-line);}
@@ -646,25 +634,19 @@
     padding:7px 11px; border-radius:6px; text-decoration:none; cursor:pointer;}
   .aud-navlink:hover{background:rgba(255,255,245,.08); color:#fff;}
 
-  .aud-wrap{max-width:1180px; margin:0 auto; padding:30px 26px 90px;}
-  .aud-intro{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin-bottom:34px; font-size:13.5px; line-height:1.6; color:var(--text);}
-  .aud-intro b{color:var(--tape);}
+  .aud-wrap{max-width:1080px; margin:0 auto; padding:30px 26px 90px;}
 
-  .aud-page-h1{font-family:var(--disp); font-weight:700; font-size:26px; margin:0 0 4px;}
-  .aud-page-sub{font-family:var(--body); font-size:13.5px; color:var(--muted); margin-bottom:10px;}
-
-  .aud-section{padding:46px 0 10px; border-top:1px solid var(--line); margin-top:10px; scroll-margin-top:150px;}
+  .aud-section{padding:46px 0 10px; border-top:1px solid var(--line); margin-top:10px; scroll-margin-top:80px;}
   .aud-section:first-of-type{border-top:none;}
   .aud-section-eyebrow{font-family:var(--label); font-size:11px; letter-spacing:1.6px; text-transform:uppercase; color:var(--tape); margin-bottom:4px;}
-  .aud-section-title{font-family:var(--disp); font-weight:700; font-size:23px; margin:0 0 8px;}
-  .aud-section-desc{font-size:13.5px; color:var(--muted); max-width:720px; line-height:1.55; margin-bottom:26px;}
+  .aud-section-title{font-family:var(--disp); font-weight:700; font-size:23px; margin:0 0 6px;}
+  .aud-section-desc{font-size:13.5px; color:var(--muted); max-width:720px; line-height:1.55; margin-bottom:22px;}
 
   .aud-groupname{font-family:var(--label); font-size:12px; letter-spacing:1px; text-transform:uppercase;
-    color:var(--text); background:var(--panel-2); border-left:3px solid var(--tape); padding:6px 12px; margin:30px 0 16px;}
-  .aud-groupnote{font-size:12.5px; color:var(--muted); margin:-10px 0 16px; max-width:680px; line-height:1.5;}
+    color:var(--text); background:var(--panel-2); border-left:3px solid var(--tape); padding:6px 12px; margin:24px 0 14px;}
+  .aud-groupnote{font-size:12.5px; color:var(--muted); margin:-8px 0 14px; max-width:680px; line-height:1.5;}
 
-  .aud-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:16px; margin-bottom:8px;}
-  .aud-grid.aud-grid-wide{grid-template-columns:repeat(auto-fit, minmax(360px,1fr));}
+  .aud-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:14px; margin-bottom:8px;}
   .aud-demo{border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--bg); display:flex; flex-direction:column;}
   .aud-demo-render{padding:18px; background:var(--bg); flex:1;}
   .aud-demo-render.aud-dark{background:var(--side-bg);}
@@ -675,16 +657,16 @@
     color:var(--danger); background:rgba(164,50,31,.1); border:1px solid rgba(164,50,31,.3); border-radius:4px; padding:1px 6px; margin-left:6px;}
 
   .aud-swatchrow{display:flex; flex-wrap:wrap; gap:14px; margin-bottom:10px;}
-  .aud-swatch{width:150px;}
-  .aud-swatch-block{height:56px; border-radius:8px; border:1px solid var(--line); margin-bottom:6px;}
+  .aud-swatch{width:140px;}
+  .aud-swatch-block{height:50px; border-radius:8px; border:1px solid var(--line); margin-bottom:5px;}
   .aud-swatch-name{font-family:var(--label); font-size:11px; font-weight:600;}
   .aud-swatch-hex{font-family:var(--mono); font-size:10.5px; color:var(--muted);}
   .aud-swatch-use{font-size:10.5px; color:var(--muted); margin-top:2px; line-height:1.4;}
 
-  .ic-cat h4{font-family:var(--label); font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:22px 0 10px;}
-  .ic-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(84px,1fr)); gap:8px;}
+  .ic-cat h4{font-family:var(--label); font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:20px 0 10px;}
+  .ic-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(80px,1fr)); gap:7px;}
   .ic-card{border:1px solid var(--line); border-radius:8px; padding:10px 4px 8px; text-align:center; background:var(--bg);}
-  .ic-swatch{display:flex; align-items:center; justify-content:center; height:28px; color:var(--text);}
+  .ic-swatch{display:flex; align-items:center; justify-content:center; height:26px; color:var(--text);}
   .ic-swatch svg{width:19px; height:19px;}
   .ic-card code{display:block; font-size:9px; color:var(--muted); margin-top:5px; word-break:break-word; line-height:1.3;}
 
@@ -695,10 +677,72 @@
   .aud-existing-ic .aud-ic-where{font-size:11px; color:var(--muted); margin-top:2px; line-height:1.4;}
   .aud-existing-ic.aud-ic-dead{opacity:.55;}
 
-  .aud-toggle-demo{border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:var(--bg);}
-  .aud-toggle-demo-head{font-family:var(--label); font-size:11px; letter-spacing:.8px; text-transform:uppercase; color:var(--tape); margin-bottom:10px; font-weight:600;}
+  .aud-footer{margin-top:60px; padding-top:18px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted);}
 
-  .aud-footer{margin-top:60px; padding-top:20px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted);}
+
+  .aud-pickable{cursor:pointer; transition:border-color .12s ease, box-shadow .12s ease;}
+  .aud-pickable:hover{border-color:var(--tape);}
+  .aud-pickable.aud-selected{border-color:var(--tape); border-width:2px; box-shadow:0 0 0 1px var(--tape); position:relative;}
+  .aud-demo.aud-selected .aud-demo-meta{background:rgba(1,119,86,.12);}
+  .aud-pickable.aud-selected::after{
+    content:'\2713'; position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%;
+    background:var(--tape); color:var(--tape-ink); font-size:11px; font-weight:700; line-height:20px; text-align:center; z-index:2;
+  }
+  .ic-card.aud-pickable{position:relative;}
+  .ic-card.aud-pickable.aud-selected{background:rgba(1,119,86,.1);}
+
+  .aud-decision-scope{position:relative; margin-bottom:30px;}
+  .aud-decision{border:1px dashed var(--tape); border-radius:10px; padding:14px 16px; margin-bottom:16px; background:rgba(1,119,86,.04);}
+  .aud-decision-q{font-family:var(--disp); font-size:16px; font-weight:700; color:var(--text); margin-bottom:8px; line-height:1.4;}
+  .aud-decision-problem{font-size:13.5px; color:var(--muted); line-height:1.55; margin-bottom:12px;}
+  .aud-decision-problem code{font-size:12px; background:var(--panel-2); padding:1px 4px; border-radius:3px;}
+  .aud-decision-problem b{color:var(--text);}
+  .aud-decision-options{display:flex; flex-direction:column; gap:6px; margin-bottom:12px;}
+  .aud-decision-opt{display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13.5px; color:var(--text);
+    padding:8px 12px; border:1px solid var(--line); border-radius:7px; background:var(--bg); transition:all .12s ease;}
+  .aud-decision-opt:hover{border-color:var(--tape);}
+  .aud-opt-radio{width:16px; height:16px; border-radius:50%; border:2px solid var(--line); flex:0 0 auto; transition:all .12s ease;
+    display:flex; align-items:center; justify-content:center;}
+  .aud-decision-opt.aud-opt-active{border-color:var(--tape); background:rgba(1,119,86,.06);}
+  .aud-decision-opt.aud-opt-active .aud-opt-radio{border-color:var(--tape); background:var(--tape);}
+  .aud-decision-opt.aud-opt-active .aud-opt-radio::after{content:''; width:6px; height:6px; border-radius:50%; background:var(--tape-ink);}
+  .aud-decision-current{font-size:13px; color:var(--tape); font-weight:600; padding:6px 0;}
+  .aud-decision-current.aud-empty{color:var(--muted); font-weight:400; font-style:italic;}
+  .aud-decision-note{width:100%; background:var(--bg); border:1px solid var(--line); border-radius:6px;
+    color:var(--text); padding:8px 10px; font-family:var(--body); font-size:13px; min-height:52px; resize:vertical;}
+  .aud-decision-note:focus{outline:none; border-color:var(--tape);}
+
+  .aud-decisions-panel{background:var(--side-bg); color:var(--side-text); border-radius:10px; padding:20px 22px; margin-bottom:34px;}
+  .aud-decisions-panel-head{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; margin-bottom:4px;}
+  .aud-decisions-title{font-family:var(--disp); font-weight:700; font-size:18px;}
+  .aud-decisions-progress{font-family:var(--label); font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#5fd6ac;}
+  .aud-progress-track{height:4px; background:rgba(255,255,245,.12); border-radius:2px; margin:10px 0 14px; overflow:hidden;}
+  .aud-progress-fill{height:100%; background:#5fd6ac; border-radius:2px; transition:width .2s ease; width:0;}
+  .aud-decisions-desc{font-size:13px; color:rgba(255,255,245,.65); margin-bottom:16px; line-height:1.55;}
+  .aud-decisions-actions{display:flex; gap:10px; flex-wrap:wrap;}
+  .aud-btn{font-family:var(--body); font-weight:600; font-size:13px; cursor:pointer; border-radius:7px;
+    border:1px solid var(--side-line); background:transparent; color:var(--side-text); padding:9px 16px;}
+  .aud-btn:hover{border-color:#5fd6ac; color:#5fd6ac;}
+  .aud-btn.aud-btn-primary{background:var(--tape); color:var(--tape-ink); border-color:var(--tape);}
+  .aud-btn.aud-btn-primary:hover{opacity:.9; color:var(--tape-ink);}
+  .aud-summary-list{margin-top:16px; max-height:0; overflow:hidden; transition:max-height .3s ease;}
+  .aud-summary-list.aud-open{max-height:6000px;}
+  .aud-summary-item{border-top:1px solid var(--side-line); padding:10px 0; font-size:12.5px;}
+  .aud-summary-item:last-child{padding-bottom:0;}
+  .aud-summary-problem{font-family:var(--label); font-size:10px; letter-spacing:.8px; text-transform:uppercase; color:#5fd6ac; margin-bottom:2px;}
+  .aud-summary-q{color:rgba(255,255,245,.65); margin-bottom:3px; font-size:12px;}
+  .aud-summary-a{color:#fff; font-weight:600;}
+  .aud-summary-item.aud-summary-unanswered .aud-summary-a{color:rgba(255,255,245,.35); font-weight:400; font-style:italic;}
+  .aud-summary-note{color:rgba(255,255,245,.55); margin-top:3px; font-size:12px;}
+  #summaryText{width:100%; margin-top:12px; min-height:140px; font-family:var(--mono); font-size:11px; display:none;
+    background:#000; color:#5fd6ac; border:1px solid var(--side-line); border-radius:6px; padding:10px; resize:vertical;}
+
+  .aud-jump-decisions{position:fixed; bottom:20px; right:20px; z-index:80;
+    font-family:var(--label); font-size:11px; letter-spacing:.8px; text-transform:uppercase;
+    background:var(--tape); color:var(--tape-ink); border:none; border-radius:24px;
+    padding:11px 18px; cursor:pointer; box-shadow:0 6px 20px rgba(17,10,8,.25); display:flex; align-items:center; gap:6px;}
+  .aud-jump-decisions:hover{opacity:.9;}
+  .aud-jump-count{background:rgba(255,255,255,.25); border-radius:10px; padding:2px 8px; font-size:10px;}
 
 </style>
 </head>
@@ -707,552 +751,662 @@
 <div class="aud-topbar">
   <div>
     <div class="aud-topbar-title"><span class="aud-dot"></span>Style Audit</div>
-    <div class="aud-topbar-sub">Call Sheet App &middot; Little Film Productions</div>
+    <div class="aud-topbar-sub">Call Sheet App · Little Film Productions</div>
   </div>
   <nav class="aud-nav">
     <a class="aud-navlink" href="#typography">Typography</a>
     <a class="aud-navlink" href="#colors">Colors</a>
-    <a class="aud-navlink" href="#spacing">Spacing &amp; layout</a>
-    <a class="aud-navlink" href="#components">Component behaviors</a>
-    <a class="aud-navlink" href="#icons-existing">Icons &mdash; existing</a>
-    <a class="aud-navlink" href="#icons-candidates">Icons &mdash; candidates</a>
+    <a class="aud-navlink" href="#spacing">Spacing</a>
+    <a class="aud-navlink" href="#components">Components</a>
+    <a class="aud-navlink" href="#icons">Icons</a>
+    <a class="aud-navlink" href="#decisions-panel">Decisions</a>
   </nav>
 </div>
 
 <div class="aud-wrap">
 
-  <div class="aud-page-h1">Style Audit</div>
-  <div class="aud-page-sub">A diagnostic catalogue of every visual style decision currently in use across the app &mdash; for review, not a feature. Nothing here is live project data.</div>
-
-  <div class="aud-intro">
-    <b>How to use this page:</b> each section groups elements that serve the <i>same purpose</i> in the app so you can compare how differently they currently render. Every example is labelled with its MAP.md section code (e.g. <code>T-2</code>, <code>D-1.3</code>) and its real CSS class name, so feedback here (“keep the T-5.2 style, drop the T-2 one”, “pick candidate icon X for the Y slot”) maps directly back to a specific piece of code for the follow-up unification pass. This page makes <b>no changes</b> to <code>index.html</code> or the live app.
+  <div class="aud-decisions-panel" id="decisions-panel">
+    <div class="aud-decisions-panel-head">
+      <div class="aud-decisions-title">Your decisions</div>
+      <div class="aud-decisions-progress"><span id="progressCount">0/14</span> answered</div>
+    </div>
+    <div class="aud-progress-track"><div class="aud-progress-fill" id="progressBar"></div></div>
+    <div class="aud-decisions-desc">
+      Work through the sections below. For each inconsistency: <b>click the example you want to keep</b> (or pick a radio option), and optionally <b>add notes</b> for nuance ("I like B's size but A's colour"). When you're done, hit <b>Export all decisions</b> to get a single block of text you can paste back to Claude.
+    </div>
+    <div class="aud-decisions-actions">
+      <button class="aud-btn" onclick="toggleSummary()">Review answers</button>
+      <button class="aud-btn aud-btn-primary" onclick="exportDecisions()">Export all decisions</button>
+    </div>
+    <div class="aud-summary-list" id="summaryList"></div>
+    <textarea id="summaryText" readonly></textarea>
   </div>
 
   <div class="aud-section" id="typography">
     <div class="aud-section-eyebrow">01</div>
     <div class="aud-section-title">Typography</div>
-    <div class="aud-section-desc">Every distinct heading/label/body-text treatment in use, grouped by where it appears so same-purpose elements sit next to each other.</div>
-    <div class="aud-groupname">Tab-entry headings — the flagship divergence</div><div class="aud-groupnote">The first heading a user meets on entering a tab. On Crew (T-2) it's a small 15px label-weight heading with a thin grey rule. On Shoot Days (T-5.2) the equivalent entry point is a 20px heading with a thick coloured rule underneath — 33% bigger and far more assertive, for a peer-level piece of UI.</div><div class="aud-grid"><div class="aud-demo">
+    <div class="aud-section-desc">How text is styled across the app — headings, labels, names. Each question highlights where the same type of element looks different depending on which screen it's on.</div>
+    <div class="aud-decision-scope" data-scope="heading-style">
+  <div class="aud-decision" id="dec-heading-style"></div>
+  <div class="aud-groupnote">Click the one you want as the standard. Add a note if you want to mix aspects (e.g. "B's size but A's green colour").</div>
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="heading-A" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="section" style="margin:0;padding:0;border:none;background:none;"><h2 style="margin:0;">Crew on this project</h2></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2 &middot; Crew tab</div><div class="aud-demo-spec">class=.section h2 &middot; Fraunces 700 15px &middot; color:var(--tape) &middot; thin 1px line after (var(--line))</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">T-2 · Crew tab (Pattern A)</div><div class="aud-demo-spec">Fraunces 15px green · thin grey rule after</div></div>
   </div>
-<div class="aud-demo">
+<div class="aud-demo aud-pickable" data-card-id="heading-B" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="sd-block-head" style="margin:0;padding-bottom:9px;cursor:default;">General information</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-5.2 &middot; Shoot Days tab<span class="aud-flag">DIVERGES</span></div><div class="aud-demo-spec">class=.sd-block-head &middot; Fraunces 700 20px &middot; color:var(--text) &middot; 2px solid var(--tape) border-bottom</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">T-5.2 · Shoot Days (Pattern B)<span class="aud-flag">LARGER</span></div><div class="aud-demo-spec">Fraunces 20px black · thick green underline</div></div>
   </div>
-<div class="aud-demo">
+<div class="aud-demo aud-pickable" data-card-id="heading-C" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="posn-company-header" style="margin:0;cursor:default;">Little Film Productions</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-5.4 &middot; Position assignments company group<span class="aud-flag">DIVERGES</span></div><div class="aud-demo-spec">class=.posn-company-header &middot; Fraunces 700 14px &middot; color:var(--text) &middot; 1px solid var(--text) border-bottom</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">T-5.4 · Position Assignments (Pattern C)</div><div class="aud-demo-spec">Fraunces 14px black · thin black underline</div></div>
   </div></div>
-<div class="aud-groupname">Other instances of .section h2 (for reference — this style is consistent with itself)</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div class="section" style="margin:0;padding:0;border:none;background:none;"><h2 style="margin:0;">All crew</h2></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">D-1 &middot; Crew database</div><div class="aud-demo-spec">class=.section h2</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="section" style="margin:0;padding:0;border:none;background:none;"><h2 style="margin:0;">Locations on this project</h2></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-3 &middot; Locations tab</div><div class="aud-demo-spec">class=.section h2</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="section" style="margin:0;padding:0;border:none;background:none;"><h2 style="margin:0;">Add from crew database</h2></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2.8 &middot; Crew tab</div><div class="aud-demo-spec">class=.section h2</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="section" style="margin:0;padding:0;border:none;background:none;"><h2 style="margin:0;">Project details</h2></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-1.1 &middot; Overview (used twice — Welcome screen new-project form and the live Overview tab)</div><div class="aud-demo-spec">class=.section h2</div></div>
-  </div></div>
-<div class="aud-groupname">Page-level headline vs. card headline</div><div class="aud-groupnote">Two more sizes in the same visual family, one tier above and one tier below the two headings compared above — shown here so the full size ladder is visible in one place: 26 &rarr; 22/20 &rarr; 15/14.</div><div class="aud-grid"><div class="aud-demo">
+</div>
+<div class="aud-decision-scope" data-scope="headline-ladder">
+  <div class="aud-decision" id="dec-headline-ladder"></div>
+  <div class="aud-groupnote">This is about the overall size hierarchy, not which specific heading to use (that's the question above).</div>
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="hl-26" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="page-head" style="margin:0;"><div class="eyebrow">Little Film Productions</div><h1 style="margin:2px 0 0;">Call Sheet App</h1></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">G-3 &middot; Welcome / database screens</div><div class="aud-demo-spec">class=.page-head h1 &middot; Fraunces 700 26px</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Page headline (26px)</div><div class="aud-demo-spec">Welcome/database screens</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="card" style="margin:0;padding:14px 16px;"><div class="line1">OFTV &mdash; ROW 2026</div><div class="sub">Client sample text</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-6.1 &middot; Call sheet preview card</div><div class="aud-demo-spec">class=.card .line1 &middot; Fraunces 700 22px</div></div>
+<div class="aud-demo aud-pickable" data-card-id="hl-22" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="card" style="margin:0;padding:14px 16px;"><div class="line1">OFTV — ROW 2026</div><div class="sub">Client name</div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Preview card title (22px)</div><div class="aud-demo-spec">Call sheet preview</div></div>
+  </div>
+<div class="aud-demo aud-pickable" data-card-id="hl-20" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="sd-block-head" style="margin:0;padding-bottom:9px;cursor:default;">Schedule</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Section header (20px)</div><div class="aud-demo-spec">Shoot Day blocks</div></div>
+  </div>
+<div class="aud-demo aud-pickable" data-card-id="hl-15" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="section" style="margin:0;padding:0;border:none;background:none;"><h2 style="margin:0;">Crew on this project</h2></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Tab-entry heading (15px)</div><div class="aud-demo-spec">Crew/Locations/Overview</div></div>
   </div></div>
-<div class="aud-groupname">Uppercase “eyebrow” labels — nine near-identical treatments</div><div class="aud-groupnote">Every one of these is a small-caps-style Oswald label used to head a block of content or field. Sizes range 10–12px, colour alternates between muted grey and brand green with no evident rule for which gets which, and only some carry a border-bottom rule.</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div class="page-head" style="margin:0;"><div class="eyebrow">New project</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">G-5 &middot; Page eyebrow</div><div class="aud-demo-spec">.page-head .eyebrow &middot; 11px &middot; var(--muted) &middot; ls 1.6px &middot; no border</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="card" style="padding:0;border:none;"><h3 style="margin:0;">Tech specs</h3></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-6.3 / T-4.4 &middot; Card sub-heading</div><div class="aud-demo-spec">.card h3 &middot; 11.5px &middot; var(--tape) &middot; no border</div></div>
-  </div>
-<div class="aud-demo">
+</div>
+<div class="aud-decision-scope" data-scope="eyebrow-labels">
+  <div class="aud-decision" id="dec-eyebrow-labels"></div>
+  <div class="aud-groupnote">The sidebar label is a special case (dark background) and probably stays as-is regardless. This is about the light-background instances.</div>
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="eye-muted-border" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="subhead" style="margin:0;">Day details</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-5.2 &middot; Shoot Day sub-section label</div><div class="aud-demo-spec">.subhead &middot; 11px &middot; var(--muted) &middot; ls 1.4px &middot; 1px border-bottom</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Grey + border-bottom</div><div class="aud-demo-spec">.subhead · 11px · used in Shoot Days</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="crewgrid-header">Days on site &rarr;</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2.2 &middot; crewgrid-header</div><div class="aud-demo-spec">.crewgrid-header &middot; 10.5px &middot; var(--muted) &middot; no border</div></div>
+<div class="aud-demo aud-pickable" data-card-id="eye-tape-noborder" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="card" style="padding:0;border:none;"><h3 style="margin:0;">Tech specs</h3></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Green + no border</div><div class="aud-demo-spec">.card h3 · 11.5px · used in Preview cards</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="ki-item"><h4>Weather</h4></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-6.1 &middot; key-info-grid item label</div><div class="aud-demo-spec">.ki-item h4 &middot; 10px &middot; var(--muted) &middot; ls 1px &middot; no border</div></div>
+<div class="aud-demo aud-pickable" data-card-id="eye-muted-noborder" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="crewgrid-header">Days on site →</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Grey + no border</div><div class="aud-demo-spec">.crewgrid-header · 10.5px · grid column headers</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="formgroup" style="padding:0;border:none;background:none;"><div class="fg-title" style="margin:0;">Camera &amp; equipment</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">D-1.3 &middot; Crew form section title</div><div class="aud-demo-spec">.formgroup .fg-title &middot; 11px &middot; var(--tape) &middot; ls 1.2px &middot; no border</div></div>
+<div class="aud-demo aud-pickable" data-card-id="eye-tape-noborder-fg" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="formgroup" style="padding:0;border:none;background:none;"><div class="fg-title" style="margin:0;">Camera & equipment</div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Green + no border (form section)</div><div class="aud-demo-spec">.fg-title · 11px · crew form sections</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="modal-box" style="padding:0;border:none;box-shadow:none;max-width:none;"><h3 style="margin:0;">Add new role</h3></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">D-1.5 &middot; Modal dialog title</div><div class="aud-demo-spec">.modal-box h3 &middot; 12px &middot; var(--tape) &middot; ls 1px &middot; no border</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="filter-toggle" style="margin:0;cursor:default;">&#9662; Filter</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2.6 / D-1.2 &middot; Filter toggle</div><div class="aud-demo-spec">.filter-toggle &middot; 11px &middot; var(--muted) &middot; ls 1.2px &middot; no border</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="crew-header-row" style="margin:0;"><div class="crew-header-left"><span>Select all</span></div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2 &middot; Crew header row (Phase V)</div><div class="aud-demo-spec">.crew-header-row &middot; 11px &middot; var(--muted) &middot; ls 1.2px &middot; no border</div></div>
-  </div>
-<div class="aud-demo">
+<div class="aud-demo aud-pickable" data-card-id="eye-sidebar" onclick="pickCard(this)">
     <div class="aud-demo-render aud-dark"><div class="side-label" style="margin:0;">Databases</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">G-1 &middot; Sidebar section label</div><div class="aud-demo-spec">.side-label &middot; 10.5px &middot; rgba(255,255,245,.55) on dark &middot; ls 1.6px</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Faded ivory on dark (sidebar)</div><div class="aud-demo-spec">.side-label · 10.5px · sidebar only</div></div>
   </div></div>
-<div class="aud-groupname">Person / identity name text</div><div class="aud-groupnote">The person's name on a crew row — rendered at three different sizes depending which screen it's on, despite being conceptually the same element (a name inside a crew row).</div><div class="aud-grid"><div class="aud-demo">
+</div>
+<div class="aud-decision-scope" data-scope="person-name-size">
+  <div class="aud-decision" id="dec-person-name-size"></div>
+  
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="name-15" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="list-card" style="margin:0;"><div class="meta"><strong>Alex Shaw</strong><div>Camera Operator</div></div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">D-1 &middot; Crew database card</div><div class="aud-demo-spec">.list-card .meta strong &middot; Fraunces 600 15px</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Crew database card (15px)</div><div class="aud-demo-spec">.list-card .meta strong</div></div>
   </div>
-<div class="aud-demo">
+<div class="aud-demo aud-pickable" data-card-id="name-14" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="roles-grid-name">Alex Shaw</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2.1 &middot; Roles tab row</div><div class="aud-demo-spec">.roles-grid-name &middot; Fraunces 600 14px</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="crew-ident one-line"><strong>Alex Shaw</strong></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2.2–2.5 &middot; Days on site / Hotel / Travel / Catering rows</div><div class="aud-demo-spec">.crew-ident.one-line strong &middot; Fraunces 600 14px</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="cam-who"><strong>Alex Shaw</strong></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-4.3 &middot; Camera designations</div><div class="aud-demo-spec">.cam-who strong &middot; Fraunces 600 14px</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Roles tab / Days on site / Camera (14px)</div><div class="aud-demo-spec">.roles-grid-name</div></div>
   </div></div>
-<div class="aud-groupname">Field labels (consistent baseline, shown for completeness)</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div><label style="margin:0;">Shoot date</label></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">Every form field across the app</div><div class="aud-demo-spec">bare label{} &middot; Oswald 500 11px &middot; var(--muted)</div></div>
-  </div></div>
-<div class="aud-groupname">Font stack in use</div><div class="aud-groupnote">Three Google-Fonts families stand in for the real brand fonts (see CSS comment). A fourth, JetBrains Mono, is declared as --mono for the WhatsApp text preview but is <b>never linked</b> in &lt;head&gt; — it silently falls back to the browser's default monospace font everywhere it's used.</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div style="font-family:Fraunces,Georgia,serif;font-weight:700;font-size:20px;">Fraunces (--disp)</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">Headings</div><div class="aud-demo-spec">stands in for Moret</div></div>
+</div>
+<div class="aud-decision-scope" data-scope="mono-font">
+  <div class="aud-decision" id="dec-mono-font"></div>
+  
+  <div class="aud-grid">
+    <div class="aud-demo aud-pickable" data-card-id="mono-jb" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div style="font-family:monospace;font-size:13px;">*CALL: 08:00*  — camera tag: A_VENICE2_AS</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Current (browser default mono)</div><div class="aud-demo-spec">Falls back silently — looks different per device</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div style="font-family:Jost,'Futura PT',sans-serif;font-size:15px;">Jost (--body)</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">Body copy, inputs, buttons</div><div class="aud-demo-spec">stands in for Futura PT</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div style="font-family:Oswald,sans-serif;font-size:14px;letter-spacing:.5px;text-transform:uppercase;">Oswald (--label)</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">Uppercase labels &amp; codes</div><div class="aud-demo-spec">the real brand font</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div style="font-family:monospace;font-size:13px;">JetBrains Mono (--mono)</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">WhatsApp text preview, camera tags<span class="aud-flag">NOT LOADED</span></div><div class="aud-demo-spec">declared but never &lt;link&gt;-loaded</div></div>
-  </div></div>
+</div>
   </div>
 
   <div class="aud-section" id="colors">
     <div class="aud-section-eyebrow">02</div>
     <div class="aud-section-title">Colors</div>
-    <div class="aud-section-desc">The full palette actually in use in the CSS &mdash; not just the documented brand colours &mdash; including one-off hex values that don't route through a CSS variable.</div>
-    <div class="aud-groupname">Documented brand palette (declared in :root)</div>
+    <div class="aud-section-desc">The full palette in use, including values that don't go through a CSS variable and can't be retinted from one place.</div>
+    <div class="aud-groupname">Documented brand palette (these are fine — shown for reference)</div>
 <div class="aud-swatchrow"><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#017756;"></div>
     <div class="aud-swatch-name">--tape</div>
     <div class="aud-swatch-hex">#017756</div>
-    <div class="aud-swatch-use">Sea Green &mdash; primary brand accent, links, active states</div>
+    <div class="aud-swatch-use">Sea Green — primary brand accent</div>
   </div><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#110A08;"></div>
     <div class="aud-swatch-name">--text</div>
     <div class="aud-swatch-hex">#110A08</div>
-    <div class="aud-swatch-use">Black &mdash; body text, sidebar background</div>
+    <div class="aud-swatch-use">Black — body text, sidebar bg</div>
   </div><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#FFFFFF;"></div>
-    <div class="aud-swatch-name">--bg / --panel</div>
+    <div class="aud-swatch-name">--bg</div>
     <div class="aud-swatch-hex">#FFFFFF</div>
-    <div class="aud-swatch-use">White &mdash; page &amp; card background</div>
+    <div class="aud-swatch-use">White — page & card background</div>
   </div><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#EEF5F2;"></div>
     <div class="aud-swatch-name">--panel-2</div>
     <div class="aud-swatch-hex">#EEF5F2</div>
-    <div class="aud-swatch-use">Pale mint &mdash; input fill, muted panel background</div>
+    <div class="aud-swatch-use">Pale mint — input fill, muted panels</div>
   </div><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#a4321f;"></div>
     <div class="aud-swatch-name">--danger</div>
     <div class="aud-swatch-hex">#a4321f</div>
-    <div class="aud-swatch-use">Rust red &mdash; destructive actions, private-note warning</div>
+    <div class="aud-swatch-use">Rust red — destructive actions</div>
   </div><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#6f6a63;"></div>
     <div class="aud-swatch-name">--muted</div>
     <div class="aud-swatch-hex">#6f6a63</div>
-    <div class="aud-swatch-use">Warm grey &mdash; secondary text, labels</div>
+    <div class="aud-swatch-use">Warm grey — secondary text</div>
   </div><div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#FFFFF5;"></div>
-    <div class="aud-swatch-name">--tape-ink / --side-text</div>
+    <div class="aud-swatch-name">--tape-ink</div>
     <div class="aud-swatch-hex">#FFFFF5</div>
-    <div class="aud-swatch-use">Ivory &mdash; text on Sea Green, sidebar text</div>
+    <div class="aud-swatch-use">Ivory — text on dark/green</div>
   </div></div>
-<div class="aud-groupname">One-off / drifted hex values found directly in the CSS <span class="aud-flag">NOT IN :root</span></div>
-<div class="aud-groupnote">These colours do not go through a CSS variable, so they can't be retinted from one place and aren't guaranteed to relate to the documented palette above.</div>
-<div class="aud-swatchrow"><div class="aud-swatch">
+<div class="aud-decision-scope" data-scope="drifted-colors">
+  <div class="aud-decision" id="dec-drifted-colors"></div>
+  
+  <div class="aud-swatchrow">
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#5fd6ac;"></div>
-    <div class="aud-swatch-name">(unnamed) bright mint</div>
+    <div class="aud-swatch-name">#5fd6ac (bright mint)</div>
     <div class="aud-swatch-hex">#5fd6ac</div>
-    <div class="aud-swatch-use">Sidebar active states: .side-item.active, .side-proj.active (text, border-left, code), .side-new:hover, mobile .topbar .burger:hover — used 7 times, close to but not equal to --tape</div>
-  </div><div class="aud-swatch">
+    <div class="aud-swatch-use">Sidebar active text/borders ×7</div>
+  </div>
+    <div class="aud-swatch">
+    <div class="aud-swatch-block" style="background:#017756;"></div>
+    <div class="aud-swatch-name">--tape for comparison</div>
+    <div class="aud-swatch-hex">#017756</div>
+    <div class="aud-swatch-use">The documented brand green</div>
+  </div>
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:#e2ede8;"></div>
-    <div class="aud-swatch-name">(unnamed) pale sage</div>
+    <div class="aud-swatch-name">#e2ede8 (pale sage)</div>
     <div class="aud-swatch-hex">#e2ede8</div>
-    <div class="aud-swatch-use">Search-result row hover: .sritem:hover — close to but not equal to --panel-2 (#EEF5F2)</div>
-  </div></div>
-<div class="aud-groupname">Sea Green used at different opacities as a tint (via rgba(1,119,86,&hellip;))</div>
-<div class="aud-groupnote">Ten distinct opacity values of the same brand green are used as background tints across the app, all hand-written as rgba() rather than derived from --tape. Shown here at actual size to compare by eye.</div>
-<div class="aud-swatchrow"><div class="aud-swatch">
+    <div class="aud-swatch-use">Search result hover ×1</div>
+  </div>
+    <div class="aud-swatch">
+    <div class="aud-swatch-block" style="background:#EEF5F2;"></div>
+    <div class="aud-swatch-name">--panel-2 for comparison</div>
+    <div class="aud-swatch-hex">#EEF5F2</div>
+    <div class="aud-swatch-use">The documented panel fill</div>
+  </div>
+  </div>
+</div>
+<div class="aud-decision-scope" data-scope="green-tints">
+  <div class="aud-decision" id="dec-green-tints"></div>
+  <div class="aud-groupnote">Showing the 5 most distinct values. The full set has 4 more that sit between .03 and .14.</div>
+  <div class="aud-swatchrow">
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:rgba(1,119,86,.03);"></div>
     <div class="aud-swatch-name">.03</div>
     <div class="aud-swatch-hex">rgba(1,119,86,.03)</div>
-    <div class="aud-swatch-use">.formgroup, .filter-panel, .bulk-edit-panel, .day-override-form backgrounds</div>
-  </div><div class="aud-swatch">
-    <div class="aud-swatch-block" style="background:rgba(1,119,86,.04);"></div>
-    <div class="aud-swatch-name">.04</div>
-    <div class="aud-swatch-hex">rgba(1,119,86,.04)</div>
-    <div class="aud-swatch-use">.roles-grid-row-editing, .crewgrid-row-editing backgrounds</div>
-  </div><div class="aud-swatch">
-    <div class="aud-swatch-block" style="background:rgba(1,119,86,.045);"></div>
-    <div class="aud-swatch-name">.045</div>
-    <div class="aud-swatch-hex">rgba(1,119,86,.045)</div>
-    <div class="aud-swatch-use">.posn-row-overridden background</div>
-  </div><div class="aud-swatch">
+    <div class="aud-swatch-use">form panels, filter panels</div>
+  </div>
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:rgba(1,119,86,.05);"></div>
     <div class="aud-swatch-name">.05</div>
     <div class="aud-swatch-hex">rgba(1,119,86,.05)</div>
-    <div class="aud-swatch-use">.list-card.list-card-editing background</div>
-  </div><div class="aud-swatch">
-    <div class="aud-swatch-block" style="background:rgba(1,119,86,.08);"></div>
-    <div class="aud-swatch-name">.08</div>
-    <div class="aud-swatch-hex">rgba(1,119,86,.08)</div>
-    <div class="aud-swatch-use">.ts-banner.differs background</div>
-  </div><div class="aud-swatch">
+    <div class="aud-swatch-use">editing state</div>
+  </div>
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:rgba(1,119,86,.1);"></div>
     <div class="aud-swatch-name">.1</div>
     <div class="aud-swatch-hex">rgba(1,119,86,.1)</div>
-    <div class="aud-swatch-use">.icon-btn:hover, .dept-code chip, .cam-badge, .posn-dept-badge backgrounds</div>
-  </div><div class="aud-swatch">
-    <div class="aud-swatch-block" style="background:rgba(1,119,86,.12);"></div>
-    <div class="aud-swatch-name">.12</div>
-    <div class="aud-swatch-hex">rgba(1,119,86,.12)</div>
-    <div class="aud-swatch-use">.pill-select background fill</div>
-  </div><div class="aud-swatch">
+    <div class="aud-swatch-use">icon hover, badges</div>
+  </div>
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:rgba(1,119,86,.14);"></div>
     <div class="aud-swatch-name">.14</div>
     <div class="aud-swatch-hex">rgba(1,119,86,.14)</div>
-    <div class="aud-swatch-use">.icon-btn.active background; crewgrid-check:checked background</div>
-  </div><div class="aud-swatch">
+    <div class="aud-swatch-use">active icon, checked state</div>
+  </div>
+    <div class="aud-swatch">
     <div class="aud-swatch-block" style="background:rgba(1,119,86,.35);"></div>
     <div class="aud-swatch-name">.35</div>
     <div class="aud-swatch-hex">rgba(1,119,86,.35)</div>
-    <div class="aud-swatch-use">Sidebar active-project gradient start</div>
-  </div></div>
-<div class="aud-groupname">Line / border colour</div>
-<div class="aud-swatchrow"><div class="aud-swatch">
-    <div class="aud-swatch-block" style="background:rgba(17,10,8,.14);"></div>
-    <div class="aud-swatch-name">--line</div>
-    <div class="aud-swatch-hex">rgba(17,10,8,.14)</div>
-    <div class="aud-swatch-use">The single border colour used everywhere on light backgrounds</div>
-  </div><div class="aud-swatch">
-    <div class="aud-swatch-block" style="background:#110A08;"></div>
-    <div class="aud-swatch-name">--side-line</div>
-    <div class="aud-swatch-hex">rgba(255,255,245,.14)</div>
-    <div class="aud-swatch-use">Border colour on the dark sidebar</div>
-  </div></div>
+    <div class="aud-swatch-use">sidebar gradient</div>
+  </div>
+  </div>
+</div>
   </div>
 
   <div class="aud-section" id="spacing">
     <div class="aud-section-eyebrow">03</div>
-    <div class="aud-section-title">Spacing &amp; layout patterns</div>
-    <div class="aud-section-desc">Box/card styles, inline-vs-stacked field groups and grid gaps, grouped so similar-purpose elements sit together.</div>
-    <div class="aud-groupname">Box / card containers — border-radius &amp; padding compared</div><div class="aud-groupnote">Nine different bordered-box treatments across the app, all built from the same two ingredients (var(--line) border, rounded corners) but with different radii, padding and fill colour with no apparent system tying them together.</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div class="section" style="margin:0;padding:16px;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.section</div><div class="aud-demo-spec">radius:10px &middot; padding:16px &middot; bg:var(--panel) (white)</div></div>
+    <div class="aud-section-title">Spacing & layout</div>
+    <div class="aud-section-desc">Box styles, field layouts, and dividers — where the same type of container or row looks different in different places.</div>
+    <div class="aud-decision-scope" data-scope="box-style">
+  <div class="aud-decision" id="dec-box-style"></div>
+  <div class="aud-groupnote">This is about picking a default. Editing states and modals can still be different — just say so in the notes.</div>
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="box-section" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="section" style="margin:0;padding:16px;"><div style="color:var(--muted);font-size:12px;">.section — radius:10px, pad:16px, white bg</div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">.section</div><div class="aud-demo-spec">Main content boxes (Crew, Locations, etc.)</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="card" style="margin:0;padding:20px;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.card</div><div class="aud-demo-spec">radius:10px &middot; padding:20px &middot; bg:var(--panel) (white)</div></div>
+<div class="aud-demo aud-pickable" data-card-id="box-card" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="card" style="margin:0;padding:20px;"><div style="color:var(--muted);font-size:12px;">.card — radius:10px, pad:20px, white bg</div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">.card</div><div class="aud-demo-spec">Preview card, call sheet output</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="list-card" style="margin:0;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.list-card</div><div class="aud-demo-spec">radius:8px &middot; padding:10px 12px &middot; bg:var(--panel-2)</div></div>
+<div class="aud-demo aud-pickable" data-card-id="box-listcard" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="list-card" style="margin:0;"><div style="color:var(--muted);font-size:12px;">.list-card — radius:8px, pad:10-12px, pale mint bg</div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">.list-card</div><div class="aud-demo-spec">Crew database rows, location rows</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="formgroup" style="margin:0;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.formgroup</div><div class="aud-demo-spec">radius:8px &middot; padding:12px &middot; bg:rgba(tape,.03)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="filter-panel" style="margin:0;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.filter-panel</div><div class="aud-demo-spec">radius:8px &middot; padding:10px 12px &middot; bg:rgba(tape,.03)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="inline-form-card" style="margin:0;border-top:1px solid var(--line);border-radius:8px;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.inline-form-card</div><div class="aud-demo-spec">radius:0 0 8px 8px &middot; padding:14px &middot; bg:var(--panel)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="roles-grid-editform" style="margin:0;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.roles-grid-editform / .crewgrid-editform</div><div class="aud-demo-spec">radius:8px &middot; padding:14px &middot; bg:var(--panel)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="day-override-form" style="margin:0;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.day-override-form</div><div class="aud-demo-spec">radius:8px &middot; padding:14px &middot; bg:rgba(tape,.03)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="modal-box" style="margin:0;max-width:none;box-shadow:none;"><div style="color:var(--muted);font-size:12px;">Content area</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.modal-box</div><div class="aud-demo-spec">radius:10px &middot; padding:20px &middot; bg:var(--panel) &middot; +box-shadow</div></div>
+<div class="aud-demo aud-pickable" data-card-id="box-formgroup" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="formgroup" style="margin:0;"><div style="color:var(--muted);font-size:12px;">.formgroup — radius:8px, pad:12px, faint green tint bg</div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">.formgroup</div><div class="aud-demo-spec">Crew form sections, filter panels</div></div>
   </div></div>
-<div class="aud-groupname">Inline vs. stacked field groups</div><div class="aud-groupnote">Two competing patterns for “label next to a right-sized control” exist side by side: .ts-field (Tech Specs only) and the more general .field-inline (used elsewhere) — near-identical intent, separate CSS.</div><div class="aud-grid"><div class="aud-demo">
+</div>
+<div class="aud-decision-scope" data-scope="field-layout">
+  <div class="aud-decision" id="dec-field-layout"></div>
+  
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="field-stacked" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="grid g2"><div><label>Client</label><input type="text" placeholder="Acme Ltd" readonly></div><div><label>Start date</label><input type="text" placeholder="12 Jun 2026" readonly></div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">Standard stacked field (.grid.g2 &gt; label+input)</div><div class="aud-demo-spec">Default pattern: label above a full-width input</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Standard stacked (label above, full width)</div><div class="aud-demo-spec">Default pattern for most form fields</div></div>
   </div>
-<div class="aud-demo">
+<div class="aud-demo aud-pickable" data-card-id="field-ts" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="ts-grid"><div class="ts-field"><label>Frame rate</label><input type="text" value="25p" readonly></div><div class="ts-field"><label>Codec</label><input type="text" value="XAVC-I" readonly></div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.ts-grid / .ts-field (Tech Specs only)</div><div class="aud-demo-spec">label beside a content-sized input, flex-wrap</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">.ts-field (Tech Specs only)</div><div class="aud-demo-spec">Label beside a content-sized input</div></div>
   </div>
-<div class="aud-demo">
+<div class="aud-demo aud-pickable" data-card-id="field-inline" onclick="pickCard(this)">
     <div class="aud-demo-render"><div class="field-inline"><label>Shot numbering</label><select><option>Continuous</option></select><div class="hint">Resets per day if off</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.field-inline (general one-off fields)</div><div class="aud-demo-spec">label beside a content-sized control, +optional hint</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">.field-inline (general use)</div><div class="aud-demo-spec">Label beside a content-sized control</div></div>
   </div></div>
-<div class="aud-groupname">Column gaps in grids</div><div class="aud-groupnote">Four different fixed grid-gap values, none shared with another, on structurally similar multi-column layouts.</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div class="grid g3" style="font-size:11px;color:var(--muted);"><div>col</div><div>col</div><div>col</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.grid (form fields)</div><div class="aud-demo-spec">gap:10px</div></div>
+</div>
+<div class="aud-decision-scope" data-scope="divider-style">
+  <div class="aud-decision" id="dec-divider-style"></div>
+  
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="div-dashed" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div style="border-bottom:1px dashed var(--line);padding-bottom:8px;font-size:12px;color:var(--muted);">Schedule row divider (dashed)</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Schedule rows</div><div class="aud-demo-spec">1px dashed</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="roles-grid" style="font-size:11px;color:var(--muted);"><div>ctrl</div><div>name</div><div>role</div><div>dept</div><div>show as</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.roles-grid (Roles tab row)</div><div class="aud-demo-spec">column-gap:10px</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="crewgrid" style="--daycols:2;font-size:11px;color:var(--muted);"><div>name</div><div>d1</div><div>d2</div><div>actions</div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.crewgrid (Days on site / Hotel / etc.)</div><div class="aud-demo-spec">column-gap:6px</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="key-info-grid" style="margin:0;padding:14px 16px;"><div class="ki-col"><div class="ki-item">Left column</div></div><div class="ki-col"><div class="ki-item">Right column</div></div></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.key-info-grid (Preview key info)</div><div class="aud-demo-spec">gap:16px 28px</div></div>
+<div class="aud-demo aud-pickable" data-card-id="div-solid" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div style="border-bottom:1px solid var(--line);padding-bottom:8px;font-size:12px;color:var(--muted);">Crew / camera row divider (solid)</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Crew, camera, roles rows</div><div class="aud-demo-spec">1px solid</div></div>
   </div></div>
-<div class="aud-groupname">Divider / rule weight</div><div class="aud-groupnote">Three different border weights and two different colours used purely as visual dividers between rows or sections.</div><div class="aud-grid"><div class="aud-demo">
-    <div class="aud-demo-render"><div style="border-bottom:1px dashed var(--line);padding-bottom:8px;font-size:12px;color:var(--muted);">Schedule row divider</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.row</div><div class="aud-demo-spec">1px dashed var(--line)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div style="border-bottom:1px solid var(--line);padding-bottom:8px;font-size:12px;color:var(--muted);">Camera / crew row divider</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.cam-row, .roles-grid-row, .crewgrid-row</div><div class="aud-demo-spec">1px solid var(--line)</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div style="border-bottom:2px solid var(--tape);padding-bottom:8px;font-size:12px;color:var(--muted);">Shoot Day block divider</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">.sd-block-head</div><div class="aud-demo-spec">2px solid var(--tape)</div></div>
-  </div></div>
+</div>
   </div>
 
   <div class="aud-section" id="components">
     <div class="aud-section-eyebrow">04</div>
     <div class="aud-section-title">Component behaviors</div>
-    <div class="aud-section-desc">Every place an Expand-all / Collapse-all (or similar toggle) pattern exists, shown side by side with its current markup.</div>
-    <div class="aud-section-desc" style="margin-bottom:30px;">Four separate implementations of “expand/collapse everything” exist in the app today, each with its own markup, state model and visual affordance. Three are driven by the shared <code>expandCollapseAllHTML()</code> helper but still render as two always-visible text links; the fourth (Phase V, the Crew tab) was deliberately rebuilt as a single rotating-chevron toggle and never back-ported to the other three.</div>
-<div class="aud-groupname">Pattern 1 &mdash; Two separate text links (via shared expandCollapseAllHTML() helper)</div>
-<div class="aud-groupnote">Used identically in three places: T-4 Tech tab (+ a "Summary" jump-link appended), T-6 Preview &amp; Export, and D-1 Crew database dept groups (+ T-5 Shoot Days, same call with no extra link). Renders two always-visible spans; clicking either one always does the same thing (open everything / close everything) regardless of current state.</div>
-<div class="aud-toggle-demo" style="max-width:420px;">
-  <div class="aud-toggle-demo-head">T-4 Tech tab / T-6 Preview / D-1 Crew DB / T-5 Shoot Days</div>
-  <div class="dept-toggle-all" style="margin:0;"><span>Expand all</span> &middot; <span>Collapse all</span> &middot; <span style="color:var(--tape);">Summary</span></div>
-  <div class="aud-demo-spec" style="margin-top:10px;">markup: &lt;div class="dept-toggle-all"&gt; &middot; two independent onclick handlers, one per direction &middot; text-only, no icon &middot; right-aligned, 11px muted</div>
+    <div class="aud-section-desc">Expand/collapse toggles — the same functionality implemented differently across the app.</div>
+    <div class="aud-decision-scope" data-scope="expand-collapse">
+  <div class="aud-decision" id="dec-expand-collapse"></div>
+  <div class="aud-groupnote">The per-section collapse carets (the small triangles on individual department headers, shoot day blocks, etc.) are a separate question — this is about the "all" toggle only.</div>
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="ec-twolink" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="dept-toggle-all" style="margin:0;"><span>Expand all</span> · <span>Collapse all</span> · <span style="color:var(--tape);">Summary</span></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Pattern 1: Two text links (older)</div><div class="aud-demo-spec">T-4 Tech / T-6 Preview / D-1 Crew DB / T-5 Shoot Days</div></div>
+  </div>
+<div class="aud-demo aud-pickable" data-card-id="ec-chevron" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="crew-header-row" style="margin:0;"><div class="crew-header-left"><span><input type="checkbox" style="margin:0;">&nbsp;Select all</span> <span>▾ Filter</span></div><div class="crew-header-right"><span class="crew-header-expandall"><span class="dept-caret expandall-caret" style="transform:rotate(180deg);">▾</span> All</span> <span>Summary</span></div></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Pattern 2: Single chevron toggle (Phase V)</div><div class="aud-demo-spec">T-2 Crew tab only — confirmed direction</div></div>
+  </div></div>
 </div>
-<div class="aud-groupname">Pattern 2 &mdash; Single rotating-chevron toggle (Phase V, Crew tab only) <span class="aud-flag">DIVERGES</span></div>
-<div class="aud-groupnote">Rebuilt for T-2 (all five Crew view-switcher tabs: Roles/Days/Hotel/Travel/Catering) as a single control that flips its own label and rotates a caret 180&deg;, embedded in the wider .crew-header-row alongside Select all and Filter. Confirmed direction for Phase V was this pattern everywhere — not yet applied to Tech/Preview/Crew-DB/Shoot-Days above.</div>
-<div class="aud-toggle-demo" style="max-width:420px;">
-  <div class="aud-toggle-demo-head">T-2 Crew tab (Roles / Days on site / Hotel / Travel / Catering)</div>
-  <div class="crew-header-row" style="margin:0;">
-    <div class="crew-header-left"><span><input type="checkbox" style="margin:0;">&nbsp;Select all</span> <span>&#9662; Filter</span></div>
-    <div class="crew-header-right"><span class="crew-header-expandall"><span class="dept-caret expandall-caret" style="transform:rotate(180deg);">&#9662;</span> All</span> <span>Summary</span></div>
+<div class="aud-decision-scope" data-scope="section-caret">
+  <div class="aud-decision" id="dec-section-caret"></div>
+  
+  <div class="aud-grid"><div class="aud-demo aud-pickable" data-card-id="caret-summary" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="sd-block-head" style="margin:0;padding-bottom:9px;cursor:default;font-size:15px;"><span class="dept-caret">▾</span> Hotel summary</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Summary blocks (15px, green caret)</div><div class="aud-demo-spec">Hotel/Catering/Transport/Tech summaries</div></div>
   </div>
-  <div class="aud-demo-spec" style="margin-top:10px;">markup: &lt;span class="crew-header-expandall"&gt; inside .crew-header-row &middot; single onclick, flips based on current state &middot; chevron icon rotates 180&deg; &middot; word "All" &middot; same row as Select all/Filter/Summary</div>
-</div>
-<div class="aud-groupname">Pattern 3 &mdash; Per-item collapse caret (not an "all" toggle, but the same underlying affordance rendered two more ways)</div>
-<div class="aud-groupnote">Individual section/group headers each carry their own expand/collapse caret — shown here because any unification of the "all" toggle above should probably also settle on one of these two caret styles for consistency.</div>
-<div class="aud-grid">
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="sd-block-head" style="margin:0;padding-bottom:9px;cursor:default;font-size:15px;"><span class="dept-caret">&#9662;</span> Hotel summary</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2.3 Hotel / Catering / Transport / Tech summary blocks</div><div class="aud-demo-spec">.sd-block-head-toggle &middot; caret + label, both clickable, 15px inline override</div></div>
+<div class="aud-demo aud-pickable" data-card-id="caret-dept" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="subhead dept-toggle" style="margin:0;">▾ Cinematography <span style="color:var(--muted);font-weight:400;">(4)</span></div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Department groups (11px uppercase)</div><div class="aud-demo-spec">Crew tab / Crew database</div></div>
   </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="subhead dept-toggle" style="margin:0;">&#9662; Cinematography <span style="color:var(--muted);font-weight:400;">(4)</span></div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-2 / D-1 department group headers</div><div class="aud-demo-spec">.subhead.dept-toggle &middot; caret + uppercase label + count, 11px</div></div>
-  </div>
-<div class="aud-demo">
-    <div class="aud-demo-render"><div class="posn-company-header" style="margin:0;cursor:default;">&#9662; Little Film Productions</div></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">T-5.4 Position Assignments company group</div><div class="aud-demo-spec">.posn-company-header &middot; caret + Fraunces headline, 14px</div></div>
-  </div>
-</div>
-<div class="aud-groupname">Adjacent pattern &mdash; native &lt;details&gt;/&lt;summary&gt; disclosure (no caret rotation choreography, browser-native)</div>
-<div class="aud-grid">
-<div class="aud-demo">
-    <div class="aud-demo-render"><details open style="border:none;"><summary class="fg-title">Camera &amp; equipment</summary></details></div>
-    <div class="aud-demo-meta"><div class="aud-demo-label">D-1.3 Crew form sections</div><div class="aud-demo-spec">summary.fg-title &middot; native &lt;details&gt;, ::before triangle rotates via CSS</div></div>
-  </div>
+<div class="aud-demo aud-pickable" data-card-id="caret-company" onclick="pickCard(this)">
+    <div class="aud-demo-render"><div class="posn-company-header" style="margin:0;cursor:default;">▾ Little Film Productions</div></div>
+    <div class="aud-demo-meta"><div class="aud-demo-label">Company groups (14px headline)</div><div class="aud-demo-spec">Position Assignments</div></div>
+  </div></div>
 </div>
   </div>
 
-  <div class="aud-section" id="icons-existing">
-    <div class="aud-section-eyebrow">05a</div>
-    <div class="aud-section-title">Icons &mdash; existing custom set</div>
-    <div class="aud-section-desc">Every custom line-SVG icon currently defined in <code>ICONS</code>, labelled with where (if anywhere) it's used.</div>
-    <div class="aud-groupname">Existing custom line-SVG set (18 icons defined, 15 in active use)</div><div class="aud-groupnote">All drawn on a 24&times;24 viewBox, stroke-width 1.8 (2 or 2.1 on a couple of outliers), round caps/joins, no fill — this is the visual weight any replacement/addition set should match.</div><div class="aud-grid"><div class="aud-existing-ic">
+  <div class="aud-section" id="icons">
+    <div class="aud-section-eyebrow">05</div>
+    <div class="aud-section-title">Icons</div>
+    <div class="aud-section-desc">The current custom icon set and a browsable gallery of candidates from Lucide (matching visual weight) for future use.</div>
+    <div class="aud-decision-scope" data-scope="dead-icons">
+  <div class="aud-decision" id="dec-dead-icons"></div>
+  
+  <div class="aud-groupname">Current custom icons (15 active, 3 unused)</div><div class="aud-groupnote">All 24×24, stroke-width 1.8, round caps/joins. This is the visual weight any replacement should match.</div><div class="aud-grid"><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('view')</div><div class="aud-ic-where">T-2.2 / D-1.4 &middot; “View” toggle on a crew card/row (swaps to close icon when open)</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('view')</div><div class="aud-ic-where">View toggle on crew cards</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L8 20H4v-4z"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('edit')</div><div class="aud-ic-where">Crew / D-1.3 / T-5.6 &middot; Edit pencil used throughout (swaps to close icon when open)</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('edit')</div><div class="aud-ic-where">Edit pencil throughout</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('close')</div><div class="aud-ic-where">Multi-purpose: closes an open View/Edit panel, deletes a schedule row, removes a camera entry</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('close')</div><div class="aud-ic-where">Close panels, delete rows</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('up')</div><div class="aud-ic-where">T-4.3 / D-1.1 / T-5.3 &middot; Reorder controls (camera operators, unnamed cameras, role seniority, schedule rows)</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('up')</div><div class="aud-ic-where">Reorder up (cameras, schedule, roles)</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10l6 6 6-6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('down')</div><div class="aud-ic-where">Same set as ‘up’, opposite direction</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('down')</div><div class="aud-ic-where">Reorder down</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 6.2"/><path d="M20 5v6h-6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('refresh')</div><div class="aud-ic-where">G-4 &middot; “Reset &amp; reload sample data” button</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('refresh')</div><div class="aud-ic-where">Reset sample data button</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h6L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('camera')</div><div class="aud-ic-where">D-1 &middot; Tech-spec summary chip on a crew card</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('camera')</div><div class="aud-ic-where">Camera info chip</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3l2-4h12l2 4v3"/><path d="M4 16h16"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('car')</div><div class="aud-ic-where">D-1 / D-2.2 &middot; “Drives” info chip; “Find nearest parking” button</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('car')</div><div class="aud-ic-where">Drives info chip, find parking</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v7M9 2v7M12 2v7M6 9c0 2 1.5 3 3 3s3-1 3-3M9 12v10"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('dietary')</div><div class="aud-ic-where">D-1 &middot; Dietary summary chip on a crew card</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('dietary')</div><div class="aud-ic-where">Dietary info chip</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h8V4M8 20v-6h8v6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('save')</div><div class="aud-ic-where">Crew Roles quick-edit “Show as” save; T-5 “Save only” button</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('save')</div><div class="aud-ic-where">Save buttons</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M8 11l4 4 4-4M5 19h14"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('download')</div><div class="aud-ic-where">T-6.6 &middot; “Download .xlsx” button</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('download')</div><div class="aud-ic-where">Download .xlsx</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V5a1.5 1.5 0 0 1 1.5-1.5H15"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('copy')</div><div class="aud-ic-where">T-2.3 / T-2.4 / T-2.5 / T-4.4 / T-6 &middot; every Copy button across summaries &amp; exports</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('copy')</div><div class="aud-ic-where">All Copy buttons</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.7 1.6A3.5 3.5 0 0 0 7 18z"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('cloud')</div><div class="aud-ic-where">T-5.2 &middot; “Fetch weather for this date &amp; location” button</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('cloud')</div><div class="aud-ic-where">Fetch weather</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('hospital')</div><div class="aud-ic-where">D-2.2 &middot; Saved-hospital line; “Find nearest hospital” button</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('hospital')</div><div class="aud-ic-where">Hospital info, find hospital</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('lock')</div><div class="aud-ic-where">D-1.4 &middot; Private-rate note in the crew read-only view</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('lock')</div><div class="aud-ic-where">Private rate warning</div></div>
   </div><div class="aud-existing-ic">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M10 11v6M14 11v6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('trash')</div><div class="aud-ic-where">T-2.2 / T-3 &middot; Remove crew from project / remove location from project</div></div>
-  </div></div><div class="aud-groupname" style="margin-top:26px;">Defined but unused</div><div class="aud-grid"><div class="aud-existing-ic aud-ic-dead">
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('trash')</div><div class="aud-ic-where">Remove from project</div></div>
+  </div></div><div class="aud-groupname" style="margin-top:24px;">Unused (can be removed or repurposed)</div><div class="aud-grid"><div class="aud-existing-ic aud-ic-dead">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('crew') <span class="aud-flag">UNUSED</span></div><div class="aud-ic-where">Defined in ICONS but never called via icon('crew') anywhere in the app</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('crew') <span class="aud-flag">UNUSED</span></div><div class="aud-ic-where">Defined but never used anywhere</div></div>
   </div><div class="aud-existing-ic aud-ic-dead">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 1 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('location') <span class="aud-flag">UNUSED</span></div><div class="aud-ic-where">Defined in ICONS but never called via icon('location') anywhere in the app</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('location') <span class="aud-flag">UNUSED</span></div><div class="aud-ic-where">Defined but never used anywhere</div></div>
   </div><div class="aud-existing-ic aud-ic-dead">
     <span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
-    <div class="aud-ic-info"><div class="aud-ic-name">icon('menu') <span class="aud-flag">UNUSED</span></div><div class="aud-ic-where">Defined in ICONS but never called via icon('menu') &mdash; the mobile burger button (G-2) instead hardcodes an identical inline &lt;svg&gt; duplicate rather than calling icon('menu')</div></div>
+    <div class="aud-ic-info"><div class="aud-ic-name">icon('menu') <span class="aud-flag">UNUSED</span></div><div class="aud-ic-where">Defined but never used — the mobile burger hardcodes a duplicate SVG instead of calling this</div></div>
   </div></div>
-  </div>
-
-  <div class="aud-section" id="icons-candidates">
-    <div class="aud-section-eyebrow">05b</div>
-    <div class="aud-section-title">Icons &mdash; candidate replacements / additions</div>
-    <div class="aud-section-desc">A browsable gallery pulled from <a href="https://lucide.dev" style="color:var(--tape);" target="_blank" rel="noopener">Lucide</a> (MIT-licensed, 24&times;24 viewBox, round-cap stroke icons &mdash; the closest open set to the existing hand-drawn style above), organised by likely use case so you can pick per-icon rather than describe what you want. Picking one doesn't commit to anything; this is just a shortlist to react to.</div>
-    <div class="ic-cat"><h4>Toggle & expand/collapse</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4" /> <path d="M17 20V4" /> <path d="m3 8 4-4 4 4" /> <path d="M7 4v16" /></svg></span><code>arrow-up-down</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span><code>check</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></span><code>chevron-down</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg></span><code>chevron-up</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5" /> <path d="m7 9 5-5 5 5" /></svg></span><code>chevrons-up-down</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="1" /> <circle cx="19" cy="9" r="1" /> <circle cx="5" cy="9" r="1" /> <circle cx="12" cy="15" r="1" /> <circle cx="19" cy="15" r="1" /> <circle cx="5" cy="15" r="1" /></svg></span><code>grip-horizontal</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1" /> <circle cx="9" cy="5" r="1" /> <circle cx="9" cy="19" r="1" /> <circle cx="15" cy="12" r="1" /> <circle cx="15" cy="5" r="1" /> <circle cx="15" cy="19" r="1" /></svg></span><code>grip-vertical</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <path d="m3 7 2 2 4-4" /></svg></span><code>list-checks</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h20" /> <path d="M6 12h12" /> <path d="M9 19h6" /></svg></span><code>list-filter</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /> <path d="m21 3-7 7" /> <path d="m3 21 7-7" /> <path d="M9 21H3v-6" /></svg></span><code>maximize-2</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10 7-7" /> <path d="M20 10h-6V4" /> <path d="m3 21 7-7" /> <path d="M4 14h6v6" /></svg></span><code>minimize-2</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20" /> <path d="m8 18 4 4 4-4" /> <path d="m8 6 4-4 4 4" /></svg></span><code>move-vertical</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M21 9H3" /> <path d="M21 15H3" /></svg></span><code>rows-3</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg></span><code>square-check</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344" /> <path d="m9 11 3 3L22 4" /></svg></span><code>square-check-big</code></div></div></div>
-<div class="ic-cat"><h4>Crew & people</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" /> <path d="m9 12 2 2 4-4" /></svg></span><code>badge-check</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /> <rect width="20" height="14" x="2" y="6" rx="2" /></svg></span><code>briefcase</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /> <path d="M5 21h14" /></svg></span><code>crown</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15" /> <path d="M11 12 5.12 2.2" /> <path d="m13 12 5.88-9.8" /> <path d="M8 7h8" /> <circle cx="12" cy="17" r="5" /> <path d="M12 18v-2h-.5" /></svg></span><code>medal</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg></span><code>star</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /> <circle cx="12" cy="7" r="4" /></svg></span><code>user</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></svg></span><code>users</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg></span><code>users-round</code></div></div></div>
-<div class="ic-cat"><h4>Hotel & travel</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16" /> <path d="M2 8h18a2 2 0 0 1 2 2v10" /> <path d="M2 17h20" /> <path d="M6 8v9" /></svg></span><code>bed</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5" /> <circle cx="5.5" cy="17.5" r="3.5" /> <circle cx="15" cy="5" r="1" /> <path d="M12 17.5V14l-3-3 4-3 2 3h2" /></svg></span><code>bike</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6" /> <path d="M15 6v6" /> <path d="M2 12h19.6" /> <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" /> <circle cx="7" cy="18" r="2" /> <path d="M9 18h5" /> <circle cx="16" cy="18" r="2" /></svg></span><code>bus</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" /></svg></span><code>car</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg></span><code>compass</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" /> <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" /> <path d="M16 17h4" /> <path d="M4 13h4" /></svg></span><code>footprints</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 22v-6.57" /> <path d="M12 11h.01" /> <path d="M12 7h.01" /> <path d="M14 15.43V22" /> <path d="M15 16a5 5 0 0 0-6 0" /> <path d="M16 11h.01" /> <path d="M16 7h.01" /> <path d="M8 11h.01" /> <path d="M8 7h.01" /> <rect x="4" y="2" width="16" height="20" rx="2" /></svg></span><code>hotel</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2" /> <path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14" /> <path d="M10 20h4" /> <circle cx="16" cy="20" r="2" /> <circle cx="8" cy="20" r="2" /></svg></span><code>luggage</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg></span><code>navigation</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" /></svg></span><code>plane</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.1V7a4 4 0 0 0 8 0V3.1" /> <path d="m9 15-1-1" /> <path d="m15 15 1-1" /> <path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z" /> <path d="m8 19-2 3" /> <path d="m16 19 2 3" /></svg></span><code>train-front</code></div></div></div>
-<div class="ic-cat"><h4>Catering</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2" /> <path d="M14 2v2" /> <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" /> <path d="M6 2v2" /></svg></span><code>coffee</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10" /> <path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z" /> <path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1" /> <path d="m13 12 4-4" /> <path d="M10.9 7.25A3.99 3.99 0 0 0 4 10c0 .73.2 1.41.54 2" /></svg></span><code>salad</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /> <path d="M7 2v20" /> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg></span><code>utensils</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8" /> <path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7" /> <path d="m2.1 21.8 6.4-6.3" /> <path d="m19 5-7 7" /></svg></span><code>utensils-crossed</code></div></div></div>
-<div class="ic-cat"><h4>Locations</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10h.01" /> <path d="M12 14h.01" /> <path d="M12 6h.01" /> <path d="M16 10h.01" /> <path d="M16 14h.01" /> <path d="M16 6h.01" /> <path d="M8 10h.01" /> <path d="M8 14h.01" /> <path d="M8 6h.01" /> <path d="M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /> <rect x="4" y="2" width="16" height="20" rx="2" /></svg></span><code>building</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg></span><code>building-2</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M14 9h-4" /> <path d="M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2" /> <path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16" /></svg></span><code>hospital</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></svg></span><code>map-pin</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="M9 12h6" /> <path d="M12 9v6" /></svg></span><code>shield-plus</code></div></div></div>
-<div class="ic-cat"><h4>Camera & tech</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m14.31 8 5.74 9.94" /> <path d="M9.69 8h11.48" /> <path d="m7.38 12 5.74-9.94" /> <path d="M9.69 16 3.95 6.06" /> <path d="M14.31 16H2.83" /> <path d="m16.62 12-5.74 9.94" /></svg></span><code>aperture</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" /> <circle cx="12" cy="13" r="3" /></svg></span><code>camera</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12.296 3.464 3.02 3.956" /> <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> <path d="m6.18 5.276 3.1 3.899" /></svg></span><code>clapperboard</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /></svg></span><code>clipboard</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="m9 14 2 2 4-4" /></svg></span><code>clipboard-check</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg></span><code>clipboard-list</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M7 3v18" /> <path d="M3 7.5h4" /> <path d="M3 12h18" /> <path d="M3 16.5h4" /> <path d="M17 3v18" /> <path d="M17 7.5h4" /> <path d="M17 16.5h4" /></svg></span><code>film</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" /> <rect x="2" y="6" width="14" height="12" rx="2" /></svg></span><code>video</code></div></div></div>
-<div class="ic-cat"><h4>Schedule & time</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /></svg></span><code>calendar</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg></span><code>calendar-days</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg></span><code>clock</code></div></div></div>
-<div class="ic-cat"><h4>Actions</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg></span><code>copy</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg></span><code>download</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg></span><code>eye</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /> <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /> <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /> <path d="m2 2 20 20" /></svg></span><code>eye-off</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg></span><code>pen</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></svg></span><code>pencil</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /> <path d="m15 5 4 4" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg></span><code>pencil-line</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /> <path d="M12 5v14" /></svg></span><code>plus</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg></span><code>refresh-cw</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /></svg></span><code>rotate-cw</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /></svg></span><code>save</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></span><code>trash-2</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg></span><code>upload</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></span><code>x</code></div></div></div>
-<div class="ic-cat"><h4>Costing</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2" /> <circle cx="12" cy="12" r="2" /> <path d="M6 12h.01M18 12h.01" /></svg></span><code>banknote</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7" /> <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" /> <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" /></svg></span><code>receipt</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /> <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg></span><code>wallet</code></div></div></div>
-<div class="ic-cat"><h4>Contact</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></svg></span><code>mail</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" /></svg></span><code>phone</code></div></div></div>
-<div class="ic-cat"><h4>Misc / status</h4><div class="ic-grid"><div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></svg></span><code>circle-check</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg></span><code>cloud</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="M20 12h2" /> <path d="m19.07 4.93-1.41 1.41" /> <path d="M15.947 12.65a4 4 0 0 0-5.925-4.128" /> <path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z" /></svg></span><code>cloud-sun</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /></svg></span><code>info</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" /> <rect width="7" height="7" x="14" y="3" rx="1" /> <rect width="7" height="7" x="14" y="14" rx="1" /> <rect width="7" height="7" x="3" y="14" rx="1" /></svg></span><code>layout-grid</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span><code>lock</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg></span><code>lock-keyhole</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg></span><code>search</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg></span><code>settings</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17H5" /> <path d="M19 7h-9" /> <circle cx="17" cy="17" r="3" /> <circle cx="7" cy="7" r="3" /></svg></span><code>settings-2</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <line x1="3" x2="21" y1="9" y2="9" /> <line x1="3" x2="21" y1="15" y2="15" /> <line x1="9" x2="9" y1="9" y2="21" /> <line x1="15" x2="15" y1="9" y2="21" /></svg></span><code>sheet</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></svg></span><code>sliders-horizontal</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" /></svg></span><code>table-2</code></div>
-<div class="ic-card"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg></span><code>triangle-alert</code></div></div></div>
+</div><div class="aud-decision-scope" data-scope="icon-candidates">
+  <div class="aud-decision" id="dec-icon-candidates"></div>
+  <div class="aud-groupnote">Clicking an icon here doesn't commit you to anything — it just records your interest so you can reference it later.</div>
+  <div class="ic-cat"><h4>Toggle & expand/collapse</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-arrow-up-down" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4" /> <path d="M17 20V4" /> <path d="m3 8 4-4 4 4" /> <path d="M7 4v16" /></svg></span><code>arrow-up-down</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-check" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span><code>check</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-chevron-down" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></span><code>chevron-down</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-chevron-up" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg></span><code>chevron-up</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-chevrons-up-down" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5" /> <path d="m7 9 5-5 5 5" /></svg></span><code>chevrons-up-down</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-grip-horizontal" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="1" /> <circle cx="19" cy="9" r="1" /> <circle cx="5" cy="9" r="1" /> <circle cx="12" cy="15" r="1" /> <circle cx="19" cy="15" r="1" /> <circle cx="5" cy="15" r="1" /></svg></span><code>grip-horizontal</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-grip-vertical" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1" /> <circle cx="9" cy="5" r="1" /> <circle cx="9" cy="19" r="1" /> <circle cx="15" cy="12" r="1" /> <circle cx="15" cy="5" r="1" /> <circle cx="15" cy="19" r="1" /></svg></span><code>grip-vertical</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-list-checks" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <path d="m3 7 2 2 4-4" /></svg></span><code>list-checks</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-list-filter" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h20" /> <path d="M6 12h12" /> <path d="M9 19h6" /></svg></span><code>list-filter</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-maximize-2" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /> <path d="m21 3-7 7" /> <path d="m3 21 7-7" /> <path d="M9 21H3v-6" /></svg></span><code>maximize-2</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-minimize-2" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10 7-7" /> <path d="M20 10h-6V4" /> <path d="m3 21 7-7" /> <path d="M4 14h6v6" /></svg></span><code>minimize-2</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-move-vertical" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20" /> <path d="m8 18 4 4 4-4" /> <path d="m8 6 4-4 4 4" /></svg></span><code>move-vertical</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-rows-3" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M21 9H3" /> <path d="M21 15H3" /></svg></span><code>rows-3</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-square-check" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg></span><code>square-check</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-square-check-big" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344" /> <path d="m9 11 3 3L22 4" /></svg></span><code>square-check-big</code></div></div></div>
+<div class="ic-cat"><h4>Crew & people</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-badge-check" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" /> <path d="m9 12 2 2 4-4" /></svg></span><code>badge-check</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-briefcase" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /> <rect width="20" height="14" x="2" y="6" rx="2" /></svg></span><code>briefcase</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-crown" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /> <path d="M5 21h14" /></svg></span><code>crown</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-medal" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15" /> <path d="M11 12 5.12 2.2" /> <path d="m13 12 5.88-9.8" /> <path d="M8 7h8" /> <circle cx="12" cy="17" r="5" /> <path d="M12 18v-2h-.5" /></svg></span><code>medal</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-star" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg></span><code>star</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-user" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /> <circle cx="12" cy="7" r="4" /></svg></span><code>user</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-users" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></svg></span><code>users</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-users-round" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg></span><code>users-round</code></div></div></div>
+<div class="ic-cat"><h4>Hotel & travel</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-bed" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16" /> <path d="M2 8h18a2 2 0 0 1 2 2v10" /> <path d="M2 17h20" /> <path d="M6 8v9" /></svg></span><code>bed</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-bike" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5" /> <circle cx="5.5" cy="17.5" r="3.5" /> <circle cx="15" cy="5" r="1" /> <path d="M12 17.5V14l-3-3 4-3 2 3h2" /></svg></span><code>bike</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-bus" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6" /> <path d="M15 6v6" /> <path d="M2 12h19.6" /> <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" /> <circle cx="7" cy="18" r="2" /> <path d="M9 18h5" /> <circle cx="16" cy="18" r="2" /></svg></span><code>bus</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-car" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" /></svg></span><code>car</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-compass" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg></span><code>compass</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-footprints" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" /> <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" /> <path d="M16 17h4" /> <path d="M4 13h4" /></svg></span><code>footprints</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-hotel" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 22v-6.57" /> <path d="M12 11h.01" /> <path d="M12 7h.01" /> <path d="M14 15.43V22" /> <path d="M15 16a5 5 0 0 0-6 0" /> <path d="M16 11h.01" /> <path d="M16 7h.01" /> <path d="M8 11h.01" /> <path d="M8 7h.01" /> <rect x="4" y="2" width="16" height="20" rx="2" /></svg></span><code>hotel</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-luggage" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2" /> <path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14" /> <path d="M10 20h4" /> <circle cx="16" cy="20" r="2" /> <circle cx="8" cy="20" r="2" /></svg></span><code>luggage</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-navigation" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg></span><code>navigation</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-plane" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" /></svg></span><code>plane</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-train-front" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.1V7a4 4 0 0 0 8 0V3.1" /> <path d="m9 15-1-1" /> <path d="m15 15 1-1" /> <path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z" /> <path d="m8 19-2 3" /> <path d="m16 19 2 3" /></svg></span><code>train-front</code></div></div></div>
+<div class="ic-cat"><h4>Catering</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-coffee" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2" /> <path d="M14 2v2" /> <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" /> <path d="M6 2v2" /></svg></span><code>coffee</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-salad" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10" /> <path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z" /> <path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1" /> <path d="m13 12 4-4" /> <path d="M10.9 7.25A3.99 3.99 0 0 0 4 10c0 .73.2 1.41.54 2" /></svg></span><code>salad</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-utensils" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /> <path d="M7 2v20" /> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg></span><code>utensils</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-utensils-crossed" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8" /> <path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7" /> <path d="m2.1 21.8 6.4-6.3" /> <path d="m19 5-7 7" /></svg></span><code>utensils-crossed</code></div></div></div>
+<div class="ic-cat"><h4>Locations</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-building" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10h.01" /> <path d="M12 14h.01" /> <path d="M12 6h.01" /> <path d="M16 10h.01" /> <path d="M16 14h.01" /> <path d="M16 6h.01" /> <path d="M8 10h.01" /> <path d="M8 14h.01" /> <path d="M8 6h.01" /> <path d="M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /> <rect x="4" y="2" width="16" height="20" rx="2" /></svg></span><code>building</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-building-2" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg></span><code>building-2</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-hospital" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M14 9h-4" /> <path d="M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2" /> <path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16" /></svg></span><code>hospital</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-map-pin" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></svg></span><code>map-pin</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-shield-plus" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="M9 12h6" /> <path d="M12 9v6" /></svg></span><code>shield-plus</code></div></div></div>
+<div class="ic-cat"><h4>Camera & tech</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-aperture" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m14.31 8 5.74 9.94" /> <path d="M9.69 8h11.48" /> <path d="m7.38 12 5.74-9.94" /> <path d="M9.69 16 3.95 6.06" /> <path d="M14.31 16H2.83" /> <path d="m16.62 12-5.74 9.94" /></svg></span><code>aperture</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-camera" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" /> <circle cx="12" cy="13" r="3" /></svg></span><code>camera</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-clapperboard" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12.296 3.464 3.02 3.956" /> <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> <path d="m6.18 5.276 3.1 3.899" /></svg></span><code>clapperboard</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-clipboard" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /></svg></span><code>clipboard</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-clipboard-check" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="m9 14 2 2 4-4" /></svg></span><code>clipboard-check</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-clipboard-list" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg></span><code>clipboard-list</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-film" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M7 3v18" /> <path d="M3 7.5h4" /> <path d="M3 12h18" /> <path d="M3 16.5h4" /> <path d="M17 3v18" /> <path d="M17 7.5h4" /> <path d="M17 16.5h4" /></svg></span><code>film</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-video" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" /> <rect x="2" y="6" width="14" height="12" rx="2" /></svg></span><code>video</code></div></div></div>
+<div class="ic-cat"><h4>Schedule & time</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-calendar" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /></svg></span><code>calendar</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-calendar-days" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg></span><code>calendar-days</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-clock" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg></span><code>clock</code></div></div></div>
+<div class="ic-cat"><h4>Actions</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-copy" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg></span><code>copy</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-download" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg></span><code>download</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-eye" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg></span><code>eye</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-eye-off" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /> <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /> <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /> <path d="m2 2 20 20" /></svg></span><code>eye-off</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-pen" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg></span><code>pen</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-pencil" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></svg></span><code>pencil</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-pencil-line" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /> <path d="m15 5 4 4" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg></span><code>pencil-line</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-plus" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /> <path d="M12 5v14" /></svg></span><code>plus</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-refresh-cw" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg></span><code>refresh-cw</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-rotate-cw" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /></svg></span><code>rotate-cw</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-save" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /></svg></span><code>save</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-trash-2" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></span><code>trash-2</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-upload" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg></span><code>upload</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-x" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></span><code>x</code></div></div></div>
+<div class="ic-cat"><h4>Costing</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-banknote" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2" /> <circle cx="12" cy="12" r="2" /> <path d="M6 12h.01M18 12h.01" /></svg></span><code>banknote</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-receipt" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7" /> <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" /> <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" /></svg></span><code>receipt</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-wallet" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /> <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg></span><code>wallet</code></div></div></div>
+<div class="ic-cat"><h4>Contact</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-mail" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></svg></span><code>mail</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-phone" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" /></svg></span><code>phone</code></div></div></div>
+<div class="ic-cat"><h4>Misc / status</h4><div class="ic-grid"><div class="ic-card aud-pickable" data-card-id="icon-circle-check" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></svg></span><code>circle-check</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-cloud" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg></span><code>cloud</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-cloud-sun" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="M20 12h2" /> <path d="m19.07 4.93-1.41 1.41" /> <path d="M15.947 12.65a4 4 0 0 0-5.925-4.128" /> <path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z" /></svg></span><code>cloud-sun</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-info" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /></svg></span><code>info</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-layout-grid" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" /> <rect width="7" height="7" x="14" y="3" rx="1" /> <rect width="7" height="7" x="14" y="14" rx="1" /> <rect width="7" height="7" x="3" y="14" rx="1" /></svg></span><code>layout-grid</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-lock" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span><code>lock</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-lock-keyhole" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg></span><code>lock-keyhole</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-search" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg></span><code>search</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-settings" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg></span><code>settings</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-settings-2" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17H5" /> <path d="M19 7h-9" /> <circle cx="17" cy="17" r="3" /> <circle cx="7" cy="7" r="3" /></svg></span><code>settings-2</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-sheet" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <line x1="3" x2="21" y1="9" y2="9" /> <line x1="3" x2="21" y1="15" y2="15" /> <line x1="9" x2="9" y1="9" y2="21" /> <line x1="15" x2="15" y1="9" y2="21" /></svg></span><code>sheet</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-sliders-horizontal" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></svg></span><code>sliders-horizontal</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-table-2" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" /></svg></span><code>table-2</code></div>
+<div class="ic-card aud-pickable" data-card-id="icon-triangle-alert" onclick="pickCard(this)"><span class="ic-swatch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg></span><code>triangle-alert</code></div></div></div>
+</div>
   </div>
 
   <div class="aud-footer">
-    Generated for Phase Style Review &middot; diagnostic only, no app changes made &middot; repo: tegidc/CallsheetManager
+    Phase Style Review · diagnostic only, no app changes made · repo: tegidc/CallsheetManager
   </div>
 
 </div>
+
+<button class="aud-jump-decisions" onclick="jumpToDecisions()">Decisions <span class="aud-jump-count" id="jumpCount">0/14</span></button>
+
+<script>
+
+const DECISIONS = [{"id": "heading-style", "problem": "The main heading you see when entering a tab looks different depending on which tab you're in. Crew says \"Crew on this project\" in a small 15px green heading with a thin grey line. Shoot Days says \"General information\" in a bigger 20px black heading with a thick green underline. These are the same level of heading doing the same job \u2014 they should match.", "question": "Which heading style should be the standard for all tab-entry headings?", "type": "pick", "options": [{"id": "heading-A", "label": "Pattern A (small green + grey rule)"}, {"id": "heading-B", "label": "Pattern B (larger black + green underline)"}, {"id": "heading-C", "label": "Pattern C (smaller black + black underline)"}]}, {"id": "headline-ladder", "problem": "The app currently uses four heading sizes (26px \u2192 22px \u2192 20px \u2192 15px \u2192 14px) but some sit very close to each other. This isn't necessarily wrong \u2014 just flagging it so you can confirm the size ladder feels right or say \"collapse these two into one size\".", "question": "Does this size ladder feel right, or should any sizes be collapsed together?", "type": "pick", "options": [{"id": "hl-keep", "label": "Keep the current ladder as-is"}, {"id": "hl-change", "label": "Change it (describe in notes)"}]}, {"id": "eyebrow-labels", "problem": "Nine different small uppercase labels exist across the app. They all use Oswald and look similar, but they range from 10px to 12px, some are grey and some are green, and some have a border underneath while others don't. Same concept, inconsistent execution.", "question": "Should these all be unified to one consistent look? If so, which colour and should they have a border?", "type": "pick", "options": [{"id": "eye-muted-border", "label": "Grey with border"}, {"id": "eye-tape-noborder", "label": "Green without border"}, {"id": "eye-muted-noborder", "label": "Grey without border"}, {"id": "eye-mixed", "label": "Mixed (explain in notes)"}]}, {"id": "person-name-size", "problem": "A person's name is displayed at 15px on the crew database cards but 14px on the Roles tab, Days on site grid, and Camera designations. Minor difference, but it means the same name renders slightly bigger/smaller depending on which screen you're on.", "question": "Should person names be the same size everywhere?", "type": "pick", "options": [{"id": "name-15", "label": "15px everywhere"}, {"id": "name-14", "label": "14px everywhere"}, {"id": "name-keep", "label": "Keep them different (DB=15, project=14)"}]}, {"id": "mono-font", "problem": "The CSS declares a monospace font (JetBrains Mono) for the WhatsApp text preview and camera tags, but the font file is never actually loaded in the page. It silently falls back to whatever default monospace font your browser has. This means the look varies by device.", "question": "Should JetBrains Mono be properly loaded, or is the browser default monospace fine?", "type": "text"}, {"id": "drifted-colors", "problem": "Two hex colours are used directly in the CSS without going through a variable. <code>#5fd6ac</code> (a bright mint green) appears 7 times for sidebar active states \u2014 it's close to the brand green but noticeably brighter. <code>#e2ede8</code> (a pale sage) is used once for search result hover \u2014 it's close to the panel background but slightly different.", "question": "Should these be replaced with the existing brand colours, or do they serve a distinct purpose worth keeping?", "type": "text"}, {"id": "green-tints", "problem": "The brand green (#017756) is used at <b>nine different opacity levels</b> as background tints (3%, 4%, 4.5%, 5%, 8%, 10%, 12%, 14%, 35%). Each is hand-written as rgba(). Many of these are so close they're visually indistinguishable \u2014 for example 3%, 4%, 4.5%, and 5% all read as \"barely there\".", "question": "Should these be consolidated down to 2-3 opacity levels (e.g. subtle/medium/strong), or left as-is?", "type": "text"}, {"id": "box-style", "problem": "Nine different bordered-box styles exist across the app. They all use the same border colour and rounded corners, but the radius (8px vs 10px), padding (10px to 20px), and background fill (white vs pale mint vs faint green tint) vary with no clear system. Some of these are genuinely different contexts (a modal vs a card), but several are doing the same job with different styling.", "question": "Pick the box style you want as the default, or describe the system you'd prefer (e.g. \"10px radius always, green tint for editing states, white for display\").", "type": "pick", "options": [{"id": "box-section", "label": ".section style (10px, 16px pad, white)"}, {"id": "box-card", "label": ".card style (10px, 20px pad, white)"}, {"id": "box-listcard", "label": ".list-card style (8px, 12px pad, mint)"}, {"id": "box-describe", "label": "Custom system (describe in notes)"}]}, {"id": "field-layout", "problem": "Two patterns exist for \"label next to a small input\" (as opposed to the standard label-above-full-width-input). One is only used on Tech Specs (.ts-field), the other (.field-inline) is used elsewhere. They do the same thing with different CSS.", "question": "Should these be merged into one pattern, and if so, which one?", "type": "pick", "options": [{"id": "field-stacked", "label": "Keep stacked as the default"}, {"id": "field-ts", "label": "Use .ts-field pattern more widely"}, {"id": "field-inline", "label": "Use .field-inline pattern more widely"}, {"id": "field-merge", "label": "Merge .ts-field and .field-inline into one"}]}, {"id": "divider-style", "problem": "Three different border weights and styles are used as row dividers: dashed for schedule rows, solid for crew/camera rows, and a thick green solid for shoot day section headers. The first two should probably be consistent with each other.", "question": "Should schedule row dividers match crew row dividers, or stay dashed?", "type": "pick", "options": [{"id": "div-dashed", "label": "Keep dashed for schedule, solid for crew"}, {"id": "div-solid", "label": "Make everything solid"}, {"id": "div-all-dashed", "label": "Make everything dashed"}]}, {"id": "expand-collapse", "problem": "Two different \"expand all / collapse all\" controls exist. The older pattern (used on Tech tab, Preview & Export, Crew database, Shoot Days) shows two text links side by side \u2014 \"Expand all \u00b7 Collapse all\". The newer Phase V pattern (Crew tab only) uses a single toggle with a rotating chevron arrow. Phase V was confirmed as the better direction, but it was never applied to the other four locations.", "question": "Should the Phase V chevron toggle replace the older two-link pattern everywhere?", "type": "pick", "options": [{"id": "ec-chevron", "label": "Yes \u2014 use the chevron toggle everywhere"}, {"id": "ec-twolink", "label": "No \u2014 keep the two-link pattern"}, {"id": "ec-other", "label": "Something else (describe in notes)"}]}, {"id": "section-caret", "problem": "Individual collapsible sections use three different header styles for their expand/collapse caret. Summary blocks (Hotel/Catering/Transport/Tech) use a 15px heading with a green caret. Department groups use a small 11px uppercase label. Position assignment company groups use a 14px Fraunces headline. All do the same thing (click to expand/collapse) but look different.", "question": "Should these be standardised, and if so, which look?", "type": "pick", "options": [{"id": "caret-summary", "label": "Summary block style for all"}, {"id": "caret-dept", "label": "Department style for all"}, {"id": "caret-keep", "label": "Keep them different (they're different contexts)"}, {"id": "caret-other", "label": "Something else (describe in notes)"}]}, {"id": "dead-icons", "problem": "Three icons are defined in the code but never actually used. The \"menu\" icon is an odd case \u2014 the mobile burger button hardcodes a copy of the exact same SVG inline instead of calling icon('menu').", "question": "Should the unused icons (crew, location, menu) be removed, and should the burger button use icon('menu') instead of its hardcoded duplicate?", "type": "text"}, {"id": "icon-candidates", "problem": "These are candidate replacement/additional icons from Lucide (MIT-licensed, same visual weight as the existing set). You don't need to pick from here now \u2014 this is a browsable reference so when you need an icon for something specific, you can point at one by name instead of describing it.", "question": "Click any icons you'd like to use (they'll be listed in your export). Or just note which categories look useful and we'll pick specific ones when needed.", "type": "text"}];
+const state = {};  // {decisionId: {pick: 'cardId'|null, notes: ''}}
+
+function initDecisions(){
+  DECISIONS.forEach(d => {
+    state[d.id] = {pick: null, notes: ''};
+    const el = document.getElementById('dec-'+d.id);
+    if(!el) return;
+    let optionsHTML = '';
+    if(d.type==='pick' && d.options){
+      optionsHTML = '<div class="aud-decision-options">' +
+        d.options.map(o =>
+          `<label class="aud-decision-opt" data-opt-id="${o.id}" onclick="pickOption('${d.id}','${o.id}')">` +
+          `<span class="aud-opt-radio"></span> ${o.label}</label>`
+        ).join('') + '</div>';
+    }
+    el.innerHTML = `
+      <div class="aud-decision-q">${d.question}</div>
+      <div class="aud-decision-problem">${d.problem}</div>
+      ${optionsHTML}
+      <div class="aud-decision-current aud-empty" id="pick-${d.id}">No selection yet — click an example above or pick an option</div>
+      <div style="margin-top:8px;"><label style="color:var(--tape);margin-bottom:4px;">Notes (optional — explain nuance, mix-and-match, etc.)</label>
+      <textarea class="aud-decision-note" id="note-${d.id}" placeholder="e.g. I like B's size but A's colour…" oninput="saveNote('${d.id}',this.value)"></textarea></div>
+    `;
+  });
+  updateProgress();
+}
+
+function pickCard(el){
+  const cardId = el.dataset.cardId;
+  const scope = el.closest('.aud-decision-scope');
+  if(!scope) return;
+  const did = scope.dataset.scope;
+  // toggle off if already selected
+  if(state[did] && state[did].pick === cardId){
+    state[did].pick = null;
+    el.classList.remove('aud-selected');
+  } else {
+    // clear previous selection in this scope
+    scope.querySelectorAll('.aud-selected').forEach(s => s.classList.remove('aud-selected'));
+    el.classList.add('aud-selected');
+    state[did] = state[did] || {pick:null, notes:''};
+    state[did].pick = cardId;
+    // also check the matching radio option if one exists
+    const opts = scope.querySelectorAll('.aud-decision-opt');
+    opts.forEach(o => o.classList.remove('aud-opt-active'));
+    opts.forEach(o => { if(o.dataset.optId === cardId) o.classList.add('aud-opt-active'); });
+  }
+  const label = el.querySelector('.aud-demo-label');
+  const pickEl = document.getElementById('pick-'+did);
+  if(pickEl){
+    if(state[did].pick){
+      pickEl.textContent = '✓ Selected: ' + (label ? label.textContent.replace(/DIVERGES|LARGER|UNUSED|NOT LOADED/g,'').trim() : cardId);
+      pickEl.classList.remove('aud-empty');
+    } else {
+      pickEl.textContent = 'No selection yet — click an example above or pick an option';
+      pickEl.classList.add('aud-empty');
+    }
+  }
+  updateProgress();
+}
+
+function pickOption(did, optId){
+  state[did] = state[did] || {pick:null, notes:''};
+  const scope = document.querySelector('[data-scope="'+did+'"]');
+  if(!scope) return;
+  // toggle off if same option clicked
+  if(state[did].pick === optId){
+    state[did].pick = null;
+    scope.querySelectorAll('.aud-opt-active').forEach(o => o.classList.remove('aud-opt-active'));
+    scope.querySelectorAll('.aud-selected').forEach(s => s.classList.remove('aud-selected'));
+  } else {
+    state[did].pick = optId;
+    scope.querySelectorAll('.aud-opt-active').forEach(o => o.classList.remove('aud-opt-active'));
+    const opt = scope.querySelector('[data-opt-id="'+optId+'"]');
+    if(opt) opt.classList.add('aud-opt-active');
+    // also highlight matching demo card if exists
+    scope.querySelectorAll('.aud-selected').forEach(s => s.classList.remove('aud-selected'));
+    const card = scope.querySelector('[data-card-id="'+optId+'"]');
+    if(card) card.classList.add('aud-selected');
+  }
+  const d = DECISIONS.find(x=>x.id===did);
+  const pickEl = document.getElementById('pick-'+did);
+  if(pickEl){
+    if(state[did].pick){
+      const o = d && d.options ? d.options.find(x=>x.id===optId) : null;
+      pickEl.textContent = '✓ Selected: ' + (o ? o.label : optId);
+      pickEl.classList.remove('aud-empty');
+    } else {
+      pickEl.textContent = 'No selection yet — click an example above or pick an option';
+      pickEl.classList.add('aud-empty');
+    }
+  }
+  updateProgress();
+}
+
+function saveNote(did, val){
+  state[did] = state[did] || {pick:null, notes:''};
+  state[did].notes = val;
+}
+
+function updateProgress(){
+  const total = DECISIONS.length;
+  const answered = DECISIONS.filter(d => state[d.id] && (state[d.id].pick || state[d.id].notes.trim())).length;
+  const pct = Math.round(answered/total*100);
+  document.getElementById('progressCount').textContent = answered + '/' + total;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('jumpCount').textContent = answered + '/' + total;
+}
+
+function toggleSummary(){
+  document.getElementById('summaryList').classList.toggle('aud-open');
+  refreshSummary();
+}
+
+function refreshSummary(){
+  const list = document.getElementById('summaryList');
+  list.innerHTML = DECISIONS.map(d => {
+    const s = state[d.id] || {};
+    const hasAnswer = s.pick || (s.notes && s.notes.trim());
+    const cls = hasAnswer ? 'aud-summary-item' : 'aud-summary-item aud-summary-unanswered';
+    let answerText = 'Not answered yet';
+    if(s.pick){
+      const o = d.options ? d.options.find(x=>x.id===s.pick) : null;
+      answerText = o ? o.label : s.pick;
+    }
+    const noteHTML = s.notes && s.notes.trim() ? '<div class="aud-summary-note">Note: '+s.notes.replace(/</g,'&lt;')+'</div>' : '';
+    return `<div class="${cls}">
+      <div class="aud-summary-problem">${d.id}</div>
+      <div class="aud-summary-q">${d.question}</div>
+      <div class="aud-summary-a">${answerText}</div>
+      ${noteHTML}
+    </div>`;
+  }).join('');
+}
+
+function exportDecisions(){
+  refreshSummary();
+  let lines = ['# Style Audit — Decisions', ''];
+  DECISIONS.forEach(d => {
+    const s = state[d.id] || {};
+    lines.push('## ' + d.id);
+    lines.push('**Problem:** ' + d.problem.replace(/<[^>]+>/g,''));
+    lines.push('**Question:** ' + d.question);
+    if(s.pick){
+      const o = d.options ? d.options.find(x=>x.id===s.pick) : null;
+      lines.push('**Decision:** ' + (o ? o.label : s.pick));
+    } else {
+      lines.push('**Decision:** (not answered)');
+    }
+    if(s.notes && s.notes.trim()){
+      lines.push('**Notes:** ' + s.notes.trim());
+    }
+    lines.push('');
+  });
+  const text = lines.join('\n');
+  const ta = document.getElementById('summaryText');
+  ta.style.display = 'block';
+  ta.value = text;
+  ta.select();
+  try{ navigator.clipboard.writeText(text); } catch(e){}
+}
+
+function jumpToDecisions(){
+  document.getElementById('decisions-panel').scrollIntoView({behavior:'smooth'});
+  const list = document.getElementById('summaryList');
+  if(!list.classList.contains('aud-open')) toggleSummary();
+}
+
+document.addEventListener('DOMContentLoaded', initDecisions);
+
+</script>
 
 </body>
 </html>
