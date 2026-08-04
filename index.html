@@ -101,7 +101,7 @@
   .ts-field{display:flex; align-items:center; gap:8px; min-width:0;}
   .ts-field label{margin:0; white-space:nowrap; flex:0 0 auto;}
   /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
-  .ts-field input[type=text]{width:var(--fw,120px); min-width:0; padding:6px 8px; font-size:13px;}
+  .ts-field input[type=text]{width:152px; min-width:0; padding:6px 8px; font-size:13px;}
   /* generic "label beside a right-sized control" row, for one-off fields whose
      control shouldn't stretch to the full section width */
   .field-inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
@@ -2646,15 +2646,16 @@ const TECHSPEC_LABELS = { frameRate:'Frame rate', resolution:'Resolution', deliv
 function techSpecRows(ts){
   return TECHSPEC_FIELDS.map(f=>[TECHSPEC_LABELS[f], (ts||{})[f]||'']).filter(([,v])=>v);
 }
-/* placeholder + box width per field — the box is sized to the value it actually
-   holds, so "25p" doesn't get the same wide box as "S-Log3 CineGamut3" */
+/* placeholder per field. All six boxes share one width (below) rather than each
+   being sized to its own placeholder — a row of visibly different-width boxes
+   read as messy rather than tidy, even though each one individually made sense. */
 const TECHSPEC_HINTS = {
-  frameRate:    { ph:'25p',               w:'62px'  },
-  resolution:   { ph:'4K UHD',            w:'96px'  },
-  delivery:     { ph:'1080p',             w:'112px' },
-  colorProfile: { ph:'S-Log3 CineGamut3', w:'156px' },
-  timecode:     { ph:'Time of Day',       w:'124px' },
-  codec:        { ph:'XAVC',              w:'84px'  },
+  frameRate:    { ph:'25p' },
+  resolution:   { ph:'4K UHD' },
+  delivery:     { ph:'1080p' },
+  colorProfile: { ph:'S-Log3 CineGamut3' },
+  timecode:     { ph:'Time of Day' },
+  codec:        { ph:'XAVC' },
 };
 /* the DOM id for a tech spec field under a given form prefix */
 const techSpecFieldId = (prefix, f) => prefix + f.charAt(0).toUpperCase() + f.slice(1);
@@ -2673,7 +2674,7 @@ function techSpecFieldsHTML(prefix){
   return `<div class="ts-grid">${TECHSPEC_FIELDS.map(f=>{
     const h = TECHSPEC_HINTS[f];
     const id = techSpecFieldId(prefix, f);
-    return `<div class="ts-field" style="--fw:${h.w};">
+    return `<div class="ts-field">
       <label for="${id}">${TECHSPEC_LABELS[f]}</label>
       <input type="text" id="${id}" placeholder="${esc(h.ph)}">
     </div>`;
