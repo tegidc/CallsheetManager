@@ -2334,7 +2334,6 @@ function renderProjectCrew(body){
   }
 
   body.innerHTML = `
-    ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
     <div class="section">
       <h2>Crew on this project</h2>
       ${viewSwitcher}
@@ -2342,6 +2341,7 @@ function renderProjectCrew(body){
       ${bulkActionBarHTML()}
       ${assignedHTML}
     </div>
+    ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
     <div class="section">
       <h2>Add from crew database</h2>
       ${unassigned.length ? `
