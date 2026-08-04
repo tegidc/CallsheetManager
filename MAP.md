@@ -320,3 +320,81 @@ decisions" button (`exportDecisions()`) compiles the picks/notes into a single b
 of text to paste back for follow-up phases. Sections: Typography, Colors, Spacing,
 Component behaviors, Icons (existing), Icons (candidates). Purely diagnostic — makes
 no changes to `index.html` or app styling itself.
+
+## The design system, as decided (Phase Style Review)
+
+The audit's exported decisions are now applied to `index.html`. This is the reference
+for what the app's styling *should* be — check here before adding a new heading,
+label or box, rather than copying whatever the nearest element happens to do.
+
+**Pattern A — the one tab-entry heading.** Fraunces 700 15px, brand green, with a
+thin grey rule that starts after the words and sits on their vertical centre. Green
+at rest, **black on hover** (the inverse of the old behaviour). Used by `.section h2`,
+`.sd-block-head` (shoot-day blocks and the Hotel/Catering/Transport/Tech summary
+blocks) and `.posn-company-header`. The old 20px-black-with-thick-green-underline and
+14px-black-with-black-underline variants are gone. Where a header carries a trailing
+action (Preview & Export's Copy buttons), the rule lives on the inner
+`.sd-block-head-toggle` so it sits *between* the title and the button.
+
+**Page headline.** `.page-head h1` is Fraunces 700 22px **uppercase**, with the
+company/client line beneath it in `--body`, upper-and-lower-case, muted — the
+preview-card (`.card .line1` + `.sub`) pattern. The eyebrow moved *below* the h1 in
+all five `.page-head` call sites; it is no longer an uppercase eyebrow above.
+
+**Label family.** One look for every small uppercase label: Oswald 11px, 1.2px
+tracking, uppercase, brand green, **no bottom border**. Block-level section labels
+(`.subhead`, `.card h3`, `.modal-box h3`, `.formgroup > .fg-title`) also carry the
+Pattern A trailing rule; column and table headers (`.crewgrid-header`,
+`.roles-grid-header`, `.section th`, `.ki-item h4`, `.meal-row-label`) take the type
+but no rule. Header *controls* (`.crew-header-row`, `.filter-toggle`,
+`.dept-toggle-all`) stay muted grey — they're controls, not captions — but share the
+same font, size and tracking, and go green on hover.
+
+**Names.** Person names and record titles are `--body` (Jost) 600 **14px**
+everywhere — `.list-card .meta strong`, `.crew-ident-top strong`,
+`.crew-ident.one-line strong`, `.roles-grid-name`, `.cam-who strong`. Fraunces is now
+reserved for display headings only. Note this also restyles location titles, since
+they share `.list-card .meta strong`.
+
+**Fields sit on a line, not stacked.** In `.grid` and `.grid.g2`, any `<div>` that
+leads with a `<label>` becomes a two-column row: a fixed `--field-label-w` (104px)
+label column so rows align down the page, then the control. Anything after the label
+stacks inside the control column. Deliberately **not** applied to `.g3`/`.g4` — those
+cells are already narrow and a 104px label column leaves ~55px for the control, which
+clips dates and times; dense rows keep the label above. Bare labels outside a `.grid`
+(log line, notes, descriptions) stay full-width stacked. Everything reverts to stacked
+below 900px. `.ts-field` and `.field-inline` were duplicates and are now one rule set.
+
+**Boxes.** White fill, `--box-radius` 8px, `--box-pad` 10px. `.card` (call sheet
+preview, a document) and `.modal-box` (a dialog) keep 16px padding as deliberate
+exceptions. `.list-card` lost its mint fill. Faint green panel tints stay on
+`.filter-panel` / `.bulk-edit-panel` / `.formgroup` / `.day-override-form`.
+
+**Green tints.** Nine hand-written `rgba(1,119,86,…)` values collapsed to four
+tokens: `--tint-1` .03 (panels), `--tint-2` .05 (editing/overridden rows), `--tint-3`
+.10 (badges, hover fills), `--tint-4` .14 (active controls — must stay distinct from
+tint-3). Two deliberate one-offs remain inline: `.35` for the sidebar active gradient
+and `.28` for selected role / HoD pills.
+
+**Colour.** No drifted hexes — the mint `#5fd6ac` and sage `#e2ede8` are gone.
+⚠️ The sidebar now uses brand green `#017756` on the near-black background, which
+measures **~3.5:1** against the required 4.5:1 for 13px text (the mint it replaced
+measured 10.9:1). This was flagged and chosen knowingly for brand purity; if active
+sidebar items read too dim, the fix is a named `--tape-light` token rather than a
+return to a stray hex.
+
+**Expand/collapse.** One toggling text control, never two links side by side:
+`expandCollapseAllHTML(fnName, arg, extraLinkHTML, allCollapsed)` renders "Expand all"
+while everything is collapsed and "Collapse all" otherwise, so only the available
+action shows. Callers pass current state. The Phase V rotating chevron is gone; the
+`.expandall-caret` rule was removed with it.
+
+**Left alone by decision.** Divider weights (schedule stays dashed — it's uniquely
+alterable; crew/camera stay solid). Unused `crew`/`location`/`menu` icons and the
+burger's hardcoded SVG stay as they are. `--mono` is now plain
+`ui-monospace, monospace` — the never-loaded JetBrains Mono name was dropped rather
+than the font being added.
+
+**Open for the next round:** a fonts-only review. One thing to fold in — Fraunces is
+loaded at weights 500 and 700 only (see the Google Fonts `<link>`), but every display
+rule asks for 600 or 700; the 600s are being synthesised rather than using a real cut.

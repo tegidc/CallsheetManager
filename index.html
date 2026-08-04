@@ -24,10 +24,20 @@
     --danger:#a4321f;
     --text:#110A08;          /* Black */
     --muted:#6f6a63;
-    --mono:'JetBrains Mono', ui-monospace, monospace;   /* raw WhatsApp text preview only */
+    --mono:ui-monospace, monospace;                     /* browser default mono — no webfont loaded (Style Review) */
     --disp:'Fraunces', Georgia, serif;                  /* stands in for Moret */
     --label:'Oswald', sans-serif;                       /* brand utility font — kept as-is */
     --body:'Jost', 'Futura PT', sans-serif;              /* stands in for Futura PT */
+    /* Brand-green background tints. Style Review collapsed nine hand-written rgba()
+       values down to four tokens — two "barely there" levels for panels vs editing
+       states, then medium/strong for badges and active controls. */
+    --tint-1:var(--tint-1);   /* panels: filter, bulk-edit, formgroup, day-override */
+    --tint-2:var(--tint-2);   /* editing / overridden row states */
+    --tint-3:var(--tint-3);   /* badges, hover fills, bulk action bar */
+    --tint-4:var(--tint-4);   /* active controls — must stay distinct from tint-3 */
+    /* Default box: white fill, 8px radius, 10px padding (Style Review) */
+    --box-radius:8px; --box-pad:10px;
+    --field-label-w:104px;   /* label column for inline fields — keeps rows aligned */
     --sidew:230px;
     --side-bg:#110A08; --side-text:#FFFFF5; --side-line:rgba(255,255,245,.14); --side-hover:rgba(255,255,245,.08);
   }
@@ -53,64 +63,92 @@
   .side-item{padding:8px 10px; border-radius:7px; font-size:13.5px; cursor:pointer; color:var(--side-text);
     display:flex; align-items:center; gap:8px; margin-bottom:2px;}
   .side-item:hover{background:var(--side-hover);}
-  .side-item.active{background:var(--side-hover); color:#5fd6ac; font-weight:600;}
+  /* Sidebar accents use the brand green directly — Style Review removed the drifted
+     mint #5fd6ac in favour of brand-only colour. Note this is a deliberate contrast
+     trade: #017756 on the near-black sidebar measures ~3.5:1, below the 4.5:1 AA
+     minimum for 13px text. Flagged and chosen knowingly; revisit if it reads too dim. */
+  .side-item.active{background:var(--side-hover); color:var(--tape); font-weight:600;}
   .side-item .ico{opacity:.85; font-size:13px;}
   .side-proj{padding:7px 10px; border-radius:7px; font-size:13px; cursor:pointer; margin-bottom:2px; color:var(--side-text);}
   .side-proj:hover{background:var(--side-hover);}
-  .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:#5fd6ac; font-weight:600; border-left:2px solid #5fd6ac; padding-left:8px;}
+  .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:var(--tape); font-weight:600; border-left:2px solid var(--tape); padding-left:8px;}
   .side-proj .code{font-family:var(--label); letter-spacing:.5px; font-size:11px; color:rgba(255,255,245,.5); display:block;}
-  .side-proj.active .code{color:#5fd6ac; opacity:.9;}
+  .side-proj.active .code{color:var(--tape); opacity:.9;}
   .side-new{margin-top:6px; width:100%; text-align:left; font-size:12.5px; color:rgba(255,255,245,.6); background:transparent; border:1px dashed var(--side-line);}
-  .side-new:hover{color:#5fd6ac; border-color:#5fd6ac;}
+  .side-new:hover{color:var(--tape); border-color:var(--tape);}
   .side-empty{font-size:12px; color:rgba(255,255,245,.45); padding:4px 10px; font-style:italic;}
 
-  .section{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px;}
+  .section{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:14px;}
+  /* PATTERN A — the one tab-entry heading style (Style Review).
+     Fraunces 700 15px, brand green, with a thin grey rule that starts after the
+     words and sits on the text's vertical centre. Green at rest, black on hover
+     (the inverse of the old behaviour, per the review). Every tab-entry heading,
+     shoot-day block, summary block and company group now uses this. */
   .section h2{font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px; text-transform:none;
     color:var(--tape); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
   .section h2::after{content:''; flex:1; height:1px; background:var(--line);}
-  /* Shoot Day build screen — top-level collapsible section headers (General
-     information / Schedule / Position assignments / Tech specs & cameras).
-     Headline-weight so they read as clear page divisions, not another field label. */
   .sd-block{margin-bottom:4px;}
   /* flex-start + margin-left:auto on any trailing action, NOT space-between: with
      space-between a header that has no action (every Shoot Day block) pushed its
      own title to the far right, away from its caret. */
-  .sd-block-head{display:flex; align-items:center; justify-content:flex-start; gap:9px; cursor:pointer; user-select:none;
-    font-family:var(--disp); font-weight:700; font-size:20px; letter-spacing:.2px;
-    color:var(--text); margin:26px 0 12px; padding-bottom:9px; border-bottom:2px solid var(--tape);}
+  .sd-block-head{display:flex; align-items:center; justify-content:flex-start; gap:8px; cursor:pointer; user-select:none;
+    font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
+    color:var(--tape); margin:26px 0 12px; padding-bottom:0; border-bottom:none;}
   .sd-block:first-child .sd-block-head{margin-top:0;}
-  .sd-block-head .dept-caret{font-size:13px; color:var(--tape);}
-  .sd-block-head > button{margin-left:auto; flex:0 0 auto;}
-  .sd-block-head:hover{color:var(--tape);}
+  .sd-block-head .dept-caret{font-size:11px; color:inherit;}
+  .sd-block-head > button{margin-left:12px; flex:0 0 auto;}
+  .sd-block-head:hover{color:var(--text);}
+  /* The rule fills the gap between title and any trailing action. When a
+     .sd-block-head-toggle is present the rule belongs to it, so it sits between
+     the title and the button rather than after the button. */
+  .sd-block-head:not(:has(.sd-block-head-toggle))::after{content:''; flex:1; height:1px; background:var(--line);}
   /* Preview & Export section headers reuse the same look, but only the caret+title
      span toggles collapse — the header action (e.g. a Copy button) sits alongside it
      and stays clickable/visible on its own, including while the body is collapsed. */
-  .sd-block-head-toggle{display:flex; align-items:center; gap:9px; cursor:pointer;}
-  .sd-block-head-toggle:hover{color:var(--tape);}
-  .sd-block-head-toggle .dept-caret{color:var(--tape);}
+  .sd-block-head-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; flex:1; min-width:0;}
+  .sd-block-head-toggle::after{content:''; flex:1; height:1px; background:var(--line);}
+  .sd-block-head-toggle:hover{color:var(--text);}
+  .sd-block-head-toggle .dept-caret{color:inherit;}
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
   .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
   label{display:block; font-family:var(--label); font-size:11px; letter-spacing:.3px; color:var(--muted); margin-bottom:4px; font-weight:500;}
-  /* Tech Specs: compact grid — values are short ("25p", "XAVC") so fields stay small */
-  /* Tech Specs: label sits BESIDE its box, and each box is sized to the value it
-     actually holds ("25p" gets a small box, "S-Log3 CineGamut3" a wider one) rather
-     than every field getting an identical full-width box under its label. Fields
-     flow and wrap naturally instead of being forced into a rigid 3-up grid. */
+
+  /* FIELDS SIT ON A LINE, NOT STACKED (Style Review).
+     In a one- or two-up grid — where a short value used to get a needlessly
+     full-width box — the label moves beside its control, in a fixed label column
+     so rows line up down the page. Anything after the label (hint, second control)
+     stacks inside the control column rather than wrapping under the label.
+     Deliberately NOT applied to .g3/.g4: those cells are already narrow, and a
+     104px label column there leaves ~55px for the control, which clips dates and
+     times. Dense rows keep the label above, where the control gets the full cell.
+     Bare labels outside a .grid — log line, notes, descriptions — stay full-width
+     stacked, which is what long text wants. Below 900px everything reverts to
+     stacked (see mobile block). */
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child){display:grid;
+    grid-template-columns:var(--field-label-w) minmax(0,1fr);
+    align-items:center; column-gap:10px; row-gap:4px;}
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child) > label{margin:0; line-height:1.25; align-self:center;}
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child) > *:not(label){grid-column:2;}
+  /* textareas are tall — pin the label to the first line instead of centring it */
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea){align-items:start;}
+  .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea) > label{padding-top:9px;}
+
+  /* One inline-field pattern. .ts-field was a Tech-Specs-only duplicate of
+     .field-inline; the Style Review merged them, so both names share these rules.
+     Label beside a control that's sized to the value it holds ("25p" gets a small
+     box, "S-Log3 CineGamut3" a wider one) rather than stretching to full width. */
   .ts-grid{display:flex; flex-wrap:wrap; gap:10px 20px; align-items:center;}
-  .ts-field{display:flex; align-items:center; gap:8px; min-width:0;}
-  .ts-field label{margin:0; white-space:nowrap; flex:0 0 auto;}
-  /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
-  .ts-field input[type=text]{width:152px; min-width:0; padding:6px 8px; font-size:13px;}
-  /* generic "label beside a right-sized control" row, for one-off fields whose
-     control shouldn't stretch to the full section width */
-  .field-inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .field-inline > label{margin:0; white-space:nowrap; flex:0 0 auto;}
+  .ts-field, .field-inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;}
+  .ts-field > label, .field-inline > label{margin:0; white-space:nowrap; flex:0 0 auto;}
+  .ts-field > select, .ts-field > input[type=text],
   .field-inline > select, .field-inline > input[type=text]{width:auto; min-width:0; flex:0 1 auto;}
-  .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
+  /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
+  .ts-field input[type=text]{width:152px; padding:6px 8px; font-size:13px;}
+  .ts-field > .hint, .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
   .ts-banner{font-size:12px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
     border-radius:6px; padding:7px 10px; margin-bottom:12px;}
-  .ts-banner.differs{background:rgba(1,119,86,.08); border-color:var(--tape); color:var(--text);}
+  .ts-banner.differs{background:var(--tint-3); border-color:var(--tape); color:var(--text);}
   .ts-banner span{color:var(--tape); cursor:pointer; text-decoration:underline; margin-left:6px;}
   /* Camera designations: name+tags | stacked per-camera lines | reorder, left-aligned
      columns, not pushed to the right. File-naming tags live under the operator's
@@ -119,14 +157,14 @@
   .cam-row{display:grid; grid-template-columns:minmax(150px,1fr) minmax(0,2fr) 60px; gap:10px; align-items:start;
     padding:11px 0; border-bottom:1px solid var(--line);}
   .cam-row:last-child{border-bottom:none;}
-  .cam-who strong{font-family:var(--disp); font-weight:600; font-size:14px;}
+  .cam-who strong{font-family:var(--body); font-weight:600; font-size:14px;}
   .cam-tags{font-family:var(--mono); font-size:10.5px; margin-top:4px; line-height:1.5;}
   /* align-items:flex-start stops "+ Add camera" stretching the full column width */
   .cam-cams{display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0;}
   .cam-cams > .cam-cam-line{align-self:stretch;}
   .cam-cam-line{display:flex; align-items:center; gap:6px;}
   .cam-badge{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:.3px; color:var(--tape);
-    background:rgba(1,119,86,.1); border-radius:5px; padding:5px 7px; flex:0 0 auto; white-space:nowrap;}
+    background:var(--tint-3); border-radius:5px; padding:5px 7px; flex:0 0 auto; white-space:nowrap;}
   .cam-body-input, .cam-shorthand-input{font-size:12px; padding:5px 7px; min-height:0; width:auto; flex:1 1 0; min-width:0;}
   .cam-reorder{display:flex; flex-direction:column; gap:4px; align-items:center;}
   .cam-reorder .icon-btn[disabled]{opacity:.25; cursor:default;}
@@ -146,8 +184,8 @@
   .icon-btn{display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0;
     border:none; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; border-radius:5px;
     vertical-align:middle; margin-left:2px; line-height:1;}
-  .icon-btn:hover{color:var(--tape); background:rgba(1,119,86,.1);}
-  .icon-btn.active{color:var(--tape); background:rgba(1,119,86,.14);}
+  .icon-btn:hover{color:var(--tape); background:var(--tint-3);}
+  .icon-btn.active{color:var(--tape); background:var(--tint-4);}
   /* destructive icon button — stays quiet until hovered, so a row of controls
      doesn't read as a row of warnings */
   .icon-btn.danger-ic:hover{color:var(--danger); background:rgba(164,50,31,.10);}
@@ -157,9 +195,14 @@
   .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;}
   .status{font-size:12px; color:var(--muted);}
 
+  /* Page headline follows the preview-card pattern picked in the Style Review:
+     a large all-caps display title, with upper-and-lower-case sub information
+     in the body font beneath it (not an uppercase eyebrow above it). */
   .page-head{margin-bottom:16px;}
-  .page-head .eyebrow{font-family:var(--label); font-size:11px; letter-spacing:1.6px; color:var(--muted); text-transform:uppercase;}
-  .page-head h1{font-family:var(--disp); font-weight:700; font-size:26px; margin:2px 0 0; color:var(--text);}
+  .page-head h1{font-family:var(--disp); font-weight:700; font-size:22px; letter-spacing:.4px;
+    text-transform:uppercase; margin:0; color:var(--text);}
+  .page-head .eyebrow{font-family:var(--body); font-size:13px; letter-spacing:0; color:var(--muted);
+    text-transform:none; margin-top:2px;}
   .page-head .code{font-family:var(--label); letter-spacing:.5px; font-size:12.5px; color:var(--tape); margin-top:4px;}
 
   .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
@@ -195,13 +238,14 @@
   .sched-shift .hint{margin:0; white-space:nowrap;}
   .rows-add .row{grid-template-columns:1fr 1fr 34px;}
 
-  .list-card{background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px;
+  .list-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:8px;
     display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
-  .list-card.list-card-editing{border-color:var(--tape); background:rgba(1,119,86,.05); margin-bottom:0; border-radius:8px 8px 0 0;}
+  .list-card.list-card-editing{border-color:var(--tape); background:var(--tint-2); margin-bottom:0; border-radius:8px 8px 0 0;}
   .crew-entry{margin-bottom:8px;}
   .crew-entry .list-card{margin-bottom:0;}
-  .inline-form-card{border:1px solid var(--tape); border-top:none; border-radius:0 0 8px 8px; padding:14px; margin-bottom:8px; background:var(--panel);}
-  .list-card .meta strong{font-family:var(--disp); font-weight:600; font-size:15px; color:var(--text);}
+  .inline-form-card{border:1px solid var(--tape); border-top:none; border-radius:0 0 var(--box-radius) var(--box-radius); padding:var(--box-pad); margin-bottom:8px; background:var(--panel);}
+  /* Names and record titles: geometric sans (--body) at 14px everywhere (Style Review) */
+  .list-card .meta strong{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text);}
   .list-card .meta div{color:var(--muted); font-size:12.5px; margin-top:2px;}
   .list-card .actions{display:flex; gap:6px; flex-wrap:wrap;}
   .empty-note{color:var(--muted); font-size:13px; font-style:italic;}
@@ -209,11 +253,13 @@
   .searchresults{position:relative;}
   .srlist{border:1px solid var(--line); border-radius:6px; background:var(--panel-2); margin-top:4px; max-height:200px; overflow:auto;}
   .sritem{padding:7px 9px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--line);}
-  .sritem:last-child{border-bottom:none;} .sritem:hover{background:#e2ede8;}
+  .sritem:last-child{border-bottom:none;} .sritem:hover{background:var(--panel-2);}
   .mapembed{width:100%; height:220px; border:1px solid var(--line); border-radius:8px; margin-top:8px;}
 
-  .card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px;}
-  .card h3{font-family:var(--label); font-size:11.5px; letter-spacing:1.2px; color:var(--tape); margin:16px 0 8px; text-transform:uppercase;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; margin-bottom:16px;}
+  .card h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; color:var(--tape); margin:16px 0 8px; text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;}
+  .card h3::after{content:''; flex:1; height:1px; background:var(--line);}
   .card h3:first-child{margin-top:0;}
   .card .line1{font-family:var(--disp); font-weight:700; font-size:22px; color:var(--text);}
   .card .sub{color:var(--muted); font-size:13px; margin-top:2px;}
@@ -222,8 +268,8 @@
   .key-info-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px 28px; margin:16px 0 20px;
     padding:14px 16px; background:var(--panel-2); border-radius:8px; border:1px solid var(--line);}
   .ki-col{display:flex; flex-direction:column; gap:12px;}
-  .ki-item h4{font-family:var(--label); font-size:10px; letter-spacing:1px; text-transform:uppercase;
-    color:var(--muted); margin:0 0 4px;}
+  .ki-item h4{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--tape); margin:0 0 4px;}
   .ki-item{font-size:13px; line-height:1.5;}
   .ki-item ul{margin:4px 0 0; padding-left:18px;}
   .card td, .card th{padding:5px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
@@ -231,16 +277,16 @@
   .card ul{margin:4px 0; padding-left:18px;}
   .section table{width:100%; border-collapse:collapse; font-size:13.5px;}
   .section td, .section th{padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
-  .section th{color:var(--muted); font-family:var(--label); font-weight:500; font-size:11.5px; letter-spacing:.6px; text-transform:uppercase;}
+  .section th{color:var(--tape); font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;}
   pre#waText{white-space:pre-wrap; word-break:break-word; font-family:var(--mono); font-size:12.5px;
     background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:14px; line-height:1.6; max-height:420px; overflow:auto;}
   .hint{font-size:12px; color:var(--muted); margin-top:6px;}
   .pill{display:inline-block; font-family:var(--label); font-size:10px; font-weight:500; padding:2px 8px; border-radius:20px;
     background:#EEF5F2; color:var(--muted); letter-spacing:.4px; vertical-align:middle;}
-  .pill.dept{background:rgba(1,119,86,.12); color:var(--tape);}
+  .pill.dept{background:var(--tint-3); color:var(--tape);}
   select.pill-select{
     appearance:none; -webkit-appearance:none; -moz-appearance:none;
-    background-color:rgba(1,119,86,.12); color:var(--tape); border:1px solid transparent;
+    background-color:var(--tint-3); color:var(--tape); border:1px solid transparent;
     border-radius:20px; font-family:var(--label); font-size:10px; font-weight:500; letter-spacing:.4px;
     padding:2px 20px 2px 9px; cursor:pointer; vertical-align:middle; margin-left:2px; max-width:180px;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23017756' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
@@ -252,24 +298,35 @@
     background-color:var(--panel-2); color:var(--muted);
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236f6a63' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
   }
-  .subhead{font-family:var(--label); font-size:11px; letter-spacing:1.4px; text-transform:uppercase;
-    color:var(--muted); margin:14px 0 8px; padding-bottom:4px; border-bottom:1px solid var(--line);}
+  /* LABEL FAMILY (Style Review) — one look for every small uppercase label:
+     Oswald 11px, 1.2px tracking, brand green, no bottom border. Block-level
+     section labels also get the Pattern A rule (starts after the words, sits on
+     their vertical centre); column and table headers get the type but no rule. */
+  .subhead{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--tape); margin:14px 0 8px; padding-bottom:0; border-bottom:none;
+    display:flex; align-items:center; gap:8px;}
+  .subhead::after{content:''; flex:1; height:1px; background:var(--line);}
   .subhead:first-child{margin-top:0;}
   .subhead.dept-toggle{cursor:pointer; user-select:none; display:flex; align-items:center; gap:4px;}
+  /* Company groups adopt Pattern A too — same job as a summary block header. */
   .posn-company-header{
-    display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;
-    font-family:var(--disp); font-weight:700; font-size:14px;
-    color:var(--text); margin:16px 0 8px; padding-bottom:6px; border-bottom:1px solid var(--text);
+    display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
+    font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
+    color:var(--tape); margin:16px 0 8px; padding-bottom:0; border-bottom:none;
   }
+  .posn-company-header::after{content:''; flex:1; height:1px; background:var(--line);}
   .posn-company-group:first-child .posn-company-header{margin-top:0;}
-  .posn-company-header:hover{color:var(--tape); border-color:var(--tape);}
+  .posn-company-header:hover{color:var(--text);}
   .posn-company-body{margin-left:2px;}
   .posn-name{font-size:13px; display:flex; flex-direction:column; gap:1px;}
   .subhead.dept-toggle:hover{color:var(--tape);}
   .dept-caret{font-size:9px; width:10px; display:inline-block;}
   .dept-code{color:var(--tape); font-weight:700; letter-spacing:.6px;}
   .dept-count{color:var(--muted); font-weight:400;}
-  .dept-toggle-all{font-size:11px; color:var(--muted); text-align:right; margin-bottom:8px;}
+  /* Same label type as the Crew tab's Select all / Filter row, so every header
+     control across the app reads at one weight and size (Style Review). */
+  .dept-toggle-all{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--muted); text-align:right; margin-bottom:8px;}
   .dept-toggle-all span{cursor:pointer;}
   .dept-toggle-all span:hover{color:var(--tape);}
   /* filter panel — shared look for the Crew database and Crew-on-project filters */
@@ -287,33 +344,36 @@
   .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
   .crew-header-row label:hover, .crew-header-row span:hover{color:var(--tape);}
   .crew-header-selectall input{margin:0;}
-  .expandall-caret{display:inline-block; transition:transform .15s;}
-  .filter-panel{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
+  .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
   .filter-chips label{font-size:12px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
-  .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(1,119,86,.1);
+  .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--tint-3);
     border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;}
   .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
-  .bulk-edit-panel{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
+  .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   /* Roles tab (Phase S) — proper tidy columns instead of one packed inline row.
      Controls | Name | Role | Department (reference-only) | Show as. */
   .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 92px minmax(120px,1fr); align-items:center; column-gap:10px;}
   .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
-  .roles-grid-header{font-family:var(--label); font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.3px; text-transform:uppercase;}
+  .roles-grid-header{font-family:var(--label); font-size:11px; font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
   .roles-grid-row{padding:8px 0; border-bottom:1px solid var(--line);}
   .roles-grid-row:last-child{border-bottom:none;}
-  .roles-grid-row-editing{background:rgba(1,119,86,.04); border-radius:8px; padding:8px;}
+  .roles-grid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .roles-grid-controls{display:flex; align-items:center; gap:0;}
-  .roles-grid-name{min-width:0; font-family:var(--disp); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .roles-grid-name{min-width:0; font-family:var(--body); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .roles-grid-cell{min-width:0;}
   .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:8px; padding:14px; background:var(--panel);}
+  .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
   .modal-overlay{position:fixed; inset:0; background:rgba(17,10,8,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
-  .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
-  .modal-box h3{font-family:var(--label); font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;}
+  .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
+  .modal-box h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;
+    display:flex; align-items:center; gap:8px;}
+  .modal-box h3::after{content:''; flex:1; height:1px; background:var(--line);}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
-  .formgroup{border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px; background:rgba(1,119,86,.03);}
-  .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;}
+  .formgroup{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
+  .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;}
+  .formgroup > .fg-title::after{content:''; flex:1; height:1px; background:var(--line);}
   /* collapsible crew-form sections */
   summary.fg-title{cursor:pointer; user-select:none; list-style:none; display:flex; align-items:center; gap:6px;}
   summary.fg-title::-webkit-details-marker{display:none;}
@@ -326,15 +386,15 @@
   .taglist{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
   .crewrow-select{display:grid; grid-template-columns:46px 1fr 100px 34px; gap:8px; align-items:start; margin-bottom:8px; padding-top:6px;}
   .posn-dept-badge{font-family:var(--label); font-size:10px; font-weight:600; letter-spacing:.4px; color:var(--tape);
-    background:rgba(1,119,86,.1); border-radius:5px; padding:6px 4px; text-align:center; align-self:center;}
+    background:var(--tint-3); border-radius:5px; padding:6px 4px; text-align:center; align-self:center;}
   /* shared crew identity block — used by every crew list in the app */
   .crew-ident{min-width:0;}
   .crew-ident-top{display:flex; align-items:center; gap:2px; flex-wrap:wrap;}
-  .crew-ident-top strong{font-family:var(--disp); font-weight:600; font-size:15px; margin-left:4px;}
+  .crew-ident-top strong{font-family:var(--body); font-weight:600; font-size:14px; margin-left:4px;}
   .crew-ident-pills{display:flex; flex-wrap:wrap; gap:4px; margin:5px 0 3px;}
   /* compact single-row variant — everything on one line */
   .crew-ident.one-line{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-width:0;}
-  .crew-ident.one-line strong{font-family:var(--disp); font-weight:600; font-size:14px; white-space:nowrap;}
+  .crew-ident.one-line strong{font-family:var(--body); font-weight:600; font-size:14px; white-space:nowrap;}
   .crew-ident.one-line .crew-ident-sub{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
   .crew-ident.one-line select.pill-select{max-width:150px;}
   .crew-ident.one-line .icon-btn{flex:0 0 auto;}
@@ -345,18 +405,18 @@
   .crew-ident.one-line.wrap-row .crew-ident-sub{white-space:normal; overflow:visible; text-overflow:clip;}
   .crew-ident.one-line.wrap-row .roles-inline{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:2px;}
   .override-dot{color:var(--tape); font-size:9px; flex:0 0 auto; cursor:help;}
-  .posn-row-overridden{background:rgba(1,119,86,.045); border-radius:8px;}
-  .day-override-form{border:1px solid var(--line); border-radius:8px; padding:14px; background:rgba(1,119,86,.03);}
+  .posn-row-overridden{background:var(--tint-2); border-radius:8px;}
+  .day-override-form{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--tint-1);}
   .day-override-form .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   select.pill-select.copro{background-color:rgba(17,10,8,.06); color:var(--text);}
   select.pill-select.copro.empty{background-color:transparent; color:var(--muted);}
   .crewgrid{display:grid; grid-template-columns:minmax(200px,1fr) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px; align-items:center; column-gap:6px;}
   .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
-  .crewgrid-header{font-family:var(--label); font-size:10.5px; font-weight:600; color:var(--muted); text-align:center; letter-spacing:.3px;}
+  .crewgrid-header{font-family:var(--label); font-size:11px; font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
   .crewgrid-row{padding:8px 0; border-bottom:1px solid var(--line);}
   .crewgrid-row:last-child{border-bottom:none;}
-  .crewgrid-row-editing{background:rgba(1,119,86,.04); border-radius:8px; padding:8px;}
+  .crewgrid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .crewgrid-row-name{min-width:0;}
   .crewgrid-row-name .icon-btn{margin-left:0; margin-right:2px;}
   .crewgrid-check{display:flex; justify-content:center;}
@@ -369,14 +429,14 @@
   .meal-subrow{margin-top:1px;}
   .meal-subrow .meal-cell input{width:13px; height:13px;}
   .meal-row-label-wrap{display:flex; align-items:center; gap:8px; min-width:0; padding-left:2px;}
-  .meal-row-label{font-family:var(--label); font-size:10.5px; font-weight:500; letter-spacing:.3px;
-    color:var(--muted);}
+  .meal-row-label{font-family:var(--label); font-size:11px; font-weight:500; letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--tape);}
   .meal-row-all{font-family:var(--label); font-size:10px; color:var(--muted);
     cursor:pointer; flex-shrink:0;}
   .meal-row-all:hover{color:var(--tape);}
   .crewgrid-remove{display:flex; align-items:center; justify-content:flex-end; gap:2px;}
   .all-toggle-btn{padding:3px 8px; font-size:11px;}
-  .crewgrid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:8px; padding:14px; background:var(--panel);}
+  .crewgrid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
 
   /* scrollable wrapper for wide preview tables */
   .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -2px;}
@@ -397,7 +457,7 @@
       width:44px; height:44px; min-width:44px; border-radius:9px; font-size:17px; line-height:1;
       display:flex; align-items:center; justify-content:center; padding:0;
     }
-    .topbar .burger:hover{border-color:#5fd6ac;}
+    .topbar .burger:hover{border-color:var(--tape);}
     .topbar .tb-title{font-family:var(--disp); font-weight:700; font-size:16px; white-space:nowrap;
       overflow:hidden; text-overflow:ellipsis;}
     .topbar .tb-dot{width:9px; height:9px; border-radius:2px; background:var(--tape); transform:rotate(45deg); flex:0 0 auto;}
@@ -430,6 +490,11 @@
     }
     textarea{min-height:80px;}
     label{font-size:12px; margin-bottom:5px;}
+    /* Inline label columns go back to stacked on narrow screens — a fixed 104px
+       label column leaves too little room for the control on a phone. */
+    .grid:not(.g3):not(.g4) > div:has(> label:first-child){display:block;}
+    .grid:not(.g3):not(.g4) > div:has(> label:first-child) > label{margin-bottom:5px;}
+    .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea) > label{padding-top:0;}
 
     /* --- buttons: 44px minimum touch target --- */
     button{font-size:15px; padding:12px 16px; min-height:46px;}
@@ -549,7 +614,7 @@
       content:'✓'; font-size:13px; font-weight:700; color:var(--tape);
       width:0; overflow:hidden; opacity:0; transition:width .12s ease, opacity .12s ease;
     }
-    .crewgrid-check:has(input:checked){background:rgba(1,119,86,.14); border-color:var(--tape);}
+    .crewgrid-check:has(input:checked){background:var(--tint-4); border-color:var(--tape);}
     .crewgrid-check:has(input:checked)::before{color:var(--tape); font-weight:600;}
     .crewgrid-check:has(input:checked)::after{width:1.1em; opacity:1; margin-left:5px;}
     /* inset:-1px, not 0 — absolute children position against the PADDING box, so
@@ -736,12 +801,15 @@ function deptHeaderHTML(label, count, collapsed, onclickJS, code){
       <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${c?`<span class="dept-code">${esc(c)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span>
     </div>`;
 }
-/* the "Expand all · Collapse all" strip */
-function expandCollapseAllHTML(fnName, arg, extraLinkHTML){
+/* Single toggling expand/collapse link (Style Review): the two side-by-side
+   links became one control that shows only the action available right now —
+   "Expand all" while everything is collapsed, "Collapse all" otherwise. Text,
+   not chevrons, in the same label type as Select all / Filter. */
+function expandCollapseAllHTML(fnName, arg, extraLinkHTML, allCollapsed){
   const a = arg===undefined ? '' : `, '${arg}'`;
+  const label = allCollapsed ? 'Expand all' : 'Collapse all';
   return `<div class="dept-toggle-all">
-      <span onclick="${fnName}(false${a})">Expand all</span> ·
-      <span onclick="${fnName}(true${a})">Collapse all</span>${extraLinkHTML ? ` · ${extraLinkHTML}` : ''}
+      <span onclick="${fnName}(${allCollapsed?'false':'true'}${a})">${label}</span>${extraLinkHTML ? ` · ${extraLinkHTML}` : ''}
     </div>`;
 }
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
@@ -1271,7 +1339,7 @@ function renderMain(){
 function renderWelcome(m){
   setTopbarTitle('Call Sheets');
   m.innerHTML = `
-    <div class="page-head"><div class="eyebrow">${esc(COMPANY)}</div><h1>Call Sheet App</h1></div>
+    <div class="page-head"><h1>Call Sheet App</h1><div class="eyebrow">${esc(COMPANY)}</div></div>
     <div class="section">
       <h2>Get started</h2>
       <p style="font-size:14px; line-height:1.6;">Build call sheets from reusable Crew and Location databases. Add a crew member or location once and it's available to every project.</p>
@@ -1880,7 +1948,7 @@ async function seedSampleData(){
 function renderNewProject(m){
   setTopbarTitle('New project');
   m.innerHTML = `
-    <div class="page-head"><div class="eyebrow">New project</div><h1>Create a project</h1></div>
+    <div class="page-head"><h1>Create a project</h1><div class="eyebrow">New project</div></div>
     <div class="section">
       <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
@@ -1928,8 +1996,8 @@ function renderProject(m){
   setTopbarTitle(p.title||'(untitled)');
   m.innerHTML = `
     <div class="page-head">
-      <div class="eyebrow">${esc(p.company||COMPANY)} · ${esc(p.client||'')}</div>
       <h1>${esc(p.title||'(untitled)')}</h1>
+      <div class="eyebrow">${esc(p.company||COMPANY)} · ${esc(p.client||'')}</div>
       <div class="code">${esc(projCode(p))}</div>
     </div>
     <div class="tabs">
@@ -2018,7 +2086,7 @@ function renderProjectTech(body){
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const continuous = p.continuousNumbering!==false;
   body.innerHTML = `
-    ${expandCollapseAllHTML('setAllTechBlocksCollapsed', undefined, `<span onclick="jumpToTechRoundup()">Summary</span>`)}
+    ${expandCollapseAllHTML('setAllTechBlocksCollapsed', undefined, `<span onclick="jumpToTechRoundup()">Summary</span>`, Object.values(techBlocks).every(v=>!v))}
     ${techBlockHTML('defaults', 'Tech specs — project defaults', '', `
       <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
       ${techSpecFieldsHTML('pj')}
@@ -2361,13 +2429,13 @@ function renderProjectCrew(body){
     const summaryLinkHTML = crewGridView==='hotel' ? `<span onclick="jumpToHotelSummary()">Summary</span>`
       : crewGridView==='catering' ? `<span onclick="jumpToCateringSummary()">Summary</span>`
       : crewGridView==='travel' ? `<span onclick="jumpToTransportSummary()">Summary</span>` : '';
-    // Expand/Collapse all (item 4): one toggle, not two separate links — a single
-    // chevron that flips 180° between "some/all collapsed → expand all" and
-    // "all expanded → collapse all", with "All" next to it either way.
+    // Expand/Collapse all: one toggle, not two separate links. The Style Review
+    // dropped the rotating chevron in favour of plain text that swaps between
+    // "Expand all" and "Collapse all" so only the available action is shown.
     let expandAllHTML = '';
     if(groups.length>1){
       const allCollapsed = groups.every(g=>collapsedProjectDepts.has(g.key));
-      expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')" title="${allCollapsed?'Expand all':'Collapse all'}"><span class="dept-caret expandall-caret" style="transform:rotate(${allCollapsed?0:180}deg);">▾</span> All</span>`;
+      expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
     }
     rightHeaderHTML = `${expandAllHTML}${summaryLinkHTML}`;
     const groupHeaderHTML = g => deptHeaderHTML(
@@ -3504,7 +3572,7 @@ function renderProjectPreview(body){
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
   body.innerHTML = dayTabsBarHTML(days) + `
-    ${expandCollapseAllHTML('setAllPreviewBlocksCollapsed')}
+    ${expandCollapseAllHTML('setAllPreviewBlocksCollapsed', undefined, undefined, Object.values(previewBlocks).every(v=>!v))}
     <div class="card" id="previewCard"></div>
     ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
       `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
@@ -3665,7 +3733,7 @@ function renderCrewDatabase(m){
   setTopbarTitle('Crew database');
   const filterCount = crewDbActiveFilterCount();
   m.innerHTML = `
-    <div class="page-head"><div class="eyebrow">Database</div><h1>Crew</h1></div>
+    <div class="page-head"><h1>Crew</h1><div class="eyebrow">Database</div></div>
     <div class="section">
       <h2 class="dept-toggle" style="cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="toggleDeptAdminPanel()">
         <span class="dept-caret">${deptAdminOpen?'▾':'▸'}</span> Departments &amp; sub-departments
@@ -3815,7 +3883,7 @@ function renderCrewList(){
   Object.keys(buckets).forEach(d=>{ buckets[d] = sortCrewDbGroup(buckets[d]); });
   const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
   const deptsCSV = deptsPresent.join(',');
-  const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML('setAllDeptsCollapsed', deptsCSV) : '';
+  const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML('setAllDeptsCollapsed', deptsCSV, undefined, deptsPresent.every(d=>collapsedDepts.has(d))) : '';
   const html = deptsPresent.map(d=>{
     const collapsed = collapsedDepts.has(d);
     return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`)
@@ -4055,7 +4123,7 @@ async function deleteCrew(id){
 function renderLocationsDatabase(m){
   setTopbarTitle('Locations database');
   m.innerHTML = `
-    <div class="page-head"><div class="eyebrow">Database</div><h1>Locations</h1></div>
+    <div class="page-head"><h1>Locations</h1><div class="eyebrow">Database</div></div>
     <div class="section">
       <h2>All locations</h2>
       <input type="text" id="locSearch" placeholder="Search saved locations…" oninput="renderLocationsList()" style="margin-bottom:10px;">
@@ -4334,7 +4402,7 @@ function shootDayBuildHTML(){
       <div id="cameraDesigList"></div>
     </div>`;
 
-  return expandCollapseAllHTML('setAllShootDayBlocksCollapsed')
+  return expandCollapseAllHTML('setAllShootDayBlocksCollapsed', undefined, undefined, Object.values(shootDayBlocks).every(v=>!v))
        + sdBlock('general','General information', general)
        + sdBlock('schedule','Schedule', schedule)
        + sdBlock('positions','Position assignments', positions)
