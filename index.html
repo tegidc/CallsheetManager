@@ -725,11 +725,11 @@ function deptHeaderHTML(label, count, collapsed, onclickJS, code){
     </div>`;
 }
 /* the "Expand all · Collapse all" strip */
-function expandCollapseAllHTML(fnName, arg){
+function expandCollapseAllHTML(fnName, arg, extraLinkHTML){
   const a = arg===undefined ? '' : `, '${arg}'`;
   return `<div class="dept-toggle-all">
       <span onclick="${fnName}(false${a})">Expand all</span> ·
-      <span onclick="${fnName}(true${a})">Collapse all</span>
+      <span onclick="${fnName}(true${a})">Collapse all</span>${extraLinkHTML ? ` · ${extraLinkHTML}` : ''}
     </div>`;
 }
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
@@ -1989,7 +1989,7 @@ function toggleTechBlock(key){ toggleBlock(techBlocks, 'tt', key); }
 function setAllTechBlocksCollapsed(collapsed){ setAllBlocksCollapsed(techBlocks, 'tt', collapsed); }
 function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = techBlocks[key];
-  return `<div class="section">
+  return `<div class="section" id="techBlock-${key}">
     <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
       <span class="sd-block-head-toggle" onclick="toggleTechBlock('${key}')"><span class="dept-caret" id="ttc-${key}">${open?'▾':'▸'}</span> ${title}</span>
       ${headerActionsHTML||''}
@@ -1997,12 +1997,16 @@ function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
     <div id="ttb-${key}" style="display:${open?'':'none'}">${bodyInnerHTML}</div>
   </div>`;
 }
+function jumpToTechRoundup(){
+  if(!techBlocks.roundup) toggleTechBlock('roundup');
+  document.getElementById('techBlock-roundup')?.scrollIntoView({block:'start'});
+}
 function renderProjectTech(body){
   const p = currentProject();
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const continuous = p.continuousNumbering!==false;
   body.innerHTML = `
-    ${expandCollapseAllHTML('setAllTechBlocksCollapsed')}
+    ${expandCollapseAllHTML('setAllTechBlocksCollapsed', undefined, `<span onclick="jumpToTechRoundup()">Summary</span>`)}
     ${techBlockHTML('defaults', 'Tech specs — project defaults', '', `
       <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
       ${techSpecFieldsHTML('pj')}
@@ -2328,8 +2332,10 @@ function renderProjectCrew(body){
     const selectAllHTML = `<label style="cursor:pointer;">
         <input type="checkbox" ${allFilteredSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${filteredIdsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
       </label>`;
+    const summaryLinkHTML = crewGridView==='hotel' ? ` · <span onclick="jumpToHotelSummary()">Summary</span>`
+      : crewGridView==='catering' ? ` · <span onclick="jumpToCateringSummary()">Summary</span>` : '';
     const toggleRow = `<div class="dept-toggle-all">
-        ${selectAllHTML}${groups.length>1 ? ` · <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> · <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>` : ''}
+        ${selectAllHTML}${groups.length>1 ? ` · <span onclick="setAllProjectDeptsCollapsed(false, '${groupsCSV}')">Expand all</span> · <span onclick="setAllProjectDeptsCollapsed(true, '${groupsCSV}')">Collapse all</span>` : ''}${summaryLinkHTML}
       </div>`;
     const groupHeaderHTML = g => deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
@@ -2626,12 +2632,16 @@ function hotelSummaryHTML(){
     ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`;
-  return `<div class="section">
+  return `<div class="section" id="hotelSummarySection">
     <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
       <span class="sd-block-head-toggle" onclick="toggleHotelSummaryBlock()"><span class="dept-caret" id="hsmc-summary">${open?'▾':'▸'}</span> Hotel summary</span>
     </div>
     <div id="hsmb-summary" style="display:${open?'':'none'}">${inner}</div>
   </div>`;
+}
+function jumpToHotelSummary(){
+  if(!hotelSummaryOpen) toggleHotelSummaryBlock();
+  document.getElementById('hotelSummarySection')?.scrollIntoView({block:'start'});
 }
 function copyHotelSummary(){
   const data = buildHotelSummary(); if(!data) return;
@@ -2800,12 +2810,16 @@ function cateringSummaryHTML(){
     </div>`;
   const inner = `${fieldsHTML}<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyCateringSummaryGrid()">${icon('copy')} Copy catering summary</button></div>`;
-  return `<div class="section">
+  return `<div class="section" id="cateringSummarySection">
     <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
       <span class="sd-block-head-toggle" onclick="toggleCateringSummaryBlock()"><span class="dept-caret" id="csmc-summary">${open?'▾':'▸'}</span> Catering summary</span>
     </div>
     <div id="csmb-summary" style="display:${open?'':'none'}">${inner}</div>
   </div>`;
+}
+function jumpToCateringSummary(){
+  if(!cateringSummaryOpen) toggleCateringSummaryBlock();
+  document.getElementById('cateringSummarySection')?.scrollIntoView({block:'start'});
 }
 function copyCateringSummaryGrid(){
   const data = buildCateringSummaryGrid(); if(!data) return;
