@@ -307,3 +307,12 @@ coarse information first, finest detail last.
 | **G-4** | Sample data reset | Wipe and reload the demo data set | `resetAndReseed()` |
 | **G-5** | New project form | Create a project (auto-creates its first shoot day) | `renderNewProject()` |
 | **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
+
+## Style audit — pattern names (Phase Style Review)
+
+`style-audit.html` is a standalone diagnostic page at the repo root (not linked from
+`index.html`'s nav — open it directly). It copies the app's real CSS verbatim from
+`index.html` (Part A) and renders it against live markup so every example is styled
+by the app's actual rules, not a re-implementation. Used to review the design system
+in isolation before making styling changes elsewhere. Sections: Typography, Colors,
+Spacing, Component behaviors, Icons (existing), Icons (candidates).
