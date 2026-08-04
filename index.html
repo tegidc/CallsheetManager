@@ -2334,6 +2334,7 @@ function renderProjectCrew(body){
   }
 
   body.innerHTML = `
+    ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
     <div class="section">
       <h2>Crew on this project</h2>
       ${viewSwitcher}
@@ -2484,58 +2485,114 @@ async function toggleHotelPre(crewId, checked){
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
-function buildHotelExport(){
+function abbreviateName(name){
+  const parts = (name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '';
+  if(parts.length===1) return parts[0];
+  return `${parts[0][0].toUpperCase()}. ${parts[parts.length-1]}`;
+}
+/* Per-person hotel summary (Phase O) — replaces the old per-night-only buildHotelExport.
+   Aggregates every booked night (pre-night + each shoot day night) per person into an
+   actual date range, so the room-booking table can be handed straight to a hotel.
+   Sort order (all three tables + rooming list share it): earliest check-in first,
+   ties broken by most total nights first — set once here via `orderIndex` and reused
+   so the per-night table's Names column and the rooming list don't drift out of sync
+   with the room-booking table's row order. */
+function buildHotelSummary(){
   const p = currentProject(); if(!p) return null;
   const days = projectDays();
   if(!days.length) return null;
-  // build a night → guests map (Pre night + each day)
-  const nightLabels = [];
-  const nightGuests = [];
-  // Pre-night
-  const preDate = days[0].date ? new Date(days[0].date+'T00:00:00') : null;
-  const preDateStr = preDate ? fmtDate(new Date(preDate.getTime()-86400000).toISOString().slice(0,10)) : 'Night before Day 1';
-  nightLabels.push(preDateStr);
-  nightGuests.push((p.hotelNightBefore||[]).map(id=>crewInfo(id).name));
-  // each shoot day night
+  const preDate = days[0].date ? new Date(new Date(days[0].date+'T00:00:00').getTime()-86400000) : null;
+  const nights = [{
+    label: preDate ? fmtDate(preDate.toISOString().slice(0,10)) : 'Night before Day 1',
+    date: preDate,
+    guestIds: p.hotelNightBefore||[]
+  }];
   days.forEach(d=>{
-    nightLabels.push(d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`);
-    nightGuests.push((d.hotelNights||[]).map(id=>crewInfo(id).name));
+    nights.push({
+      label: d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`,
+      date: d.date ? new Date(d.date+'T00:00:00') : null,
+      guestIds: d.hotelNights||[]
+    });
   });
-  // filter out nights with nobody
-  const active = nightLabels.map((label,i)=>({label, guests:nightGuests[i]})).filter(n=>n.guests.length);
+  const active = nights.filter(n=>n.guestIds.length);
   if(!active.length) return null;
-  // booking summary: count max rooms, date range
-  const maxRooms = Math.max(...active.map(n=>n.guests.length));
-  const totalNights = active.length;
+
+  const personMap = new Map();
+  active.forEach(n=>{
+    n.guestIds.forEach(id=>{
+      if(!personMap.has(id)) personMap.set(id, { id, name: crewInfo(id).name, nightDates:[] });
+      personMap.get(id).nightDates.push(n.date);
+    });
+  });
+  const people = [...personMap.values()].map(person=>{
+    const dated = person.nightDates.filter(Boolean).sort((a,b)=>a-b);
+    const checkIn = dated.length ? dated[0] : null;
+    const lastNight = dated.length ? dated[dated.length-1] : null;
+    return {
+      id: person.id, name: person.name,
+      totalNights: person.nightDates.length,
+      checkIn, checkOut: lastNight ? new Date(lastNight.getTime()+86400000) : null
+    };
+  });
+  people.sort((a,b)=>{
+    const at = a.checkIn ? a.checkIn.getTime() : Infinity;
+    const bt = b.checkIn ? b.checkIn.getTime() : Infinity;
+    return at!==bt ? at-bt : b.totalNights-a.totalNights;
+  });
+  const orderIndex = new Map(people.map((pp,i)=>[pp.id,i]));
+
+  const perNight = active.map(n=>{
+    const ids = [...n.guestIds].sort((x,y)=>(orderIndex.get(x)??999)-(orderIndex.get(y)??999));
+    return { label:n.label, rooms:ids.length, names: ids.map(id=>abbreviateName(crewInfo(id).name)) };
+  });
+  const roomBooking = people.map((pp,i)=>({
+    roomNo: i+1, name: pp.name,
+    from: pp.checkIn ? fmtDate(pp.checkIn.toISOString().slice(0,10)) : '—',
+    to: pp.checkOut ? fmtDate(pp.checkOut.toISOString().slice(0,10)) : '—',
+    totalNights: pp.totalNights
+  }));
+  const maxRooms = Math.max(...active.map(n=>n.guestIds.length));
   const dateRange = `${active[0].label} – ${active[active.length-1].label}`;
-  const summary = `${maxRooms} room${maxRooms>1?'s':''} for ${totalNights} night${totalNights>1?'s':''}, ${dateRange}`;
-  // rooming list: unique names across all nights
-  const allGuests = [...new Set(active.flatMap(n=>n.guests))].sort();
-  return { summary, totalNights, maxRooms, dateRange, nights:active, roomingList:allGuests };
+  const summary = `${maxRooms} room${maxRooms>1?'s':''} max, ${active.length} night${active.length>1?'s':''}, ${dateRange}`;
+  return { summary, perNight, roomingList: people.map(pp=>pp.name), roomBooking };
 }
-function renderHotelExport(){
-  const el = document.getElementById('hotelExportSection'); if(!el) return;
-  const data = buildHotelExport();
-  const headerActions = `<button class="small" onclick="copyHotelExport()">${icon('copy')} Copy booking summary</button>`;
-  if(!data){ el.innerHTML = pvBlockHTML('hotel', 'Hotel booking', headerActions, '<div class="empty-note">No hotel nights ticked yet — fill them in on the Crew tab Hotel view.</div>'); return; }
-  const body = `<div class="card" style="padding:16px;">
-    <div class="line1" style="font-size:15px;"><strong>${esc(data.summary)}</strong></div>
-    <div class="hint" style="margin:6px 0 12px;">One room per person. Send this to the hotel alongside the rooming list below.</div>
-    <h4 style="margin:12px 0 6px;">Per-night breakdown</h4>
-    <table><tr><th>Night</th><th>Guests</th><th>Rooms</th></tr>
-    ${data.nights.map(n=>`<tr><td>${esc(n.label)}</td><td>${esc(n.guests.join(', '))}</td><td>${n.guests.length}</td></tr>`).join('')}
+let hotelSummaryOpen = true; // collapsible state for the T-2.3 hotel summary block (Phase O)
+function toggleHotelSummaryBlock(){
+  hotelSummaryOpen = !hotelSummaryOpen;
+  applyBlockState({summary:hotelSummaryOpen}, 'hsm', 'summary');
+}
+function hotelSummaryHTML(){
+  const data = buildHotelSummary();
+  const open = hotelSummaryOpen;
+  const inner = !data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
+    <div class="hint" style="margin:0 0 12px;">${esc(data.summary)}</div>
+    <h4 style="margin:12px 0 6px;">Per-night table</h4>
+    <table><tr><th>Night</th><th>Rooms</th><th>Names</th></tr>
+    ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
     <h4 style="margin:14px 0 6px;">Rooming list</h4>
     <ol>${data.roomingList.map(n=>`<li>${esc(n)}</li>`).join('')}</ol>
+    <h4 style="margin:14px 0 6px;">Room-booking table</h4>
+    <table><tr><th>Room No.</th><th>Name</th><th>Date from</th><th>Date to</th><th>Total nights</th></tr>
+    ${data.roomBooking.map(r=>`<tr><td>${r.roomNo}</td><td>${esc(r.name)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td><td>${r.totalNights}</td></tr>`).join('')}
+    </table>
+    <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`;
+  return `<div class="section">
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="toggleHotelSummaryBlock()"><span class="dept-caret" id="hsmc-summary">${open?'▾':'▸'}</span> Hotel summary</span>
+    </div>
+    <div id="hsmb-summary" style="display:${open?'':'none'}">${inner}</div>
   </div>`;
-  el.innerHTML = pvBlockHTML('hotel', 'Hotel booking', headerActions, body);
 }
-function copyHotelExport(){
-  const data = buildHotelExport(); if(!data) return;
-  const lines = [`HOTEL BOOKING — ${data.summary}`, ''];
-  data.nights.forEach(n=>lines.push(`${n.label}: ${n.guests.length} room${n.guests.length>1?'s':''} — ${n.guests.join(', ')}`));
+function copyHotelSummary(){
+  const data = buildHotelSummary(); if(!data) return;
+  const lines = [`HOTEL BOOKING — ${data.summary}`, '', 'PER-NIGHT TABLE'];
+  data.perNight.forEach(n=>lines.push(`${n.label}: ${n.rooms} room${n.rooms>1?'s':''} — ${n.names.join(', ')}`));
   lines.push('','ROOMING LIST');
   data.roomingList.forEach((n,i)=>lines.push(`${i+1}. ${n}`));
+  lines.push('','ROOM-BOOKING TABLE');
+  data.roomBooking.forEach(r=>lines.push(`Room ${r.roomNo}: ${r.name} — ${r.from} to ${r.to} (${r.totalNights} night${r.totalNights>1?'s':''})`));
   copyText(lines.join('\n'), 'Copied!');
 }
 /* ---- Catering: breakfast / lunch / dinner per person per day ----
@@ -3083,7 +3140,7 @@ function renderProjectDays(body){
    next day too. Each section's header keeps its Copy button visible even while
    collapsed (see pvBlockHTML) — collapsing is about scanning the page fast, not
    about hiding the one action you actually came here for. */
-let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, hotel:true, catering:true, excel:true };
+let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, catering:true, excel:true };
 /* ---- collapsible block plumbing, shared by Preview & Export and the Shoot Day editor ----
    Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
    only thing that differed between them was the id prefix, so that's the parameter. */
@@ -3122,14 +3179,12 @@ function renderProjectPreview(body){
     ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
       `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
     <div id="techSpecsSection"></div>
-    <div id="hotelExportSection"></div>
     <div id="cateringExportSection"></div>
     ${pvBlockHTML('excel', 'Excel export', '', `
       <button class="primary" onclick="downloadExcel()">${icon('download')} Download .xlsx</button>
       <p class="hint">Opens in Excel, Numbers, or Google Sheets (File → Import). Includes a separate Tech Specs sheet.</p>`)}`;
   const d = days.find(x=>x.id===currentShootDayId);
   generatePreview(d);
-  renderHotelExport();
   renderCateringExport();
 }
 function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
