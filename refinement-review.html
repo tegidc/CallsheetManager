@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase Refinement — findings &amp; recommendations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --disp:'Fraunces',Georgia,serif; --label:'Oswald',sans-serif; --body:'Jost',system-ui,sans-serif;
+    --tape:#017756; --tape-light:#0FA47A; --text:#110A08; --muted:#6b625e;
+    --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05);
+    --tint-3:rgba(1,119,86,.10); --tint-4:rgba(1,119,86,.14);
+    --paper:#FBFAF8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--text); font-family:var(--body); font-size:14px; line-height:1.55;}
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 20px 80px;}
+  h1{font-family:var(--disp); font-weight:700; font-size:26px; text-transform:uppercase; margin:0 0 4px; letter-spacing:.3px;}
+  .eyebrow{color:var(--muted); font-size:13px; margin-bottom:22px;}
+  h2{font-family:var(--disp); font-weight:700; font-size:17px; color:var(--tape);
+     display:flex; align-items:center; gap:10px; margin:38px 0 6px;}
+  h2::after{content:''; flex:1; height:1px; background:var(--line);}
+  h3{font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+     color:var(--tape); display:flex; align-items:center; gap:8px; margin:26px 0 10px;}
+  h3::after{content:''; flex:1; height:1px; background:var(--line);}
+  p{margin:8px 0;}
+  .lede{font-size:15px; max-width:78ch;}
+  .muted{color:var(--muted);}
+  .note{background:var(--tint-1); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:14px 0;}
+  .note strong{color:var(--tape);}
+
+  table{width:100%; border-collapse:collapse; margin-top:6px;}
+  th{font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+     color:var(--tape); text-align:left; padding:8px 10px; border-bottom:1.5px solid var(--line); vertical-align:bottom;}
+  td{padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr:hover td{background:var(--tint-1);}
+  .rec-id{font-family:var(--label); font-size:11px; letter-spacing:1px; color:var(--tape); white-space:nowrap;}
+  .rec-what{font-weight:500; display:block; margin-bottom:3px;}
+  .rec-why{color:var(--muted); font-size:13px;}
+  .where{font-size:12px; color:var(--muted); white-space:nowrap;}
+  .size{font-family:var(--label); font-size:11px; letter-spacing:.8px; text-transform:uppercase;
+        padding:2px 7px; border-radius:3px; background:var(--tint-3); color:var(--tape); white-space:nowrap;}
+  .size.m{background:rgba(180,120,10,.14); color:#8a5c00;}
+  .size.l{background:rgba(160,40,30,.12); color:#8f2a1e;}
+
+  .picks{display:flex; gap:4px; margin-bottom:6px;}
+  .pick{font-family:var(--body); font-size:12px; padding:4px 10px; cursor:pointer; user-select:none;
+        border:1px solid var(--field-line); background:#fff; border-radius:4px; color:var(--muted); white-space:nowrap;}
+  .pick:hover{border-color:var(--tape); color:var(--tape);}
+  .pick.on{background:var(--tape); border-color:var(--tape); color:#fff; font-weight:500;}
+  .pick.on.no{background:#8f2a1e; border-color:#8f2a1e;}
+  .pick.on.later{background:#8a5c00; border-color:#8a5c00;}
+  textarea{width:100%; min-height:34px; font-family:var(--body); font-size:13px; color:var(--text);
+     border:none; border-bottom:1px solid var(--field-line); background:transparent; padding:4px 2px; resize:vertical;}
+  textarea:focus{outline:none; box-shadow:0 1px 0 0 var(--tape); border-bottom-color:var(--tape);}
+
+  .bar{position:sticky; bottom:0; background:var(--paper); border-top:1px solid var(--line);
+       padding:12px 0; margin-top:30px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  button{font-family:var(--body); font-size:13px; font-weight:500; padding:9px 16px; border-radius:6px;
+     border:1px solid var(--tape); background:var(--tape); color:#fff; cursor:pointer;}
+  button.ghost{background:#fff; color:var(--tape);}
+  button:hover{opacity:.9;}
+  #out{width:100%; min-height:220px; font-family:ui-monospace,monospace; font-size:12px; margin-top:12px;
+       border:1px solid var(--line); border-radius:8px; padding:12px; display:none; background:#fff;}
+  .count{font-size:13px; color:var(--muted);}
+
+  .done td{background:rgba(1,119,86,.05);}
+  .tick{color:var(--tape); font-weight:600;}
+  ul{margin:8px 0; padding-left:20px;} li{margin:5px 0;}
+  .phase{border-left:3px solid var(--tint-4); padding-left:14px; margin:14px 0;}
+  code{font-family:ui-monospace,monospace; font-size:12.5px; background:var(--tint-2); padding:1px 5px; border-radius:3px;}
+  @media(max-width:820px){ .where,.sizecol{display:none;} td,th{padding:9px 6px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Phase Refinement</h1>
+<div class="eyebrow">Call Sheet Manager · Little Film Productions · what I changed, what I'd suggest next, and a plan for multi-user</div>
+
+<p class="lede">This page has three parts. <strong>Part 1</strong> is what I actually changed (already committed and live).
+<strong>Part 2</strong> is a list of things I noticed but deliberately <em>didn't</em> change, because they'd alter how the
+app behaves — tick the ones you want and I'll build them. <strong>Part 3</strong> is a separate proposal for multi-user
+collaboration, which is a much bigger piece of work.</p>
+
+<div class="note">
+  <strong>Nothing in Part 2 has been done.</strong> This phase was a tidy-up, not a feature phase — so anything that would
+  change how a screen behaves is parked here as a question rather than done quietly. Use the buttons to say
+  yes / maybe / no on each, add a note if you want, then hit <strong>Export my answers</strong> at the bottom and paste
+  the result back to me.
+</div>
+
+<!-- ============================== PART 1 ============================== -->
+<h2>Part 1 — what changed (already live)</h2>
+
+<p>All of this is invisible in the sense that the app behaves exactly as it did before. The one exception is the Budget
+day filter, which you asked for.</p>
+
+<h3>Things that were quietly broken</h3>
+<table>
+  <tr><th style="width:34%;">What</th><th>Detail</th></tr>
+  <tr><td><span class="rec-what">Six headings were rendering in the wrong font</span></td>
+      <td class="rec-why">The stylesheet has no rule for <code>h4</code> headings at all, so anywhere one had been used
+      it fell back to the browser's default serif rather than the app's own label style. It affected the three headings
+      on Budget's Costs tab (Catering / Travel / Hotel), the two on the Hotel summary, and "Dietary requirements" on the
+      catering export. They now use the app's proper heading style. <strong>This is the most visible change in the whole phase.</strong></td></tr>
+  <tr><td><span class="rec-what">The same styling copy-pasted seven times</span></td>
+      <td class="rec-why">Seven collapsible section headers each carried an identical hand-written style patch —
+      and half of it (<code>font-size:15px</code>) did nothing at all, because the style it was overriding was already
+      15px. That's a strong sign the pattern had been copied forward without anyone knowing what it did. It's now one
+      named style used by all seven. Pixel-identical, just no longer seven copies.</td></tr>
+  <tr><td><span class="rec-what">Dead leftovers in Tasks and AI Scan</span></td>
+      <td class="rec-why">Both sections had copied a naming convention from the older collapsible sections without the
+      machinery that actually uses it, leaving tags that nothing ever read. Removed. I checked the Hotel/Catering/Travel
+      summaries carefully — theirs <em>are</em> real and were left alone.</td></tr>
+  <tr><td><span class="rec-what">The code map was wrong in three places</span></td>
+      <td class="rec-why">MAP.md described one shared function's inputs in an order that <em>no part of the app has ever
+      used</em> — documented that way twice. And two notes still referred to Preview &amp; Export by its old code
+      (T-6.x) from before Budget took that number; one line contradicted itself. All corrected against the real code.</td></tr>
+</table>
+
+<h3>The one addition — filter Budget by day</h3>
+<p>You can now tick which shoot days to cost. No ticks means the whole project, exactly as before. It sits above the
+Per Department / Per Day / Per Person / Costs switcher rather than inside it, because it changes what <em>all four</em>
+of those are showing, not just one.</p>
+<p class="muted">I checked the arithmetic rather than trusting it: on ROW 2026, costing each of the six days on its own
+adds up to exactly the full project total (£50,510), and a two-day selection came out at £18,730 — the two days' figures
+added together. So nothing is double-counted or dropped, including the hotel night before Day 1, which only gets charged
+when Day 1 itself is selected.</p>
+
+<h3>Also checked and found clean</h3>
+<ul>
+  <li>No unused or orphaned functions anywhere in the app.</li>
+  <li>Budget doesn't keep its own copy of the hotel / catering / travel costs — it genuinely reads the same records those
+      tabs own, so there's nothing to drift apart. Same for the Costs tab.</li>
+  <li>The Crew toolbar and filter panel really are built once and shared identically across all five Crew tabs
+      (Roles / Days on site / Hotel / Travel / Catering) — that held up.</li>
+  <li>Every tab, every Crew view and every Budget view was opened in a browser against your real ROW 2026 data. No errors.</li>
+</ul>
+
+<!-- ============================== PART 2 ============================== -->
+<h2>Part 2 — recommendations (nothing done, your call)</h2>
+<p class="muted">Sizes are my rough estimate of effort: <span class="size">S</span> an hour or so ·
+<span class="size m">M</span> half a day · <span class="size l">L</span> a day or more.</p>
+
+<div class="count" id="count">0 of 18 answered</div>
+<table id="recs">
+  <tr>
+    <th style="width:52px;">#</th>
+    <th style="width:30%;">Recommendation</th>
+    <th>Why I'm raising it</th>
+    <th class="where" style="width:96px;">Where</th>
+    <th class="sizecol" style="width:44px;">Size</th>
+    <th style="width:230px;">Your call</th>
+  </tr>
+</table>
+
+<div class="bar">
+  <button onclick="exportDecisions()">Export my answers</button>
+  <button class="ghost" onclick="setAll('yes')">Tick all yes</button>
+  <button class="ghost" onclick="clearAll()">Clear</button>
+  <span class="count" id="count2"></span>
+</div>
+<textarea id="out" readonly placeholder="Your answers will appear here"></textarea>
+
+<!-- ============================== PART 3 ============================== -->
+<h2>Part 3 — proposal: multi-user collaboration (AL)</h2>
+
+<p class="lede">This is deliberately a separate proposal, not a recommendation in the table above — it's a different
+order of work, and it changes assumptions the whole app currently rests on.</p>
+
+<h3>The honest starting position</h3>
+<p>Right now the app has <strong>no concept of a user at all</strong>. There is one hardcoded company, no login, and
+every browser that opens the URL reads and writes the same shared database with the same permissions. That isn't a gap
+to be patched — it's the foundation the current design sits on, and it's why so much of the app is pleasantly simple.</p>
+<p>There are two specific things that will bite the moment a second person is editing:</p>
+<ul>
+  <li><strong>Last-write-wins on whole lists.</strong> Saving anything writes the <em>entire</em> collection back —
+      all crew, or all projects. If you and I both have the app open and I add a crew member while you rename a project,
+      whoever saves second silently erases the other's change. This is the single biggest risk and it exists today, even
+      without a login screen, any time two tabs are open.</li>
+  <li><strong>Screens don't know when data changed.</strong> Everything renders from an in-memory copy loaded at startup,
+      so another person's edits simply won't appear until the page is reloaded.</li>
+</ul>
+
+<h3>A staged route, cheapest first</h3>
+
+<div class="phase">
+  <strong>Stage 1 — Stop the silent overwrites.</strong> <span class="size m">M</span><br>
+  Before it matters who anyone is, make saving safe. Two options: either write only the record that changed rather than
+  the whole list, or keep a version number on each collection and refuse a save that's based on a stale copy, reloading
+  and reapplying instead. <em>This is worth doing on its own merits even if multi-user never happens</em> — it's a real
+  data-loss risk today with two tabs open.
+</div>
+
+<div class="phase">
+  <strong>Stage 2 — Live updates.</strong> <span class="size m">M</span><br>
+  Supabase can push changes to every open browser as they happen. Subscribe, and refresh the affected screen when
+  something changes underneath you. Once Stage 1 is done this is mostly plumbing, and it makes the app feel
+  collaborative before any accounts exist.
+</div>
+
+<div class="phase">
+  <strong>Stage 3 — Actual accounts.</strong> <span class="size l">L</span><br>
+  Supabase has login built in, so the sign-in part is not the hard bit. The hard bit is that every record then needs an
+  owner and access rules, which is a change to every table and every read the app makes. Worth doing properly in one
+  pass rather than half-adding it.
+</div>
+
+<div class="phase">
+  <strong>Stage 4 — Roles and permissions.</strong> <span class="size l">L</span><br>
+  The realistic need isn't "admin vs. user", it's that <em>crew day rates and private contact details shouldn't be
+  visible to everyone on the call sheet</em>. Note the app already has a "Private" section on the crew form — that's the
+  natural seam. A sensible first cut is three levels: <strong>Producer</strong> (everything, including Budget),
+  <strong>Crew</strong> (their own details plus the schedule), <strong>View-only</strong> (the call sheet, nothing else).
+</div>
+
+<div class="phase">
+  <strong>Stage 5 — Per-company branding.</strong> <span class="size m">M</span><br>
+  Already noted as parked in your own docs. Only becomes real once someone outside Little Film uses it, and it depends
+  on Stage 3 — a logo needs an account to belong to.
+</div>
+
+<h3>What I'd actually suggest</h3>
+<p><strong>Do Stage 1 now, as its own small piece of work, and stop there for the moment.</strong> It removes a live
+data-loss risk, it's invisible when it's working, and it doesn't commit you to anything. Stage 2 is a nice follow-on.
+Stages 3–5 are a genuine project and I'd only start them when there's a real second person who needs access — building
+a permissions model for a hypothetical user is how apps get complicated for no return.</p>
+
+<div class="note">
+  <strong>One caveat worth knowing.</strong> The AI Scan feature talks to Claude through a server function that requires
+  an API key to be set by hand. If that's never been set, AI Scan will fail at the moment someone tries to use it rather
+  than telling them up front — see recommendation <strong>R14</strong> in the table above.
+</div>
+
+<script>
+/* Same click-to-pick + notes + export idiom as style-audit.html / -fonts / -detail:
+   pick a value per row, optionally add a note, export everything as one block of
+   text to paste back into chat. Nothing here touches the app. */
+const RECS = [
+ {id:'R1', area:'Budget', size:'M',
+  what:'Let Budget be exported or copied',
+  why:'Budget is the one screen whose numbers you\'d actually want to send to someone — but it has no Copy button and no spreadsheet export, so the figures can only be read on screen. Every other summary in the app (hotel, catering, travel, tech) has a Copy. This is the odd one out.'},
+ {id:'R2', area:'Budget', size:'M',
+  what:'Include location fees in the budget',
+  why:'Currently excluded on purpose, because one fee can cover several shoot days and there was no clean way to split it. But it\'s usually a big number, so a budget without it can mislead. Suggest: enter a fee per location, and either spread it across that location\'s days or leave it as a project-level line.'},
+ {id:'R3', area:'Budget', size:'S',
+  what:'Make the VAT tickbox save itself',
+  why:'On Per Person, ticking VAT changes the totals immediately but doesn\'t save — it only reaches the database if you afterwards click the save icon on the day rate next to it. There\'s a line of small print explaining this. It works, but it\'s a rule you have to remember, and the numbers move as if it had saved.'},
+ {id:'R4', area:'Budget', size:'S',
+  what:'Sort the Per Person list',
+  why:'It\'s locked to department order, heads of department first. With 66 crew, "who are my ten most expensive people" means reading the whole table. The Crew tab already has a sort dropdown that could simply be reused here.'},
+ {id:'R5', area:'Budget', size:'S',
+  what:'Day-filter shortcuts',
+  why:'The new day filter is one tick per day. On a long shoot, presets like "first week" or a from–to range would save clicking. Only worth it if you find yourself using the filter a lot — happy to leave it.'},
+ {id:'R6', area:'Overview · Tasks', size:'S',
+  what:'Stop losing a half-typed task',
+  why:'If you type a task title and then collapse or expand the Tasks box before pressing Add, the text is lost, because the whole tab redraws. AI Scan already has a fix for exactly this problem; the same trick would work here. Small, but it\'s the kind of thing that\'s annoying precisely when you\'re busy.'},
+ {id:'R7', area:'Overview · Tasks', size:'M',
+  what:'Due dates on tasks',
+  why:'Tasks are title, note and a tick. On a production, "by when" is usually the point. Adding a date would also let overdue tasks show up as a flag, which the Tasks box already knows how to display.'},
+ {id:'R8', area:'Overview · Tasks', size:'S',
+  what:'Decide the fate of the three hidden flag settings',
+  why:'Three on/off switches for the warning rules still exist in the saved settings, but the controls that changed them were removed, so they\'re permanently on with no way to reach them. Either give them a home on the Settings screen or delete them — right now they\'re neither.'},
+ {id:'R9', area:'Overview · Tasks', size:'S',
+  what:'Let a warning flag be dismissed',
+  why:'Flags disappear only when you fix the thing. That\'s deliberate and mostly right, but "Day 4 has no location" can be a known, accepted state for weeks, and there\'s no way to say so. A "not now" that hides it until the day changes might be enough.'},
+ {id:'R10', area:'AI Scan', size:'M',
+  what:'Remember the AI Scan conversation',
+  why:'Chat history is wiped on every page reload, on purpose for the first build. In practice you\'d reload, lose the thread, and have to re-attach the brief. Your own notes already flag this as "tell us if it turns out to be unwanted" — from reading it, I think it will be.'},
+ {id:'R11', area:'AI Scan', size:'M',
+  what:'Let AI Scan propose tasks',
+  why:'It can propose shoot dates, locations and crew. Briefs are full of "we still need to confirm X", which is a task, not a record — and Tasks now exists to receive them. This was parked waiting for exactly that, and the wait is over.'},
+ {id:'R12', area:'Crew · filters', size:'S',
+  what:'Clear the crew filter when you switch project',
+  why:'The filter is remembered across projects. Open project B after filtering project A and the filter is still on — the count is shown, but if you\'ve forgotten, it looks like crew are missing. Suggest clearing it on project switch.'},
+ {id:'R13', area:'Crew · filters', size:'S',
+  what:'Make "Inverse" harder to leave on by accident',
+  why:'The Inverse tickbox flips the filter to show everyone who does NOT match. It\'s genuinely useful and easy to forget you set. The Filter label could say so directly rather than only counting the filters.'},
+ {id:'R14', area:'AI Scan · setup', size:'S',
+  what:'Say up front if AI Scan isn\'t configured',
+  why:'AI Scan needs a key set on the server by hand. If it hasn\'t been, the feature looks completely normal and only fails when someone types a message and sends it. A one-line notice in the box, or on Settings, would be honest about the state.'},
+ {id:'R15', area:'Settings', size:'S',
+  what:'Make Settings sections collapsible',
+  why:'Your standing rule is that every section should collapse. Settings\' four sections don\'t. It\'s a short page so it doesn\'t hurt, but it is the exception to the rule — worth either fixing or consciously exempting.'},
+ {id:'R16', area:'Budget', size:'S',
+  what:'Make Budget\'s sections collapsible too',
+  why:'Same rule, same gap. Budget is one long section with a summary bar and a table. Not painful today, but it\'s the other place the rule isn\'t followed.'},
+ {id:'R17', area:'Whole app', size:'L',
+  what:'Undo',
+  why:'There isn\'t any. Deleting a project, a crew member or a shoot day is guarded by a confirm box and then it\'s gone. Bulk edit makes this sharper — one edit can now change 60 people at once. Even a five-second "undo" toast after destructive actions would help.'},
+ {id:'R18', area:'Whole app', size:'M',
+  what:'Protect against two tabs overwriting each other',
+  why:'Saving writes back the whole list, so two browser tabs open on the same data can silently erase each other\'s changes. This is a today problem, not just a multi-user one. Explained fully in Part 3, Stage 1 — I\'d put this above everything else on this list.'},
+];
+
+const state = {};
+const tbl = document.getElementById('recs');
+RECS.forEach(r=>{
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="rec-id">${r.id}</td>
+    <td><span class="rec-what">${r.what}</span></td>
+    <td class="rec-why">${r.why}</td>
+    <td class="where">${r.area}</td>
+    <td class="sizecol"><span class="size ${r.size==='M'?'m':r.size==='L'?'l':''}">${r.size}</span></td>
+    <td>
+      <div class="picks">
+        <span class="pick" data-v="yes">Yes</span>
+        <span class="pick" data-v="later">Later</span>
+        <span class="pick" data-v="no">No</span>
+      </div>
+      <textarea placeholder="Notes (optional)"></textarea>
+    </td>`;
+  tr.querySelectorAll('.pick').forEach(b=>{
+    b.onclick = ()=>{
+      const v = b.dataset.v;
+      if(state[r.id]?.pick === v){ delete state[r.id]; }
+      else { state[r.id] = {...(state[r.id]||{}), pick:v}; }
+      paint(tr, r.id); tally();
+    };
+  });
+  tr.querySelector('textarea').oninput = e=>{
+    state[r.id] = {...(state[r.id]||{}), note:e.target.value}; tally();
+  };
+  tbl.appendChild(tr);
+  tr._id = r.id;
+});
+function paint(tr, id){
+  const pick = state[id]?.pick;
+  tr.querySelectorAll('.pick').forEach(b=>{
+    b.className = 'pick' + (b.dataset.v===pick ? ' on '+(b.dataset.v==='no'?'no':b.dataset.v==='later'?'later':'') : '');
+  });
+  tr.classList.toggle('done', !!pick);
+}
+function tally(){
+  const n = Object.values(state).filter(s=>s.pick).length;
+  const t = `${n} of ${RECS.length} answered`;
+  document.getElementById('count').textContent = t;
+  document.getElementById('count2').textContent = t;
+}
+function setAll(v){
+  RECS.forEach(r=>{ state[r.id] = {...(state[r.id]||{}), pick:v}; });
+  [...tbl.rows].slice(1).forEach(tr=>paint(tr, tr._id)); tally();
+}
+function clearAll(){
+  Object.keys(state).forEach(k=>delete state[k]);
+  [...tbl.rows].slice(1).forEach(tr=>{ paint(tr, tr._id); tr.querySelector('textarea').value=''; });
+  tally();
+  document.getElementById('out').style.display='none';
+}
+function exportDecisions(){
+  const L = ['PHASE REFINEMENT — feedback on recommendations', ''];
+  const by = v => RECS.filter(r=>state[r.id]?.pick===v);
+  [['yes','BUILD THESE'],['later','LATER / MAYBE'],['no','NOT WANTED']].forEach(([v,heading])=>{
+    const rows = by(v);
+    if(!rows.length) return;
+    L.push(heading, '-'.repeat(heading.length));
+    rows.forEach(r=>{
+      L.push(`${r.id} [${r.area}, ${r.size}] ${r.what}`);
+      const n = state[r.id]?.note?.trim();
+      if(n) L.push(`    note: ${n}`);
+    });
+    L.push('');
+  });
+  const unanswered = RECS.filter(r=>!state[r.id]?.pick);
+  if(unanswered.length){
+    L.push('NO ANSWER GIVEN', '---------------');
+    unanswered.forEach(r=>{
+      const n = state[r.id]?.note?.trim();
+      L.push(`${r.id} ${r.what}${n?`  — note: ${n}`:''}`);
+    });
+    L.push('');
+  }
+  const out = document.getElementById('out');
+  out.value = L.join('\n');
+  out.style.display = 'block';
+  out.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  out.scrollIntoView({behavior:'smooth', block:'center'});
+}
+tally();
+</script>
+</div>
+</body>
+</html>

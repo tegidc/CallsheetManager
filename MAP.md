@@ -697,6 +697,21 @@ Both paths still end where they always did (`addLocToProject()` / `saveLocation(
 with `locFormContext` set). The Shoot Day form's `quickAddLocationForDay()` is a
 different entry point on a different screen and was left alone.
 
+## Refinement review page (Phase Refinement)
+
+`refinement-review.html` — fourth review page, same click-to-pick + notes +
+"Export my answers" system as `style-audit.html` / `-fonts` / `-detail`,
+standalone at the repo root, not linked from `index.html`. Unlike those three it
+is **not** a styling diagnostic: it records what Phase Refinement changed (Part
+1), lists 18 recommended feature changes that were deliberately NOT made because
+they'd alter behaviour (Part 2, R1–R18, each with an effort estimate), and
+carries the staged multi-user proposal (Part 3, the AL groundwork).
+
+⚠️ The single most important item on it is **R18 / Part 3 Stage 1**: `saveDB()`
+writes an entire collection back on every save, so two browser tabs open on the
+same data can silently erase each other's edits. That is a *today* risk, not a
+multi-user one — it needs no accounts, no login and no second person to happen.
+
 ## The design system, as decided (Phase Refinement)
 
 A consistency pass over everything built since Phase U (Budget, AI Scan, Overview
