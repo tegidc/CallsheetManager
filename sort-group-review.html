@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sort / Group by — Structural Review — Call Sheet App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Variables/tokens copied from index.html's :root — same brand palette, same
+     type scale, so this page's crew rows read exactly like the live Crew tab. */
+  :root{
+    --bg:#FFFFFF; --panel:#FFFFFF; --panel-2:#EEF5F2;
+    --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tape:#017756; --tape-light:#0FA47A; --tape-ink:#FFFFF5;
+    --danger:#a4321f; --text:#110A08; --muted:#6f6a63;
+    --disp:'Fraunces', Georgia, serif; --label:'Oswald', sans-serif; --body:'Jost', 'Futura PT', sans-serif;
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05);
+    --tint-3:rgba(1,119,86,.10); --tint-4:rgba(1,119,86,.14);
+    --tint-5:rgba(1,119,86,.35); --tint-6:rgba(1,119,86,.28);
+    --box-radius:8px; --box-pad:10px;
+    --fs-name:14px; --fs-field:13px; --fs-meta:12px; --fs-ctl:11px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg); color:var(--text); font-family:var(--body); -webkit-font-smoothing:antialiased; padding:24px 22px 90px;}
+
+  .page{max-width:980px; margin:0 auto;}
+  .page-head{margin-bottom:24px;}
+  .page-head h1{font-family:var(--disp); font-weight:700; font-size:25px; margin:0 0 4px; color:var(--text);}
+  .page-head .hint{font-size:13px;}
+  .page-head .note{background:var(--panel-2); border:1px solid var(--line); border-radius:var(--box-radius);
+    padding:10px 14px; font-size:12.5px; color:var(--muted); margin-top:12px;}
+
+  .approach{margin-bottom:34px;}
+  .approach-label{font-family:var(--label); font-size:11px; letter-spacing:1.4px; text-transform:uppercase;
+    color:var(--tape); margin-bottom:6px; font-weight:600;}
+  .approach-caption{font-size:12.5px; color:var(--muted); margin-bottom:14px; max-width:760px; line-height:1.5;}
+  .approach-caption b{color:var(--text); font-weight:600;}
+
+  .section{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px;}
+  .section h2{font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
+    color:var(--tape); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+  .section h2::after{content:''; flex:1; height:1px; background:var(--line);}
+
+  .hint{font-size:var(--fs-meta); color:var(--muted); margin-top:6px;}
+
+  label{display:block; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+  select, input[type=text]{width:100%; background:transparent; border:none; border-radius:0; border-bottom:1px solid var(--field-line);
+    color:var(--text); padding:6px 8px 5px; font-family:var(--body); font-size:var(--fs-field);}
+  select{cursor:pointer;}
+  select:hover, input[type=text]:hover{border-bottom-color:var(--text);}
+  select:focus, input[type=text]:focus{outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
+
+  .grid{display:grid; gap:14px;} .grid.g2{grid-template-columns:1fr 1fr;}
+  @media (max-width:640px){ .grid.g2{grid-template-columns:1fr;} }
+  .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:14px; background:var(--tint-1);}
+
+  .subhead{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--tape); margin:14px 0 8px; padding-bottom:0; border-bottom:none;
+    display:flex; align-items:center; gap:8px;}
+  .subhead::after{content:''; flex:1; height:1px; background:var(--line);}
+  .subhead:first-child{margin-top:0;}
+  .subhead.nested{color:var(--muted); font-size:10.5px; margin:8px 0 6px 4px;}
+  .dept-code{color:var(--tape); font-weight:600; letter-spacing:1.2px;}
+  .dept-count{color:var(--muted); font-weight:400;}
+
+  .pill{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; padding:2px 8px; border-radius:20px;
+    background:var(--panel-2); color:var(--muted); letter-spacing:1.2px; vertical-align:middle;}
+  .pill.dept{background:var(--tint-3); color:var(--tape);}
+  .pill.co{background:var(--panel-2); color:var(--muted);}
+  .pill.tag{background:var(--tint-4); color:var(--tape);}
+
+  .list-scroll{max-height:560px; overflow-y:auto; border-top:1px solid var(--line); padding-top:2px;}
+
+  .crew-row{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; padding:7px 2px; border-bottom:1px solid var(--line);}
+  .crew-row:last-child{border-bottom:none;}
+  .crew-row .name{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text); white-space:nowrap;}
+  .crew-row .role{font-size:var(--fs-meta); color:var(--muted); white-space:nowrap;}
+
+  .empty-note{font-size:13px; color:var(--muted); padding:10px 2px;}
+
+  /* ---- Approach C: preset buttons ---- */
+  .preset-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+  .preset-btn{font-family:var(--label); font-size:11.5px; letter-spacing:.6px; font-weight:500;
+    background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:20px;
+    padding:7px 14px; cursor:pointer;}
+  .preset-btn:hover{border-color:var(--tape);}
+  .preset-btn.active{background:var(--tape); color:var(--tape-ink); border-color:var(--tape);}
+  .preset-btn.custom{background:transparent; border-style:dashed;}
+
+  /* ---- Approach B / C-custom: field picker ---- */
+  .field-picker{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:14px; background:var(--tint-1);}
+  .field-search{margin-bottom:8px;}
+  .active-picks{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; margin-bottom:10px; align-items:center;}
+  .active-picks .pick{display:flex; align-items:center; gap:6px;}
+  .active-picks .pick-label{font-family:var(--label); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted);}
+  .active-picks .pick-val{font-weight:600; color:var(--tape);}
+  .active-picks .clear-x{cursor:pointer; color:var(--muted); font-size:12px;}
+  .active-picks .clear-x:hover{color:var(--danger);}
+
+  .field-list{max-height:280px; overflow-y:auto; border-top:1px solid var(--line);}
+  .field-row{display:flex; align-items:center; gap:10px; padding:7px 4px; border-bottom:1px solid var(--line);}
+  .field-row .fname{font-weight:600; font-size:13px; flex:1; min-width:0;}
+  .field-row .fexample{font-size:11px; color:var(--muted); flex:1.4; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .fbtn{font-family:var(--label); font-size:10px; letter-spacing:.8px; font-weight:500; text-transform:uppercase;
+    border:1px solid var(--line); background:var(--panel); color:var(--muted); border-radius:14px; padding:4px 10px; cursor:pointer; white-space:nowrap;}
+  .fbtn:hover:not(:disabled){border-color:var(--tape); color:var(--tape);}
+  .fbtn.on{background:var(--tape); color:var(--tape-ink); border-color:var(--tape);}
+  .fbtn:disabled{opacity:.3; cursor:default;}
+  .field-empty{font-size:12.5px; color:var(--muted); padding:10px 4px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>Sort / Group by — structural approaches</h1>
+    <div class="hint">Standalone review page — not linked from the app's nav, not a change to the live app.</div>
+    <div class="note">
+      All three sections below render the SAME 66-person crew roster from a real project ("ROW 2026 London",
+      Little Film Productions / OFTV) — real names, roles, departments, companies, VAT status, travel methods,
+      hotel bookings and shoot-day assignments, pulled live from the app's Supabase database. Every control is
+      live: change a dropdown, click a preset, or pick a field and the list below re-groups/re-sorts immediately.
+      This page compares three ways of <b>structuring</b> the flexibility (fixed dropdowns vs. a generic field
+      picker vs. presets-plus-custom) — it is not proposing a final option list, and no recommendation is made
+      between the three.
+    </div>
+  </div>
+
+  <!-- ============================================================ APPROACH A ============================================================ -->
+  <div class="approach">
+    <div class="approach-label">Approach A — Fixed curated dropdowns</div>
+    <div class="approach-caption">
+      Two ordinary <code>&lt;select&gt;</code> dropdowns, same shape as the live app's current Filter panel, but with a
+      deliberately broad option list — every grouping/sort the crew data model actually supports, spelled out up front.
+      <b>Trade-off:</b> simplest to build and to use (no discovery needed, everything's visible in one click), but the
+      option list is a fixed ceiling — a new kind of grouping needs a code change, and the list itself gets long as more
+      options are added.
+    </div>
+    <div class="section">
+      <h2>Crew on this project</h2>
+      <div class="filter-panel">
+        <div class="grid g2">
+          <div>
+            <label>Group by</label>
+            <select id="aGroup" onchange="renderA()">
+              <option value="department" selected>Department</option>
+              <option value="dept_company">Department &amp; Company</option>
+              <option value="company">Lead company</option>
+              <option value="role">Role</option>
+              <option value="subDepartment">Sub-department</option>
+              <option value="personType">Crew / Talent / Client</option>
+              <option value="hasHotel">Hotel assigned / not assigned</option>
+              <option value="travelMethod">Travel method</option>
+              <option value="vatRegistered">VAT registered</option>
+              <option value="dietaryGeneral">Catering / dietary type</option>
+              <option value="seniorityTier">Seniority</option>
+              <option value="daysOnSite">Shoot day on site</option>
+              <option value="none">None (flat list)</option>
+            </select>
+          </div>
+          <div>
+            <label>Sort by</label>
+            <select id="aSort" onchange="renderA()">
+              <option value="dept" selected>Department order (HoD first)</option>
+              <option value="name">Name (A–Z)</option>
+              <option value="role">Role</option>
+              <option value="seniority">Seniority</option>
+              <option value="company">Company</option>
+              <option value="daysCount">Days on site (most first)</option>
+              <option value="added">Date added to project</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint">Fully independent — any Group by pairs with any Sort by. This list is longer than the live app's current two-option shell on purpose, to show roughly how far a curated list needs to stretch to cover the real data.</div>
+      </div>
+      <div id="aList" class="list-scroll"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================ APPROACH B ============================================================ -->
+  <div class="approach">
+    <div class="approach-label">Approach B — Generic field picker</div>
+    <div class="approach-caption">
+      One searchable list of every attribute that actually exists on a crew-in-project record, built by reading the
+      record's own fields at runtime rather than a hand-typed list — so a field added to the data model later would
+      just appear here with no extra work. Each field is tagged <span class="pill tag">Groupable</span> and/or
+      <span class="pill tag">Sortable</span> depending on its shape (a boolean or short-list field groups well; a rate
+      or "date added" sorts but doesn't meaningfully group). <b>Trade-off:</b> maximum flexibility and it never goes
+      stale, but it exposes raw field names/values to the user and needs a search box to stay usable once the field
+      count grows — there's no editorial judgement about which groupings are actually useful.
+    </div>
+    <div class="section">
+      <h2>Crew on this project</h2>
+      <div id="bPicker"></div>
+      <div id="bList" class="list-scroll"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================ APPROACH C ============================================================ -->
+  <div class="approach">
+    <div class="approach-label">Approach C — Presets + custom</div>
+    <div class="approach-caption">
+      One click for the groupings people reach for most; a "Custom…" option folds out the same field picker as
+      Approach B for anything not covered. <b>Trade-off:</b> a hybrid — fast for the common cases (no dropdown to
+      read, just click), full flexibility still available one step down, but it's two UI patterns to maintain instead
+      of one, and someone has to decide which handful of groupings earn a permanent button.
+    </div>
+    <div class="section">
+      <h2>Crew on this project</h2>
+      <div class="preset-row" id="cPresets"></div>
+      <div id="cCustomWrap" style="display:none;">
+        <div id="cPicker"></div>
+      </div>
+      <div id="cList" class="list-scroll"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- real crew-on-project data: "ROW 2026 London" (id_msc4nv2c0g178), Little Film
+   Productions / OFTV — pulled live from the app's own Supabase app_data table
+   (db:crew / db:projects / db:shootdays, filtered to this project's crewIds, in
+   roster order). hasHotel/daysOnSite/travelMethod/rate are derived exactly the way
+   the live app derives them (p.hotelNightBefore + each shoot day's hotelNights,
+   d.positions, p.travelMethods, p.crewRateOverrides falling back to c.rate).
+   Phone numbers were deliberately left out of this export — not needed for any of
+   the three approaches below, and there's no reason to publish crew contact details
+   on a standalone review page. */
+const CREW_DATA = [{"id":"id_msc4nv2cpzeap","name":"Justin Schoenrock","role":"Executive Producer","roles":["Production/Executive Producer"],"department":"Production","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":0},{"id":"id_msc4nv2ch32ld","name":"Olivia Arnold","role":"Client Rep","roles":["Client/Client Rep"],"department":"Client","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"Flying","hasHotel":true,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":1},{"id":"id_msc4nv2cm1fon","name":"Julia Pomis","role":"Client Rep","roles":["Client/Client Rep"],"department":"Client","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"Train","hasHotel":true,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":2},{"id":"id_msc4nv2cnnukt","name":"Paul Buscemi","role":"EIC","roles":["Production/EIC"],"department":"Production","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":true,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":3},{"id":"id_msc4nv2cgk2wr","name":"Michael O'Brien","role":"Line Producer","roles":["Production/Line Producer"],"department":"Production","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":4},{"id":"id_msc4nv2chq7fd","name":"Alex Ovaida","role":"Producer","roles":["Production/Producer"],"department":"Production","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":5},{"id":"id_msc4nv2cqx8b5","name":"Taylor Hingtgen","role":"Producer","roles":["Production/Producer"],"department":"Production","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":true,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":6},{"id":"id_msc4nv2cuayor","name":"Nestor Ruesga","role":"Kit Tech","roles":["Equipment/Kit Tech"],"department":"Equipment","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":7},{"id":"id_msc4nv2cew3wq","name":"Tegid Cartwright","role":"DOP","roles":["Cinematography/DOP"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"Yes","rate":"\u00a3600/day","travelMethod":"","hasHotel":false,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"Yes","addedIdx":8},{"id":"id_msc4nv2c1bdqx","name":"Sabrina Goreeba","role":"Line Producer","roles":["Production/Line Producer"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"450","travelMethod":"","hasHotel":true,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":9},{"id":"id_msc4nv2cac46c","name":"Matt Wells","role":"Field Producer","roles":["Production/Field Producer"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"450","travelMethod":"Public transport","hasHotel":false,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":10},{"id":"id_msc4nv2cw8ald","name":"Karim D Clarke","role":"Camera Operator","roles":["Cinematography/Camera Operator"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"","rate":"850","travelMethod":"","hasHotel":false,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":11},{"id":"id_msc4nv2ctbtmq","name":"Alex Magill","role":"Gaffer","roles":["Grip/Gaffer"],"department":"Grip","subDepartment":"","company":"","vatRegistered":"","rate":"650","travelMethod":"","hasHotel":false,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"Yes","addedIdx":12},{"id":"id_msc4nv2ctg7mz","name":"Richard Scott","role":"Grip","roles":["Grip/Grip"],"department":"Grip","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":13},{"id":"id_msc4nv2c1rg6e","name":"Kevin W. Malbas","role":"Grip","roles":["Grip/Grip"],"department":"Grip","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":14},{"id":"id_msc4nv2cza9j8","name":"Daniel Kirwan-Baez","role":"Grip","roles":["Grip/Grip"],"department":"Grip","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":15},{"id":"id_msc4nv2co0t1m","name":"Callum Turnor","role":"Grip","roles":["Grip/Grip"],"department":"Grip","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["6"],"dietaryGeneral":"","drives":"","addedIdx":16},{"id":"id_msc4nv2cm77w1","name":"Amrita Bisla","role":"Set Designer","roles":["Set/Set Designer"],"department":"Set","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":17},{"id":"id_msc4nv2ckwotp","name":"Hana Koza","role":"Set Assistant","roles":["Set/Set Assistant"],"department":"Set","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":18},{"id":"id_msc4nv2cr7457","name":"Ishavishali Chandrakumar","role":"Set Assistant","roles":["Set/Set Assistant"],"department":"Set","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":19},{"id":"id_msc4nv2ca83qe","name":"Sam Charlton","role":"Runner","roles":["Production/Runner"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"300","travelMethod":"Production transport","hasHotel":true,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":20},{"id":"id_msc4nv2cj4x3l","name":"Hassan Al Rikhabi","role":"Security","roles":["Other/Security"],"department":"Other","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":21},{"id":"id_msc4nv2c0gvaf","name":"Mario Prifti","role":"Security","roles":["Other/Security"],"department":"Other","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":22},{"id":"id_msc4nv2cilwm5","name":"Jamie Brindle","role":"Rigger","roles":["Grip/Rigger"],"department":"Grip","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["1","5","6"],"dietaryGeneral":"","drives":"","addedIdx":23},{"id":"id_msc4nv2cnd19f","name":"Sid Ellisdon","role":"Runner","roles":["Production/Runner"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"300","travelMethod":"Production transport","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":24},{"id":"id_msc4nv2crgpij","name":"Alisha Shaw","role":"PA","roles":["Production/PA"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"350","travelMethod":"Own car","hasHotel":true,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":25},{"id":"id_msc4nv2c8x535","name":"Stella Moss","role":"PA","roles":["Production/PA"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"350","travelMethod":"","hasHotel":true,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":26},{"id":"id_msc4nv2cvftmw","name":"Heather Bradley","role":"Runner","roles":["Production/Runner"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"300","travelMethod":"Public transport","hasHotel":true,"daysOnSite":["1","2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":27},{"id":"id_msc4nv2c7jgkr","name":"Patch Boshell","role":"DJ / Tech","roles":["Other/DJ / Tech"],"department":"Other","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":[],"dietaryGeneral":"","drives":"","addedIdx":28},{"id":"id_msc4nv2chipdr","name":"Nicole McClain","role":"Edit Supervisor","roles":["Post Production/Edit Supervisor"],"department":"Post Production","subDepartment":"","company":"Creative Dynamic","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":29},{"id":"id_msc4nv2cj1giq","name":"Mark Bricker","role":"BTS Crew","roles":["Other/BTS Crew"],"department":"Other","subDepartment":"","company":"Strategic Media Team","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":30},{"id":"id_msc4nv2cugmoy","name":"Harrison Ferrante","role":"BTS Crew","roles":["Other/BTS Crew"],"department":"Other","subDepartment":"","company":"Strategic Media Team","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":31},{"id":"id_msc4nv2cy9oqx","name":"Spenser Sease","role":"BTS Crew","roles":["Other/BTS Crew"],"department":"Other","subDepartment":"","company":"Strategic Media Team","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":32},{"id":"id_msc4nv2c4xmau","name":"Emily Black","role":"Host","roles":["Talent/Host"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"Vegetarian","drives":"","addedIdx":33},{"id":"id_msc4nv2cduhu5","name":"Lewis Buchan","role":"BTS Crew","roles":["Other/BTS Crew"],"department":"Other","subDepartment":"","company":"Strategic Media Team","vatRegistered":"","rate":"","travelMethod":"","hasHotel":true,"daysOnSite":["2"],"dietaryGeneral":"","drives":"","addedIdx":34},{"id":"id_msc4nv2cwupta","name":"Jessica Phillips","role":"BTS Crew","roles":["Talent/Talent","Other/BTS Crew"],"department":"Other","subDepartment":"","company":"Strategic Media Team","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2"],"dietaryGeneral":"","drives":"","addedIdx":35},{"id":"id_msc4nv2cxixnz","name":"George Pearton","role":"Camera Operator","roles":["Cinematography/Camera Operator"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"","rate":"850","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":36},{"id":"id_msc4nv2cewhvy","name":"Charlie De La Hunt","role":"Camera Operator","roles":["Cinematography/Camera Operator"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"","rate":"900","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":37},{"id":"id_msc4nv2cf7jeg","name":"Konrad Frost","role":"Camera Operator","roles":["Cinematography/Camera Operator"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"","rate":"800","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":38},{"id":"id_msc4nv2cxqt7i","name":"Meurig Marshall","role":"Assistant Camera (AC)","roles":["Cinematography/Assistant Camera (AC)"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"","rate":"400","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":39},{"id":"id_msc4nv2co8qb8","name":"Alina Kosolova","role":"Assistant Camera (AC)","roles":["Cinematography/Assistant Camera (AC)"],"department":"Cinematography","subDepartment":"","company":"","vatRegistered":"","rate":"350","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":40},{"id":"id_msc4nv2crzyuv","name":"Mark Levien","role":"Sound Mixer","roles":["Audio/Sound Mixer"],"department":"Audio","subDepartment":"","company":"","vatRegistered":"","rate":"450","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":41},{"id":"id_msc4nv2ch4lkm","name":"Joe Worthy","role":"Boom Operator","roles":["Audio/Boom Operator"],"department":"Audio","subDepartment":"","company":"","vatRegistered":"","rate":"430","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":42},{"id":"id_msc4nv2cdj52c","name":"Jojo Copeman","role":"HMUA","roles":["Vanities/HMUA"],"department":"Vanities","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"Production transport","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":43},{"id":"id_msc4nv2cjdzzw","name":"Eden Ward","role":"HMUA","roles":["Vanities/HMUA"],"department":"Vanities","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"Own car","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":44},{"id":"id_msc4nv2ctsx80","name":"Brian De Carvalho","role":"Costume/Wardrobe","roles":["Vanities/Costume/Wardrobe"],"department":"Vanities","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"Own car","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":45},{"id":"id_msc4nv2c6hi4s","name":"Angel Leatherwood","role":"Costume/Wardrobe","roles":["Vanities/Costume/Wardrobe"],"department":"Vanities","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2","3","4","5","6"],"dietaryGeneral":"","drives":"","addedIdx":46},{"id":"id_msc4nv2cwx6sl","name":"Kai","role":"Security","roles":["Other/Security"],"department":"Other","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["3"],"dietaryGeneral":"","drives":"","addedIdx":47},{"id":"id_msc4nv2c80xcb","name":"Josh Bister","role":"DIT","roles":["Post Production/DIT"],"department":"Post Production","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["6"],"dietaryGeneral":"","drives":"","addedIdx":48},{"id":"id_msc4nv2c5t40u","name":"Billie Billington","role":"PA","roles":["Production/PA"],"department":"Production","subDepartment":"","company":"","vatRegistered":"","rate":"300","travelMethod":"Public transport","hasHotel":false,"daysOnSite":["6"],"dietaryGeneral":"","drives":"","addedIdx":49},{"id":"id_msc4nv2czliuh","name":"Freya Mallard","role":"Host","roles":["Talent/Host"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["6"],"dietaryGeneral":"","drives":"","addedIdx":50},{"id":"id_msc4nv2cvze00","name":"Sarah Jayne Dunn","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2"],"dietaryGeneral":"","drives":"","addedIdx":51},{"id":"id_msc4nv2c42oi6","name":"James Sutton","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["2"],"dietaryGeneral":"","drives":"","addedIdx":52},{"id":"id_msc4nv2cagnub","name":"Scarlett Howard","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["3"],"dietaryGeneral":"","drives":"","addedIdx":53},{"id":"id_msc4nv2c7ga9k","name":"Sophie Stonehouse","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["3"],"dietaryGeneral":"","drives":"","addedIdx":54},{"id":"id_msc4nv2clwdtl","name":"Hannah Elizabeth","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["3"],"dietaryGeneral":"","drives":"","addedIdx":55},{"id":"id_msc4nv2cfm7ij","name":"Elizabeth Vasilenko","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["3"],"dietaryGeneral":"","drives":"","addedIdx":56},{"id":"id_msc4nv2ctjea5","name":"Keiran Lee","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["4"],"dietaryGeneral":"","drives":"","addedIdx":57},{"id":"id_msc4nv2c4rjz1","name":"Danny D","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["4"],"dietaryGeneral":"","drives":"","addedIdx":58},{"id":"id_msc4nv2chcxpj","name":"Lauren Alexis","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["4"],"dietaryGeneral":"","drives":"","addedIdx":59},{"id":"id_msc4nv2cwzab3","name":"Kailah Bird","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["4"],"dietaryGeneral":"","drives":"","addedIdx":60},{"id":"id_msc4nv2c7o83t","name":"Rebecca Goodwin","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["5"],"dietaryGeneral":"","drives":"","addedIdx":61},{"id":"id_msc4nv2c9uja5","name":"Lena Polanski","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["5"],"dietaryGeneral":"","drives":"","addedIdx":62},{"id":"id_msc4nv2cb9rju","name":"Vanessa Neumann","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["5"],"dietaryGeneral":"","drives":"","addedIdx":63},{"id":"id_msc4nv2cgklfv","name":"Stefan Garlicki","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["5"],"dietaryGeneral":"","drives":"","addedIdx":64},{"id":"id_msc4nv2ctcjqh","name":"Meg Prescott","role":"Guest","roles":["Talent/Guest"],"department":"Talent","subDepartment":"","company":"","vatRegistered":"","rate":"","travelMethod":"","hasHotel":false,"daysOnSite":["6"],"dietaryGeneral":"","drives":"","addedIdx":65}];
+const DEPARTMENTS = ['Production','Client','Talent','Cinematography','Audio','Grip','Equipment','Set','Vanities','Catering & Travel','Post Production','Other'];
+const DEPARTMENT_CODES = {
+  'Production':'PROD','Client':'CLIENT','Talent':'TALENT','Cinematography':'CIN','Audio':'AUD',
+  'Grip':'GRIP','Equipment':'EQUIP','Set':'SET','Vanities':'HMUC','Catering & Travel':'CAT/TRA',
+  'Post Production':'POST','Other':'—'
+};
+/* approximate seniority ordering (most senior first) covering the roles actually
+   present on this project — same idea as the real app's ROLE_SENIORITY, just a flat
+   illustrative list here rather than a per-department admin-editable one. Used for
+   Approach A's "Seniority" sort and the derived seniorityTier field all three
+   approaches can group by. */
+const SENIORITY_ORDER = [
+  'Director','Executive Producer','EIC','Line Producer','Field Producer','Producer',
+  'Production Manager','Production Coordinator','Client Rep','DOP',
+  'Gaffer','Sound Mixer','Set Designer','HMUA','Costume/Wardrobe','Edit Supervisor',
+  'Camera Operator','Assistant Camera (AC)','Boom Operator','Kit Tech','DIT',
+  'Grip','Rigger','Set Assistant','Runner','PA','Host','Guest','BTS Crew','DJ / Tech','Security',
+];
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function seniorityRank(role){ const i = SENIORITY_ORDER.indexOf(role); return i===-1 ? Infinity : i; }
+function seniorityTierOf(role){
+  const r = seniorityRank(role);
+  if(r<10) return 'Lead / Head of Department';
+  if(r<21) return 'Mid-level';
+  return 'Support';
+}
+function personTypeOf(c){
+  if(c.department==='Talent') return 'Talent';
+  if(c.department==='Client') return 'Client';
+  return 'Crew';
+}
+/* two fields derived at load time (not raw db columns) so all three approaches below
+   can group/sort by "seniority" and "crew vs talent vs client" without either being a
+   literal field on the crew record — same as how the live app derives things like
+   deptBucketKey() or personHasHotel() rather than storing them */
+CREW_DATA.forEach(c=>{ c.seniorityTier = seniorityTierOf(c.role); c.personType = personTypeOf(c); });
+
+function deptIndex(dept){ const i = DEPARTMENTS.indexOf(dept); return i===-1 ? DEPARTMENTS.length : i; }
+function sortHoDFirst(list){ return list.slice().sort((a,b)=> (b.isHoD?1:0)-(a.isHoD?1:0) || (a.name||'').localeCompare(b.name||'')); }
+function parseRate(rate){ const m = /([\d.]+)/.exec(rate||''); return m ? parseFloat(m[1]) : null; }
+
+function rowHTML(c){
+  const deptPill = `<span class="pill dept">${esc(DEPARTMENT_CODES[c.department]||c.department||'—')}</span>`;
+  const coPill = c.company ? `<span class="pill co">${esc(c.company)}</span>` : '';
+  return `<div class="crew-row">
+      <span class="name">${esc(c.name)}</span>
+      <span class="role">${esc(c.role)}</span>
+      ${deptPill}${coPill}
+    </div>`;
+}
+function groupHeaderHTML(label, count, code){
+  return `<div class="subhead">${code?`<span class="dept-code">${esc(code)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span></div>`;
+}
+
+/* ---------------- generic sort engine — shared by all three approaches ---------------- */
+function applySort(list, sortKey){
+  const l = list.slice();
+  const byName = (a,b)=> a.name.localeCompare(b.name);
+  switch(sortKey){
+    case 'name': return l.sort(byName);
+    case 'role': return l.sort((a,b)=>a.role.localeCompare(b.role)||byName(a,b));
+    case 'department': return l.sort((a,b)=>deptIndex(a.department)-deptIndex(b.department)||byName(a,b));
+    case 'subDepartment': return l.sort((a,b)=>(a.subDepartment||'￿').localeCompare(b.subDepartment||'￿')||byName(a,b));
+    case 'company': return l.sort((a,b)=>(a.company||'￿').localeCompare(b.company||'￿')||byName(a,b));
+    case 'travelMethod': return l.sort((a,b)=>(a.travelMethod||'￿').localeCompare(b.travelMethod||'￿')||byName(a,b));
+    case 'dietaryGeneral': return l.sort((a,b)=>(a.dietaryGeneral||'￿').localeCompare(b.dietaryGeneral||'￿')||byName(a,b));
+    case 'vatRegistered': return l.sort((a,b)=>((b.vatRegistered==='Yes')-(a.vatRegistered==='Yes'))||byName(a,b));
+    case 'hasHotel': return l.sort((a,b)=>((b.hasHotel?1:0)-(a.hasHotel?1:0))||byName(a,b));
+    case 'drives': return l.sort((a,b)=>((b.drives==='Yes')-(a.drives==='Yes'))||byName(a,b));
+    case 'personType': return l.sort((a,b)=>['Crew','Talent','Client'].indexOf(a.personType)-['Crew','Talent','Client'].indexOf(b.personType)||byName(a,b));
+    case 'seniorityTier':
+    case 'seniority': return l.sort((a,b)=>seniorityRank(a.role)-seniorityRank(b.role)||byName(a,b));
+    case 'daysOnSite':
+    case 'daysCount': return l.sort((a,b)=>b.daysOnSite.length-a.daysOnSite.length||byName(a,b));
+    case 'addedIdx':
+    case 'added': return l.sort((a,b)=>a.addedIdx-b.addedIdx);
+    case 'rate': return l.sort((a,b)=>{
+      const ra=parseRate(a.rate), rb=parseRate(b.rate);
+      if(ra==null&&rb==null) return byName(a,b);
+      if(ra==null) return 1; if(rb==null) return -1;
+      return rb-ra;
+    });
+    case 'roles': return l.sort((a,b)=>((a.roles&&a.roles[0])||'￿').localeCompare((b.roles&&b.roles[0])||'￿')||byName(a,b));
+    case 'dept':
+    default: return sortHoDFirst(l).sort((a,b)=>deptIndex(a.department)-deptIndex(b.department));
+  }
+}
+
+/* ---------------- generic group engine — shared by all three approaches ---------------- */
+const GROUP_ORDER = {
+  department: DEPARTMENTS,
+  seniorityTier: ['Lead / Head of Department','Mid-level','Support'],
+  personType: ['Crew','Talent','Client'],
+  hasHotel: ['Has hotel','No hotel'],
+};
+function bucketSortKey(key, label){
+  const order = GROUP_ORDER[key];
+  if(order){ const i = order.indexOf(label); return i===-1?999:i; }
+  if(key==='daysOnSite') return label==='Not on any shoot day' ? 999 : parseInt(label.replace('Day ',''),10);
+  if(key==='vatRegistered') return label==='Yes' ? 0 : 1;
+  return null;
+}
+function fieldValues(c, key){
+  switch(key){
+    case 'daysOnSite': return (c.daysOnSite&&c.daysOnSite.length) ? c.daysOnSite.map(d=>'Day '+d) : ['Not on any shoot day'];
+    case 'roles': return (c.roles&&c.roles.length) ? c.roles.map(rp=> rp.includes('/')?rp.split('/').slice(1).join('/'):rp) : ['No saved roles'];
+    case 'hasHotel': return [c.hasHotel ? 'Has hotel' : 'No hotel'];
+    case 'vatRegistered': return [c.vatRegistered || 'Not set / no VAT'];
+    case 'drives': return [c.drives || 'Not specified'];
+    case 'travelMethod': return [c.travelMethod || 'Not set'];
+    case 'dietaryGeneral': return [c.dietaryGeneral || 'Standard / not set'];
+    case 'company': return [c.company || 'No lead company (in-house)'];
+    case 'subDepartment': return [c.subDepartment || 'No sub-department'];
+    default: { const v = c[key]; return [ (v==null||v==='') ? '(blank)' : String(v) ]; }
+  }
+}
+function groupAndSort(list, groupKey, sortKey){
+  if(!groupKey || groupKey==='none'){
+    return [{ key:'__all__', label:null, items: applySort(list, sortKey) }];
+  }
+  if(groupKey==='dept_company'){
+    const groups = [];
+    DEPARTMENTS.forEach(dept=>{
+      const deptItems = list.filter(c=>c.department===dept);
+      if(!deptItems.length) return;
+      const companies = [...new Set(deptItems.map(c=>c.company||'No lead company (in-house)'))]
+        .sort((a,b)=> a==='No lead company (in-house)'?1 : b==='No lead company (in-house)'?-1 : a.localeCompare(b));
+      const sub = companies.map(co=>({ label:co, items: applySort(deptItems.filter(c=>(c.company||'No lead company (in-house)')===co), sortKey) }));
+      groups.push({ key:dept, label:dept, code:DEPARTMENT_CODES[dept], sub });
+    });
+    return groups;
+  }
+  const buckets = {};
+  list.forEach(c=>{ fieldValues(c, groupKey).forEach(label=>{ (buckets[label]=buckets[label]||[]).push(c); }); });
+  const labels = Object.keys(buckets);
+  labels.sort((a,b)=>{
+    const ka = bucketSortKey(groupKey,a), kb = bucketSortKey(groupKey,b);
+    if(ka!=null || kb!=null) return (ka==null?999:ka)-(kb==null?999:kb);
+    const blankish = s => /^(blank|not set|no |standard)/i.test(s);
+    if(blankish(a)!==blankish(b)) return blankish(a)?1:-1;
+    return a.localeCompare(b);
+  });
+  return labels.map(label=>({ key:label, label, code: groupKey==='department'?DEPARTMENT_CODES[label]:'', items: applySort(buckets[label], sortKey) }));
+}
+function renderGroups(containerId, groups){
+  let html = '';
+  groups.forEach(g=>{
+    if(g.sub){
+      html += groupHeaderHTML(g.label, g.sub.reduce((n,s)=>n+s.items.length,0), g.code);
+      g.sub.forEach(s=>{
+        html += `<div class="subhead nested">${esc(s.label)} <span class="dept-count">(${s.items.length})</span></div>`;
+        html += s.items.map(rowHTML).join('');
+      });
+    } else if(g.label===null){
+      html += g.items.map(rowHTML).join('');
+    } else {
+      html += groupHeaderHTML(g.label, g.items.length, g.code);
+      html += g.items.map(rowHTML).join('');
+    }
+  });
+  document.getElementById(containerId).innerHTML = html || '<div class="empty-note">No crew match.</div>';
+}
+
+/* ================================================================ APPROACH A */
+function renderA(){
+  const groupKey = document.getElementById('aGroup').value;
+  const sortKey = document.getElementById('aSort').value;
+  renderGroups('aList', groupAndSort(CREW_DATA, groupKey, sortKey));
+}
+
+/* ================================================================ APPROACH B + C's "Custom…" (shared field-picker engine) */
+const EXCLUDED_FIELDS = ['id'];
+const FIELD_META = {
+  name:            { label:'Name', groupable:false, sortable:true },
+  role:            { label:'Role', groupable:true, sortable:true },
+  roles:           { label:'Saved roles', groupable:true, sortable:true },
+  department:      { label:'Department', groupable:true, sortable:true },
+  subDepartment:   { label:'Sub-department', groupable:true, sortable:true },
+  company:         { label:'Lead / co-production company', groupable:true, sortable:true },
+  vatRegistered:   { label:'VAT registered', groupable:true, sortable:true },
+  rate:            { label:'Day rate', groupable:false, sortable:true },
+  travelMethod:    { label:'Travel method', groupable:true, sortable:true },
+  hasHotel:        { label:'Hotel assigned', groupable:true, sortable:true },
+  daysOnSite:      { label:'Shoot days on site', groupable:true, sortable:true },
+  dietaryGeneral:  { label:'Catering / dietary type', groupable:true, sortable:true },
+  drives:          { label:'Drives own vehicle', groupable:true, sortable:true },
+  addedIdx:        { label:'Date added to project', groupable:false, sortable:true },
+  seniorityTier:   { label:'Seniority tier (derived)', groupable:true, sortable:true },
+  personType:      { label:'Crew / Talent / Client (derived)', groupable:true, sortable:true },
+};
+function humanizeKey(k){ return k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()); }
+function buildFieldDefs(){
+  const sample = CREW_DATA[0];
+  return Object.keys(sample).filter(k=>!EXCLUDED_FIELDS.includes(k)).map(key=>{
+    const meta = FIELD_META[key];
+    if(meta) return Object.assign({key}, meta);
+    /* fallback for any field NOT explicitly annotated above — this is what makes the
+       picker genuinely extensible: a field added to the crew-in-project record later
+       still shows up here, usably, with no code change to this page */
+    const vals = CREW_DATA.map(c=>c[key]);
+    const isArray = Array.isArray(vals[0]);
+    const distinct = new Set(vals.map(v=>Array.isArray(v)?v.join(','):v)).size;
+    return { key, label: humanizeKey(key), groupable: isArray || distinct<=20, sortable: !isArray };
+  });
+}
+const FIELD_DEFS = buildFieldDefs();
+function fieldLabel(key){ const f = FIELD_DEFS.find(x=>x.key===key); return f?f.label:key; }
+function exampleValue(key){
+  const rec = CREW_DATA.find(c=>{ const v=c[key]; return Array.isArray(v)?v.length:v; });
+  if(!rec) return '—';
+  const v = rec[key];
+  return Array.isArray(v) ? v.join(', ') : String(v);
+}
+
+const pickerState = { b:{ query:'', group:'department', sort:'name' }, c:{ query:'', group:null, sort:null } };
+function fieldPickerShellHTML(prefix, state){
+  return `<div class="field-picker">
+    <div class="field-search"><label>Search fields</label><input type="text" id="${prefix}Query" placeholder="e.g. hotel, VAT, travel…" value="${esc(state.query||'')}" oninput="setQuery('${prefix}', this.value)"></div>
+    <div class="active-picks" id="${prefix}ActivePicks"></div>
+    <div class="field-list" id="${prefix}FieldList"></div>
+  </div>`;
+}
+function activePicksHTML(prefix, state){
+  return `<div class="pick"><span class="pick-label">Group by</span> <span class="pick-val">${state.group?esc(fieldLabel(state.group)):'— none —'}</span>${state.group?`<span class="clear-x" onclick="setField('${prefix}','group',null)" title="Clear">✕</span>`:''}</div>
+    <div class="pick"><span class="pick-label">Sort by</span> <span class="pick-val">${state.sort?esc(fieldLabel(state.sort)):'— none —'}</span>${state.sort?`<span class="clear-x" onclick="setField('${prefix}','sort',null)" title="Clear">✕</span>`:''}</div>`;
+}
+function fieldListRowsHTML(prefix, state){
+  const q = (state.query||'').toLowerCase();
+  const rows = FIELD_DEFS.filter(f=> !q || f.label.toLowerCase().includes(q) || f.key.toLowerCase().includes(q));
+  if(!rows.length) return '<div class="field-empty">No field matches your search.</div>';
+  return rows.map(f=>`
+    <div class="field-row">
+      <span class="fname">${esc(f.label)}</span>
+      <span class="fexample">e.g. ${esc(exampleValue(f.key))}</span>
+      <button class="fbtn ${state.group===f.key?'on':''}" ${f.groupable?'':'disabled'} onclick="setField('${prefix}','group','${f.key}')" title="${f.groupable?'Group crew by this field':'Not groupable — too many distinct values'}">Group</button>
+      <button class="fbtn ${state.sort===f.key?'on':''}" ${f.sortable?'':'disabled'} onclick="setField('${prefix}','sort','${f.key}')" title="${f.sortable?'Sort crew by this field':'Not orderable'}">Sort</button>
+    </div>`).join('');
+}
+function updateFieldPicker(prefix){
+  const state = pickerState[prefix];
+  document.getElementById(prefix+'ActivePicks').innerHTML = activePicksHTML(prefix, state);
+  document.getElementById(prefix+'FieldList').innerHTML = fieldListRowsHTML(prefix, state);
+}
+function setQuery(prefix, val){ pickerState[prefix].query = val; updateFieldPicker(prefix); }
+function setField(prefix, kind, key){
+  pickerState[prefix][kind] = (pickerState[prefix][kind]===key) ? null : key;
+  updateFieldPicker(prefix);
+  if(prefix==='b') renderB(); else renderC();
+}
+
+/* ================================================================ APPROACH B */
+function initB(){
+  document.getElementById('bPicker').innerHTML = fieldPickerShellHTML('b', pickerState.b);
+  updateFieldPicker('b');
+  renderB();
+}
+function renderB(){
+  const st = pickerState.b;
+  renderGroups('bList', groupAndSort(CREW_DATA, st.group, st.sort));
+}
+
+/* ================================================================ APPROACH C */
+const PRESETS = [
+  { label:'By department', group:'department', sort:'dept' },
+  { label:'By hotel assigned', group:'hasHotel', sort:'name' },
+  { label:'By VAT status', group:'vatRegistered', sort:'name' },
+  { label:'By travel method', group:'travelMethod', sort:'name' },
+  { label:'By company', group:'company', sort:'name' },
+];
+let cState = { mode:'preset', presetIdx:0 };
+function presetsHTML(){
+  return PRESETS.map((p,i)=>`<button class="preset-btn ${cState.mode==='preset'&&cState.presetIdx===i?'active':''}" onclick="pickPreset(${i})">${esc(p.label)}</button>`).join('')
+    + `<button class="preset-btn custom ${cState.mode==='custom'?'active':''}" onclick="pickCustom()">Custom…</button>`;
+}
+function pickPreset(i){
+  cState.mode = 'preset'; cState.presetIdx = i;
+  document.getElementById('cCustomWrap').style.display = 'none';
+  document.getElementById('cPresets').innerHTML = presetsHTML();
+  renderC();
+}
+function pickCustom(){
+  cState.mode = 'custom';
+  document.getElementById('cCustomWrap').style.display = '';
+  document.getElementById('cPresets').innerHTML = presetsHTML();
+  if(!document.getElementById('cPicker').innerHTML.trim()){
+    document.getElementById('cPicker').innerHTML = fieldPickerShellHTML('c', pickerState.c);
+    updateFieldPicker('c');
+  }
+  renderC();
+}
+function renderC(){
+  if(cState.mode==='preset'){
+    const p = PRESETS[cState.presetIdx];
+    renderGroups('cList', groupAndSort(CREW_DATA, p.group, p.sort));
+  } else {
+    const st = pickerState.c;
+    renderGroups('cList', groupAndSort(CREW_DATA, st.group, st.sort));
+  }
+}
+
+/* ---- init ---- */
+document.getElementById('cPresets').innerHTML = presetsHTML();
+renderA();
+initB();
+renderC();
+</script>
+</body>
+</html>
