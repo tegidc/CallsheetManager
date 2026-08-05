@@ -684,27 +684,24 @@
     .crewgrid-row-name{margin-bottom:8px;}
     /* The whole chip IS the toggle: the native checkbox is stretched invisibly over
        it (still focusable, still fires change), and state is read from the chip's
-       own fill plus a tick. That removes the redundant box-next-to-a-label, roughly
-       halves each chip's width, and gives a full 44px tap target on the chip. */
+       own fill. That removes the redundant box-next-to-a-label. Sized (and squared
+       off, no border-radius) to fit up to 7 same-row chips on a phone-width screen
+       without wrapping — a full week's D1–D7 row (Phase Bulk Edit). */
     .crewgrid-check{
       position:relative; display:inline-flex; align-items:center; justify-content:center;
-      border:1px solid var(--line); border-radius:20px; padding:0 13px;
-      margin:0 6px 6px 0; background:#fff; min-height:44px; min-width:52px;
-      transition:border-color .12s ease;
+      border:1px solid var(--line); border-radius:0; padding:0 7px;
+      margin:0 4px 4px 0; background:#fff; min-height:32px; min-width:30px;
+      transition:background-color .12s ease, border-color .12s ease;
     }
     .crewgrid-check::before{
-      content:attr(data-day); font-family:var(--label); font-size:13px;
-      font-weight:500; letter-spacing:.4px; color:var(--muted);
+      content:attr(data-day); font-family:var(--label); font-size:11px;
+      font-weight:500; letter-spacing:.3px; color:var(--muted);
     }
-    /* tick appears only when on, and reserves no space when off */
-    .crewgrid-check::after{
-      content:'\00D7'; font-size:16px; font-weight:500; color:var(--text);
-      width:0; overflow:hidden; opacity:0; transition:width .12s ease, opacity .12s ease;
-    }
-    /* checked state is the X and a darker outline only — the fill never changes */
-    .crewgrid-check:has(input:checked){border-color:var(--text);}
-    .crewgrid-check:has(input:checked)::before{color:var(--text); font-weight:600;}
-    .crewgrid-check:has(input:checked)::after{width:1.1em; opacity:1; margin-left:5px;}
+    /* Checked state is ONE signal, not two: a filled dark chip. Earlier this also
+       drew an "×" mark alongside the darker outline, which was redundant with the
+       fill — removed (Phase Bulk Edit). */
+    .crewgrid-check:has(input:checked){background:var(--text); border-color:var(--text);}
+    .crewgrid-check:has(input:checked)::before{color:#fff; font-weight:600;}
     /* inset:-1px, not 0 — absolute children position against the PADDING box, so
        inset:0 would leave the chip's 1px border ring untappable */
     .crewgrid-check input{
@@ -960,7 +957,17 @@ async function setActiveRole(crewId, rolePath, skipSave){
   const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
   c.role = roleName;
   if(dept){ c.department = dept; c.subDepartment = ''; }
-  if(!skipSave){ await saveDB('db:crew', crewDB); refreshCrewScreen(); }
+  if(!skipSave){
+    // skipSave calls are internal consistency fixups (e.g. reactivating a
+    // replacement role after removeRoleFromCrew) — only a direct, user-initiated
+    // role pick fans out to the rest of the current selection.
+    selectedEditTargets(crewId).filter(id=>id!==crewId).forEach(id=>{
+      const other = crewById(id); if(!other) return;
+      other.role = roleName;
+      if(dept){ other.department = dept; other.subDepartment = ''; }
+    });
+    await saveDB('db:crew', crewDB); refreshCrewScreen();
+  }
 }
 /* ---- "Add new role" dialog (item 5) ----
    Single in-page dialog: canonical Department select + free-text Role name,
@@ -2428,6 +2435,19 @@ function toggleSelectAllFilteredCrew(idsCSV, checked){
   renderProjectBody();
 }
 function clearCrewSelection(){ projectCrewSelected.clear(); bulkEditOpen = false; renderProjectBody(); }
+/* ---- Selected-set bulk edit (Phase Bulk Edit) ----
+   Every per-field editor on the Crew tab (day/hotel/meal checkboxes, travel method,
+   Show as, role) calls this at the top of its mutation to find out who the edit
+   should actually apply to. If the person being edited is part of the current
+   multi-select AND at least one other person is also selected, the edit fans out to
+   the whole selected set; otherwise it's just that one person, same as before this
+   phase. Callers still own their own field-specific mutation — this only answers
+   "which ids", so a single loop + one save/render per call site covers every field
+   without a per-field bulk-edit implementation. */
+function selectedEditTargets(crewId){
+  if(projectCrewSelected.size>1 && projectCrewSelected.has(crewId)) return [...projectCrewSelected];
+  return [crewId];
+}
 async function bulkRemoveSelectedFromProject(){
   const p = currentProject(); if(!p) return;
   const n = projectCrewSelected.size;
@@ -2472,11 +2492,14 @@ async function applyBulkLeadCompany(){
 }
 function bulkActionBarHTML(){
   if(!projectCrewSelected.size) return '';
+  const propagateHint = projectCrewSelected.size>1
+    ? `<span class="hint">Editing a field for one selected person applies it to all ${projectCrewSelected.size}</span>` : '';
   return `<div class="bulk-action-bar">
     <strong>${projectCrewSelected.size} selected</strong>
     <button class="small" onclick="toggleBulkEdit()">Edit</button>
     <button class="small danger" onclick="bulkRemoveSelectedFromProject()">Remove from project</button>
     <span class="hint" style="cursor:pointer;" onclick="clearCrewSelection()">Clear selection</span>
+    ${propagateHint}
   </div>${bulkEditPanelHTML()}`;
 }
 /* ---- Crew toolbar (Phase Detail) --------------------------------------------
@@ -2657,10 +2680,11 @@ async function saveQuickShowAs(crewId, value){
   const c = crewById(crewId); if(!c) return;
   const next = (value||'').trim();
   if(c.showAs === next) return;
-  c.showAs = next;
+  selectedEditTargets(crewId).forEach(id=>{ const other = crewById(id); if(other) other.showAs = next; });
   await saveDB('db:crew', crewDB);
   // no re-render: the input already shows the new value, and re-rendering here
-  // would steal focus from wherever the user tabbed to next
+  // would steal focus from wherever the user tabbed to next. Other selected
+  // rows' inputs pick up the propagated value next time they're rendered.
 }
 /* shared "add from crew database" option-list builder — grouped by department
    instead of a flat list, for the project Crew tab and Position Assignments pickers */
@@ -2736,16 +2760,20 @@ function crewCateringBlockHTML(c, days){
 async function toggleHotelNight(crewId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
   d.hotelNights = d.hotelNights || [];
-  if(checked){ if(!d.hotelNights.includes(crewId)) d.hotelNights.push(crewId); }
-  else { d.hotelNights = d.hotelNights.filter(id=>id!==crewId); }
+  selectedEditTargets(crewId).forEach(id=>{
+    if(checked){ if(!d.hotelNights.includes(id)) d.hotelNights.push(id); }
+    else { d.hotelNights = d.hotelNights.filter(x=>x!==id); }
+  });
   await saveDB('db:shootdays', shootDaysDB);
   renderProjectBody();
 }
 async function toggleHotelPre(crewId, checked){
   const p = currentProject(); if(!p) return;
   p.hotelNightBefore = p.hotelNightBefore || [];
-  if(checked){ if(!p.hotelNightBefore.includes(crewId)) p.hotelNightBefore.push(crewId); }
-  else { p.hotelNightBefore = p.hotelNightBefore.filter(id=>id!==crewId); }
+  selectedEditTargets(crewId).forEach(id=>{
+    if(checked){ if(!p.hotelNightBefore.includes(id)) p.hotelNightBefore.push(id); }
+    else { p.hotelNightBefore = p.hotelNightBefore.filter(x=>x!==id); }
+  });
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
@@ -2869,10 +2897,12 @@ function getCateringMeals(dayId, crewId){
 async function toggleMeal(crewId, dayId, meal, checked){
   const d = dayById(dayId); if(!d) return;
   d.cateringMeals = d.cateringMeals || {};
-  d.cateringMeals[crewId] = d.cateringMeals[crewId] || {b:false, l:false, d:false};
-  d.cateringMeals[crewId][meal] = checked;
-  // clean up if all false
-  if(!d.cateringMeals[crewId].b && !d.cateringMeals[crewId].l && !d.cateringMeals[crewId].d) delete d.cateringMeals[crewId];
+  selectedEditTargets(crewId).forEach(id=>{
+    d.cateringMeals[id] = d.cateringMeals[id] || {b:false, l:false, d:false};
+    d.cateringMeals[id][meal] = checked;
+    // clean up if all false
+    if(!d.cateringMeals[id].b && !d.cateringMeals[id].l && !d.cateringMeals[id].d) delete d.cateringMeals[id];
+  });
   await saveDB('db:shootdays', shootDaysDB);
   renderProjectBody();
 }
@@ -3055,16 +3085,16 @@ async function setTravelMethod(crewId, selectEl){
   const value = selectEl.value;
   const p = currentProject(); if(!p) return;
   p.travelMethods = p.travelMethods || {};
+  let applied = value;
   if(value==='__add__'){
     const newOpt = (prompt('Add a new travel method:')||'').trim();
     if(newOpt && !travelMethodsList.includes(newOpt)){
       travelMethodsList.push(newOpt);
       await saveDB('db:travelmethods', travelMethodsList);
     }
-    p.travelMethods[crewId] = newOpt || '';
-  } else {
-    p.travelMethods[crewId] = value;
+    applied = newOpt || '';
   }
+  selectedEditTargets(crewId).forEach(id=>{ p.travelMethods[id] = applied; });
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
@@ -3180,11 +3210,13 @@ function copyTransportSummary(){
 async function toggleCrewOnDay(crewId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
   d.positions = d.positions || [];
-  if(checked){
-    if(!d.positions.some(pos=>pos[0]===crewId)) d.positions.push([crewId, '', '', '', '']);
-  } else {
-    d.positions = d.positions.filter(pos=>pos[0]!==crewId);
-  }
+  selectedEditTargets(crewId).forEach(id=>{
+    if(checked){
+      if(!d.positions.some(pos=>pos[0]===id)) d.positions.push([id, '', '', '', '']);
+    } else {
+      d.positions = d.positions.filter(pos=>pos[0]!==id);
+    }
+  });
   await saveDB('db:shootdays', shootDaysDB);
   renderProjectBody();
 }
