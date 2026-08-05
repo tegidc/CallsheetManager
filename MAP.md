@@ -167,6 +167,81 @@ Every screen needs the same handful of records. These are the single place that 
 - `WMO` — lookup table mapping Open-Meteo weather codes to human-readable conditions — [Shoot Days]
 - `saveShootDay()` — validates and persists the current shoot day's form data — [Shoot Days]
 
+## Budget
+
+Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already
+entered elsewhere in the app rather than owning any of its own, with one exception: no
+per-project hotel rate existed anywhere before this phase, so `getHotelCosts()`/
+`saveHotelCosts()` were added, same `{field: Number(val)||0}` shape as
+`getCateringCosts()`/`getTransportCosts()`. Deliberately excludes location fees (one
+fee can span several shoot days, not handled here) and offers no editable line-item
+budget or export of its own — Preview & Export stays the export surface.
+
+- `VAT_RATE` — fixed at 0.20 (UK standard). Not project-configurable — a real rate
+  input is out of scope for a cost-visibility phase — [Budget]
+- `parseRateNumber()` — best-effort numeric extraction from the crew database's
+  free-text Fee/rate field ("£450/day" → 450); returns `null` (not 0) when nothing
+  numeric is found, so "no rate on file" stays distinguishable from "costs nothing" —
+  [Budget]
+- `resolveCrewRate()` — **the per-project day-rate override mechanism.** Day rate
+  needs to vary by job, so it follows the same shape as every other per-project
+  per-crew-id map already in the app (`p.travelMethods`, `p.hotelNightBefore`,
+  `day.crewOverrides`): `p.crewRateOverrides[crewId]`. Checked first; falls back to
+  `parseRateNumber(c.rate)`; falls back to "no rate on file" (`hasRate:false`) rather
+  than silently costing someone at 0 — [Budget]
+- `saveCrewRateOverride()` — writes/clears one person's override (empty input clears
+  it, reverting to the database rate); rejects a non-numeric entry by re-rendering
+  without saving, so the field visibly reverts instead of holding invalid text —
+  edited inline on the Per Person view, no separate edit affordance (matches the
+  Phase Detail "Show as" decision — a plain input, not a pencil-and-save control) —
+  [Budget]
+- `getHotelCosts()` / `saveHotelCosts()` — the one cost rate Budget owns itself
+  (`p.hotelCosts.perRoomNight`), since Catering/Travel already have theirs on their
+  own tabs — [Budget]
+- `budgetView` / `setBudgetView()` — which of the three views (`department` /
+  `person` / `day`) is showing, same pattern as `crewGridView` — [Budget]
+- `budgetVatToggle` / `toggleBudgetVat()` — itemized (every figure ex-VAT, VAT broken
+  out as its own line in the summary bar) vs baked in (VAT folded silently into every
+  figure everywhere, one Total). Extras (catering/travel/hotel) never carry VAT in
+  either state — only a crew member's own rate does, gated on `c.vatRegistered` —
+  [Budget]
+- `budgetPersonDisplay()` — the one function that applies the VAT toggle to a
+  person's cost; every rollup (department, day, person-view Subtotal) is built by
+  summing this, not the raw subtotal, so the toggle can never go stale in one view
+  and not another — [Budget]
+- `budgetDayBlocks` / `syncBudgetDayBlocks()` / `toggleBudgetDayBlock()` /
+  `setAllBudgetDayBlocksCollapsed()` / `toggleAllBudgetDayBlocks()` — Per Day's
+  collapsible rows, same shared plumbing (`toggleBlock`/`setAllBlocksCollapsed`/
+  `applyBlockState`, prefix `bd`) as the `sd`/`tt`/`pv` blocks. Unlike those, this
+  state is keyed by shoot-day id rather than a small fixed set of section names, so
+  `syncBudgetDayBlocks()` must run before every use to add/prune keys for the
+  project's current days — `setAllBlocksCollapsed`/`allBlocksCollapsed` only ever see
+  `Object.keys(state)`, so a day that was never individually toggled would otherwise
+  be silently skipped by Expand/Collapse-all — [Budget]
+- `buildBudgetData()` — the one aggregator behind all three views and the summary
+  bar. Days worked = shoot days where `(d.positions||[]).some(pos=>pos[0]===crewId)`,
+  the same on-day signal `buildTransportSummary()`/Days-on-site already use. Hotel
+  room-nights are counted directly off `d.hotelNights`/`p.hotelNightBefore` rather
+  than via `buildHotelSummary()`, which filters to "active" nights only and would
+  need label-matching to recover one specific day's figure — this way project-wide
+  and per-day hotel costs share one calculation. The night before Day 1 has no
+  shoot-day row of its own, so its rooms fold into Day 1. Department rollups (both
+  project-wide and per-day) are filtered by **presence** (someone's actually in that
+  department), not by a truthy total — a department with people but no rate set
+  shows as £0.00 rather than vanishing, which is the whole point of a cost-visibility
+  screen — [Budget]
+- `budgetSummaryBarHTML()` — the three-line/one-line summary bar, driven by
+  `budgetVatToggle` — [Budget]
+- `budgetDeptExtrasTableHTML()` — the department-rows + Catering/Travel/Hotels
+  extras + Total table, shared verbatim by the project-wide Per Department view and
+  each Per Day row's own expanded breakdown ("same structure … just scoped to that
+  single day" per the brief) — [Budget]
+- `budgetDepartmentViewHTML()` / `budgetPersonViewHTML()` / `budgetDayViewHTML()` —
+  the three views. Per Person's row order is canonical department order then
+  `sortHoDFirst()` within it — there's no existing sortable-table (click-a-column)
+  pattern anywhere in this app to extend, so this is a fixed, sensible order rather
+  than a new UI paradigm built for one screen — [Budget]
+
 ## Preview & Export
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
@@ -284,15 +359,20 @@ coarse information first, finest detail last.
 | T-5.4 | · Position assignments | Call times, grouped by company → department → role seniority (Phase N item 2) | `renderPositionAssignments()` |
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
-| **T-6** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
-| T-6.0 | · Format panel | Collapsible Filter-style panel: Printable/WhatsApp selector, the four section checkboxes that gate all three outputs, and both output actions (Copy, Download .xlsx) | `exportPanelHTML()` |
-| T-6.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
-| T-6.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) — same Client/Positions/Talent/co-production ordering as T-6.1 | `buildWAText()` |
-| T-6.2b | · Hotel summary | Same room-booking table + per-night table as T-2.3's Hotel summary, shown again here below the WhatsApp text | `hotelSummaryHTML()` |
-| T-6.3 | · Tech specs | Camera/technical crew reference + camera designations, per the selected shoot day (resolved override vs. project default). Kept here as-is even after Phase P1 added the project-level version at T-4.4 — this one stays day-aware, T-4.4 doesn't | `renderTechSpecsSection()` |
-| T-6.4 | · Transport summary | Same cost fields + per-day method-count grid as T-2.4, shown here too when Travel is ticked (Phase Q) | `transportSummaryHTML()` |
-| T-6.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
-| T-6.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-6.1. No longer a block of its own: it's the Download .xlsx button in T-6.0 | `downloadExcel()` |
+| **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
+| T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
+| T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
+| T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override), Days worked, Subtotal | `budgetPersonViewHTML()` |
+| T-6.4 | · Per Day | One collapsed row per shoot day (day number + short location label + total), expanding to that day's own department + extras breakdown | `budgetDayViewHTML()` |
+| **T-7** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
+| T-7.0 | · Format panel | Collapsible Filter-style panel: Printable/WhatsApp selector, the four section checkboxes that gate all three outputs, and both output actions (Copy, Download .xlsx) | `exportPanelHTML()` |
+| T-7.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
+| T-7.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) — same Client/Positions/Talent/co-production ordering as T-7.1 | `buildWAText()` |
+| T-7.2b | · Hotel summary | Same room-booking table + per-night table as T-2.3's Hotel summary, shown again here below the WhatsApp text | `hotelSummaryHTML()` |
+| T-7.3 | · Tech specs | Camera/technical crew reference + camera designations, per the selected shoot day (resolved override vs. project default). Kept here as-is even after Phase P1 added the project-level version at T-4.4 — this one stays day-aware, T-4.4 doesn't | `renderTechSpecsSection()` |
+| T-7.4 | · Transport summary | Same cost fields + per-day method-count grid as T-2.4, shown here too when Travel is ticked (Phase Q) | `transportSummaryHTML()` |
+| T-7.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
+| T-7.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-7.1. No longer a block of its own: it's the Download .xlsx button in T-7.0 | `downloadExcel()` |
 
 ## D — Databases (project-independent, the source of truth)
 

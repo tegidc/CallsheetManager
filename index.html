@@ -537,6 +537,24 @@
   .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -2px;}
   .tablewrap table{min-width:520px;}
 
+  /* Budget summary bar (Phase Budget) — glanceable stat figures, same visual
+     language as the display headings (Fraunces headline number + Oswald label)
+     used everywhere else, without needing a .card wrapper. */
+  .budget-summary{display:flex; gap:28px; flex-wrap:wrap; align-items:flex-end;
+    margin:14px 0 18px; padding-bottom:14px; border-bottom:1px solid var(--line);}
+  .budget-stat .num{font-family:var(--disp); font-weight:700; font-size:22px; color:var(--text);}
+  .budget-stat .lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--tape); margin-top:2px;}
+  .budget-vat-toggle{margin-left:auto; align-self:center;}
+  .budget-vat-toggle label{display:flex; align-items:center; gap:7px; margin:0;
+    font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
+    letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer;}
+  .budget-rate-input{width:84px; text-align:right;}
+  .budget-extras-row td{padding-top:14px;}
+  .budget-total-row td{padding-top:10px; border-top:1.5px solid var(--field-line);
+    font-weight:600;}
+  .budget-noRate{color:var(--muted); font-style:italic;}
+
   /* ============================================================
      MOBILE / TABLET
      ============================================================ */
@@ -765,6 +783,7 @@
     .srlist{max-height:250px;}
     .sritem{padding:12px 11px; font-size:14px;}
     .subhead{font-size:12px;}
+    .budget-vat-toggle{margin-left:0; width:100%;}
 
     /* --- sticky save bar on the shoot-day editor --- */
     .toolbar.sticky-actions{
@@ -2252,6 +2271,7 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS</div>
       <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
+      <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
       <div class="tab ${currentProjectTab==='preview'?'active':''}" onclick="goProjectTab('preview')">PREVIEW &amp; EXPORT</div>
     </div>
     <div id="projectBody"></div>`;
@@ -2265,6 +2285,7 @@ function renderProjectBody(){
   if(currentProjectTab==='locations') return renderProjectLocations(body);
   if(currentProjectTab==='tech') return renderProjectTech(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
+  if(currentProjectTab==='budget') return renderProjectBudget(body);
   if(currentProjectTab==='preview') return renderProjectPreview(body);
 }
 
@@ -3993,6 +4014,297 @@ function exportPanelHTML(){
       ? 'Plain text for a chat app — the ticked sections are appended to the message. Untick Tech specs for the version that goes to the full crew.'
       : 'The formatted call sheet — print it or save it as a PDF. Copy gives you the same call sheet as plain text; the .xlsx carries one sheet per ticked section.'}</p>
   </div>`;
+}
+
+/* ============================================================
+   BUDGET (Phase Budget) — cost visibility only, not a working budget.
+   Rolls up cost data already entered elsewhere in the app (crew day rate ×
+   days worked, the Catering/Travel cost summaries, Hotel room-nights) into
+   three views. Deliberately excludes location fees (one fee can span several
+   shoot days — not handling that here) and offers no editable line-item
+   budget or export of its own; Preview & Export stays the export surface.
+   ============================================================ */
+
+// UK standard rate. Not project-configurable — this phase is cost VISIBILITY,
+// not a real budgeting tool, so a fixed rate is the deliberate scope line.
+const VAT_RATE = 0.20;
+
+/* Hotel is the one cost area with no existing per-project rate anywhere in the
+   app (Catering/Travel already have getCateringCosts()/getTransportCosts()) —
+   added here, same {field: Number(val)||0} shape as those two. */
+function getHotelCosts(p){
+  const c = (p && p.hotelCosts) || {};
+  return { perRoomNight: Number(c.perRoomNight)||0 };
+}
+async function saveHotelCosts(){
+  const p = currentProject(); if(!p) return;
+  p.hotelCosts = { perRoomNight: Number(val('bgHotelRate'))||0 };
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+
+/* Best-effort numeric extraction from the crew database's free-text Fee/rate
+   field ("£450/day" -> 450). Returns null when nothing numeric is found,
+   which the caller treats as "no rate on file", not as a rate of zero. */
+function parseRateNumber(str){
+  if(!str) return null;
+  const m = String(str).replace(/,/g,'').match(/[\d]+(\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+
+/* Day rate needs a PER-PROJECT override (rate can vary by job) — same shape as
+   every other per-project per-crew-id map in the app (p.travelMethods,
+   p.hotelNightBefore, day.crewOverrides): p.crewRateOverrides[crewId]. Falls
+   back to a best-effort parse of the crew database's Fee/rate field, and
+   finally to "no rate on file" rather than silently costing someone at 0. */
+function resolveCrewRate(c, p){
+  const overrides = (p && p.crewRateOverrides) || {};
+  if(Object.prototype.hasOwnProperty.call(overrides, c.id)){
+    const n = Number(overrides[c.id]);
+    if(!isNaN(n)) return { rate:n, hasRate:true, isOverride:true };
+  }
+  const parsed = parseRateNumber(c.rate);
+  if(parsed!=null) return { rate:parsed, hasRate:true, isOverride:false };
+  return { rate:0, hasRate:false, isOverride:false };
+}
+async function saveCrewRateOverride(crewId, rawValue){
+  const p = currentProject(); if(!p) return;
+  p.crewRateOverrides = p.crewRateOverrides || {};
+  const trimmed = (rawValue||'').trim();
+  if(trimmed===''){
+    delete p.crewRateOverrides[crewId];
+  } else {
+    const n = Number(trimmed);
+    if(isNaN(n)){ renderProjectBody(); return; } // reject garbage, revert the field to the last valid value
+    p.crewRateOverrides[crewId] = n;
+  }
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+
+let budgetView = 'department'; // 'department' | 'person' | 'day'
+function setBudgetView(view){ budgetView = view; renderProjectBody(); }
+// true = itemized (every figure ex-VAT, VAT broken out at the top); false =
+// baked in (VAT folded silently into every figure, one Total). The toggle's
+// whole job — see budgetPersonDisplay().
+let budgetVatToggle = true;
+function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(); }
+// {dayId: true/false}, same shared plumbing (toggleBlock/setAllBlocksCollapsed
+// /applyBlockState) as the sd/tt/pv collapsible blocks. Unlike those, the
+// day list is dynamic per project, so syncBudgetDayBlocks() keeps its keys in
+// step with the project's current shoot days before every use — otherwise
+// Expand/Collapse-all would silently skip any day never individually toggled.
+let budgetDayBlocks = {};
+function syncBudgetDayBlocks(dayIds){
+  const idSet = new Set(dayIds);
+  Object.keys(budgetDayBlocks).forEach(k=>{ if(!idSet.has(k)) delete budgetDayBlocks[k]; });
+  dayIds.forEach(id=>{ if(!(id in budgetDayBlocks)) budgetDayBlocks[id] = false; });
+}
+function toggleBudgetDayBlock(dayId){ toggleBlock(budgetDayBlocks, 'bd', dayId); }
+function setAllBudgetDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(budgetDayBlocks, 'bd', collapsed); }
+function toggleAllBudgetDayBlocks(){ setAllBudgetDayBlocksCollapsed(!allBlocksCollapsed(budgetDayBlocks)); }
+
+/* A person's DISPLAYED cost, respecting the VAT toggle: the plain ex-VAT
+   subtotal when itemized (VAT is shown as its own line in the summary bar
+   instead), or subtotal+VAT baked silently in when not. Extras (catering/
+   travel/hotel) never carry VAT in either state — only a crew member's own
+   rate does, per c.vatRegistered. */
+function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle ? 0 : vat); }
+
+function buildBudgetData(){
+  const p = currentProject();
+  const days = projectDays();
+  const crew = projectCrew(p);
+  const hotelCosts = getHotelCosts(p);
+
+  const people = crew.map(c=>{
+    const {rate, hasRate, isOverride} = resolveCrewRate(c, p);
+    const daysWorked = days.filter(d=>(d.positions||[]).some(pos=>pos[0]===c.id)).length;
+    const subtotal = rate * daysWorked;
+    const vatRegistered = c.vatRegistered==='Yes';
+    const vat = vatRegistered ? subtotal * VAT_RATE : 0;
+    return {
+      id:c.id, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
+      rate, hasRate, isOverride, daysWorked, subtotal, vatRegistered, vat,
+      display: budgetPersonDisplay(subtotal, vat)
+    };
+  });
+
+  // Filtered by PRESENCE (deptCounts), not by a truthy total — a department
+  // with people assigned but no rate set should show as £0.00, not vanish, or
+  // a whole department missing its rates would go unnoticed on a cost screen.
+  const deptTotals = {}, deptCounts = {};
+  people.forEach(pp=>{
+    deptTotals[pp.department] = (deptTotals[pp.department]||0) + pp.display;
+    deptCounts[pp.department] = (deptCounts[pp.department]||0) + 1;
+  });
+  const departments = DEPARTMENTS.filter(d=>deptCounts[d]).map(d=>
+    ({dept:d, code:DEPARTMENT_CODES[d]||'', total:deptTotals[d]||0}));
+
+  const cateringGrid = buildCateringSummaryGrid();
+  const transportSummary = buildTransportSummary();
+  const cateringTotal = cateringGrid ? cateringGrid.totalCost : 0;
+  const travelTotal = transportSummary ? transportSummary.totalCost : 0;
+  // Room-nights counted directly off the day records rather than via
+  // buildHotelSummary(), which filters down to "active" nights only and would
+  // need label-matching to recover one specific day's figure — this way, the
+  // project-wide and per-day totals below share the exact same calculation.
+  const preNightRooms = (p.hotelNightBefore||[]).length;
+  const dayHotelRooms = days.map(d=>(d.hotelNights||[]).length);
+  const hotelTotal = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
+
+  const crewTotalExVat = people.reduce((s,pp)=>s+pp.subtotal, 0);
+  const vatTotal = people.reduce((s,pp)=>s+pp.vat, 0);
+  const extrasTotal = cateringTotal + travelTotal + hotelTotal;
+  const totalExVat = crewTotalExVat + extrasTotal;
+  const totalIncVat = totalExVat + vatTotal;
+
+  const perDay = days.map((d,i)=>{
+    const onDayIds = new Set((d.positions||[]).map(pos=>pos[0]));
+    const dayPeople = people.filter(pp=>onDayIds.has(pp.id));
+    const dayDeptTotals = {}, dayDeptCounts = {};
+    dayPeople.forEach(pp=>{
+      const dayVat = pp.vatRegistered ? pp.rate*VAT_RATE : 0;
+      dayDeptTotals[pp.department] = (dayDeptTotals[pp.department]||0) + budgetPersonDisplay(pp.rate, dayVat);
+      dayDeptCounts[pp.department] = (dayDeptCounts[pp.department]||0) + 1;
+    });
+    const dayDepartments = DEPARTMENTS.filter(dd=>dayDeptCounts[dd]).map(dd=>
+      ({dept:dd, code:DEPARTMENT_CODES[dd]||'', total:dayDeptTotals[dd]||0}));
+    const cateringCol = cateringGrid ? cateringGrid.cols.find(c=>c.dayNum===d.dayNum) : null;
+    const travelCol = transportSummary ? transportSummary.cols.find(c=>c.dayNum===d.dayNum) : null;
+    const dayCatering = cateringCol ? cateringCol.dailyCost : 0;
+    const dayTravel = travelCol ? travelCol.dailyCost : 0;
+    // the night before Day 1 has no shoot-day row of its own — folds into Day 1
+    const rooms = dayHotelRooms[i] + (i===0 ? preNightRooms : 0);
+    const dayHotel = rooms * hotelCosts.perRoomNight;
+    const crewDisplay = dayDepartments.reduce((s,dd)=>s+dd.total, 0);
+    const loc = d.locationId ? locById(d.locationId) : null;
+    return {
+      dayId:d.id, dayNum:d.dayNum, locationLabel: loc ? loc.name : '',
+      departments:dayDepartments, catering:dayCatering, travel:dayTravel, hotel:dayHotel,
+      total: crewDisplay + dayCatering + dayTravel + dayHotel
+    };
+  });
+
+  return {
+    people, departments, cateringTotal, travelTotal, hotelTotal, extrasTotal,
+    crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
+    hasCrew: crew.length>0, hasDays: days.length>0
+  };
+}
+
+function budgetSummaryBarHTML(data){
+  const fmt = n => '£'+(n||0).toFixed(2);
+  const stats = budgetVatToggle
+    ? [['Total (ex-VAT)', data.totalExVat], ['VAT', data.vatTotal], ['Total (inc-VAT)', data.totalIncVat]]
+    : [['Total', data.totalIncVat]];
+  return `<div class="budget-summary">
+    ${stats.map(([lbl,v])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}</div></div>`).join('')}
+    <div class="budget-vat-toggle"><label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label></div>
+  </div>`;
+}
+
+/* Shared by the project-wide Per Department view and each Per Day row's own
+   expanded breakdown — "same department + aggregated-extras structure … just
+   scoped to that single day" per the brief. Extras rows are always their own
+   labelled block, never folded into a department — a catering or travel bill
+   isn't any one department's cost. */
+function budgetDeptExtrasTableHTML(departments, catering, travel, hotel, total, extrasLabel){
+  const fmt = n => '£'+(n||0).toFixed(2);
+  if(!departments.length && !catering && !travel && !hotel){
+    return '<div class="empty-note">Nothing to cost yet.</div>';
+  }
+  return `<div class="tablewrap"><table>
+    <tr><th>Department</th><th>Cost</th></tr>
+    ${departments.map(d=>`<tr><td>${d.code?`<span class="dept-code">${esc(d.code)}</span> `:''}${esc(d.dept)}</td><td>${fmt(d.total)}</td></tr>`).join('')}
+    <tr class="budget-extras-row"><td colspan="2"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
+    <tr><td>Catering</td><td>${fmt(catering)}</td></tr>
+    <tr><td>Travel</td><td>${fmt(travel)}</td></tr>
+    <tr><td>Hotels</td><td>${fmt(hotel)}</td></tr>
+    <tr class="budget-total-row"><td>Total</td><td>${fmt(total)}</td></tr>
+  </table></div>`;
+}
+
+function budgetDepartmentViewHTML(data){
+  if(!data.hasCrew && !data.cateringTotal && !data.travelTotal && !data.hotelTotal){
+    return '<div class="empty-note">No crew assigned to this project yet.</div>';
+  }
+  const displayTotal = budgetVatToggle ? data.totalExVat : data.totalIncVat;
+  return budgetDeptExtrasTableHTML(data.departments, data.cateringTotal, data.travelTotal, data.hotelTotal, displayTotal, 'Project-wide extras');
+}
+
+function budgetPersonViewHTML(data){
+  if(!data.hasCrew) return '<div class="empty-note">No crew assigned to this project yet.</div>';
+  const fmt = n => '£'+(n||0).toFixed(2);
+  // Same order as everywhere else crew is listed without an explicit sort
+  // control: canonical department order, HoD-first within it (sortHoDFirst).
+  // There's no existing sortable-table (click-a-column-header) pattern
+  // anywhere in this app to extend, so this stays a fixed, sensible order
+  // rather than inventing a new UI paradigm for one screen.
+  const ordered = DEPARTMENTS.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
+  const noRateCount = data.people.filter(pp=>!pp.hasRate).length;
+  return `<div class="tablewrap"><table>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th>Days worked</th><th>Subtotal</th></tr>
+    ${ordered.map(pp=>`<tr>
+      <td>${esc(pp.name)}</td>
+      <td>${esc(pp.role||'')}</td>
+      <td><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveCrewRateOverride('${pp.id}', this.value)"></td>
+      <td>${pp.daysWorked}</td>
+      <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
+    </tr>`).join('')}
+  </table></div>
+  ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}`;
+}
+
+function budgetDayViewHTML(data){
+  if(!data.hasDays) return '<div class="empty-note">Add shoot days first, then assign crew positions to cost them out here.</div>';
+  syncBudgetDayBlocks(data.perDay.map(d=>d.dayId));
+  const fmt = n => '£'+(n||0).toFixed(2);
+  const toggleRow = data.perDay.length>1 ? expandCollapseAllHTML('toggleAllBudgetDayBlocks()', undefined, allBlocksCollapsed(budgetDayBlocks), 'bd') : '';
+  const rows = data.perDay.map(d=>{
+    const open = budgetDayBlocks[d.dayId];
+    const title = `Day ${esc(d.dayNum||'?')}${d.locationLabel?' — '+esc(d.locationLabel):''}`;
+    return `<div class="sd-block">
+      <div class="sd-block-head" style="margin:14px 0 0;">
+        <span class="sd-block-head-toggle" onclick="toggleBudgetDayBlock('${d.dayId}')" style="flex:1;">
+          <span class="dept-caret" id="bdc-${d.dayId}">${open?'▾':'▸'}</span> ${title}
+        </span>
+        <strong>${fmt(d.total)}</strong>
+      </div>
+      <div id="bdb-${d.dayId}" style="display:${open?'':'none'}; margin-top:10px;">
+        ${budgetDeptExtrasTableHTML(d.departments, d.catering, d.travel, d.hotel, d.total, 'Day extras')}
+      </div>
+    </div>`;
+  }).join('');
+  return toggleRow + rows;
+}
+
+function renderProjectBudget(body){
+  const p = currentProject();
+  const data = buildBudgetData();
+  const viewLabels = {department:'Per Department', person:'Per Person', day:'Per Day'};
+  const viewSwitcher = `<div class="tabs">
+    ${Object.keys(viewLabels).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${viewLabels[v]}</div>`).join('')}
+  </div>`;
+  const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
+    : budgetView==='day' ? budgetDayViewHTML(data)
+    : budgetDepartmentViewHTML(data);
+  const hotelCosts = getHotelCosts(p);
+  body.innerHTML = `
+    <div class="section">
+      <h2>Budget at a glance</h2>
+      <div class="hint">Cost visibility only — crew day rates, and the catering/travel/hotel costs already
+        entered on their own tabs. Not a working budget: location fees aren't included, and there's nothing
+        here to edit as a line-item budget.</div>
+      <div class="field-inline" style="margin-top:10px;">
+        <label for="bgHotelRate">Hotel cost per room/night</label>
+        <input type="text" inputmode="decimal" id="bgHotelRate" value="${hotelCosts.perRoomNight||''}" placeholder="0.00" style="width:90px;" onchange="saveHotelCosts()">
+        <span class="hint">The one rate Budget needs that isn't set elsewhere — Catering/Travel costs are entered on their own tabs.</span>
+      </div>
+      ${budgetSummaryBarHTML(data)}
+      ${viewSwitcher}
+      ${viewHTML}
+    </div>`;
 }
 function renderProjectPreview(body){
   const days = projectDays();
