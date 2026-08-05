@@ -3036,20 +3036,125 @@ function personHasHotel(c, p, days){
   if(((p&&p.hotelNightBefore)||[]).includes(c.id)) return true;
   return days.some(d=>(d.hotelNights||[]).includes(c.id));
 }
-function sortProjectCrewGroup(list){
-  return projectCrewFilter.sort==='name' ? list.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')) : sortHoDFirst(list);
+/* seniority BAND for the Group by "Seniority" option — derived from the real
+   per-department roleSeniorityRank() (index/ROLE_SENIORITY), not a separate
+   flat list. Rank 0 is always the first/most-senior role listed for a
+   department in ROLES_BY_DEPT, so low ranks band together sensibly across
+   departments even though the underlying numbers aren't globally comparable. */
+function crewSeniorityBand(c){
+  const r = roleSeniorityRank(c.department, c.role);
+  if(r<10) return 'Department leads';
+  if(r<30) return 'Mid-level';
+  return 'Support / entry level';
 }
-/* groups the (already filtered) crew list either by department (default) or
-   by hotel status — same shape either way, so every crewGridView branch can
-   render off of it without caring which grouping is active */
-function buildProjectCrewGroups(list, p, days){
-  const buckets = {};
-  if(projectCrewFilter.groupBy==='hotel'){
-    list.forEach(c=>{ const key = personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel'; (buckets[key]=buckets[key]||[]).push(c); });
-    return ['Has hotel','No hotel'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:sortProjectCrewGroup(buckets[k])}));
+function sortProjectCrewGroup(list, p, days){
+  const byName = (a,b)=>(a.name||'').localeCompare(b.name||'');
+  switch(projectCrewFilter.sort){
+    case 'name': return list.slice().sort(byName);
+    case 'role': return list.slice().sort((a,b)=>(a.role||'').localeCompare(b.role||'')||byName(a,b));
+    case 'seniority': return list.slice().sort((a,b)=>roleSeniorityRank(a.department,a.role)-roleSeniorityRank(b.department,b.role)||byName(a,b));
+    case 'company': return list.slice().sort((a,b)=>(a.coProductionCompany||'￿').localeCompare(b.coProductionCompany||'￿')||byName(a,b));
+    case 'daysCount': {
+      const dayCount = c => (days||[]).filter(d=>(d.positions||[]).some(pos=>pos[0]===c.id)).length;
+      return list.slice().sort((a,b)=>dayCount(b)-dayCount(a)||byName(a,b));
+    }
+    case 'added': {
+      const order = (p&&p.crewIds)||[];
+      return list.slice().sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
+    }
+    case 'dept':
+    default: return sortHoDFirst(list);
   }
-  list.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
-  return DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length).map(d=>({key:d, label:d, code:DEPARTMENT_CODES[d]||'', items:sortProjectCrewGroup(buckets[d])}));
+}
+/* groups the (already filtered) crew list by whichever attribute Group by is
+   currently set to — same {key,label,code,items} shape regardless of which,
+   so every crewGridView branch renders off of it without caring which
+   grouping is active. "Shoot day on site" is the one multi-bucket grouping —
+   a person assigned to 3 shoot days appears in 3 groups, same idea as a
+   tag-style filter would. */
+function buildProjectCrewGroups(list, p, days){
+  const gb = projectCrewFilter.groupBy;
+  const bySort = arr => sortProjectCrewGroup(arr, p, days);
+  const bucketOf = keyFn => {
+    const buckets = {};
+    list.forEach(c=>{ const key = keyFn(c); (buckets[key]=buckets[key]||[]).push(c); });
+    return buckets;
+  };
+
+  if(gb==='hotel'){
+    const buckets = bucketOf(c => personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel');
+    return ['Has hotel','No hotel'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
+  }
+  if(gb==='deptCompany'){
+    const meta = {};
+    list.forEach(c=>{
+      const dept = deptBucketKey(c.department), co = c.coProductionCompany || 'No lead company';
+      const key = `${dept} — ${co}`;
+      (meta[key]=meta[key]||{dept,co,items:[]}).items.push(c);
+    });
+    return Object.keys(meta)
+      .sort((a,b)=> (DEPARTMENTS.indexOf(meta[a].dept)-DEPARTMENTS.indexOf(meta[b].dept)) || meta[a].co.localeCompare(meta[b].co))
+      .map(key=>({key, label:key, code:DEPARTMENT_CODES[meta[key].dept]||'', items:bySort(meta[key].items)}));
+  }
+  if(gb==='company'){
+    const buckets = bucketOf(c => c.coProductionCompany || 'No lead company');
+    const keys = Object.keys(buckets).sort((a,b)=> a==='No lead company'?1 : b==='No lead company'?-1 : a.localeCompare(b));
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  }
+  if(gb==='role'){
+    const buckets = bucketOf(c => c.role || 'No role set');
+    const keys = Object.keys(buckets).sort((a,b)=> a==='No role set'?1 : b==='No role set'?-1 : a.localeCompare(b));
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  }
+  if(gb==='subDept'){
+    const buckets = bucketOf(c => c.subDepartment || 'No sub-department');
+    const keys = Object.keys(buckets).sort((a,b)=> a==='No sub-department'?1 : b==='No sub-department'?-1 : a.localeCompare(b));
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  }
+  if(gb==='personType'){
+    const typeOf = c => deptBucketKey(c.department)==='Talent' ? 'Talent' : deptBucketKey(c.department)==='Client' ? 'Client' : 'Crew';
+    const buckets = bucketOf(typeOf);
+    return ['Crew','Talent','Client'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
+  }
+  if(gb==='travel'){
+    const methods = (p&&p.travelMethods)||{};
+    const buckets = bucketOf(c => methods[c.id] || 'Not set');
+    const keys = Object.keys(buckets).sort((a,b)=> a==='Not set'?1 : b==='Not set'?-1 : a.localeCompare(b));
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  }
+  if(gb==='vat'){
+    // c.vatRegistered is strictly '' / 'Yes' / 'No' — the same yn('ncVat',…) field
+    // Budget's VAT calc already reads (buildBudgetData()), not a second source
+    const label = v => v==='Yes' ? 'VAT registered' : v==='No' ? 'Not VAT registered' : 'Not set';
+    const buckets = bucketOf(c => label(c.vatRegistered));
+    return ['VAT registered','Not VAT registered','Not set'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
+  }
+  if(gb==='catering'){
+    const buckets = bucketOf(c => c.dietaryGeneral || 'Standard / not set');
+    const keys = Object.keys(buckets).sort((a,b)=> a==='Standard / not set'?1 : b==='Standard / not set'?-1 : a.localeCompare(b));
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  }
+  if(gb==='seniority'){
+    const buckets = bucketOf(crewSeniorityBand);
+    return ['Department leads','Mid-level','Support / entry level'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
+  }
+  if(gb==='daysOnSite'){
+    const buckets = {};
+    (days||[]).forEach(d=>{
+      const onDay = list.filter(c=>(d.positions||[]).some(pos=>pos[0]===c.id));
+      if(onDay.length) buckets[`Day ${d.dayNum||'?'}`] = onDay;
+    });
+    const notOn = list.filter(c=>!(days||[]).some(d=>(d.positions||[]).some(pos=>pos[0]===c.id)));
+    if(notOn.length) buckets['Not on any shoot day'] = notOn;
+    const keys = (days||[]).map(d=>`Day ${d.dayNum||'?'}`).filter(k=>buckets[k]).concat(notOn.length?['Not on any shoot day']:[]);
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  }
+  if(gb==='none'){
+    return [{key:'all', label:'All crew', code:'', items:bySort(list)}];
+  }
+  // default: 'dept'
+  const buckets = bucketOf(c => deptBucketKey(c.department));
+  return DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length).map(d=>({key:d, label:d, code:DEPARTMENT_CODES[d]||'', items:bySort(buckets[d])}));
 }
 function toggleProjectCrewFilterPanel(){ projectCrewFilterOpen = !projectCrewFilterOpen; renderProjectBody(); }
 function toggleProjectFilterDept(dept, checked){
@@ -3099,10 +3204,26 @@ function projectCrewFilterPanelHTML(assignedAll, days){
       <div><label>Sort</label><select onchange="setProjectFilterField('sort', this.value)">
         <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
         <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
+        <option value="role" ${f.sort==='role'?'selected':''}>By role</option>
+        <option value="seniority" ${f.sort==='seniority'?'selected':''}>By seniority</option>
+        <option value="company" ${f.sort==='company'?'selected':''}>By company</option>
+        <option value="daysCount" ${f.sort==='daysCount'?'selected':''}>By days on site (most first)</option>
+        <option value="added" ${f.sort==='added'?'selected':''}>By date added to project</option>
       </select></div>
       <div><label>Group by</label><select onchange="setProjectFilterField('groupBy', this.value)">
         <option value="dept" ${f.groupBy==='dept'?'selected':''}>Department</option>
+        <option value="deptCompany" ${f.groupBy==='deptCompany'?'selected':''}>Department &amp; company</option>
+        <option value="company" ${f.groupBy==='company'?'selected':''}>Lead company</option>
+        <option value="role" ${f.groupBy==='role'?'selected':''}>Role</option>
+        <option value="subDept" ${f.groupBy==='subDept'?'selected':''}>Sub-department</option>
+        <option value="personType" ${f.groupBy==='personType'?'selected':''}>Crew / Talent / Client</option>
         <option value="hotel" ${f.groupBy==='hotel'?'selected':''}>Has hotel / No hotel</option>
+        <option value="travel" ${f.groupBy==='travel'?'selected':''}>Travel method</option>
+        <option value="vat" ${f.groupBy==='vat'?'selected':''}>VAT registered</option>
+        <option value="catering" ${f.groupBy==='catering'?'selected':''}>Catering / dietary type</option>
+        <option value="seniority" ${f.groupBy==='seniority'?'selected':''}>Seniority</option>
+        <option value="daysOnSite" ${f.groupBy==='daysOnSite'?'selected':''}>Shoot day on site</option>
+        <option value="none" ${f.groupBy==='none'?'selected':''}>None (flat list)</option>
       </select></div>
     </div>
     <div style="margin-top:10px;">
