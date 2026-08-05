@@ -85,13 +85,14 @@ Every screen needs the same handful of records. These are the single place that 
 
 ## Locations
 
-- `renderProjectLocations()` — renders the project Locations tab (assigned/unassigned lists, day grid) — [Locations]
+- `renderProjectLocations()` — renders the project Locations tab: the assigned-locations day grid, then the ONE "Add location" entry point — [Locations]
+- `locAddOpen` / `locAddQuery` / `toggleLocAdd()` / `onLocAddInput()` / `locAddResultsHTML()` / `startNewLocationFromSearch()` (Phase Q) — **the unified add-location flow.** One button opens a search field over `locationsDB` (already-assigned locations filtered out, capped at 8 results), and the "create new location" option is the last row of that same result list, prefilled with whatever was typed. `onLocAddInput()` re-renders `#locAddResults` ONLY — re-rendering the tab would steal focus mid-word, the same reason `crewSearchQuery` lives outside the DOM. `startNewLocationFromSearch()` sets `locFormContext` to the project id itself, which is what makes `saveLocation()` attach the new record to `p.locationIds`. Replaces the old two-button arrangement (a database `<select>` + a separate "Add a new location" form) — [Locations]
 - `locDayGridHTML()` — renders the per-location "which days is this used" checkbox grid — [Locations]
 - `locRowHTML()` — renders one location row within a project — [Locations]
 - `toggleLocOnDay()` — toggles a location's assignment to a given shoot day — [Locations]
-- `addLocToProject()` / `removeLocFromProject()` — add/remove a location from the current project — [Locations]
+- `addLocToProject(id)` / `removeLocFromProject()` — add/remove a location from the current project. Takes the id as an argument since Phase Q; the old no-arg form read a `#addLocPick` `<select>` that no longer exists — [Locations]
 - `renderLocationsDatabase()` / `renderLocationsList()` — render the standalone locations database screen and its list — [Locations]
-- `locFormHTML()` / `toggleLocForm()` / `closeLocForm()` — render/open/close the add-or-edit location form — [Locations]
+- `locFormHTML()` / `toggleLocForm()` / `closeLocForm()` — render/open/close the add-or-edit location form. `toggleLocForm()` is now the **Locations database screen only** and takes no project id (it always clears `locFormContext`) — the project tab's way in is `startNewLocationFromSearch()`, which sets the context itself — [Locations]
 - `editLocation()` / `saveLocation()` / `deleteLocation()` — edit, persist, and delete a location record — [Locations]
 - `debouncedAddressSearch()` / `runAddressSearch()` / `pickAddress()` — debounce and run address geocoding search, and select a result — [Locations]
 - `updateMapPreview()` — refreshes the embedded map preview for the currently selected location coordinates — [Locations]
@@ -169,7 +170,8 @@ Every screen needs the same handful of records. These are the single place that 
 ## Preview & Export
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
-- `renderProjectPreview()` — renders the Preview & Export tab body (call sheet, WhatsApp text, tech specs, hotel, catering, Excel blocks) — [Preview & Export]
+- `exportFormat` / `exportSections` / `EXPORT_SECTION_LABELS` / `setExportFormat()` / `toggleExportSection()` / `exportOptionsHTML()` (Phase Q) — **the two independent export choices.** `exportFormat` ('printable' | 'whatsapp') picks the output SHAPE; `exportSections` ({tech, catering, hotels, travel}, all true by default) picks WHICH optional content areas that shape carries. Session state, not persisted — same rule as `previewBlocks`/`crewGridView`: this is "what am I sending right now", not a project property. Excel is deliberately **not** a third format — see the Phase Q section at the bottom of this file — [Preview & Export]
+- `renderProjectPreview()` — renders the Preview & Export tab body for the current `exportFormat`: printable = call sheet card + the ticked section blocks + Excel; WhatsApp = the text block alone (the sections are inside the text). Only one shape is in the DOM at a time, so `generatePreview()`/`renderPreviewCard()` both guard for a missing element rather than assuming it. Also wires the Travel block's cost-field autosave, scoped by target id — a bare `body.oninput` would fire on the Include checkboxes too, and `saveTransportCosts()` reading fields no longer in the DOM would write both rates back as 0 — [Preview & Export]
 - `buildFullData()` — assembles the complete RESOLVED data set for a shoot day (crew, locations, schedule, tech specs, weather) used by every export. Each position's `role` is `c.showAs||c.role` — the one place a crew member's "Show as" cosmetic override (Phase R item 3) actually reaches the call sheet/WhatsApp text/Excel output; `canonicalRole` (`c.role`, un-cosmeticised) rides alongside it purely so seniority ranking can look the role up in `ROLES_BY_DEPT`/`ROLE_SENIORITY`, since a free-text "Show as" usually won't match a saved role name. Splits the day's positions three ways (Phase N item 3): `positions` (crew, canonical department order, Client/Talent excluded), `clientPositions`, `talentPositions` — Client and Talent stand apart from the crew departments in every output instead of sorting in among them. `coProductionGroups` (by company) is untouched by that split. Returns `positions`/`clientPositions`/`talentPositions`/each `coProductionGroups[].people` all pre-sorted by `positionOutputCompare()` — [Preview & Export, Shared/utility functions]
   - tech specs go through `resolveTechSpecs()`, NOT the raw `day.techSpecs`: a day stores only what DIFFERS from the project defaults (`saveShootDay` deletes the key when nothing differs), so reading it raw exported blank tech specs for every day sitting on the defaults — fixed in Phase U
 - `positionOutputCompare()` — the shared sort for every position list in the call sheet output: department (canonical order) → role seniority within it (`roleSeniorityRank()`, via `canonicalRole`) → role text → name — [Preview & Export]
@@ -177,7 +179,8 @@ Every screen needs the same handful of records. These are the single place that 
 - `renderTechSpecsSection()` / `copyTechSpecsText()` / `copyTechSpecs()` — render and copy the tech specs reference block, day-resolved (`resolveTechSpecs`/`resolveCameras` via `buildFullData`). Table markup comes from the shared `techSpecsRoundupBodyHTML()`/`cameraDesignationRows()` (Phase P1), also used by the Tech tab's project-level `renderTechSpecsRoundup()` (T-4.4) — [Preview & Export, Tech Specs]
 - `renderPreviewCard()` / `positionsTableHTML()` — render the formatted call sheet preview card; `positionsTableHTML()` is the shared Dept/Position/Name/Call/Phone table markup behind the Client block (before Position assignments), the crew Position assignments block, the Talent block (after it), and each co-production group (Phase N item 3) — [Preview & Export]
 - `buildWAText()` / `pushPeopleLines()` / `copyWA()` — build and copy the WhatsApp-formatted plain-text call sheet; `pushPeopleLines()` is the shared "*HEADING*" + per-person lines block behind CLIENT/POSITIONS/TALENT/each co-production group, same ordering as the preview card (Phase N item 3) — [Preview & Export]
-- `downloadExcel()` / `pushPeopleRows()` — build and download the multi-sheet Excel call sheet (via SheetJS); `pushPeopleRows()` is the shared heading-row + table-row block behind CLIENT/POSITION ASSIGNMENTS/TALENT/each co-production group in the Call Sheet aoa, same ordering as the other two outputs (Phase N item 3) — [Preview & Export]
+- `downloadExcel()` / `pushPeopleRows()` — build and download the multi-sheet Excel call sheet (via SheetJS); `pushPeopleRows()` is the shared heading-row + table-row block behind CLIENT/POSITION ASSIGNMENTS/TALENT/each co-production group in the Call Sheet aoa, same ordering as the other two outputs (Phase N item 3). Since Phase Q it emits one sheet per **ticked** section (Tech Specs / Hotel / Catering / Travel) on top of the always-present Call Sheet — a section with no data produces no sheet whether ticked or not, since an empty tab is worse than a missing one — [Preview & Export]
+- `techSpecsLines()` / `hotelSummaryLines()` / `cateringOrderLines()` / `transportSummaryLines()` (Phase Q) — the four sections as arrays of text lines, each returning `null` when there's nothing to say. Extracted from the bodies of the four Copy buttons so the WhatsApp export appends **exactly** the text those buttons produce rather than a second rendering of the same data. `techSpecsLines()` takes resolved `buildFullData()` output, not a raw day, so it can't reintroduce the raw-`day.techSpecs` bug Phase U fixed — [Preview & Export]
 
 ## Shared/utility functions
 
@@ -209,6 +212,8 @@ Every screen needs the same handful of records. These are the single place that 
 - `duplicateCrew()` — clones a crew record as a starting point for a new one — [Shared/utility functions]
 - `coProPillSelect()` / `quickSetCoPro()` / `coProCompaniesList` — render and update a crew member's co-production company assignment — [Shared/utility functions]
 - `crewIdentityHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab) — [Shared/utility functions]
+- `appSettings` / `SETTINGS_DEFAULTS` / `HEADER_FONTS` / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
+- `renderSettings()` / `goSettings()` (Phase Q) — the Settings screen (S-1), reached from the sidebar. A full screen, not a floating cog panel: the app's one existing pattern for a project-independent thing you go and look at is the sidebar screen (Crew database, Locations database), and a modal would have been a second pattern for no gain — [Shared/utility functions]
 - `renderSide()` — renders the left sidebar (project list, nav) — [Shared/utility functions]
 - `toggleDrawer()` / `closeDrawer()` — open/close the mobile navigation drawer — [Shared/utility functions]
 - `setTopbarTitle()` — updates the mobile top bar's title text — [Shared/utility functions]
@@ -262,8 +267,8 @@ coarse information first, finest detail last.
 | T-2.8 | · Add from crew database | Department-grouped picker | `addCrewToProject()` |
 | **T-3** | **Locations** | Where the project shoots | `renderProjectLocations()` |
 | T-3.1 | · Location × day grid | Which days each location is used | `locDayGridHTML()` |
-| T-3.2 | · Add from locations database | Picker | `addLocToProject()` |
-| T-3.3 | · Add a new location | Inline location form, scoped to this project | `toggleLocForm()` |
+| T-3.2 | · Add location | ONE button → search the Locations database as you type, with "create new location" as the last row of the same result list (Phase Q) | `toggleLocAdd()` / `locAddResultsHTML()` |
+| ~~T-3.3~~ | ~~· Add a new location~~ | Merged into T-3.2 by Phase Q — there is no second add button | — |
 | **T-4** | **Tech** | Project-wide technical defaults | `renderProjectTech()` |
 | T-4.1 | · Tech specs — project defaults | Frame rate, resolution, delivery, colour, timecode, codec | `techSpecFieldsHTML('pj')` |
 | T-4.2 | · Shot numbering | Continuous vs reset-each-day | `saveProjectTechSpecs()` |
@@ -277,12 +282,14 @@ coarse information first, finest detail last.
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
+| T-6.0 | · Format & Include | Printable/WhatsApp selector + the four section checkboxes that gate all three outputs (Phase Q) | `exportOptionsHTML()` |
 | T-6.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
 | T-6.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) — same Client/Positions/Talent/co-production ordering as T-6.1 | `buildWAText()` |
 | T-6.2b | · Hotel summary | Same room-booking table + per-night table as T-2.3's Hotel summary, shown again here below the WhatsApp text | `hotelSummaryHTML()` |
 | T-6.3 | · Tech specs | Camera/technical crew reference + camera designations, per the selected shoot day (resolved override vs. project default). Kept here as-is even after Phase P1 added the project-level version at T-4.4 — this one stays day-aware, T-4.4 doesn't | `renderTechSpecsSection()` |
+| T-6.4 | · Transport summary | Same cost fields + per-day method-count grid as T-2.4, shown here too when Travel is ticked (Phase Q) | `transportSummaryHTML()` |
 | T-6.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
-| T-6.6 | · Excel export | Multi-sheet .xlsx (Call Sheet + Tech Specs) — same Client/Positions/Talent/co-production ordering as T-6.1 | `downloadExcel()` |
+| T-6.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-6.1 | `downloadExcel()` |
 
 ## D — Databases (project-independent, the source of truth)
 
@@ -298,11 +305,21 @@ coarse information first, finest detail last.
 | D-2.1 | · Location form | Address search, map preview, access/recce/parking notes | `locFormHTML()` |
 | D-2.2 | · Nearest hospital / parking | OpenStreetMap Overpass lookup, saved onto the location | `lookupAmenityForForm()` |
 
+## S — Settings
+
+| Code | Section | What it is | Entry point |
+|---|---|---|---|
+| **S-1** | **Settings** | App-wide font and brand colour, reached from the sidebar | `renderSettings()` |
+| S-1.1 | · Call sheet headers | Header font for every display heading | `HEADER_FONTS` |
+| S-1.2 | · Brand colours | Brand colour (light backgrounds) + sidebar accent (dark), driving every tint | `applyAppSettings()` |
+| S-1.3 | · Preview | A sample call sheet card, so a pick can be judged before it's used | `renderSettings()` |
+| S-1.4 | · Company | Read-only `COMPANY`. Deliberately not editable — see the Phase Q section | `COMPANY` |
+
 ## G — Global chrome
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
-| **G-1** | Sidebar | Databases, project list, + New project | `renderSide()` |
+| **G-1** | Sidebar | Databases, project list, + New project, Settings | `renderSide()` |
 | **G-2** | Mobile top bar & drawer | Burger, title, slide-out nav | `toggleDrawer()` / `setTopbarTitle()` |
 | **G-3** | Welcome screen | Landing state when no project is open | `renderWelcome()` |
 | **G-4** | Sample data reset | Wipe and reload the demo data set | `resetAndReseed()` |
@@ -361,6 +378,60 @@ Two defects it documents, both checkable against the font request on line 8 of
 - **Fraunces 500 is loaded but never used** — every `--disp` rule renders at 700.
 - **Jost 700 is used but not loaded** — `.dept-code` and the mobile checkbox tick ask
   for it, so the browser synthesises a fake bold. Jost is requested at 400/500/600.
+
+## The decisions (Phase Q)
+
+**Format and Include are two questions, not one list.** *Format* is the SHAPE of the
+output — a formatted call sheet you print, or plain text you paste into a chat.
+*Include* is WHICH of the four optional content areas that shape carries. Rolling
+them into one list of five options would have forced a choice between "WhatsApp" and
+"WhatsApp with hotels", which is not a choice anybody has.
+
+**Excel is not a third format.** It is the printable content in a spreadsheet
+container: same call sheet, same sections, same order, just a different file to hand
+to an accountant or a caterer. So it stays a download button inside the printable
+shape rather than a third radio option, and it obeys the same four checkboxes — one
+sheet per ticked section on top of the always-present Call Sheet. A section with no
+data produces no sheet whether ticked or not; an empty tab is worse than a missing
+one. If Excel ever needs a genuinely different content shape it earns a third format
+then, not before.
+
+**Tech specs is now a checkbox, not a hardcode.** The WhatsApp text used to exclude
+tech specs unconditionally, explained only by a hint under the box ("the version for
+the full crew"). That rule is now the Tech specs checkbox, so the crew-wide message
+is one untick away and the choice is visible. Hotels, Catering and Travel are
+appended to the text the same way — each is exactly the text its own Copy button
+produces, via the shared `*Lines()` builders, so the two can't drift.
+
+**Settings is a sidebar screen, not a cog panel.** The app has one existing pattern
+for a project-independent thing you go and look at, and it's the sidebar screen
+(Crew database, Locations database). A floating cog panel would have been a second
+pattern for no gain.
+
+**Settings works entirely through tokens the stylesheet already had.**
+`applyAppSettings()` writes `--disp`, `--tape`, `--tape-light` and the six `--tint-N`
+onto `documentElement`; no CSS rule knows settings exist. That only works if every
+brand-coloured surface actually reads a token, which is why the two "deliberate
+one-offs" the Style Review left inline — the sidebar active gradient and the
+selected-role/HoD pill — became `--tint-5` and `--tint-6`. A token that isn't a
+token can't follow the brand colour.
+⚠️ Only add a family to `HEADER_FONTS` if it's in the Google Fonts `<link>` on line 8
+(or a system stack). Anything else silently renders as the fallback.
+
+**No multi-tenancy.** Single hardcoded `COMPANY`, shown read-only on the Settings
+screen. Per-company logo and detail upload is explicitly parked until the app is used
+by someone outside Little Film Productions — only font and colour are configurable.
+
+**One way to add a location.** The Locations tab used to carry two buttons that
+overlapped: a database dropdown and a separate "add a new location" form. Which one
+you needed depended on something you could only learn by opening the dropdown and
+reading it, and picking wrong meant backing out and starting again in the other. Now
+one button opens a search field, and "create new location" is the last row of the
+same result list, prefilled with what you typed — so the answer to "is it already
+saved?" arrives as you type and either outcome continues from where you already are.
+Both paths still end where they always did (`addLocToProject()` / `saveLocation()`
+with `locFormContext` set). The Shoot Day form's `quickAddLocationForDay()` is a
+different entry point on a different screen and was left alone.
 
 ## The design system, as decided (Phase Detail)
 

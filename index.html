@@ -43,6 +43,10 @@
     --tint-2:rgba(1,119,86,.05);   /* editing / overridden row states */
     --tint-3:rgba(1,119,86,.10);   /* badges, hover fills, bulk action bar */
     --tint-4:rgba(1,119,86,.14);   /* active controls — must stay distinct from tint-3 */
+    /* Phase Q: the two former hand-written one-offs are tokens too, so a brand-colour
+       change in Settings reaches every tinted surface rather than leaving these behind. */
+    --tint-5:rgba(1,119,86,.35);   /* sidebar active-project gradient */
+    --tint-6:rgba(1,119,86,.28);   /* selected saved-role pill / Head of Department pill */
     /* Default box: white fill, 8px radius, 10px padding (Style Review) */
     --box-radius:8px; --box-pad:10px;
     /* TYPE SCALE (Fonts Review). Body ladder collapsed from eight sizes to three:
@@ -83,7 +87,7 @@
   .side-item .ico{opacity:.85; font-size:var(--fs-meta);}
   .side-proj{padding:7px 10px; border-radius:7px; font-size:var(--fs-field); cursor:pointer; margin-bottom:2px; color:var(--side-text);}
   .side-proj:hover{background:var(--side-hover);}
-  .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:var(--tape-light); font-weight:600; border-left:2px solid var(--tape-light); padding-left:8px;}
+  .side-proj.active{background:linear-gradient(90deg, var(--tint-5), transparent); color:var(--tape-light); font-weight:600; border-left:2px solid var(--tape-light); padding-left:8px;}
   .side-proj .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:rgba(255,255,245,.5); display:block;}
   .side-proj.active .code{color:var(--tape-light); opacity:.9;}
   .side-new{margin-top:6px; width:100%; text-align:left; font-size:var(--fs-meta); color:rgba(255,255,245,.6); background:transparent; border:1px dashed var(--side-line);}
@@ -202,6 +206,10 @@
   input:focus, textarea:focus, select:focus{
     outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
   input[readonly]{opacity:.7; border-bottom-style:dotted;}
+  /* Settings' colour pickers (Phase Q). A swatch is the value, so it gets the box the
+     ruled-line fields deliberately don't have — there is no "writing area" to underline. */
+  input[type=color]{width:56px; height:30px; padding:2px; background:transparent;
+    border:1px solid var(--field-line); border-radius:var(--box-radius); cursor:pointer;}
   textarea{resize:vertical; min-height:52px; line-height:1.5;}
 
   /* CHECKBOXES: an X, not a tick, and the box never changes fill (Fonts Review).
@@ -420,6 +428,17 @@
   .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
   .crew-header-row label:hover, .crew-header-row span:hover{color:var(--tape);}
   .crew-header-selectall input{margin:0;}
+  /* Preview & Export "Include" row (Phase Q). Same reasoning as .crew-header-row
+     above — these are controls, not captions, so they take Jost --fs-meta and the
+     global label{} rule has to be overridden for the checkbox labels. The one real
+     caption ("Include") keeps the Oswald label look. */
+  .export-include{display:flex; align-items:center; flex-wrap:wrap; gap:6px 16px; margin-top:12px;}
+  .export-include-label{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--tape);}
+  .export-include label.export-include-item{font-family:var(--body); font-size:var(--fs-meta);
+    letter-spacing:0; text-transform:none; font-weight:400; color:var(--muted); margin:0;
+    display:inline-flex; align-items:center; gap:5px; cursor:pointer; user-select:none;}
+  .export-include label.export-include-item:hover{color:var(--tape);}
   .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
   .filter-chips label{font-size:var(--fs-meta); display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
@@ -791,6 +810,8 @@
     <div class="side-label">Projects</div>
     <div id="sideProjects"></div>
     <button class="side-new" onclick="goNewProject()">+ New project</button>
+    <div class="side-label">App</div>
+    <div class="side-item" data-side="settings" onclick="goSettings()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4M6.7 6.7L5 5M19 19l-1.7-1.7M6.7 17.3L5 19M19 5l-1.7 1.7"/></svg></span> Settings</div>
   </aside>
   <main class="main" id="main"></main>
 </div>
@@ -811,6 +832,62 @@ const sb = supabase.createClient(
 <script>
 /* ============================================================ STATE + STORAGE */
 const COMPANY = 'Little Film Productions';
+
+/* ============================================================ APP SETTINGS (Phase Q)
+   Font + brand colour for the call sheet output and the app chrome, persisted to
+   'db:settings' like every other collection. Deliberately NOT multi-tenant: the
+   company is still the hardcoded COMPANY above, and there is no logo/company-detail
+   upload — that's parked until the app opens up beyond Little Film Productions.
+
+   Everything here works by writing the SAME CSS custom properties the stylesheet
+   already declares in :root (--disp, --tape, --tape-light, --tint-1..6) onto
+   documentElement, so no rule needs to know settings exist. That is also why the two
+   former hand-written rgba(1,119,86,…) one-offs became --tint-5/--tint-6: a token
+   that isn't a token can't follow the brand colour. */
+const HEADER_FONTS = {
+  fraunces:  { label:'Fraunces (default — stands in for Moret)', stack:"'Fraunces', Georgia, serif" },
+  oswald:    { label:'Oswald (the real brand font)',             stack:"'Oswald', sans-serif" },
+  jost:      { label:'Jost (stands in for Futura PT)',           stack:"'Jost', 'Futura PT', sans-serif" },
+  georgia:   { label:'Georgia (system serif)',                   stack:"Georgia, 'Times New Roman', serif" },
+  helvetica: { label:'Helvetica / Arial (system sans)',          stack:"'Helvetica Neue', Helvetica, Arial, sans-serif" },
+};
+/* Only families already in the Google Fonts request on line 8 (plus two system stacks)
+   are offered — adding a family here means adding it to that <link> too, or it renders
+   as the fallback and nobody notices. */
+const SETTINGS_DEFAULTS = { headerFont:'fraunces', brand:'#017756', brandLight:'#0FA47A' };
+let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
+
+function hexToRgbTriple(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex||'').trim());
+  if(!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n>>16)&255, (n>>8)&255, n&255].join(',');
+}
+/* the six tint levels, all derived from one brand colour */
+const TINT_ALPHAS = [.03, .05, .10, .14, .35, .28];
+function applyAppSettings(){
+  const root = document.documentElement.style;
+  const font = HEADER_FONTS[appSettings.headerFont] || HEADER_FONTS.fraunces;
+  root.setProperty('--disp', font.stack);
+  const brand = appSettings.brand || SETTINGS_DEFAULTS.brand;
+  const light = appSettings.brandLight || SETTINGS_DEFAULTS.brandLight;
+  root.setProperty('--tape', brand);
+  root.setProperty('--tape-light', light);
+  const triple = hexToRgbTriple(brand);
+  if(triple) TINT_ALPHAS.forEach((a,i)=>root.setProperty('--tint-'+(i+1), `rgba(${triple},${a})`));
+}
+async function saveAppSettings(){ await saveDB('db:settings', appSettings); }
+async function setSetting(field, value){
+  appSettings[field] = value;
+  applyAppSettings();
+  await saveAppSettings();
+}
+async function resetAppSettings(){
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS);
+  applyAppSettings();
+  await saveAppSettings();
+  renderMain();
+}
 const DEPARTMENTS = ['Production','Client','Talent','Cinematography','Audio','Grip','Equipment','Set','Vanities','Catering & Travel','Post Production','Other'];
 const DEPARTMENT_CODES = {
   'Production':'PROD', 'Client':'CLIENT', 'Talent':'TALENT', 'Cinematography':'CIN', 'Audio':'AUD',
@@ -927,7 +1004,7 @@ function rolesTagListHTML(c){
   return `<span class="taglist" style="display:inline-flex;">${roles.map(rp=>{
     const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
     const active = !!c.role && c.role===name;
-    return `<span class="pill dept" style="cursor:pointer;${active?'background:rgba(1,119,86,.28);':''}" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
+    return `<span class="pill dept" style="cursor:pointer;${active?'background:var(--tint-6);':''}" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
   }).join('')}</span>`;
 }
 function roleAddPickerHTML(c){
@@ -1226,6 +1303,7 @@ const ICONS = {
   cloud:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.7 1.6A3.5 3.5 0 0 0 7 18z"/></svg>',
   hospital:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>',
   lock:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  cog:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4M6.7 6.7L5 5M19 19l-1.7-1.7M6.7 17.3L5 19M19 5l-1.7 1.7"/></svg>',
   trash:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M10 11v6M14 11v6"/></svg>',
 };
 function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
@@ -1237,11 +1315,11 @@ function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
 async function loadDB(key){
   try{
     const { data, error } = await sb.from('app_data').select('value').eq('key', key).maybeSingle();
-    const isObjKey = key==='db:subdepartments' || key==='db:roleseniority';
+    const isObjKey = key==='db:subdepartments' || key==='db:roleseniority' || key==='db:settings';
     if(error){ console.error('Supabase load failed ('+key+'):', error.message); return isObjKey ? {} : []; }
     if(!data) return isObjKey ? {} : [];
     return data.value;
-  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return key==='db:subdepartments'||key==='db:roleseniority' ? {} : []; }
+  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return key==='db:subdepartments'||key==='db:roleseniority'||key==='db:settings' ? {} : []; }
 }
 async function saveDB(key, value){
   try{
@@ -1263,6 +1341,9 @@ async function initApp(){
   if(savedRoles && !Array.isArray(savedRoles) && Object.keys(savedRoles).length) ROLES_BY_DEPT = savedRoles;
   const savedRoleSeniority = await loadDB('db:roleseniority');
   if(savedRoleSeniority && !Array.isArray(savedRoleSeniority) && Object.keys(savedRoleSeniority).length) ROLE_SENIORITY = savedRoleSeniority;
+  const savedSettings = await loadDB('db:settings');
+  if(savedSettings && !Array.isArray(savedSettings)) appSettings = Object.assign({}, SETTINGS_DEFAULTS, savedSettings);
+  applyAppSettings();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
     await saveDB('db:travelmethods', travelMethodsList);
@@ -1374,7 +1455,7 @@ function projCode(p){
 /* ============================================================ SIDE PANEL */
 function renderSide(){
   document.querySelectorAll('.side-item').forEach(el=>{
-    el.classList.toggle('active', (route.screen==='db-crew'&&el.dataset.side==='crew') || (route.screen==='db-locations'&&el.dataset.side==='locations'));
+    el.classList.toggle('active', (route.screen==='db-crew'&&el.dataset.side==='crew') || (route.screen==='db-locations'&&el.dataset.side==='locations') || (route.screen==='settings'&&el.dataset.side==='settings'));
   });
   const wrap = document.getElementById('sideProjects');
   if(!projectsDB.length){ wrap.innerHTML = '<div class="side-empty">No projects yet</div>'; return; }
@@ -1431,6 +1512,7 @@ window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer();
 /* ============================================================ ROUTER */
 function goDatabase(which){ route={screen:'db-'+which}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
 function goNewProject(){ route={screen:'new-project'}; closeDrawer(); renderSide(); renderMain(); }
+function goSettings(){ route={screen:'settings'}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
 function openProject(id){ currentProjectId=id; route={screen:'project'}; currentProjectTab='overview'; closeDrawer(); renderSide(); renderMain(); }
 function goProjectTab(tab){ currentProjectTab=tab; renderMain(); window.scrollTo(0,0); }
 
@@ -1441,9 +1523,75 @@ function renderMain(){
   else if(route.screen==='db-crew') renderCrewDatabase(m);
   else if(route.screen==='db-locations') renderLocationsDatabase(m);
   else if(route.screen==='new-project') renderNewProject(m);
+  else if(route.screen==='settings') renderSettings(m);
   else if(route.screen==='project') renderProject(m);
   renderGlobalOverlay();
 }
+
+/* ============================================================ SETTINGS (Phase Q)
+   A full screen reached from the sidebar, not a floating cog panel — the app's one
+   existing navigation pattern for "project-independent thing you go and look at" is
+   the sidebar screen (Crew database, Locations database), and a modal cog would have
+   been a second pattern for no gain. Same .page-head / .section markup as those. */
+function renderSettings(m){
+  setTopbarTitle('Settings');
+  const fontOptions = Object.keys(HEADER_FONTS).map(k=>
+    `<option value="${k}" ${appSettings.headerFont===k?'selected':''}>${esc(HEADER_FONTS[k].label)}</option>`).join('');
+  m.innerHTML = `
+    <div class="page-head"><h1>Settings</h1><div class="eyebrow">${esc(COMPANY)}</div></div>
+    <div class="section">
+      <h2>Call sheet headers</h2>
+      <div class="grid g2">
+        <div>
+          <label for="setHeaderFont">Header font</label>
+          <select id="setHeaderFont" onchange="setSetting('headerFont', this.value); renderMain();">${fontOptions}</select>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:8px;">Used for every display heading — the call sheet preview title, section headings and shoot-day block headings. The WhatsApp text is plain text, so it can't carry a font; this reaches the preview card and the printable output.</p>
+    </div>
+    <div class="section">
+      <h2>Brand colours</h2>
+      <div class="grid g2">
+        <div>
+          <label for="setBrand">Brand colour (light backgrounds)</label>
+          <input type="color" id="setBrand" value="${esc(appSettings.brand)}"
+            oninput="previewSetting('brand', this.value)" onchange="setSetting('brand', this.value)">
+        </div>
+        <div>
+          <label for="setBrandLight">Sidebar accent (dark backgrounds)</label>
+          <input type="color" id="setBrandLight" value="${esc(appSettings.brandLight)}"
+            oninput="previewSetting('brandLight', this.value)" onchange="setSetting('brandLight', this.value)">
+        </div>
+      </div>
+      <p class="hint" style="margin-top:8px;">The brand colour drives every heading, label and green tint, including the call sheet output. The sidebar sits on a near-black background, so it takes a lifted version of the same hue — the default pair is #017756 / #0FA47A, which clears AA contrast in both places. Pick something too dark for the sidebar and active items will be hard to read.</p>
+      <div class="toolbar" style="margin-top:12px;">
+        <button onclick="resetAppSettings()">${icon('refresh')} Reset to brand defaults</button>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Preview</h2>
+      <div class="card" style="margin-top:0;">
+        <div class="line1">${esc(COMPANY)} · Sample Client — Sample Project</div>
+        <div class="sub">Monday 1 June 2026 · Day 1 of 3 · All-crew call 08:00</div>
+        <h3>Position assignments</h3>
+        <div class="tablewrap"><table>
+          <tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th></tr>
+          <tr><td>PR</td><td>Producer</td><td>Sample Name</td><td>08:00</td></tr>
+          <tr><td>CIN</td><td>DOP</td><td>Sample Name</td><td>08:30</td></tr>
+        </table></div>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Company</h2>
+      <div class="grid g2">
+        <div><label>Production company</label><input type="text" value="${esc(COMPANY)}" readonly></div>
+      </div>
+      <p class="hint" style="margin-top:8px;">Single company for now. Per-company logos and details are deliberately not built — that waits until the app is used by anyone outside ${esc(COMPANY)}.</p>
+    </div>`;
+}
+/* apply without persisting — the colour picker fires oninput continuously while
+   dragging, and one Supabase write per pixel of hue is not a good trade */
+function previewSetting(field, value){ appSettings[field] = value; applyAppSettings(); }
 
 function renderWelcome(m){
   setTopbarTitle('Call Sheets');
@@ -2894,12 +3042,19 @@ function jumpToHotelSummary(){
   if(!hotelSummaryOpen) toggleHotelSummaryBlock();
   document.getElementById('hotelSummarySection')?.scrollIntoView({block:'start'});
 }
-function copyHotelSummary(){
-  const data = buildHotelSummary(); if(!data) return;
+/* the text form of the hotel summary, as an array of lines — shared by the Copy
+   button here and the WhatsApp export's Hotels section (Phase Q). `null` when there
+   are no hotel nights at all, so a caller can leave the section out entirely. */
+function hotelSummaryLines(){
+  const data = buildHotelSummary(); if(!data) return null;
   const lines = [`HOTEL BOOKING — ${data.summary}`, '', 'ROOM-BOOKING TABLE'];
   data.roomBooking.forEach(r=>lines.push(`Room ${r.roomNo}: ${r.name} — ${r.from} to ${r.to} (${r.totalNights} night${r.totalNights>1?'s':''})`));
   lines.push('','PER-NIGHT TABLE');
   data.perNight.forEach(n=>lines.push(`${n.label}: ${n.rooms} room${n.rooms>1?'s':''} — ${n.names.join(', ')}`));
+  return lines;
+}
+function copyHotelSummary(){
+  const lines = hotelSummaryLines(); if(!lines) return;
   copyText(lines.join('\n'), 'Copied!');
 }
 /* ---- Catering: breakfast / lunch / dinner per person per day ----
@@ -2968,8 +3123,10 @@ function renderCateringExport(){
   });
   el.innerHTML = pvBlockHTML('catering', 'Catering order', headerActions, body);
 }
-function copyCateringExport(){
-  const data = buildCateringExport(); if(!data) return;
+/* text form of the catering order — shared by the Copy button and the WhatsApp
+   export's Catering section (Phase Q); `null` when nothing is ordered */
+function cateringOrderLines(){
+  const data = buildCateringExport(); if(!data) return null;
   const lines = ['CATERING ORDER',''];
   data.forEach(day=>{
     lines.push(day.label);
@@ -2982,6 +3139,10 @@ function copyCateringExport(){
     }
     lines.push('');
   });
+  return lines;
+}
+function copyCateringExport(){
+  const lines = cateringOrderLines(); if(!lines) return;
   copyText(lines.join('\n'), 'Copied!');
 }
 /* ---- Catering tab's own grid-format summary (Phase P2) ----
@@ -3211,8 +3372,10 @@ function jumpToTransportSummary(){
   if(!transportSummaryOpen) toggleTransportSummaryBlock();
   document.getElementById('transportSummarySection')?.scrollIntoView({block:'start'});
 }
-function copyTransportSummary(){
-  const data = buildTransportSummary(); if(!data) return;
+/* text form of the transport summary — shared by the Copy button and the WhatsApp
+   export's Travel section (Phase Q); `null` when no travel methods are in use */
+function transportSummaryLines(){
+  const data = buildTransportSummary(); if(!data) return null;
   const fmt = n => (n||0).toFixed(2);
   const lines = ['TRANSPORT SUMMARY', ''];
   data.cols.forEach(c=>{
@@ -3220,6 +3383,10 @@ function copyTransportSummary(){
     lines.push(`${c.label}: ${parts} — Daily cost ${fmt(c.dailyCost)}`);
   });
   lines.push('', `Total transport cost: ${fmt(data.totalCost)}`);
+  return lines;
+}
+function copyTransportSummary(){
+  const lines = transportSummaryLines(); if(!lines) return;
   copyText(lines.join('\n'), 'Copied!');
 }
 async function toggleCrewOnDay(crewId, dayId, checked){
@@ -3577,7 +3744,6 @@ async function removeCrewFromProject(id){
 function renderProjectLocations(body){
   const p = currentProject();
   const assigned = (p.locationIds||[]).map(id=>locById(id)).filter(Boolean);
-  const unassigned = locationsDB.filter(l=>!(p.locationIds||[]).includes(l.id));
   const days = projectDays();
   body.innerHTML = `
     <div class="section">
@@ -3585,19 +3751,72 @@ function renderProjectLocations(body){
       ${assigned.length ? locDayGridHTML(assigned, days) : '<div class="empty-note">No locations assigned to this project yet.</div>'}
     </div>
     <div class="section">
-      <h2>Add from locations database</h2>
-      ${unassigned.length ? `
-        <select id="addLocPick"><option value="">— Select location —</option>
-          ${unassigned.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}
-        </select>
-        <div class="toolbar" style="margin-top:8px;"><button class="primary" onclick="addLocToProject()">Add to project</button></div>
-      ` : '<div class="empty-note">Every saved location is already on this project.</div>'}
-    </div>
-    <div class="section">
-      <h2>Add a new location</h2>
-      <button class="small" onclick="toggleLocForm('${p.id}')">+ Add location</button>
-      <div id="locFormWrap" style="display:none; margin-top:12px;"></div>
+      <h2>Add location</h2>
+      <button class="small" onclick="toggleLocAdd()">${locAddOpen?'Cancel':'+ Add location'}</button>
+      ${locAddOpen ? `
+        <div class="searchresults" style="margin-top:10px;">
+          <input type="text" id="locAddSearch" placeholder="Search saved locations…" value="${esc(locAddQuery)}" oninput="onLocAddInput(this.value)" autocomplete="off">
+          <div class="srlist" id="locAddResults">${locAddResultsHTML()}</div>
+        </div>
+        <div id="locFormWrap" style="display:none; margin-top:12px;"></div>
+      ` : '<div id="locFormWrap" style="display:none;"></div>'}
     </div>`;
+  if(locAddOpen) document.getElementById('locAddSearch')?.focus();
+}
+/* ---- ONE way to add a location (Phase Q) ----
+   This tab used to carry two buttons that overlapped: a "select from the database"
+   dropdown and a separate "add a new location" form. Which one you needed depended
+   on something you could only find out by opening the dropdown and reading it, and
+   picking wrong meant backing out and starting again in the other one.
+
+   Now there is one button. It opens a search field over the Locations database, and
+   the "create new location" option lives at the bottom of the same result list —
+   so the answer to "is it already saved?" arrives as you type, and either outcome
+   continues from where you already are. Both paths still end where they always did:
+   an existing pick goes through addLocToProject(), and a new one through the same
+   locFormHTML()/saveLocation() form with locFormContext set to this project, which
+   is what attaches it to p.locationIds on save. */
+let locAddOpen = false;
+let locAddQuery = '';
+function toggleLocAdd(){
+  locAddOpen = !locAddOpen;
+  if(!locAddOpen) locAddQuery = '';
+  renderProjectBody();
+}
+function onLocAddInput(q){
+  locAddQuery = q;
+  const el = document.getElementById('locAddResults');
+  if(el) el.innerHTML = locAddResultsHTML();   // results only — re-rendering the tab would steal focus mid-word
+}
+function locAddResultsHTML(){
+  const p = currentProject(); if(!p) return '';
+  const assignedIds = p.locationIds||[];
+  const q = locAddQuery.trim();
+  const ql = q.toLowerCase();
+  const blob = l => (l.name+' '+(l.address||'')).toLowerCase();
+  const matches = locationsDB.filter(l=>!assignedIds.includes(l.id)).filter(l=>!ql || blob(l).includes(ql)).slice(0,8);
+  const rows = matches.map(l=>`<div class="sritem" onclick="addLocToProject('${l.id}')">
+      <strong>${esc(l.name)}</strong>${l.address?`<div class="hint">${esc(l.address)}</div>`:''}
+    </div>`).join('');
+  let note = '';
+  if(!matches.length){
+    const alreadyOn = ql && locationsDB.some(l=>assignedIds.includes(l.id) && blob(l).includes(ql));
+    note = `<div class="sritem" style="cursor:default; color:var(--muted);">${
+      alreadyOn ? 'Already on this project.'
+      : q ? `No saved location matches “${esc(q)}”.`
+      : 'Every saved location is already on this project.'}</div>`;
+  }
+  return rows + note + `<div class="sritem" style="color:var(--tape);" onclick="startNewLocationFromSearch()">${
+    q ? `+ Create new location “${esc(q)}”` : '+ Create a new location'}</div>`;
+}
+function startNewLocationFromSearch(){
+  const p = currentProject(); if(!p) return;
+  const w = document.getElementById('locFormWrap'); if(!w) return;
+  locFormState = {lat:null, lon:null, hospital:null, parking:null};
+  locFormContext = p.id;                       // what makes saveLocation() attach it to this project
+  w.innerHTML = locFormHTML({ name: locAddQuery.trim() });
+  w.style.display = '';
+  w.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 /* Day-checkbox grid for project locations — same pattern as Crew tab's Days on site.
    Ticking a day for a location sets it as that day's primary location if the day has
@@ -3643,10 +3862,13 @@ async function toggleLocOnDay(locId, dayId, checked){
   await saveDB('db:shootdays', shootDaysDB);
   renderProjectBody();
 }
-async function addLocToProject(){
-  const id = val('addLocPick'); if(!id) return;
+/* takes the id directly now — the old no-arg form read a <select> that the unified
+   add flow (Phase Q) replaced with the search result list */
+async function addLocToProject(id){
+  if(!id) return;
   const p = currentProject();
   p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(id)) p.locationIds.push(id);
+  locAddOpen = false; locAddQuery = '';
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeLocFromProject(id){
@@ -3715,6 +3937,45 @@ function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
     <div id="pvb-${key}" style="display:${open?'':'none'}">${bodyInnerHTML}</div>
   </div>`;
 }
+/* ---- Phase Q: what the export actually contains ----
+   TWO independent choices, deliberately not one list:
+     exportFormat   — the SHAPE of the output. 'printable' is the formatted call
+                      sheet card (the thing you print or save as PDF); 'whatsapp' is
+                      the plain-text version pasted into a chat.
+     exportSections — WHICH of the four optional content areas either shape carries.
+
+   Excel is NOT a third format. It is the printable content in a spreadsheet
+   container — same call sheet, same sections, same order, just a different file to
+   hand to an accountant or a caterer. So it stays a download button inside the
+   printable shape rather than a third radio option, and it obeys the same section
+   checkboxes (an unticked Catering means no Catering sheet in the .xlsx).
+
+   Session state, like previewBlocks/crewGridView — this is "what am I sending right
+   now", not a project property, so it isn't persisted. */
+let exportFormat = 'printable';                                       // 'printable' | 'whatsapp'
+let exportSections = { tech:true, catering:true, hotels:true, travel:true };
+const EXPORT_SECTION_LABELS = { tech:'Tech specs', catering:'Catering', hotels:'Hotels', travel:'Travel' };
+function setExportFormat(f){ exportFormat = f; renderProjectBody(); }
+function toggleExportSection(key, checked){ exportSections[key] = checked; renderProjectBody(); }
+function exportOptionsHTML(){
+  const fmtTab = (key, label) => `<div class="tab ${exportFormat===key?'active':''}" onclick="setExportFormat('${key}')">${label}</div>`;
+  const boxes = Object.keys(EXPORT_SECTION_LABELS).map(key=>`
+    <label class="export-include-item">
+      <input type="checkbox" ${exportSections[key]?'checked':''} onchange="toggleExportSection('${key}', this.checked)">
+      ${esc(EXPORT_SECTION_LABELS[key])}
+    </label>`).join('');
+  return `<div class="section">
+    <h2>Format</h2>
+    <div class="tabs">${fmtTab('printable','Printable')}${fmtTab('whatsapp','WhatsApp')}</div>
+    <div class="export-include">
+      <span class="export-include-label">Include</span>
+      ${boxes}
+    </div>
+    <p class="hint" style="margin-top:8px;">${exportFormat==='whatsapp'
+      ? 'Plain text for a chat app — the ticked sections are appended to the message. Untick Tech specs for the version that goes to the full crew.'
+      : 'The formatted call sheet — print it, save it as a PDF, or download the same content as .xlsx below.'}</p>
+  </div>`;
+}
 function renderProjectPreview(body){
   const days = projectDays();
   if(!days.length){
@@ -3722,20 +3983,32 @@ function renderProjectPreview(body){
     return;
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
-  body.innerHTML = dayTabsBarHTML(days) + `
+  const printable = exportFormat!=='whatsapp';
+  body.innerHTML = dayTabsBarHTML(days) + exportOptionsHTML() + (printable ? `
     ${expandCollapseAllHTML('toggleAllPreviewBlocks()', undefined, allBlocksCollapsed(previewBlocks), 'pv')}
     <div class="card" id="previewCard"></div>
-    ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
-      `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
-    ${hotelSummaryHTML()}
-    <div id="techSpecsSection"></div>
-    <div id="cateringExportSection"></div>
+    ${exportSections.tech ? '<div id="techSpecsSection"></div>' : ''}
+    ${exportSections.hotels ? hotelSummaryHTML() : ''}
+    ${exportSections.catering ? '<div id="cateringExportSection"></div>' : ''}
+    ${exportSections.travel ? transportSummaryHTML() : ''}
     ${pvBlockHTML('excel', 'Excel export', '', `
       <button class="primary" onclick="downloadExcel()">${icon('download')} Download .xlsx</button>
-      <p class="hint">Opens in Excel, Numbers, or Google Sheets (File → Import). Includes a separate Tech Specs sheet.</p>`)}`;
+      <p class="hint">Opens in Excel, Numbers, or Google Sheets (File → Import). One sheet per ticked section.</p>`)}`
+  : `
+    ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
+      `<pre id="waText"></pre>`)}`);
   const d = days.find(x=>x.id===currentShootDayId);
   generatePreview(d);
-  renderCateringExport();
+  if(printable && exportSections.catering) renderCateringExport();
+  /* The Travel block brings its own cost inputs (same markup as the Crew tab's), so
+     they need the same autosave wiring here. Scoped to those two field ids on
+     purpose: a bare body.oninput would also fire on the Include checkboxes, and
+     saveTransportCosts() reading fields that are no longer in the DOM would write
+     both rates back as 0. */
+  body.oninput = (printable && exportSections.travel)
+    ? (e) => { if(e.target && (e.target.id==='tsCostPublic' || e.target.id==='tsCostMileage'))
+        scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); }); }
+    : null;
 }
 function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
 /* shared record shape — used by addShootDay, createProject (auto first day), and syncShootDayCount */
@@ -3941,7 +4214,7 @@ function renderDeptAdminPanel(){
         </div>` : '<span class="hint">No saved roles yet.</span>'}
       </div>
       ${roster.length ? `<div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
-        ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:rgba(1,119,86,.28);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`).join('')}
+        ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:var(--tint-6);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`).join('')}
       </div>` : '<div class="hint">No crew assigned to this department yet.</div>'}
     </div>`;
   }).join('');
@@ -4345,9 +4618,12 @@ function locFormHTML(l){
       <button onclick="closeLocForm()">Cancel</button>
     </div>`;
 }
-function toggleLocForm(projectId){
+/* Locations DATABASE screen only — no project context, so nothing to attach to.
+   The project tab's route in is startNewLocationFromSearch(), which sets
+   locFormContext itself (Phase Q). */
+function toggleLocForm(){
   const w=document.getElementById('locFormWrap');
-  if(w.style.display==='none'){ locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=projectId||null; w.innerHTML=locFormHTML(); w.style.display=''; } else closeLocForm();
+  if(w.style.display==='none'){ locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=null; w.innerHTML=locFormHTML(); w.style.display=''; } else closeLocForm();
 }
 function closeLocForm(){ const w=document.getElementById('locFormWrap'); w.style.display='none'; w.innerHTML=''; locFormState={lat:null,lon:null,hospital:null,parking:null}; locFormContext=null; }
 function editLocation(id){
@@ -4370,7 +4646,9 @@ async function saveLocation(){
   if(locFormContext){
     const p = projById(locFormContext);
     if(p){ p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(merged.id)) p.locationIds.push(merged.id); await saveDB('db:projects', projectsDB); }
-    closeLocForm(); renderProjectBody();
+    closeLocForm();
+    locAddOpen = false; locAddQuery = '';   // the add flow is finished — collapse it back to the one button
+    renderProjectBody();
   } else {
     closeLocForm(); renderLocationsList();
   }
@@ -5066,10 +5344,14 @@ function buildFullData(d){
     // d.techSpecs directly exported blank tech specs for every day on the defaults.
     techSpecs:resolveTechSpecs(d), cameraDesignations };
 }
+/* Only one output shape is in the DOM at a time now (Phase Q), so each of these is
+   guarded rather than assumed — the WhatsApp <pre> doesn't exist in printable mode
+   and the card doesn't exist in WhatsApp mode. */
 function generatePreview(d){
   const data=buildFullData(d);
   renderPreviewCard(data);
-  document.getElementById('waText').textContent=buildWAText(data);
+  const wa=document.getElementById('waText');
+  if(wa) wa.textContent=buildWAText(data);
   renderTechSpecsSection(data);
 }
 function renderTechSpecsSection(d){
@@ -5082,9 +5364,11 @@ function renderTechSpecsSection(d){
   const body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>` + techSpecsRoundupBodyHTML(rows, cams);
   el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
 }
-function copyTechSpecsText(){
-  const d=currentDay(); if(!d) return '';
-  const data=buildFullData(d); const ts=data.techSpecs||{};
+/* text form of a day's tech specs — shared by the Copy button and the WhatsApp
+   export's Tech specs section (Phase Q). Takes RESOLVED data (buildFullData output),
+   not a raw day, so both callers are looking at the same override-vs-default result. */
+function techSpecsLines(data){
+  const ts=data.techSpecs||{};
   const dayLine=(data.dayNum||data.dayTotal)?`Day ${data.dayNum||'?'}${data.dayTotal?(' of '+data.dayTotal):''}`:'';
   const L=[`*TECH SPECS* — ${data.shootTitle||''} ${dayLine}`.trim()];
   techSpecRows(ts).forEach(([k,v])=>L.push(`${k}: ${v}`));
@@ -5092,7 +5376,11 @@ function copyTechSpecsText(){
     L.push('','*CAMERA DESIGNATIONS*');
     data.cameraDesignations.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name}${cd.shorthand?(' ['+cd.shorthand+']'):''} (${cd.tag})`));
   }
-  return L.join('\n');
+  return L;
+}
+function copyTechSpecsText(){
+  const d=currentDay(); if(!d) return '';
+  return techSpecsLines(buildFullData(d)).join('\n');
 }
 function copyTechSpecs(){ return copyText(copyTechSpecsText()); }
 /* one Dept/Position/Name/Call/Phone table, shared by Client, Talent and the main
@@ -5140,7 +5428,8 @@ function renderPreviewCard(d){
       h += positionsTableHTML(g.company, g.people, '(co-production)');
     });
   }
-  document.getElementById('previewCard').innerHTML = header + `<div id="pvb-callsheet" style="display:${open?'':'none'}; margin-top:14px;">${h}</div>`;
+  const card = document.getElementById('previewCard'); if(!card) return;
+  card.innerHTML = header + `<div id="pvb-callsheet" style="display:${open?'':'none'}; margin-top:14px;">${h}</div>`;
 }
 /* pushes a "*HEADING*" line then one "*Role* — Name" / "Call · phone" pair per
    person — the shared WhatsApp-text block for Client, Position assignments,
@@ -5170,6 +5459,16 @@ function buildWAText(d){
   if(d.brief.length){ L.push('','*PRODUCTION BRIEF*'); d.brief.forEach(l=>L.push(`- ${l}`)); }
   if(d.parking) L.push('','*PARKING / ARRIVAL*',d.parking);
   if(d.notes) L.push('','*NOTES*',d.notes);
+  /* Phase Q — the four optional sections, appended in the same order the printable
+     shape stacks them, each gated by its Include checkbox. Tech specs used to be
+     hardcoded OUT of this text ("the version for the full crew"); that rule is now
+     the Tech specs checkbox instead of a rule nobody could see, so the old crew-wide
+     message is one untick away. Hotels/Catering/Travel are project-wide summaries,
+     not per-day slices — the same text their Copy buttons produce. */
+  if(exportSections.tech){ L.push(''); techSpecsLines(d).forEach(l=>L.push(l)); }
+  if(exportSections.hotels){ const h=hotelSummaryLines(); if(h){ L.push('','*HOTELS*'); h.forEach(l=>L.push(l)); } }
+  if(exportSections.catering){ const c=cateringOrderLines(); if(c){ L.push('','*CATERING*'); c.forEach(l=>L.push(l)); } }
+  if(exportSections.travel){ const t=transportSummaryLines(); if(t){ L.push('','*TRAVEL*'); t.forEach(l=>L.push(l)); } }
   return L.join('\n');
 }
 function copyWA(){ return copyText(document.getElementById('waText').textContent); }
@@ -5203,16 +5502,61 @@ function downloadExcel(){
   if(data.notes){ aoa.push(['PRODUCTION NOTES']); aoa.push([data.notes]); }
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:12},{wch:24},{wch:24},{wch:14},{wch:16},{wch:20}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Call Sheet');
-  const ts=data.techSpecs||{};
-  const tsRows=techSpecRows(ts);
-  const tsAoa=[['TECH SPECS — camera/technical crew reference'],[],...tsRows];
-  if(data.cameraDesignations && data.cameraDesignations.length){
-    tsAoa.push([]); tsAoa.push(['CAMERA DESIGNATIONS']); tsAoa.push(['Camera','Name','Shorthand','File tag']);
-    data.cameraDesignations.forEach(cd=>tsAoa.push([cd.letter, cd.name, cd.shorthand||'', cd.tag]));
+  /* Phase Q — one sheet per ticked section, same four checkboxes that gate the
+     printable blocks and the WhatsApp text. A section with no data at all still
+     produces no sheet, ticked or not: an empty tab is worse than a missing one. */
+  const addSheet=(name, sheetAoa, cols)=>{
+    const s=XLSX.utils.aoa_to_sheet(sheetAoa);
+    if(cols) s['!cols']=cols;
+    XLSX.utils.book_append_sheet(wb,s,name);
+  };
+  if(exportSections.tech){
+    const tsRows=techSpecRows(data.techSpecs||{});
+    const tsAoa=[['TECH SPECS — camera/technical crew reference'],[],...tsRows];
+    if(data.cameraDesignations && data.cameraDesignations.length){
+      tsAoa.push([]); tsAoa.push(['CAMERA DESIGNATIONS']); tsAoa.push(['Camera','Name','Shorthand','File tag']);
+      data.cameraDesignations.forEach(cd=>tsAoa.push([cd.letter, cd.name, cd.shorthand||'', cd.tag]));
+    }
+    addSheet('Tech Specs', tsAoa, [{wch:20},{wch:30}]);
   }
-  const wsTech=XLSX.utils.aoa_to_sheet(tsAoa);
-  wsTech['!cols']=[{wch:20},{wch:30}];
-  XLSX.utils.book_append_sheet(wb,wsTech,'Tech Specs');
+  if(exportSections.hotels){
+    const hotel=buildHotelSummary();
+    if(hotel){
+      const hAoa=[['HOTEL BOOKING', hotel.summary],[],['ROOM-BOOKING TABLE'],['Room No.','Name','Date from','Date to','Total nights']];
+      hotel.roomBooking.forEach(r=>hAoa.push([r.roomNo, r.name, r.from, r.to, r.totalNights]));
+      hAoa.push([]); hAoa.push(['PER-NIGHT TABLE']); hAoa.push(['Night','Rooms','Names']);
+      hotel.perNight.forEach(n=>hAoa.push([n.label, n.rooms, n.names.join(', ')]));
+      addSheet('Hotel', hAoa, [{wch:10},{wch:24},{wch:16},{wch:16},{wch:40}]);
+    }
+  }
+  if(exportSections.catering){
+    const catering=buildCateringExport();
+    if(catering){
+      const cAoa=[['CATERING ORDER'],[]];
+      catering.forEach(day=>{
+        cAoa.push([day.label]); cAoa.push(['Meal','Count']);
+        if(day.bCount) cAoa.push(['Breakfast', day.bCount]);
+        if(day.lCount) cAoa.push(['Lunch', day.lCount]);
+        if(day.dCount) cAoa.push(['Dinner', day.dCount]);
+        if(day.dietaryNotes.length){
+          cAoa.push(['Dietary requirements']); cAoa.push(['Name','Type','Specific']);
+          day.dietaryNotes.forEach(n=>cAoa.push([n.name, n.general, n.specific]));
+        }
+        cAoa.push([]);
+      });
+      addSheet('Catering', cAoa, [{wch:24},{wch:18},{wch:32}]);
+    }
+  }
+  if(exportSections.travel){
+    const travel=buildTransportSummary();
+    if(travel){
+      const tAoa=[['TRANSPORT SUMMARY'],[], ['Method', ...travel.cols.map(c=>c.label)]];
+      travel.usedMethods.forEach(m=>tAoa.push([m, ...travel.cols.map(c=>c.counts[m])]));
+      tAoa.push(['Daily cost', ...travel.cols.map(c=>Number((c.dailyCost||0).toFixed(2)))]);
+      tAoa.push([]); tAoa.push(['Total transport cost', Number((travel.totalCost||0).toFixed(2))]);
+      addSheet('Travel', tAoa, [{wch:24}]);
+    }
+  }
   XLSX.writeFile(wb,`callsheet-${data.shootDate||'draft'}${data.dayNum?('-day'+data.dayNum):''}.xlsx`);
 }
 </script>
