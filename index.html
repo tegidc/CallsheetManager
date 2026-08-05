@@ -2349,8 +2349,6 @@ function renderProjectOverview(body){
   const p = currentProject();
   const days = projectDays(p.id);
   body.innerHTML = `
-    ${renderTasksSection(p, days)}
-    ${aiScanSectionHTML(p)}
     <div class="section">
       <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
@@ -2371,10 +2369,11 @@ function renderProjectOverview(body){
       <label>Production description</label>
       <textarea id="ovDescription">${esc(p.description)}</textarea>
       <div class="toolbar" style="margin-top:12px;">
-        <button class="primary" onclick="saveProjectOverview()">Save changes</button>
         <span class="status" id="ovStatus"></span>
       </div>
     </div>
+    ${renderTasksSection(p, days)}
+    ${aiScanSectionHTML(p)}
     <div class="section">
       <h2>Danger zone</h2>
       <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
@@ -2477,6 +2476,8 @@ function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
    persisted per-project records the user creates by hand. Both live in this
    one merged section, replacing the old standalone "Bare minimums" box.
    --------------------------------------------------------------------------- */
+let tasksSectionOpen = false;            // collapsed by default, same convention as AI Scan/summary blocks
+function toggleTasksSection(){ tasksSectionOpen = !tasksSectionOpen; renderProjectBody(); }
 let taskFlagsSettingsOpen = false;
 function toggleTaskFlagsSettings(){ taskFlagsSettingsOpen = !taskFlagsSettingsOpen; renderProjectBody(); }
 async function toggleTaskFlagRule(field, checked){ await setSetting(field, checked); renderProjectBody(); }
@@ -2584,18 +2585,24 @@ function renderTasksSection(p, days){
   const flagsToggleSpan = `<span class="crew-header-filter" onclick="toggleTaskFlagsSettings()">
       <span class="dept-caret">${taskFlagsSettingsOpen?'▾':'▸'}</span> Flags${flagItems.length?` (${flagItems.length})`:''}
     </span>`;
+  const open = tasksSectionOpen;
+  const openTaskCount = (p.tasks||[]).filter(t=>!t.completed).length;
   return `<div class="section" id="tasksSection">
-    <h2>Tasks</h2>
-    ${crewToolbarHTML('', flagsToggleSpan, '')}
-    ${taskFlagsSettingsOpen ? taskFlagsSettingsHTML() : ''}
-    ${taskFlagPillsHTML(flagItems)}
-    <div class="subhead" style="margin-top:18px;">Add a task</div>
-    <div class="grid g2" style="margin-bottom:8px;">
-      <div><label>Title</label><input type="text" id="taskTitleInput" placeholder="e.g. Confirm parking permit" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
-      <div><label>Note (optional)</label><input type="text" id="taskNoteInput" placeholder="Optional detail" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="toggleTasksSection()"><span class="dept-caret" id="tasks-block">${open?'▾':'▸'}</span> Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}</span>
     </div>
-    <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
-    ${tasksListHTML(p)}
+    <div id="tasksb-block" style="display:${open?'':'none'}">
+      ${crewToolbarHTML('', flagsToggleSpan, '')}
+      ${taskFlagsSettingsOpen ? taskFlagsSettingsHTML() : ''}
+      ${taskFlagPillsHTML(flagItems)}
+      <div class="subhead" style="margin-top:18px;">Add a task</div>
+      <div class="grid g2" style="margin-bottom:8px;">
+        <div><label>Title</label><input type="text" id="taskTitleInput" placeholder="e.g. Confirm parking permit" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+        <div><label>Note (optional)</label><input type="text" id="taskNoteInput" placeholder="Optional detail" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+      </div>
+      <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
+      ${tasksListHTML(p)}
+    </div>
   </div>`;
 }
 /* ============================================================================
