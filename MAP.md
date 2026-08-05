@@ -67,7 +67,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `projectCrewSelected` / `toggleCrewSelected()` / `toggleSelectAllFilteredCrew()` / `clearCrewSelection()` / `bulkRemoveSelectedFromProject()` / `bulkActionBarHTML()` — bulk-select (checkbox swapped in for the view/eye icon via `crewIdentityHTML`'s `bulkSelect` option) and the bulk "Remove from project" action. `toggleSelectAllFilteredCrew()` is the "Select all" checkbox next to Expand/Collapse all (Phase T item 2) — it's always handed exactly the currently-filtered/visible crew ids, never the full project roster, so it only ever selects what the active filter is showing — [Crew]
 - `selectedEditTargets(crewId)` (Phase Bulk Edit) — **the selected-set bulk-edit pattern.** Every per-field editor on the Crew tab calls this first: if `crewId` is part of the current multi-select AND at least one other person is also selected, it returns every selected id; otherwise just `[crewId]`. The caller then loops its own field-specific mutation over the returned ids and does ONE `saveDB`/render at the end — this is the reusable "which ids does this edit apply to" decision, not a per-field bulk-edit implementation. Wired into `toggleCrewOnDay()` (Days on site), `toggleHotelNight()` / `toggleHotelPre()` (Hotel), `toggleMeal()` (Catering), `setTravelMethod()` (Travel), `saveQuickShowAs()` (Roles — Show as) and `setActiveRole()` (Roles — role/department; only on a direct user pick, i.e. `skipSave` falsy — the internal `skipSave:true` calls used to reactivate a replacement role after `removeRoleFromCrew()` do NOT fan out, since that's a single-person consistency fixup, not a user edit). `bulkActionBarHTML()` shows a one-line hint ("Editing a field for one selected person applies it to all N") whenever 2+ are selected. Deliberately NOT wired into `toggleAllForPerson()` / `toggleAllMealForPerson()` (the per-person "All" button) — that's a different axis (all days for one person), mixing it with cross-person propagation would be confusing — [Crew]
 - `bulkEditOpen` / `toggleBulkEdit()` / `bulkEditPanelHTML()` / `applyBulkLeadCompany()` — bulk-edit panel opened from the bulk-action bar; currently just Lead Company, the field Phase R moved off the main Roles row — [Crew]
-- `crewRolesRowHTML()` — renders one person's row in the Roles tab as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (saved-roles taglist only — no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
+- `crewRolesRowHTML()` — renders one person's row in the Roles tab as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (saved-roles taglist only — no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
 - `showAsQuickEditHTML()` / `saveQuickShowAs()` — inline "Show as" quick-edit, used on the Roles row. Renders via the same `.icon-btn` pencil button as every other edit affordance in the row (Phase S item 2) rather than a separately-styled control — [Crew]
 - `groupedCrewOptionsHTML()` — builds `<option>` groups (by department) for crew-picker selects — [Crew]
 - `crewAssignRowHTML()` — renders one crew row in the "days on site"/"hotel" grid. Department badge and Lead Company pill are hidden (Phase S item 6) and role display falls back to Show-as (`showAsOrRole`, item 8) — this row no longer offers any role editing (the old per-row role quick-edit was removed; role/department/Show-as are only ever edited on the Roles tab) — [Crew]
@@ -211,15 +211,68 @@ Preview & Export stays the export surface.
   edited inline on the Per Person view, no separate edit affordance (matches the
   Phase Detail "Show as" decision — a plain input, not a pencil-and-save control) —
   [Budget]
+- `crewRateSaveIconHTML()` / `saveCrewRateToDatabase()` (Phase AG) — the Day Rate
+  "Save to database" icon, the first thing in the app that writes from a project back
+  onto the shared crew database itself (everything else is the reverse: database →
+  per-project override). A deliberately separate, explicit action from the project's
+  own autosave — `p.crewRateOverrides`/`resolveCrewRate()`/`saveCrewRateOverride()`
+  keep behaving exactly as before; this only pushes the currently-resolved rate onto
+  `c.rate` (formatted `£${rate}/day`, matching the crew database's own free-text
+  convention). Reused verbatim in the three places the Day Rate field appears — the
+  Roles tab's Rate column (`crewRolesRowHTML()`), Budget's Per Person view
+  (`budgetPersonViewHTML()`), and the crew Edit expansion (`crewFormHTML()`, project
+  context only — see below) — via a shared `context` tag ('r'/'b'/'e') that keeps
+  their status-flash element ids from colliding when the Roles row and its own Edit
+  expansion are both on screen at once. Fans out through the same
+  `selectedEditTargets()` bulk pattern as every other Crew-tab field, but — because
+  this is the one field that can silently rewrite someone else's standing database
+  record — a 2+ selection gets an explicit `confirm()` first ("This will change all
+  these entries in the database — is that ok?"); cancelling changes nothing, no
+  `saveDB` call happens. Does not touch `c.vatRegistered` itself — see
+  `toggleBudgetVatRegistered()` below for why it doesn't need to — [Crew, Budget]
+- `toggleBudgetVatRegistered()` (Phase AH) — Budget Per Person's VAT checkbox, the
+  editable front-end for `c.vatRegistered` (the same field the crew database's own
+  "VAT registered" select and `buildBudgetData()`'s VAT calc already read — not a
+  second flag). Mutates the live `crewDB` record immediately on tick (so Budget's own
+  VAT totals update in this same render) but does **not** call `saveDB` — per the
+  brief this checkbox has no save icon of its own. It only reaches the database when
+  the adjacent Day Rate Save icon (`saveCrewRateToDatabase()`) is next clicked, which
+  persists the whole `crewDB` array and so picks up whatever's currently sitting in
+  memory here for free — "one action, both fields" without either function needing to
+  know about the other — [Budget]
 - `getHotelCosts()` / `saveHotelCosts()` (Phase AD, moved from Budget to the Hotel
   tab) — read/persist `p.hotelCosts.perRoomNight`, same `{field: Number(val)||0}` shape
   as `getCateringCosts()`/`getTransportCosts()`. The field itself now lives in
-  `hotelSummaryHTML()` (id `hcRoomNight`) — same place Catering/Travel keep theirs —
-  Budget only calls `getHotelCosts()` to read it — [Crew, Budget]
-- `budgetView` / `setBudgetView()` — which of the three views (`department` /
-  `person` / `day`) is showing, same pattern as `crewGridView`. Displayed in the tab
-  switcher as Per Department / Per Day / Per Person (Phase AA) — the switcher's own
-  key order, `viewLabels`, not `budgetView`'s internal naming — [Budget]
+  `hotelSummaryHTML()` (id `hcRoomNight`) — same place Catering/Travel keep theirs.
+  Budget calls `getHotelCosts()` to read it project-wide, and (Phase AF) also renders
+  the same `hcRoomNight` field itself on the Costs tab — see `budgetCostsViewHTML()`
+  below — [Crew, Budget]
+- `budgetCostsViewHTML()` (Phase AF) — Budget's own "Costs" tab (T-6.5, after Per
+  Department/Per Day/Per Person): lets the Hotel/Catering/Travel cost inputs be
+  adjusted from inside Budget too. Holds no state and no fields of its own — every
+  input reuses the **exact same DOM id** as its home tab (`ccCostB`/`ccCostL`/
+  `ccCostD`/`ccCostDelivery`, `tsCostPublic`/`tsCostMileage`, `hcRoomNight`) and reads/
+  writes through the exact same `getCateringCosts()`/`saveCateringCosts()`,
+  `getTransportCosts()`/`saveTransportCosts()`, `getHotelCosts()`/`saveHotelCosts()`
+  pairs the Catering/Travel/Hotel tabs under Crew already use — there is nowhere else
+  these values live, so a change made in either place is the same underlying
+  `p.cateringCosts`/`p.transportCosts`/`p.hotelCosts` record; the other screen's next
+  render just reads it fresh. Reusing the ids is safe because only one tab body is
+  ever in the DOM at once — same precedent as `hcRoomNight` being reused between the
+  Hotel tab and Preview & Export. `renderProjectBudget()`'s `body.oninput` (scoped to
+  `budgetView==='costs'`) autosaves each field via `scheduleAutosave()`, then calls
+  `renderBudgetSummaryBar()` — a targeted refresh of just `#budgetSummaryBarWrap`, not
+  a full re-render, so the field the user is typing in doesn't lose focus (same rule
+  as `renderCateringSummaryGridSection()`/`renderTransportSummaryGridSection()`) —
+  [Budget]
+- `renderBudgetSummaryBar()` (Phase AF) — the targeted refresh behind
+  `budgetCostsViewHTML()`'s autosave; re-renders `budgetSummaryBarHTML()` into
+  `#budgetSummaryBarWrap` only — [Budget]
+- `budgetView` / `setBudgetView()` — which of the four views (`department` /
+  `person` / `day` / `costs`) is showing, same pattern as `crewGridView`. Displayed in
+  the tab switcher as Per Department / Per Day / Per Person / Costs (Phase AA, `costs`
+  added Phase AF) — the switcher's own key order, `viewLabels`, not `budgetView`'s
+  internal naming — [Budget]
 - `budgetVatToggle` / `toggleBudgetVat()` — itemized (every figure ex-VAT, VAT broken
   out as its own line in the summary bar) vs baked in (VAT folded silently into every
   figure everywhere, one Total). Extras (catering/travel/hotel) never carry VAT in
@@ -257,13 +310,18 @@ Preview & Export stays the export surface.
   each Per Day row's own expanded breakdown ("same structure … just scoped to that
   single day" per the brief) — [Budget]
 - `budgetDepartmentViewHTML()` / `budgetPersonViewHTML()` / `budgetDayViewHTML()` —
-  the three views. Per Person's row order is canonical department order then
-  `sortHoDFirst()` within it — there's no existing sortable-table (click-a-column)
-  pattern anywhere in this app to extend, so this is a fixed, sensible order rather
-  than a new UI paradigm built for one screen. Per Person's "Days worked" column is
-  labelled "Days" and centered (Phase AA); its Day rate `.budget-rate-input` field is
-  left-aligned and 64px (Phase AA, was right-aligned/84px) — same class/input reused
-  verbatim by `crewRolesRowHTML()`'s Rate column (Phase Z) — [Budget, Crew]
+  the three rollup views (Costs, the fourth tab, is `budgetCostsViewHTML()` above —
+  it's not a rollup, so it lives with the cost-input machinery instead). Per Person's
+  row order is canonical department order then `sortHoDFirst()` within it — there's no
+  existing sortable-table (click-a-column) pattern anywhere in this app to extend, so
+  this is a fixed, sensible order rather than a new UI paradigm built for one screen.
+  Per Person's "Days worked" column is labelled "Days" and centered (Phase AA); its
+  Day rate `.budget-rate-input` field is left-aligned and 64px (Phase AA, was
+  right-aligned/84px) — same class/input reused verbatim by `crewRolesRowHTML()`'s
+  Rate column (Phase Z). Both Day rate fields now sit inside a `.rate-with-save` wrap
+  next to their `crewRateSaveIconHTML()` Save icon (Phase AG); Per Person also gained
+  a VAT checkbox column between Day rate and Days (Phase AH,
+  `toggleBudgetVatRegistered()`) — [Budget, Crew]
 
 ## Preview & Export
 
@@ -326,7 +384,7 @@ Preview & Export stays the export surface.
 - `renderCrewDatabase()` / `renderCrewList()` / `crewSearchBlob()` / `crewCardHTML()` — render the standalone crew database screen, its filtered list, and its search index/card markup. `crewSearchBlob()` includes `c.showAs` so the cosmetic override is searchable too — [Crew, Shared/utility functions]
 - `toggleDeptCollapse()` / `setAllDeptsCollapsed()` — collapse/expand department groups in the crew database list — [Crew]
 - `toggleProjectDeptCollapse()` / `setAllProjectDeptsCollapsed()` — the same, for the project Crew tab's groups — [Crew]
-- `crewFormHTML()` / `toggleCarFields()` — render the add/edit crew form and react to "has car" toggling. No more free-text Role or manual Department field (Phase R item 1/follow-up): existing crew (`c.id` set) get the live saved-roles tag-list editor; a brand-new crew member gets `newCrewRolePickerHTML()` instead, required to save. Also has the new "Show as" text field — [Crew]
+- `crewFormHTML()` / `toggleCarFields()` — render the add/edit crew form and react to "has car" toggling. No more free-text Role or manual Department field (Phase R item 1/follow-up): existing crew (`c.id` set) get the live saved-roles tag-list editor; a brand-new crew member gets `newCrewRolePickerHTML()` instead, required to save. Also has the new "Show as" text field. Since Phase AG, the Private section's Fee/rate row also carries a "Day rate (this project)" field next to it, when-and-only-when this form is opened from within a project for an existing crew member (`c.id` set AND `currentProject()` resolves — false on the standalone Crew database screen, which shares this same function but has no project) — same `p.crewRateOverrides`/`resolveCrewRate()`/`saveCrewRateOverride()` field as the Roles row and Budget's Per Person view, with its own `crewRateSaveIconHTML()` Save icon (context `'e'`), not a second copy of the override — [Crew]
 - `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view. `toggleCrewForm()`/`closeCrewForm()` reset `pendingNewCrewRole` when the new-crew form opens/closes — [Crew]
 - `saveCrew()` — persist a crew record. Refuses to create a brand-new crew member without `pendingNewCrewRole` set ("every crew member needs at least one saved role"); for a new record, role/department/`roles` are derived entirely from that pick. For an existing record, role/department/`roles` are left untouched (they're managed live by `addRoleToCrew`/`setActiveRole` elsewhere, not by this form) — [Crew]
 - `deleteCrew()` — delete a crew record — [Crew]
@@ -426,8 +484,9 @@ coarse information first, finest detail last.
 | **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
 | T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
 | T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
-| T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override), Days worked, Subtotal | `budgetPersonViewHTML()` |
+| T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override) with its Save-to-database icon (Phase AG), VAT checkbox (Phase AH), Days worked, Subtotal | `budgetPersonViewHTML()` |
 | T-6.4 | · Per Day | One collapsed row per shoot day (day number + short location label + total), expanding to that day's own department + extras breakdown | `budgetDayViewHTML()` |
+| T-6.5 | · Costs | Phase AF — the Hotel/Catering/Travel cost fields, editable from inside Budget too (same underlying fields as their home tabs, not a copy) | `budgetCostsViewHTML()` |
 | **T-7** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
 | T-7.0 | · Format panel | Collapsible Filter-style panel: Printable/WhatsApp selector, the four section checkboxes that gate all three outputs, and both output actions (Copy, Download .xlsx) | `exportPanelHTML()` |
 | T-7.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |

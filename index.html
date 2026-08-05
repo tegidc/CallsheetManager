@@ -440,7 +440,7 @@
   .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   /* Roles tab (Phase S, reordered Phase Z) — proper tidy columns instead of one
      packed inline row. Controls | Name | Role | Rate | Show as. */
-  .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 92px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 118px minmax(120px,1fr); align-items:center; column-gap:10px;}
   .roles-grid-rate{white-space:nowrap;}
   .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .roles-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
@@ -554,6 +554,10 @@
     font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer;}
   .budget-rate-input{width:64px; text-align:left;}
+  /* AG: the Day Rate input + its "save to crew database" icon, wherever the pair appears
+     (Roles tab, Budget Per Person, the crew Edit expansion) */
+  .rate-with-save{display:inline-flex; align-items:center; gap:4px;}
+  .rate-with-save .hint{font-size:11px; white-space:nowrap;}
   .budget-extras-row td{padding-top:14px;}
   .budget-total-row td{padding-top:10px; border-top:1.5px solid var(--field-line);
     font-weight:600;}
@@ -3364,7 +3368,7 @@ function crewRolesRowHTML(c){
     <div class="roles-grid-controls">${selectCb}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}${copyBadge}</div>
     <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${rolesTagListHTML(c)}</span></div>
-    <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveCrewRateOverride('${c.id}', this.value)"></div>
+    <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveCrewRateOverride('${c.id}', this.value)">${crewRateSaveIconHTML(c.id, 'r')}</span></div>
     <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(c)}</div>
     ${crewExpansionHTML(c, 'roles-grid-editform')}
   </div>`;
@@ -4623,6 +4627,40 @@ async function saveCrewRateOverride(crewId, rawValue){
   renderProjectBody();
 }
 
+/* AG: the Day Rate "Save to database" icon — the first thing in the app that writes
+   from a project back to the shared crew database itself (everything else here is the
+   opposite direction: database → per-project override). Deliberately a separate,
+   explicit action from the project's own autosave: p.crewRateOverrides keeps behaving
+   exactly as before, this only pushes the currently-resolved rate onto c.rate, the
+   crew member's STANDING rate. Reused verbatim in all three places the Day Rate field
+   appears (Roles tab, Budget Per Person, the crew Edit expansion) — `context` just
+   keeps their status-flash element ids from colliding when more than one is on screen
+   at once (the Roles row and its own Edit expansion render simultaneously). */
+function crewRateSaveIconHTML(crewId, context){
+  const elId = `crsStatus-${context}-${crewId}`;
+  return `<button type="button" class="icon-btn" onclick="saveCrewRateToDatabase('${crewId}','${context}')" title="Saves to Database" aria-label="Save day rate to database">${icon('save')}</button><span class="hint" id="${elId}"></span>`;
+}
+async function saveCrewRateToDatabase(crewId, context){
+  // Same selected-set fan-out as every other bulk-editable field on the Crew tab
+  // (selectedEditTargets) — but this is the one field that can silently rewrite
+  // someone else's standing database record, so unlike those, a 2+ selection gets an
+  // explicit confirmation first. Cancelling changes nothing.
+  const targets = selectedEditTargets(crewId);
+  if(targets.length>1 && !confirm('This will change all these entries in the database — is that ok?')) return;
+  const p = currentProject();
+  targets.forEach(id=>{
+    const c = crewById(id); if(!c) return;
+    const { rate, hasRate } = resolveCrewRate(c, p);
+    // vatRegistered is NOT touched here — AH's Budget VAT checkbox already mutates
+    // it directly on the live crewDB record the moment it's ticked, so whatever's
+    // currently in memory rides along with this same saveDB call for free (AH's
+    // "pushes both fields together in one action").
+    if(hasRate) c.rate = `£${rate}/day`;
+  });
+  await saveDB('db:crew', crewDB);
+  flashStatus(`crsStatus-${context}-${crewId}`, 'Saved to database');
+}
+
 let budgetView = 'department'; // 'department' | 'person' | 'day'
 function setBudgetView(view){ budgetView = view; renderProjectBody(); }
 // true = itemized (every figure ex-VAT, VAT broken out at the top); false =
@@ -4651,6 +4689,21 @@ function toggleAllBudgetDayBlocks(){ setAllBudgetDayBlocksCollapsed(!allBlocksCo
    travel/hotel) never carry VAT in either state — only a crew member's own
    rate does, per c.vatRegistered. */
 function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle ? 0 : vat); }
+
+/* AH: Budget Per Person's VAT checkbox — the editable front-end for the same
+   c.vatRegistered the crew database's own "VAT registered" field (crewFormHTML's
+   yn('ncVat',...)) and buildBudgetData()'s vat calc already read, not a second flag.
+   Mutates the live crewDB record straight away (so VAT toggles on/off in this same
+   render, exactly like ticking it on the database form would once saved) but does
+   NOT call saveDB itself — per the brief this checkbox has no save icon of its own;
+   it only reaches the database when the adjacent Day Rate Save icon (AG,
+   saveCrewRateToDatabase) is clicked, which persists the whole crewDB array and so
+   picks up whatever's currently sitting in memory here for free. */
+function toggleBudgetVatRegistered(crewId, checked){
+  const c = crewById(crewId); if(!c) return;
+  c.vatRegistered = checked ? 'Yes' : 'No';
+  renderProjectBody();
+}
 
 function buildBudgetData(){
   const p = currentProject();
@@ -4785,16 +4838,18 @@ function budgetPersonViewHTML(data){
   const ordered = DEPARTMENTS.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
   const noRateCount = data.people.filter(pp=>!pp.hasRate).length;
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">Days</th><th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT</th><th style="text-align:center;">Days</th><th>Subtotal</th></tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
-      <td><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveCrewRateOverride('${pp.id}', this.value)"></td>
+      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveCrewRateOverride('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
+      <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
       <td style="text-align:center;">${pp.daysWorked}</td>
       <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
     </tr>`).join('')}
   </table></div>
-  ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}`;
+  ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}
+  <div class="hint" style="margin-top:8px;">Ticking VAT here doesn't save on its own — it's saved to the crew database together with the day rate, the next time that row's Save icon is clicked.</div>`;
 }
 
 function budgetDayViewHTML(data){
@@ -4820,14 +4875,61 @@ function budgetDayViewHTML(data){
   return toggleRow + rows;
 }
 
+/* AF: Budget's own "Costs" tab. Deliberately holds no state of its own — every field
+   here is the exact same DOM id, read via the exact same getCateringCosts()/
+   getTransportCosts()/getHotelCosts() and written via the exact same saveCateringCosts()/
+   saveTransportCosts()/saveHotelCosts() as the Hotel/Catering/Travel tabs under Crew.
+   That's what keeps the two places in sync for free — there is nowhere else these
+   values live, so editing either one is editing the one underlying p.cateringCosts/
+   p.transportCosts/p.hotelCosts record; the next render of either screen just reads
+   it fresh. Reusing the ids (ccCostB etc.) is safe because only one tab body is ever
+   in the DOM at once — same precedent as hcRoomNight being reused between the Hotel
+   tab and Preview & Export. */
+function budgetCostsViewHTML(){
+  const p = currentProject();
+  const cateringCosts = getCateringCosts(p);
+  const transportCosts = getTransportCosts(p);
+  const hotelCosts = getHotelCosts(p);
+  const costFieldHTML = (id, label, value) => `<div class="field-inline">
+      <label for="${id}">${label}</label>
+      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
+    </div>`;
+  return `
+    <div class="hint" style="margin-bottom:14px;">Same cost fields as the Hotel/Catering/Travel tabs under Crew —
+      a change made here or there updates both.</div>
+    <h4 style="margin:0 0 8px;">Catering</h4>
+    <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px;">
+      ${costFieldHTML('ccCostB', 'Est. cost per Breakfast', cateringCosts.b)}
+      ${costFieldHTML('ccCostL', 'Est. cost per Lunch', cateringCosts.l)}
+      ${costFieldHTML('ccCostD', 'Est. cost per Dinner', cateringCosts.d)}
+      ${costFieldHTML('ccCostDelivery', 'Delivery cost', cateringCosts.delivery)}
+    </div>
+    <h4 style="margin:0 0 8px;">Travel</h4>
+    <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px;">
+      ${costFieldHTML('tsCostPublic', 'Est. public transport cost/day', transportCosts.publicPerDay)}
+      ${costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', transportCosts.mileage)}
+    </div>
+    <h4 style="margin:0 0 8px;">Hotel</h4>
+    <div style="display:flex; gap:18px; flex-wrap:wrap;">
+      ${costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight)}
+    </div>`;
+}
+/* Targeted refresh of just the summary bar after a Costs-tab cost field autosaves —
+   same "don't blow away the field the user is still typing in" rule as
+   renderCateringSummaryGridSection()/renderTransportSummaryGridSection() (Phase P2/W). */
+function renderBudgetSummaryBar(){
+  const el = document.getElementById('budgetSummaryBarWrap'); if(!el) return;
+  el.innerHTML = budgetSummaryBarHTML(buildBudgetData());
+}
 function renderProjectBudget(body){
   const data = buildBudgetData();
-  const viewLabels = {department:'Per Department', day:'Per Day', person:'Per Person'};
+  const viewLabels = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Costs'};
   const viewSwitcher = `<div class="tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
   const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
     : budgetView==='day' ? budgetDayViewHTML(data)
+    : budgetView==='costs' ? budgetCostsViewHTML()
     : budgetDepartmentViewHTML(data);
   body.innerHTML = `
     <div class="section">
@@ -4835,10 +4937,19 @@ function renderProjectBudget(body){
       <div class="hint">Cost visibility only — crew day rates, and the catering/travel/hotel costs already
         entered on their own tabs. Not a working budget: location fees aren't included, and there's nothing
         here to edit as a line-item budget.</div>
-      ${budgetSummaryBarHTML(data)}
+      <div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(data)}</div>
       ${viewSwitcher}
       ${viewHTML}
     </div>`;
+  body.oninput = budgetView==='costs' ? (e) => {
+    const id = e.target.id;
+    if(id==='ccCostB' || id==='ccCostL' || id==='ccCostD' || id==='ccCostDelivery')
+      scheduleAutosave('cateringCosts', () => { saveCateringCosts(); renderBudgetSummaryBar(); });
+    else if(id==='tsCostPublic' || id==='tsCostMileage')
+      scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderBudgetSummaryBar(); });
+    else if(id==='hcRoomNight')
+      scheduleAutosave('hotelCosts', () => { saveHotelCosts(); renderBudgetSummaryBar(); });
+  } : null;
 }
 function renderProjectPreview(body){
   const days = projectDays();
@@ -5209,6 +5320,23 @@ function crewFormHTML(c){
   const roleFieldHTML = c.id
     ? `<span class="roles-inline">${rolesTagListHTML(c)}${roleAddPickerHTML(c)}</span>`
     : newCrewRolePickerHTML();
+  // AG, place 1 of 2: the Save-to-database icon inside this Edit expansion. Only
+  // shown for an existing crew member (c.id) opened from within a project (the same
+  // form also renders on the standalone Crew database screen, which has no project
+  // and so no per-project override to show) — reads/writes the exact same
+  // p.crewRateOverrides field as the Roles row and Budget's Per Person view, not a
+  // second copy of it.
+  const projectForRate = c.id ? currentProject() : null;
+  const projectDayRateHTML = projectForRate ? (()=>{
+    const rate = resolveCrewRate(c, projectForRate);
+    return `<div><label>Day rate (this project)</label>
+      <span class="rate-with-save">
+        <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onchange="saveCrewRateOverride('${c.id}', this.value)">
+        ${crewRateSaveIconHTML(c.id, 'e')}
+      </span>
+      <div class="hint">Per-project override — same field as the Roles tab and Budget's Per Person view.</div>
+    </div>`;
+  })() : '<div></div>';
   return `
     <input type="hidden" id="crewEditId" value="${esc(c.id||'')}">
 
@@ -5298,7 +5426,7 @@ function crewFormHTML(c){
       <div class="private-note"><b>${icon('lock')} Never appears on any call sheet.</b> Rate is for your reference only.</div>
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label>Fee / rate</label><input type="text" id="ncRate" value="${esc(c.rate||'')}" placeholder="e.g. £450/day"></div>
-        <div></div>
+        ${projectDayRateHTML}
       </div>
       <label>Notes <span style="color:var(--muted)">(private)</span></label><textarea id="ncNotes">${esc(c.notes||'')}</textarea>
     </details>
