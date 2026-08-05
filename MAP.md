@@ -361,6 +361,53 @@ Two defects it documents, both checkable against the font request on line 8 of
 - **Jost 700 is used but not loaded** — `.dept-code` and the mobile checkbox tick ask
   for it, so the browser synthesises a fake bold. Jost is requested at 400/500/600.
 
+## The design system, as decided (Phase Detail)
+
+Applied from the `style-audit-detail.html` decisions. Supersedes the Phase Fonts
+section where they disagree.
+
+**The Crew toolbar is one component.** `crewToolbarHTML()` and
+`crewToolbarSelectAll()` own the bar's markup and ordering — build it there, never
+inline. It previously existed only as four loose string variables concatenated inside
+`renderProjectCrew()`, which is exactly how its four controls drifted into four
+different fonts and shapes. Order is **Select all / Filter … Summary /
+Expand-Collapse all**: left is what you act *with*, right is what you act on the whole
+list *with*, and the All-type action sits furthest right above the grid's own All
+column. No rule under the bar.
+
+⚠️ **`.crew-header-row label` must stay.** Select all is a `<label>`, so the global
+`label{font-family:var(--label)}` rule was giving it Oswald 11px while its neighbours
+were Jost 12px — the visible reason the bar looked unrelated. That override puts it
+back in the toolbar's font. Remove it and the bug returns.
+
+**Company headings are Oswald 700, ink, uppercase.** `.posn-company-header` was
+Fraunces 700 15px green, identical to `.sd-block-head` directly above it, so Position
+assignments stacked two indistinguishable heading levels. Now block (Fraunces green) /
+company (Oswald bold ink) / department (Oswald 11px green) read as three distinct
+levels. **Oswald 700 was added to the font request** for this.
+
+**Preview & Export has no rule between people.** `.card td` carries no border;
+`.card th` alone carries a 1.5px 35% rule under the column headings. The card stays
+white. Phase Fonts kept the per-row borders by reading that table as functional
+structure — that was wrong, and this reverses it.
+
+**Short fields use the Tech Specs pattern.** Shoot Days' Day details and Weather rows
+are `.ts-grid`/`.ts-field`, not `.grid.g4`. Width classes `fld-xs` 52px / `fld-sm`
+78px / `fld-md` 132px / `fld-date` 150px size each box to the value it holds. Long
+fields — brief, parking, notes — stay full-width stacked.
+
+**"Show as" is just an input.** No pencil, no edit state, no save button; the
+`quickEditShowAsId` flag is gone. `saveQuickShowAs(id, value)` fires on `onchange`,
+so it writes only when the value actually changed and focus has left — tabbing through
+66 rows saves nothing. It deliberately does **not** re-render, which would steal focus
+from wherever you tabbed to next.
+
+**The crew grid name column is capped.** `minmax(200px,340px)` with a trailing
+`minmax(0,1fr)` so spare width lands after the row. It was `minmax(200px,1fr)`, which
+swallowed everything — 342px at seven day-columns but **562px at two**, stranding the
+checkboxes at the right edge on short projects. 340px is what a six-day project
+already gave it, so wide projects are unchanged.
+
 ## Detail review page (Phase Detail)
 
 `style-audit-detail.html` — third review page, same click-to-pick + notes + export

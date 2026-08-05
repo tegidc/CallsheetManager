@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Call Sheet App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /*
@@ -161,6 +161,10 @@
   .field-inline > select, .field-inline > input[type=text]{width:auto; min-width:0; flex:0 1 auto;}
   /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
   .ts-field input[type=text]{width:152px; padding:6px 8px; font-size:var(--fs-field);}
+  /* box sized to the value it holds, rather than every field getting the same width */
+  .ts-field input.fld-xs{width:52px;} .ts-field input.fld-sm{width:78px;}
+  .ts-field input.fld-md{width:132px;} .ts-field input.fld-date{width:150px;}
+  .ts-field input[type=date]{width:150px; padding:6px 8px; font-size:var(--fs-field);}
   .ts-field > .hint, .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
   .ts-banner{font-size:var(--fs-meta); color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
     border-radius:6px; padding:7px 10px; margin-bottom:12px;}
@@ -313,7 +317,12 @@
     color:var(--tape); margin:0 0 4px;}
   .ki-item{font-size:var(--fs-field); line-height:1.5;}
   .ki-item ul{margin:4px 0 0; padding-left:18px;}
-  .card td, .card th{padding:5px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
+  /* No rule between people (Phase Detail) — only under the column headings. The
+     card stays white; the header rule is stronger than --line so it reads as the
+     one division on the sheet. */
+  .card td{padding:5px 6px; text-align:left; vertical-align:top;}
+  .card th{padding:5px 6px; text-align:left; vertical-align:top;
+    border-bottom:1.5px solid rgba(17,10,8,.35);}
   .card th{color:var(--muted); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
   .card ul{margin:4px 0; padding-left:18px;}
   .section table{width:100%; border-collapse:collapse; font-size:var(--fs-field);}
@@ -355,14 +364,22 @@
   .subhead:first-child{margin-top:0;}
   .subhead.dept-toggle{cursor:pointer; user-select:none; display:flex; align-items:center; gap:4px;}
   /* Company groups adopt Pattern A too — same job as a summary block header. */
+  /* Company groups are Oswald Bold in ink (Phase Detail). They previously matched
+     .sd-block-head exactly — Fraunces 700 15px green — so Position assignments
+     stacked two typographically identical heading levels. Different font, different
+     colour, so block / company / department now read as three distinct levels. */
   .posn-company-header{
     display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
-    font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
-    color:var(--tape); margin:16px 0 8px; padding-bottom:0; border-bottom:none;
+    font-family:var(--label); font-weight:700; font-size:13px; letter-spacing:.6px;
+    text-transform:uppercase;
+    color:var(--text); margin:16px 0 8px; padding-bottom:0; border-bottom:none;
   }
+  .posn-company-header .dept-caret{color:var(--tape);}
+  .posn-company-header .dept-count{font-family:var(--body); font-weight:400;
+    font-size:var(--fs-meta); letter-spacing:0; text-transform:none; color:var(--muted);}
   .posn-company-header::after{content:''; flex:1; height:1px; background:var(--line);}
   .posn-company-group:first-child .posn-company-header{margin-top:0;}
-  .posn-company-header:hover{color:var(--text);}
+  .posn-company-header:hover{color:var(--tape);}
   .posn-company-body{margin-left:2px;}
   .posn-name{font-size:var(--fs-field); display:flex; flex-direction:column; gap:1px;}
   .subhead.dept-toggle:hover{color:var(--tape);}
@@ -386,10 +403,20 @@
   /* Header controls (Select all / Filter / Expand-collapse / Summary / All) are in
      the BODY font, not the label font (Fonts Review) — they're things you click,
      not captions, and Oswald's uppercase tracking made them read as headings. */
-  .crew-header-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+  /* CREW TOOLBAR (Phase Detail). One row, one font, no rule underneath. The right
+     group is pushed by margin-left:auto rather than space-between — with
+     space-between the two halves were flung 481px apart at 1000px and the gap grew
+     with the window. Order is Select all / Filter … Summary / Expand-Collapse all,
+     so the All-type action sits furthest right, above the grid's own All column. */
+  .crew-header-row{display:flex; align-items:center; flex-wrap:wrap;
     gap:6px 16px; font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none;
     color:var(--muted); margin-bottom:8px;}
   .crew-header-left, .crew-header-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .crew-header-right{margin-left:auto;}
+  /* Select all is a <label>, so the global label{} rule was giving it Oswald 11px
+     while its neighbours were Jost 12px. Put it back in the toolbar's own font. */
+  .crew-header-row label{font-family:var(--body); font-size:var(--fs-meta);
+    letter-spacing:0; text-transform:none; font-weight:400; color:inherit; margin:0;}
   .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
   .crew-header-row label:hover, .crew-header-row span:hover{color:var(--tape);}
   .crew-header-selectall input{margin:0;}
@@ -459,7 +486,12 @@
     text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   select.pill-select.copro{color:var(--text);}
   select.pill-select.copro.empty{color:var(--muted);}
-  .crewgrid{display:grid; grid-template-columns:minmax(200px,1fr) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px; align-items:center; column-gap:6px;}
+  /* The name column was minmax(200px,1fr) and swallowed all spare width — 342px at
+     seven day-columns but 562px at two, stranding the checkboxes at the right edge.
+     Capped at 340px (what a six-day project already gave it, so nothing regresses)
+     with a trailing flexible column so the slack lands after the row instead. */
+  .crewgrid{display:grid; grid-template-columns:minmax(200px,340px) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px minmax(0,1fr);
+    align-items:center; column-gap:6px;}
   .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .crewgrid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
   /* No rule between people — the department heading does the dividing (Fonts Review) */
@@ -2447,6 +2479,24 @@ function bulkActionBarHTML(){
     <span class="hint" style="cursor:pointer;" onclick="clearCrewSelection()">Clear selection</span>
   </div>${bulkEditPanelHTML()}`;
 }
+/* ---- Crew toolbar (Phase Detail) --------------------------------------------
+   The bar used to be four loose string variables concatenated at the point of use,
+   which is how its four controls drifted into four different fonts and shapes.
+   These two functions own it instead: anything that needs a Crew toolbar builds it
+   here so the markup, the ordering and the styling can only change in one place.
+   Left group is what you act WITH (select, filter); right group is what you act ON
+   the whole list with (summary, expand/collapse). ---------------------------- */
+function crewToolbarSelectAll(idsCSV, allSelected, filterCount){
+  return `<label class="crew-header-selectall">
+      <input type="checkbox" ${allSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${idsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
+    </label>`;
+}
+function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
+  return `<div class="crew-header-row">
+      <div class="crew-header-left">${selectAllHTML||''}${filterHTML||''}</div>
+      <div class="crew-header-right">${rightHTML||''}</div>
+    </div>`;
+}
 function renderProjectCrew(body){
   const p = currentProject();
   const days = projectDays();
@@ -2479,9 +2529,7 @@ function renderProjectCrew(body){
     // is currently showing, never every crew member on the project.
     const filteredIdsCSV = filtered.map(c=>c.id).join(',');
     const allFilteredSelected = filtered.every(c=>projectCrewSelected.has(c.id));
-    selectAllHTML = `<label class="crew-header-selectall">
-        <input type="checkbox" ${allFilteredSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${filteredIdsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
-      </label>`;
+    selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
     const summaryLinkHTML = crewGridView==='hotel' ? `<span onclick="jumpToHotelSummary()">Summary</span>`
       : crewGridView==='catering' ? `<span onclick="jumpToCateringSummary()">Summary</span>`
       : crewGridView==='travel' ? `<span onclick="jumpToTransportSummary()">Summary</span>` : '';
@@ -2493,7 +2541,9 @@ function renderProjectCrew(body){
       const allCollapsed = groups.every(g=>collapsedProjectDepts.has(g.key));
       expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
     }
-    rightHeaderHTML = `${expandAllHTML}${summaryLinkHTML}`;
+    // Summary before Expand/Collapse all — the All-type action sits furthest right,
+    // directly above the grid's own All column.
+    rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
     const groupHeaderHTML = g => deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
       `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
@@ -2542,10 +2592,7 @@ function renderProjectCrew(body){
     }
   }
 
-  const headerRow = `<div class="crew-header-row">
-      <div class="crew-header-left">${selectAllHTML}${filterToggleSpan}</div>
-      <div class="crew-header-right">${rightHeaderHTML}</div>
-    </div>${filterPanelHTML}`;
+  const headerRow = crewToolbarHTML(selectAllHTML, filterToggleSpan, rightHeaderHTML) + filterPanelHTML;
 
   body.innerHTML = `
     <div class="section">
@@ -2593,30 +2640,27 @@ function crewRolesRowHTML(c){
     ${crewExpansionHTML(c, 'roles-grid-editform')}
   </div>`;
 }
-/* inline "Show as" quick-edit — a purely cosmetic override shown on the call sheet
-   instead of the role label (item 3). The saved role/department stay untouched.
-   Uses the same .icon-btn pencil as every other edit affordance in the row (Phase S
-   item 2) — not a separately-styled control — and stays to a single line. */
-let quickEditShowAsId = null;
+/* "Show as" — a purely cosmetic override shown on the call sheet instead of the role
+   label. The saved role/department stay untouched.
+   It is just a field (Phase Detail): type in it or leave it blank. No pencil,
+   no edit state, no save button. onchange (not oninput) means it only writes when the
+   value actually changed and focus has left, so tabbing through 66 rows saves nothing. */
 function showAsQuickEditHTML(c){
-  if(quickEditShowAsId===c.id){
-    return `<span class="roles-grid-showas" onclick="event.stopPropagation()">
-      <input type="text" id="qsaShowAs_${c.id}" value="${esc(c.showAs||'')}" placeholder="Show as…" style="width:100%;min-width:0;padding:3px 6px;font-size:12px;min-height:0;" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter')saveQuickShowAs('${c.id}')">
-      <button class="icon-btn active" onclick="event.stopPropagation();saveQuickShowAs('${c.id}')" title="Save">${icon('save')}</button>
-    </span>`;
-  }
   return `<span class="roles-grid-showas">
-    <span class="hint" style="overflow:hidden;text-overflow:ellipsis;">${c.showAs?esc(c.showAs):'— show as —'}</span>
-    <button class="icon-btn" onclick="event.stopPropagation();quickEditShowAsId='${c.id}';renderProjectBody();" title="Edit Show as" aria-label="Edit Show as">${icon('edit')}</button>
+    <input type="text" value="${esc(c.showAs||'')}" placeholder="Show as…"
+      onclick="event.stopPropagation()"
+      onchange="saveQuickShowAs('${c.id}', this.value)"
+      onkeydown="if(event.key==='Enter')this.blur()">
   </span>`;
 }
-async function saveQuickShowAs(crewId){
+async function saveQuickShowAs(crewId, value){
   const c = crewById(crewId); if(!c) return;
-  const el = document.getElementById('qsaShowAs_'+crewId);
-  c.showAs = (el?.value||'').trim();
+  const next = (value||'').trim();
+  if(c.showAs === next) return;
+  c.showAs = next;
   await saveDB('db:crew', crewDB);
-  quickEditShowAsId = null;
-  renderProjectBody();
+  // no re-render: the input already shows the new value, and re-rendering here
+  // would steal focus from wherever the user tabbed to next
 }
 /* shared "add from crew database" option-list builder — grouped by department
    instead of a flat list, for the project Crew tab and Position Assignments pickers */
@@ -4384,11 +4428,11 @@ function shootDayBuildHTML(){
   const general = `
     <div class="section">
       <div class="subhead">Day details</div>
-      <div class="grid g4">
-        <div><label>Day #</label><input type="text" id="sdDayNum"></div>
-        <div><label>of (total)</label><input type="text" id="sdDayTotal"></div>
-        <div><label>Shoot date</label><input type="date" id="sdDate" onchange="onDayChanged()"></div>
-        <div><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
+      <div class="ts-grid">
+        <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"></div>
+        <div class="ts-field"><label>of (total)</label><input type="text" id="sdDayTotal" class="fld-xs"></div>
+        <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
+        <div class="ts-field"><label>All-crew call</label><input type="text" id="sdAllCall" class="fld-sm" placeholder="08:00"></div>
       </div>
       <div class="subhead">Production brief</div>
       <label>The scenes / setups being shot today — one per line</label>
@@ -4407,11 +4451,11 @@ function shootDayBuildHTML(){
       <div class="subhead">Weather</div>
       <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch weather for this date &amp; location</button>
       <div id="weatherStatus" class="hint" style="margin-top:6px;"></div>
-      <div class="grid g4" style="margin-top:10px;">
-        <div><label>Temp</label><input type="text" id="wxTemp"></div>
-        <div><label>Precip</label><input type="text" id="wxPrecip"></div>
-        <div><label>Condition</label><input type="text" id="wxCond"></div>
-        <div><label>Sunrise/Sunset</label><input type="text" id="wxSun"></div>
+      <div class="ts-grid" style="margin-top:10px;">
+        <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
+        <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
+        <div class="ts-field"><label>Condition</label><input type="text" id="wxCond" class="fld-md"></div>
+        <div class="ts-field"><label>Sunrise/Sunset</label><input type="text" id="wxSun" class="fld-md"></div>
       </div>
       <div class="subhead">Nearest hospital</div>
       <div id="sdHospitalInfo" class="hint"></div>
