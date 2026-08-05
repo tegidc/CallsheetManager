@@ -30,6 +30,17 @@ Every screen needs the same handful of records. These are the single place that 
 - `taskFlagsSettingsOpen` / `toggleTaskFlagsSettings()` / `taskFlagsSettingsHTML()` — the small disclosure (built from `crewToolbarHTML()`, same idiom as the Crew tab's Filter toggle and Preview & Export's Format toggle) holding the three rule on/off checkboxes. The flags themselves always show regardless of whether this panel is open — only the toggle controls hide behind it — [Overview]
 - `flagNoLocation` / `flagNoCrew` / `flagNoDayRate` — the three rule toggles, stored in `appSettings` (`db:settings`) alongside the header font/brand colour — site-wide, not per-project, so silencing a noisy rule sticks everywhere — [Overview, Shared/utility functions]
 - `addProjectTask()` / `toggleProjectTask()` / `deleteProjectTask()` / `taskListItemHTML()` / `tasksListHTML()` — manual tasks, persisted as `project.tasks[]` (`{id, title, note, completed, createdAt}`), same per-project-array pattern as everything else on a project record. Rendered with the app's standard `.list-card` (matches the Locations database list). Completed tasks hide by default behind a `showCompletedTasks` count toggle rather than sitting struck-through in the main list — a reasonable default, not a hard requirement. `deleteProjectTask()`'s trash-icon button wasn't explicitly requested in the brief but was added to match every other list in the app (crew, locations) having one — a task list with no way to ever remove an item would only accumulate — [Overview]
+- `aiScanSectionHTML()` (Phase AI Scan) — the collapsible "AI Scan" box on Overview, below Tasks: a real chat interface (not a one-shot extractor) backed by the `ai-scan` Supabase Edge Function, which proxies the Anthropic API so the API key never reaches the client. Chat history (`aiScanMessages`) is frontend-memory only, reset whenever the open project changes (`aiScanProjectId`) — **not persisted across page reloads**, deliberately, per the build brief; flag back if that turns out to be an unwanted limitation once used for real — [Overview]
+- `AI_SCAN_ENDPOINT` / `AI_SCAN_ANON_KEY` — the Edge Function URL and the same publishable/anon key the `sb` client already uses (not a new exposure, just reused as the function's bearer token; `verify_jwt:true` on the function requires *some* valid Supabase token, and a single-user no-auth app has no other one to send) — [Overview]
+- `sendAiScanMessage()` — the whole turn lifecycle: reads the typed text + any attached files, prepends `pendingAiToolResultBlocks()` (**required** by the Anthropic API — every `tool_use` block in the assistant's last turn needs a matching `tool_result` before the conversation can continue, reflecting whatever the user has/hasn't actioned on each card), POSTs the full history + `crewSummary`/`locationSummary` to the Edge Function, and on success appends both the user and assistant turns to `aiScanMessages` and registers any new `tool_use` blocks in `aiScanProposals`. On failure, leaves the typed text/attachments untouched so Send retries cleanly — [Overview]
+- `aiScanDraftText` — **exists because of a bug caught in testing**: this app's `renderProjectBody()` fully replaces `body.innerHTML` on every state change (its pattern everywhere), which silently wipes any input whose value isn't sourced from state — including `sendAiScanMessage()`'s own busy-state render, on literally every send. The chat text input's `value=` is bound to this variable (kept in sync via `oninput`) specifically so a failed send doesn't lose what was typed. Nothing else in the app has this problem as visibly, since most other inputs happen to redisplay a last-*saved* value after a stray re-render rather than going blank — [Overview]
+- `pendingAiToolResultBlocks()` — builds those required `tool_result` blocks from `aiScanProposals` state: "added as new" / "matches existing X, assigned" / "declined, don't re-propose" / "not reviewed yet" (the fallback, so an ignored card doesn't break the next turn) — [Overview]
+- `aiScanProposals` / `acceptAiProposal()` / `discardAiProposal()` / `proposalCardHTML()` — the proposal cards. Ticking commits the **current field values** (editable inline, no separate edit mode) via matched-record functions when a `match_id` checkbox is ticked, or new-record functions otherwise; discarding changes nothing. Cards stay visible after resolving (per the brief), fields disabled, with a status line — [Overview]
+- `addShootDayFromProposal()` / `addNewLocationFromProposal()` / `addNewCrewFromProposal()` — the "new record" commit paths. `addShootDayFromProposal()` reuses the actual shared `makeShootDayRecord()`. The other two **can't** call `saveCrew()`/`saveLocation()` directly — those read ~25 fields via `val('nc...')`/`val('nl...')` off their own database forms, not parameters — so these mirror their record shape exactly (every field `saveCrew()`'s `rec` object sets) rather than faking a whole form. Matched proposals instead call the real existing `addCrewToProject(id)` / `addLocToProject(id)` — [Overview, Crew, Locations]
+  - `addCrewToProject()` gained an optional `id` parameter for this (`id = id || val('addCrewPick')`) — its own call site, unchanged, still works with no argument — [Crew]
+- `buildCrewSummary()` / `buildLocationSummary()` — compact `{id, name, role}`/`{id, name}` projections of the FULL `crewDB`/`locationsDB` (not just this project's roster) sent with every request, so Claude can propose a `match_id` against anyone already in either database — [Overview]
+- `fileToContentBlock()` / `fileToBase64()` / `fileToText()` — turn an attached file into an Anthropic content block client-side. PDF → base64 `document` block (Claude reads PDFs natively, no extraction needed). `.docx` → plain text via `mammoth.js` (the API has no native docx support). `.txt`/anything else → read as plain text. 15MB cap per file — [Overview]
+- `stripAiScanDisplayFields()` — strips the display-only `_filename` property (stashed on file blocks purely so `aiScanMessageHTML()` can show an attachment's name) before any message array reaches the actual API request — [Overview]
 - `renderWelcome()` — renders the landing screen shown when no project is open — [Overview]
 - `resetAndReseed()` — wipes and reloads sample data for a fresh demo state — [Overview]
 - `seedSampleData()` — populates the databases with sample crew/locations/projects/days for demo purposes — [Overview]
@@ -316,6 +327,44 @@ budget or export of its own — Preview & Export stays the export surface.
 - `crewDbFilter` / `crewDbFilterOpen` / `crewSearchQuery` — Crew database's filter-panel state (same shape as `projectCrewFilter`, no group-by since there's no hotel context) and the free-text search, kept outside the DOM so re-renders don't clear the search box — [Crew]
 - `personMatchesCrewDbFilter()` / `sortCrewDbGroup()` / `toggleCrewDbFilterPanel()` / `toggleCrewDbFilterDept()` / `toggleCrewDbFilterRole()` / `setCrewDbFilterField()` / `toggleCrewDbFilterFlag()` / `clearCrewDbFilter()` / `crewDbActiveFilterCount()` / `crewDbFilterPanelHTML()` — Crew database's filter panel (multiselect departments, lead company, roles, exclude-Talent/exclude-other-companies, sort) — [Crew]
 
+## Server-side: Supabase Edge Functions (Phase AI Scan)
+
+The first piece of server-side logic this project has ever needed — everything else
+is static/client-side, reading and writing Supabase directly from the browser via the
+`sb` client. This exists solely because the Anthropic API key can't go in a public
+static site.
+
+- `supabase/functions/ai-scan/index.ts` — a thin proxy, nothing more. Accepts
+  `{messages, crewSummary, locationSummary}` from the frontend, builds the system
+  prompt (matching instructions + the two summaries embedded directly in it), calls
+  the Anthropic Messages API with the three tool definitions below, and returns the
+  raw `content`/`stop_reason` back untouched — no business logic, no persistence, the
+  frontend owns all of that. Reads `ANTHROPIC_API_KEY` via `Deno.env.get()` — set as a
+  Supabase secret (`supabase secrets set ANTHROPIC_API_KEY=...`), never in code.
+  Deployed via the Supabase MCP `deploy_edge_function` tool, project
+  `ioueoaasqnseuhrtzhbz`, `verify_jwt:true`. CORS locked to
+  `https://tegidc.github.io` only.
+  - ⚠️ **This repo has no tool/CLI access to set Supabase secrets, and shouldn't be
+    given the actual key value even if it did** — that's a credential, handled outside
+    chat. The Edge Function deploys and runs correctly without it (verified — it
+    returns a clean `"AI Scan isn't configured yet"` error rather than crashing), but
+    AI Scan can't actually talk to Claude until a human runs
+    `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` themselves.
+  - `propose_shoot_date` (date, label, notes) / `propose_location` (name,
+    address_or_notes, optional match_id) / `propose_crew` (name, department — enum of
+    `DEPARTMENTS` — role, optional match_id) — the three tools. `match_id` is
+    deliberately a *property Claude omits* rather than an explicit null for "no
+    match" — cleaner for the model, and the frontend already treats a missing/unknown
+    id as "no match" defensively (`crewById(match_id)`/`locById(match_id)` returning
+    falsy). No `propose_task` / `propose_schedule_item` — see the Overview Tasks
+    section above for why the former is a parked, planned follow-up once a Tasks-style
+    bucket exists for uncertain info, and MAP.md's own history for why the latter is
+    parked indefinitely, not planned.
+  - Model is `claude-sonnet-5`, matching the build brief's "Sonnet-tier, check the
+    current recommended string rather than assuming one" — this was Anthropic's
+    current Sonnet model ID at build time. If this ever needs bumping, it's the one
+    constant to change, in one file.
+
 ---
 
 # Section codes
@@ -338,7 +387,8 @@ coarse information first, finest detail last.
 | T-1.3 | · Shoot day reduction | Picker for which day(s) to lose when reducing the count | `shootDayReductionPanelHTML()` |
 | T-1.4 | · Tasks — Flags | Live, computed, click-to-fix warning pills — the original three (missing dates/locations/crew) plus three toggle-able rules (Phase Tasks) | `buildTaskFlags()` |
 | T-1.5 | · Tasks — Manual tasks | Title/note/tick, persisted per project | `addProjectTask()` |
-| T-1.6 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
+| T-1.6 | · AI Scan | Chat + document attachments, proposes shoot dates/locations/crew as tool-use cards (Phase AI Scan) | `aiScanSectionHTML()` |
+| T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
 | T-2.1 | · Roles | Name / Role / Department / Show as, one tidy row per person | `crewRolesRowHTML()` |
 | T-2.2 | · Days on site | Person × day checkbox matrix | `crewAssignRowHTML()` |

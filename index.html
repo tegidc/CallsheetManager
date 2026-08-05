@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- AI Scan (Phase AI Scan): client-side .docx text extraction only — PDFs go to the
+     Anthropic API natively as a document block, no library needed for those. -->
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <style>
   /*
     BRAND NOTE: Moret and Futura PT are paid/licensed fonts not available on Google Fonts.
@@ -554,6 +557,33 @@
   .budget-total-row td{padding-top:10px; border-top:1.5px solid var(--field-line);
     font-weight:600;}
   .budget-noRate{color:var(--muted); font-style:italic;}
+
+  /* AI Scan (Phase AI Scan) — the first chat UI in the app. Deliberately NOT
+     rounded chat bubbles: this app's whole visual language is ruled lines and
+     flat paper-form boxes, so a turn is a left-border-flagged block instead of
+     importing a generic chat look that would clash with everything else. */
+  .ai-chat{max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+    padding:2px 2px 2px 0; margin-bottom:10px;}
+  .ai-turn{border-left:2px solid var(--line); padding-left:12px;}
+  .ai-turn-assistant{border-left-color:var(--tape);}
+  .ai-turn-role{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--muted); margin-bottom:3px;}
+  .ai-turn-assistant .ai-turn-role{color:var(--tape);}
+  .ai-bubble-text{font-size:var(--fs-field); line-height:1.5;}
+  .ai-bubble-file{display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-meta);
+    color:var(--muted); background:var(--panel-2); border-radius:20px; padding:3px 10px; margin-top:4px;}
+  .ai-card{border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad);
+    margin-top:8px; background:var(--tint-1);}
+  .ai-card-resolved{border-color:var(--line); background:none; opacity:.72;}
+  .ai-match-banner{display:flex; align-items:center; gap:8px; font-size:var(--fs-meta);
+    margin-bottom:10px; cursor:pointer;}
+  .ai-card-status{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--muted); margin-top:8px;}
+  .ai-error{border:1px solid var(--danger); color:var(--danger); border-radius:var(--box-radius);
+    padding:9px 11px; font-size:var(--fs-meta); margin-bottom:10px;}
+  .ai-attachments{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+  .ai-input-row{display:flex; align-items:center; gap:8px;}
+  .ai-input-row input[type=text]{flex:1;}
 
   /* ============================================================
      MOBILE / TABLET
@@ -1315,6 +1345,10 @@ const ICONS = {
   lock:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
   cog:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4M6.7 6.7L5 5M19 19l-1.7-1.7M6.7 17.3L5 19M19 5l-1.7 1.7"/></svg>',
   trash:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M10 11v6M14 11v6"/></svg>',
+  paperclip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V7a4 4 0 0 1 8 0v9.5a2.5 2.5 0 0 1-5 0V9"/></svg>',
+  send:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l17-7-6.5 17-2.5-8-8-2z"/></svg>',
+  sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M4 12h4M16 12h4M6.5 6.5l2 2M15.5 15.5l2 2M17.5 6.5l-2 2M8.5 15.5l-2 2"/></svg>',
+  doc:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>',
 };
 function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
 
@@ -2296,6 +2330,7 @@ function renderProjectOverview(body){
   const days = projectDays(p.id);
   body.innerHTML = `
     ${renderTasksSection(p, days)}
+    ${aiScanSectionHTML(p)}
     <div class="section">
       <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
@@ -2327,6 +2362,8 @@ function renderProjectOverview(body){
   // autosave: ~1s after the user stops typing anywhere in this tab, save project
   // details silently (no alert, no button flash — just the existing "Saved" text)
   body.oninput = () => scheduleAutosave('overview', () => saveProjectOverview(true));
+  const chatEl = document.getElementById('aiScanChat');
+  if(chatEl) chatEl.scrollTop = chatEl.scrollHeight;
 }
 /* ---------- Tech (Phase M — split out of Overview: tech specs defaults + camera
    designations get their own dedicated space for future tech-related features) ---------- */
@@ -2540,6 +2577,353 @@ function renderTasksSection(p, days){
     <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
     ${tasksListHTML(p)}
   </div>`;
+}
+/* ============================================================================
+   AI SCAN (Phase AI Scan) — a chat box on Overview backed by a Supabase Edge
+   Function that proxies the Anthropic API (the key never reaches the client).
+   Claude reads free text + attached briefing documents and, when confident
+   about a specific element, proposes it as a structured card (shoot date,
+   location, or crew member) via tool use. Ticking a card commits straight
+   into the project's normal data — no further AI call involved in accepting.
+
+   Chat history is frontend-memory only, per project, for the life of this
+   page load — nothing here is persisted (explicitly out of scope; flag back
+   if that turns out to be unwanted once used for real). Deliberately no
+   propose_task / propose_schedule_item types yet — see the Overview Tasks
+   phase and MAP.md for why those are parked, not missing.
+   ============================================================================ */
+const AI_SCAN_ENDPOINT = 'https://ioueoaasqnseuhrtzhbz.supabase.co/functions/v1/ai-scan';
+// Same publishable/anon key already used by the sb client above — not a new
+// exposure, just reused as the Edge Function's bearer token.
+const AI_SCAN_ANON_KEY = 'sb_publishable_roKbOQwNFveMHtT0OeJk5A_R1jvrKdr';
+
+let aiScanOpen = false;                 // collapsed by default, same convention as every other Overview/summary block
+let aiScanProjectId = null;             // which project aiScanMessages currently belongs to
+let aiScanMessages = [];                // [{role, content:[...blocks]}] — Anthropic message shape, frontend-only
+let aiScanProposals = {};               // {toolUseId: {type, input, status:'pending'|'accepted_new'|'accepted_match'|'discarded', matchLabel}}
+let aiScanPendingFiles = [];            // [{block, filename}] attached to the NOT-YET-SENT next message
+let aiScanBusy = false;
+let aiScanError = null;
+let aiScanPendingUserMsg = null;        // optimistic preview of the in-flight user turn while busy
+// The draft text box. renderProjectBody() fully replaces .innerHTML on every
+// state change (this app's established pattern everywhere), which would wipe
+// an in-progress, not-yet-sent message the instant ANYTHING else re-rendered
+// the tab — including sendAiScanMessage()'s own busy-state render. Tracked
+// here and fed back into the template's value= so it survives re-renders;
+// val('aiScanInput') is still used to read it at the moment Send is clicked.
+let aiScanDraftText = '';
+
+function toggleAiScanBlock(){ aiScanOpen = !aiScanOpen; renderProjectBody(); }
+
+/* ---- committing a ticked proposal into real project data --------------------
+   Matched proposals reuse the exact existing add-crew/add-location functions.
+   New records mirror saveCrew()/saveLocation()'s record shape exactly, but
+   can't call those functions directly — they're bound to ~25 form fields via
+   val('nc...')/val('nl...') on the Crew/Locations database forms, not
+   parameters, and faking that whole form for a chat-driven add would be far
+   more fragile than a small dedicated constructor. addShootDayFromProposal
+   DOES reuse the actual shared makeShootDayRecord() — the one piece of this
+   that already took a data-only shape. ------------------------------------- */
+async function addShootDayFromProposal(date, label, notes){
+  const p = currentProject(); if(!p) return null;
+  const rec = makeShootDayRecord(currentProjectId, p);
+  if(date) rec.date = date;
+  if(label) rec.brief = [label];
+  if(notes) rec.notes = notes;
+  shootDaysDB.push(rec);
+  await saveDB('db:shootdays', shootDaysDB);
+  return rec;
+}
+async function addNewLocationFromProposal(name, addressOrNotes){
+  const p = currentProject(); if(!p || !name) return null;
+  const rec = { id:uid(), name, address:addressOrNotes||'', lat:null, lon:null,
+    onsiteContactName:'', onsiteContactPhone:'', accessInfo:'', recceInfo:'', parkingInfo:'', hospital:null, nearestParking:null };
+  locationsDB.push(rec);
+  await saveDB('db:locations', locationsDB);
+  p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(rec.id)) p.locationIds.push(rec.id);
+  await saveDB('db:projects', projectsDB);
+  return rec;
+}
+async function addNewCrewFromProposal(name, department, role){
+  const p = currentProject(); if(!p || !name) return null;
+  const rolePath = `${department}/${role}`;
+  const rec = { id:uid(), name, roles:[rolePath], role, department,
+    subDepartment:'', showAs:'', coProductionCompany:'', phone:'', email:'', skills:'',
+    camera1:'', camera2:'', camera3:'', cameraExtras:'',
+    dietaryGeneral:'', dietarySpecific:'', shoeSize:'', clothingSize:'',
+    vatRegistered:'', drives:'', carMakeModel:'', carReg:'', homeAddress:'',
+    generalNotes:'', previousProjects:'', instagram:'', youtube:'', linkedin:'', coffeeOrder:'',
+    rate:'', notes:'' };
+  crewDB.push(rec);
+  await saveDB('db:crew', crewDB);
+  p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(rec.id)) p.crewIds.push(rec.id);
+  await saveDB('db:projects', projectsDB);
+  return rec;
+}
+
+async function acceptAiProposal(id){
+  const state = aiScanProposals[id]; if(!state || state.status!=='pending') return;
+  const type = state.type;
+  if(type==='propose_shoot_date'){
+    const date = val(`ai-date-${id}`), label = val(`ai-label-${id}`), notes = val(`ai-notes-${id}`);
+    state.status = 'accepted_new';
+    await addShootDayFromProposal(date, label, notes);
+  } else if(type==='propose_location'){
+    const useMatch = document.getElementById(`ai-usematch-${id}`);
+    const matchedLoc = useMatch && useMatch.checked && state.input.match_id ? locById(state.input.match_id) : null;
+    if(matchedLoc){
+      state.status = 'accepted_match'; state.matchLabel = matchedLoc.name;
+      await addLocToProject(matchedLoc.id);
+    } else {
+      const name = val(`ai-name-${id}`), addr = val(`ai-addr-${id}`);
+      state.status = 'accepted_new';
+      await addNewLocationFromProposal(name, addr);
+    }
+  } else if(type==='propose_crew'){
+    const useMatch = document.getElementById(`ai-usematch-${id}`);
+    const matchedCrew = useMatch && useMatch.checked && state.input.match_id ? crewById(state.input.match_id) : null;
+    if(matchedCrew){
+      state.status = 'accepted_match'; state.matchLabel = matchedCrew.name;
+      await addCrewToProject(matchedCrew.id);
+    } else {
+      const name = val(`ai-name-${id}`), dept = val(`ai-dept-${id}`), role = val(`ai-role-${id}`);
+      state.status = 'accepted_new';
+      await addNewCrewFromProposal(name, dept, role);
+    }
+  }
+  renderProjectBody();
+}
+function discardAiProposal(id){
+  const state = aiScanProposals[id]; if(!state || state.status!=='pending') return;
+  state.status = 'discarded';
+  renderProjectBody();
+}
+
+/* ---- rendering ---- */
+function proposalCardHTML(toolUseBlock){
+  const id = toolUseBlock.id;
+  const type = toolUseBlock.name;
+  const input = toolUseBlock.input || {};
+  const state = aiScanProposals[id];
+  if(!state) return ''; // unknown tool block — never render garbage
+  const resolved = state.status !== 'pending';
+
+  let title = '', fieldsHTML = '', matchBannerHTML = '';
+  if(type==='propose_shoot_date'){
+    title = 'Proposed shoot day';
+    fieldsHTML = `<div class="grid g2">
+        <div><label>Date</label><input type="date" id="ai-date-${id}" value="${esc(input.date||'')}" ${resolved?'disabled':''}></div>
+        <div><label>Label</label><input type="text" id="ai-label-${id}" value="${esc(input.label||'')}" ${resolved?'disabled':''}></div>
+      </div>
+      <div style="margin-top:8px;"><label>Notes</label><input type="text" id="ai-notes-${id}" value="${esc(input.notes||'')}" ${resolved?'disabled':''}></div>`;
+  } else if(type==='propose_location'){
+    title = 'Proposed location';
+    const match = input.match_id ? locById(input.match_id) : null;
+    if(match) matchBannerHTML = `<label class="ai-match-banner"><input type="checkbox" id="ai-usematch-${id}" ${resolved?'disabled':''} ${(state.status!=='accepted_new')?'checked':''}> Matches existing: <strong>${esc(match.name)}</strong></label>`;
+    else if(input.match_id) matchBannerHTML = `<div class="hint" style="margin-bottom:8px;">Suggested match isn't in the database any more — will add as new.</div>`;
+    fieldsHTML = `<div class="grid g2">
+        <div><label>Name</label><input type="text" id="ai-name-${id}" value="${esc(input.name||'')}" ${resolved?'disabled':''}></div>
+        <div><label>Address / notes</label><input type="text" id="ai-addr-${id}" value="${esc(input.address_or_notes||'')}" ${resolved?'disabled':''}></div>
+      </div>`;
+  } else if(type==='propose_crew'){
+    title = 'Proposed crew member';
+    const match = input.match_id ? crewById(input.match_id) : null;
+    if(match) matchBannerHTML = `<label class="ai-match-banner"><input type="checkbox" id="ai-usematch-${id}" ${resolved?'disabled':''} ${(state.status!=='accepted_new')?'checked':''}> Matches existing: <strong>${esc(match.name)}</strong>${match.role?(' — '+esc(match.role)):''}</label>`;
+    else if(input.match_id) matchBannerHTML = `<div class="hint" style="margin-bottom:8px;">Suggested match isn't in the database any more — will add as new.</div>`;
+    fieldsHTML = `<div class="grid g2">
+        <div><label>Name</label><input type="text" id="ai-name-${id}" value="${esc(input.name||'')}" ${resolved?'disabled':''}></div>
+        <div><label>Role</label><input type="text" id="ai-role-${id}" value="${esc(input.role||'')}" ${resolved?'disabled':''}></div>
+      </div>
+      <div style="margin-top:8px;"><label>Department</label>
+        <select id="ai-dept-${id}" ${resolved?'disabled':''}>${DEPARTMENTS.map(d=>`<option value="${esc(d)}" ${input.department===d?'selected':''}>${esc(d)}</option>`).join('')}</select>
+      </div>`;
+  } else {
+    return '';
+  }
+
+  const statusLineHTML = resolved
+    ? `<div class="ai-card-status">${state.status==='accepted_new' ? '✓ Added as new' : state.status==='accepted_match' ? `✓ Assigned existing (${esc(state.matchLabel||'match')}) to this project` : '✗ Discarded'}</div>`
+    : `<div class="toolbar" style="margin-top:10px;">
+        <button class="small primary" onclick="acceptAiProposal('${id}')">${icon('save')} Add</button>
+        <button class="small danger" onclick="discardAiProposal('${id}')">${icon('close')} Discard</button>
+      </div>`;
+
+  return `<div class="ai-card ${resolved?'ai-card-resolved':''}" id="ai-card-${id}">
+    <div class="fg-title">${esc(title)}</div>
+    ${matchBannerHTML}
+    ${fieldsHTML}
+    ${statusLineHTML}
+  </div>`;
+}
+function aiScanMessageHTML(msg){
+  const isUser = msg.role==='user';
+  const blocks = Array.isArray(msg.content) ? msg.content : [{type:'text', text:msg.content}];
+  const parts = blocks.map(b=>{
+    if(b.type==='text') return `<div class="ai-bubble-text">${esc(b.text).replace(/\n/g,'<br>')}</div>`;
+    if(b.type==='document') return `<div class="ai-bubble-file">${icon('doc')} ${esc(b._filename||'Attached document')}</div>`;
+    if(b.type==='tool_use') return proposalCardHTML(b);
+    return ''; // tool_result and anything else: bookkeeping, not shown as a bubble
+  }).filter(Boolean).join('');
+  if(!parts) return '';
+  return `<div class="ai-turn ${isUser?'ai-turn-user':'ai-turn-assistant'}">
+    <div class="ai-turn-role">${isUser?'You':'Claude'}</div>
+    ${parts}
+  </div>`;
+}
+function aiScanSectionHTML(p){
+  // a different project than the one this session belongs to — start fresh,
+  // matching "each AI Scan session starts fresh" rather than leaking one
+  // project's proposals/history into another's chat
+  if(aiScanProjectId !== p.id){
+    aiScanMessages = []; aiScanProposals = {}; aiScanProjectId = p.id;
+    aiScanPendingFiles = []; aiScanError = null; aiScanPendingUserMsg = null; aiScanBusy = false;
+  }
+  const open = aiScanOpen;
+  const displayMessages = aiScanPendingUserMsg ? [...aiScanMessages, aiScanPendingUserMsg] : aiScanMessages;
+  const turnsHTML = displayMessages.map(aiScanMessageHTML).filter(Boolean).join('');
+  const chipsHTML = aiScanPendingFiles.length ? `<div class="ai-attachments">${aiScanPendingFiles.map((f,i)=>
+    `<span class="pill">${icon('doc')} ${esc(f.filename)} <span onclick="removeAiScanPendingFile(${i})" style="cursor:pointer;" title="Remove">${icon('close')}</span></span>`).join('')}</div>` : '';
+  const errorHTML = aiScanError ? `<div class="ai-error">${esc(aiScanError)}</div>` : '';
+  return `<div class="section" id="aiScanSection">
+    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+      <span class="sd-block-head-toggle" onclick="toggleAiScanBlock()"><span class="dept-caret" id="aisc-block">${open?'▾':'▸'}</span> ${icon('sparkle')} AI Scan</span>
+    </div>
+    <div id="aisb-block" style="display:${open?'':'none'}">
+      <div class="hint" style="margin-bottom:10px;">Chat about the project, or attach a briefing document (PDF, .docx, .txt) — Claude proposes shoot dates, locations and crew as you go. Nothing is added until you tick a proposal. This conversation isn't saved — it starts over if you leave and come back.</div>
+      <div class="ai-chat" id="aiScanChat">${turnsHTML || '<div class="empty-note">Say something about the project, or attach a briefing document, to get started.</div>'}</div>
+      ${errorHTML}
+      ${aiScanBusy ? `<div class="hint" style="margin-bottom:8px;">Thinking…</div>` : ''}
+      ${chipsHTML}
+      <div class="ai-input-row">
+        <input type="file" id="aiScanFileInput" accept=".pdf,.docx,.txt" multiple style="display:none" onchange="handleAiScanFileInput(this)">
+        <button class="icon-btn" onclick="document.getElementById('aiScanFileInput').click()" title="Attach a document" aria-label="Attach a document" ${aiScanBusy?'disabled':''}>${icon('paperclip')}</button>
+        <input type="text" id="aiScanInput" placeholder="Tell me about the shoot…" value="${esc(aiScanDraftText)}" oninput="aiScanDraftText=this.value" ${aiScanBusy?'disabled':''} onkeydown="if(event.key==='Enter'){event.preventDefault();sendAiScanMessage();}">
+        <button class="icon-btn" onclick="sendAiScanMessage()" title="Send" aria-label="Send" ${aiScanBusy?'disabled':''}>${icon('send')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---- file attachments ---- */
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]); // strip the data: URL prefix
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+function fileToText(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+/* PDFs go to the API natively as a document block — Claude reads them
+   directly, no extraction needed. .docx has no native API support, so it's
+   extracted to plain text client-side via mammoth.js first. .txt (and
+   anything else) is just read as text. */
+async function fileToContentBlock(file){
+  const name = file.name.toLowerCase();
+  if(name.endsWith('.pdf')){
+    const b64 = await fileToBase64(file);
+    return { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } };
+  }
+  if(name.endsWith('.docx')){
+    if(typeof mammoth==='undefined') throw new Error('the .docx reader failed to load');
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    return { type:'text', text:`[Attached document: ${file.name}]\n\n${result.value}` };
+  }
+  const text = await fileToText(file);
+  return { type:'text', text:`[Attached document: ${file.name}]\n\n${text}` };
+}
+async function handleAiScanFileInput(inputEl){
+  const files = [...(inputEl.files||[])];
+  inputEl.value = ''; // so re-picking the same file again later still fires onchange
+  for(const file of files){
+    if(file.size > 15*1024*1024){ aiScanError = `"${file.name}" is over 15MB — attach a smaller file.`; continue; }
+    try{
+      const block = await fileToContentBlock(file);
+      aiScanPendingFiles.push({ block, filename: file.name });
+    } catch(err){
+      aiScanError = `Couldn't read "${file.name}": ${err.message||err}`;
+    }
+  }
+  renderProjectBody();
+}
+function removeAiScanPendingFile(idx){ aiScanPendingFiles.splice(idx,1); renderProjectBody(); }
+
+/* ---- sending a turn ---- */
+function buildCrewSummary(){ return crewDB.map(c=>({id:c.id, name:c.name, role:c.role||''})); }
+function buildLocationSummary(){ return locationsDB.map(l=>({id:l.id, name:l.name})); }
+/* Every tool_use block from the assistant's LAST turn needs a matching
+   tool_result before the conversation can continue — the API requires it.
+   Reflects whatever the user has (or hasn't) actioned on each card so far,
+   so Claude doesn't re-propose something already discarded, and knows what's
+   actually landed if asked. Ticking/discarding a card does NOT call the API
+   by itself (per the brief) — these accumulate silently and go out bundled
+   with whatever the user sends next. */
+function pendingAiToolResultBlocks(){
+  const last = aiScanMessages[aiScanMessages.length-1];
+  if(!last || last.role!=='assistant') return [];
+  const toolUses = (last.content||[]).filter(b=>b.type==='tool_use');
+  return toolUses.map(tu=>{
+    const st = aiScanProposals[tu.id];
+    let text = 'The user has not reviewed this proposal yet.';
+    if(st){
+      if(st.status==='accepted_new') text = 'The user added this as a new record in the project.';
+      else if(st.status==='accepted_match') text = `The user confirmed this matches an existing record (${st.matchLabel||'match'}) and assigned it to the project.`;
+      else if(st.status==='discarded') text = 'The user declined this proposal. Do not propose it again unless new information changes it.';
+    }
+    return { type:'tool_result', tool_use_id: tu.id, content: text };
+  });
+}
+/* strip the display-only filename we stash on document/text blocks before
+   they go anywhere near the actual API request */
+function stripAiScanDisplayFields(messages){
+  return JSON.parse(JSON.stringify(messages, (k,v)=> k==='_filename' ? undefined : v));
+}
+async function sendAiScanMessage(){
+  if(aiScanBusy) return;
+  const text = (val('aiScanInput')||'').trim();
+  const files = aiScanPendingFiles.slice();
+  if(!text && !files.length) return;
+
+  const content = files.map(f=>Object.assign({}, f.block, {_filename:f.filename}));
+  if(text) content.push({ type:'text', text });
+  const newUserMsg = { role:'user', content:[...pendingAiToolResultBlocks(), ...content] };
+
+  aiScanPendingUserMsg = newUserMsg;
+  aiScanBusy = true; aiScanError = null;
+  renderProjectBody();
+
+  try{
+    const outgoing = stripAiScanDisplayFields([...aiScanMessages, newUserMsg]);
+    const res = await fetch(AI_SCAN_ENDPOINT, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+AI_SCAN_ANON_KEY, 'apikey':AI_SCAN_ANON_KEY },
+      body: JSON.stringify({ messages: outgoing, crewSummary: buildCrewSummary(), locationSummary: buildLocationSummary() })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || ('Request failed ('+res.status+')'));
+    const assistantMsg = { role:'assistant', content: data.content||[] };
+    assistantMsg.content.forEach(b=>{
+      if(b.type==='tool_use') aiScanProposals[b.id] = { type:b.name, input:b.input||{}, status:'pending' };
+    });
+    aiScanMessages = [...aiScanMessages, newUserMsg, assistantMsg];
+    aiScanPendingUserMsg = null;
+    aiScanPendingFiles = [];
+    aiScanDraftText = '';
+  } catch(err){
+    aiScanError = err.message || String(err);
+    aiScanPendingUserMsg = null; // don't leave a fake-sent bubble behind — aiScanDraftText/aiScanPendingFiles are untouched, so Send retries cleanly
+  } finally {
+    aiScanBusy = false;
+    renderProjectBody();
+  }
 }
 async function saveProjectTechSpecs(){
   const p = currentProject(); if(!p) return;
@@ -3853,8 +4237,10 @@ function refreshTechSpecsBanner(){
          <span onclick="resetDayTechSpecs()">Reset to project defaults</span></div>`
     : `<div class="ts-banner">Showing the project defaults. Editing anything here changes this day only.</div>`;
 }
-async function addCrewToProject(){
-  const id = val('addCrewPick'); if(!id) return;
+/* takes an id directly when given one (AI Scan proposal accept) — the original
+   no-arg form still reads the #addCrewPick picker for its own call site */
+async function addCrewToProject(id){
+  id = id || val('addCrewPick'); if(!id) return;
   const p = currentProject();
   p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(id)) p.crewIds.push(id);
   await saveDB('db:projects', projectsDB); renderProjectBody();
