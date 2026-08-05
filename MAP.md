@@ -361,6 +361,30 @@ Two defects it documents, both checkable against the font request on line 8 of
 - **Jost 700 is used but not loaded** — `.dept-code` and the mobile checkbox tick ask
   for it, so the browser synthesises a fake bold. Jost is requested at 400/500/600.
 
+## Detail review page (Phase Detail)
+
+`style-audit-detail.html` — third review page, same click-to-pick + notes + export
+system, standalone at the repo root, not linked from `index.html`. Six sections, 7
+decisions: the Crew toolbar, short fields on Shoot Days, lines in Preview & Export,
+company headings in Position assignments, the Roles "Show as" cell, and checkbox
+column alignment.
+
+Measurements it records, all taken from the live app:
+- The Crew header row is `justify-content:space-between`, leaving **481px of empty
+  space** at a 1000px viewport between Select all/Filter and Collapse all/Summary,
+  growing with the window. Its four controls are four different constructions
+  (`<label>`+checkbox, `<span>`+caret, bare `<span>` ×2), assembled inline in
+  `renderProjectCrew()` as four separate string variables — nothing owns "the toolbar".
+- The Preview & Export call sheet card carries **58 `td` bottom borders**, one under
+  every person in Position assignments. `.card td, .card th` has had that rule since
+  before any of these phases — it was not added, but Phase Fonts deliberately kept it
+  and that was wrong.
+- `.crewgrid` uses `minmax(200px,1fr)` for the name column, so it absorbs all slack:
+  **342px wide at 7 day-columns, 562px at 2**, stranding the checkboxes at the right
+  edge on projects with few days.
+- `.posn-company-header` and `.sd-block-head` are typographically identical (Fraunces
+  700 15px green), so Position assignments stacks two indistinguishable heading levels.
+
 ## The design system, as decided (Phase Fonts)
 
 Applied from the `style-audit-fonts.html` decisions. **Where this contradicts the
