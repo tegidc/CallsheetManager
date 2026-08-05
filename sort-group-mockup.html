@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sort / Group by — Mockup — Call Sheet App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Variables/tokens copied from index.html's :root — same brand palette, same
+     type scale, so this mockup's crew rows read exactly like the live Crew tab. */
+  :root{
+    --bg:#FFFFFF; --panel:#FFFFFF; --panel-2:#EEF5F2;
+    --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tape:#017756; --tape-light:#0FA47A; --tape-ink:#FFFFF5;
+    --danger:#a4321f; --text:#110A08; --muted:#6f6a63;
+    --disp:'Fraunces', Georgia, serif; --label:'Oswald', sans-serif; --body:'Jost', 'Futura PT', sans-serif;
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05);
+    --tint-3:rgba(1,119,86,.10); --tint-4:rgba(1,119,86,.14);
+    --tint-5:rgba(1,119,86,.35); --tint-6:rgba(1,119,86,.28);
+    --box-radius:8px; --box-pad:10px;
+    --fs-name:14px; --fs-field:13px; --fs-meta:12px; --fs-ctl:11px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg); color:var(--text); font-family:var(--body); -webkit-font-smoothing:antialiased; padding:24px 22px 90px;}
+
+  .page{max-width:1500px; margin:0 auto;}
+  .page-head{margin-bottom:20px;}
+  .page-head h1{font-family:var(--disp); font-weight:700; font-size:24px; margin:0 0 4px; color:var(--text);}
+  .page-head .hint{font-size:13px;}
+  .page-head .note{background:var(--panel-2); border:1px solid var(--line); border-radius:var(--box-radius);
+    padding:10px 14px; font-size:12.5px; color:var(--muted); margin-top:12px; max-width:820px;}
+
+  .compare{display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start;}
+  @media (max-width:1100px){ .compare{grid-template-columns:1fr;} }
+
+  .col-caption{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:8px;}
+  .col-caption b{color:var(--tape); font-weight:600;}
+  .col-caption::after{content:''; flex:1; height:1px; background:var(--line);}
+
+  .section{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px;}
+  .section h2{font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
+    color:var(--tape); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+  .section h2::after{content:''; flex:1; height:1px; background:var(--line);}
+
+  .hint{font-size:var(--fs-meta); color:var(--muted); margin-top:6px;}
+
+  label{display:block; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+  select{width:100%; background:transparent; border:none; border-radius:0; border-bottom:1px solid var(--field-line);
+    color:var(--text); padding:6px 8px 5px; font-family:var(--body); font-size:var(--fs-field); cursor:pointer;}
+  select:hover{border-bottom-color:var(--text);}
+  select:focus{outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
+
+  .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;}
+  .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:14px; background:var(--tint-1);}
+
+  .subhead{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--tape); margin:14px 0 8px; padding-bottom:0; border-bottom:none;
+    display:flex; align-items:center; gap:8px;}
+  .subhead::after{content:''; flex:1; height:1px; background:var(--line);}
+  .subhead:first-child{margin-top:0;}
+  .dept-caret{font-size:9px; width:10px; display:inline-block;}
+  .dept-code{color:var(--tape); font-weight:600; letter-spacing:1.2px;}
+  .dept-count{color:var(--muted); font-weight:400;}
+
+  .pill{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; padding:2px 8px; border-radius:20px;
+    background:var(--panel-2); color:var(--muted); letter-spacing:1.2px; vertical-align:middle;}
+  .pill.dept{background:var(--tint-3); color:var(--tape);}
+  .pill.co{background:var(--panel-2); color:var(--muted);}
+
+  .crew-row{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; padding:7px 2px; border-bottom:1px solid var(--line);}
+  .crew-row:last-child{border-bottom:none;}
+  .crew-row .name{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text); white-space:nowrap;}
+  .crew-row .role{font-size:var(--fs-meta); color:var(--muted); white-space:nowrap;}
+  .crew-row .idx{font-family:var(--label); font-size:10px; color:var(--muted); opacity:.55; margin-left:auto; white-space:nowrap;}
+  .hod-star{color:var(--tape); margin-right:1px;}
+
+  .empty-note{font-size:13px; color:var(--muted); padding:10px 2px;}
+  .group-count{font-size:11px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>Sort / Group by — Crew tab mockup</h1>
+    <div class="hint">Standalone comparison page — not linked from the app's nav. Not a change to the live app.</div>
+    <div class="note">
+      Both columns render the SAME 65-person crew list from a real project ("ROW 2026 London") pulled from the
+      live Supabase database — real names, roles, departments and companies, not placeholder rows. Change either
+      dropdown and the list below it re-groups/re-sorts live. This is purely to compare the two option sets side
+      by side so you can pick one before anything is wired into the real app — no recommendation is being made here.
+    </div>
+  </div>
+
+  <div class="compare">
+    <div>
+      <div class="col-caption"><b>Version A</b> — currently in the app</div>
+      <div class="section">
+        <h2>Crew on this project</h2>
+        <div class="filter-panel">
+          <div class="grid g2">
+            <div>
+              <label>Sort</label>
+              <select id="aSort">
+                <option value="dept">By department (HoD first)</option>
+              </select>
+            </div>
+            <div>
+              <label>Group by</label>
+              <select id="aGroup" onchange="renderA()">
+                <option value="dept">Department</option>
+                <option value="hotel">Has hotel / No hotel</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint">Sort has one option live today (this mockup shows it disabled, matching the real UI shell). Group by is the control this mockup makes functional.</div>
+        </div>
+        <div id="aList"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="col-caption"><b>Version B</b> — original spec</div>
+      <div class="section">
+        <h2>Crew on this project</h2>
+        <div class="filter-panel">
+          <div class="grid g2">
+            <div>
+              <label>Group by</label>
+              <select id="bGroup" onchange="renderB()">
+                <option value="none">None</option>
+                <option value="dept" selected>Department</option>
+                <option value="deptco">Department &amp; Company</option>
+                <option value="co">Company</option>
+                <option value="role">Role</option>
+              </select>
+            </div>
+            <div>
+              <label>Sort by</label>
+              <select id="bSort" onchange="renderB()">
+                <option value="seniority" selected>Seniority</option>
+                <option value="name">Name (A–Z)</option>
+                <option value="role">Role</option>
+                <option value="co">Company</option>
+                <option value="added">Date added</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint">Fully independent — any Group by pairs with any Sort by.</div>
+        </div>
+        <div id="bList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- real crew data: "ROW 2026 London" project, pulled from Supabase (db:crew /
+   db:projects, filtered to this project's crewIds), in the order they were added
+   to the project's roster (crewIds order — the same "date added" signal the real
+   app has, since crew records themselves carry no createdAt field). hasHotel is
+   derived from this project's real hotelNightBefore + every shoot day's
+   hotelNights arrays. Nobody in this project has isHoD set true in the live data
+   (sortHoDFirst just falls back to alphabetical when that's the case, same as
+   the real app would). */
+const CREW = [
+  {name:"Justin Schoenrock", role:"Executive Producer", department:"Production", co:"Creative Dynamic", hotel:false},
+  {name:"Olivia Arnold", role:"Client Rep", department:"Client", co:"", hotel:true},
+  {name:"Julia Pomis", role:"Client Rep", department:"Client", co:"", hotel:true},
+  {name:"Paul Buscemi", role:"EIC", department:"Production", co:"Creative Dynamic", hotel:true},
+  {name:"Michael O'Brien", role:"Line Producer", department:"Production", co:"Creative Dynamic", hotel:false},
+  {name:"Alex Ovaida", role:"Producer", department:"Production", co:"", hotel:false},
+  {name:"Taylor Hingtgen", role:"Producer", department:"Production", co:"Creative Dynamic", hotel:true},
+  {name:"Nestor Ruesga", role:"Kit Tech", department:"Equipment", co:"Creative Dynamic", hotel:false},
+  {name:"Tegid Cartwright", role:"DOP", department:"Cinematography", co:"", hotel:false},
+  {name:"Sabrina Goreeba", role:"Line Producer", department:"Production", co:"", hotel:true},
+  {name:"Matt Wells", role:"Field Producer", department:"Production", co:"", hotel:false},
+  {name:"Karim D Clarke", role:"Camera Operator", department:"Cinematography", co:"", hotel:false},
+  {name:"Alex Magill", role:"Gaffer", department:"Grip", co:"", hotel:false},
+  {name:"Richard Scott", role:"Grip", department:"Grip", co:"", hotel:false},
+  {name:"Kevin W. Malbas", role:"Grip", department:"Grip", co:"", hotel:false},
+  {name:"Daniel Kirwan-Baez", role:"Grip", department:"Grip", co:"", hotel:false},
+  {name:"Callum Turnor", role:"Grip", department:"Grip", co:"", hotel:false},
+  {name:"Amrita Bisla", role:"Set Designer", department:"Set", co:"", hotel:false},
+  {name:"Hana Koza", role:"Set Assistant", department:"Set", co:"", hotel:false},
+  {name:"Ishavishali Chandrakumar", role:"Set Assistant", department:"Set", co:"", hotel:false},
+  {name:"Sam Charlton", role:"Runner", department:"Production", co:"", hotel:true},
+  {name:"Hassan Al Rikhabi", role:"Security", department:"Other", co:"", hotel:false},
+  {name:"Mario Prifti", role:"Security", department:"Other", co:"", hotel:false},
+  {name:"Jamie Brindle", role:"Rigger", department:"Grip", co:"", hotel:false},
+  {name:"Sid Ellisdon", role:"Runner", department:"Production", co:"", hotel:false},
+  {name:"Alisha Shaw", role:"PA", department:"Production", co:"", hotel:true},
+  {name:"Stella Moss", role:"PA", department:"Production", co:"", hotel:true},
+  {name:"Heather Bradley", role:"Runner", department:"Production", co:"", hotel:true},
+  {name:"Patch Boshell", role:"DJ / Tech", department:"Other", co:"", hotel:false},
+  {name:"Nicole McClain", role:"Edit Supervisor", department:"Post Production", co:"Creative Dynamic", hotel:false},
+  {name:"Mark Bricker", role:"BTS Crew", department:"Other", co:"Strategic Media Team", hotel:false},
+  {name:"Harrison Ferrante", role:"BTS Crew", department:"Other", co:"Strategic Media Team", hotel:false},
+  {name:"Spenser Sease", role:"BTS Crew", department:"Other", co:"Strategic Media Team", hotel:false},
+  {name:"Emily Black", role:"Host", department:"Talent", co:"", hotel:false},
+  {name:"Lewis Buchan", role:"BTS Crew", department:"Other", co:"Strategic Media Team", hotel:true},
+  {name:"Jessica Phillips", role:"BTS Crew", department:"Other", co:"Strategic Media Team", hotel:false},
+  {name:"George Pearton", role:"Camera Operator", department:"Cinematography", co:"", hotel:false},
+  {name:"Charlie De La Hunt", role:"Camera Operator", department:"Cinematography", co:"", hotel:false},
+  {name:"Konrad Frost", role:"Camera Operator", department:"Cinematography", co:"", hotel:false},
+  {name:"Meurig Marshall", role:"Assistant Camera (AC)", department:"Cinematography", co:"", hotel:false},
+  {name:"Alina Kosolova", role:"Assistant Camera (AC)", department:"Cinematography", co:"", hotel:false},
+  {name:"Mark Levien", role:"Sound Mixer", department:"Audio", co:"", hotel:false},
+  {name:"Joe Worthy", role:"Boom Operator", department:"Audio", co:"", hotel:false},
+  {name:"Jojo Copeman", role:"HMUA", department:"Vanities", co:"", hotel:false},
+  {name:"Eden Ward", role:"HMUA", department:"Vanities", co:"", hotel:false},
+  {name:"Brian De Carvalho", role:"Costume/Wardrobe", department:"Vanities", co:"", hotel:false},
+  {name:"Angel Leatherwood", role:"Costume/Wardrobe", department:"Vanities", co:"", hotel:false},
+  {name:"Kai", role:"Security", department:"Other", co:"", hotel:false},
+  {name:"Josh Bister", role:"DIT", department:"Post Production", co:"", hotel:false},
+  {name:"Billie Billington", role:"PA", department:"Production", co:"", hotel:false},
+  {name:"Freya Mallard", role:"Host", department:"Talent", co:"", hotel:false},
+  {name:"Sarah Jayne Dunn", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"James Sutton", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Scarlett Howard", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Sophie Stonehouse", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Hannah Elizabeth", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Elizabeth Vasilenko", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Keiran Lee", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Danny D", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Lauren Alexis", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Kailah Bird", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Rebecca Goodwin", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Lena Polanski", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Vanessa Neumann", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Stefan Garlicki", role:"Guest", department:"Talent", co:"", hotel:false},
+  {name:"Meg Prescott", role:"Guest", department:"Talent", co:"", hotel:false},
+].map((c,i)=>({...c, id:i, isHoD:false, addedIdx:i}));
+
+const DEPARTMENTS = ['Production','Client','Talent','Cinematography','Audio','Grip','Equipment','Set','Vanities','Catering & Travel','Post Production','Other'];
+const DEPARTMENT_CODES = {
+  'Production':'PROD','Client':'CLIENT','Talent':'TALENT','Cinematography':'CIN','Audio':'AUD',
+  'Grip':'GRIP','Equipment':'EQUIP','Set':'SET','Vanities':'HMUC','Catering & Travel':'CAT/TRA',
+  'Post Production':'POST','Other':'—'
+};
+// same seniority ordering ROLES_BY_DEPT implies in the real app — earlier in the
+// list = more senior. Used for Version B's "Seniority" sort.
+const SENIORITY_ORDER = [
+  'Director','Executive Producer','Line Producer','Field Producer','EIC','Producer','Production Manager',
+  'Production Coordinator','Runner','PA',
+  'Client Rep',
+  'Presenter','Host','Guest','Contributor','Cast',
+  'DOP','Camera Operator','Assistant Camera (AC)','1st AC','2nd AC','Loader','Focus Puller',
+  'Sound Mixer','Sound Recordist','Boom Operator',
+  'Gaffer','Best Boy','Rigger','Grip',
+  'Equipment Manager','Kit Tech',
+  'Set Designer','Art Director','Set Assistant','Props',
+  'HMUA','Hair Stylist','Costume/Wardrobe',
+  'Chef','Caterer','Driver','Travel Coordinator',
+  'Editor','Edit Supervisor','Colourist','DIT','Assistant Editor',
+  'BTS Crew','DJ / Tech','Security',
+];
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function seniorityRank(role){ const i = SENIORITY_ORDER.indexOf(role); return i===-1 ? Infinity : i; }
+
+function sortHoDFirst(list){
+  return list.slice().sort((a,b)=> (b.isHoD?1:0)-(a.isHoD?1:0) || a.name.localeCompare(b.name));
+}
+
+function rowHTML(c, opts){
+  opts = opts || {};
+  const bits = [];
+  if(!opts.hideRole) bits.push(esc(c.role));
+  if(opts.showDept) bits.push(esc(c.department));
+  if(opts.showCo && c.co) bits.push(esc(c.co));
+  const idxNote = opts.showIdx ? `<span class="idx">added #${c.addedIdx+1}</span>` : '';
+  return `<div class="crew-row">
+      <span class="name">${c.isHoD?'<span class="hod-star">★</span>':''}${esc(c.name)}</span>
+      ${bits.length?`<span class="role">${bits.join(' · ')}</span>`:''}
+      ${!opts.hideDeptPill ? `<span class="pill dept">${esc(DEPARTMENT_CODES[c.department]||c.department)}</span>` : ''}
+      ${opts.showCoPill && c.co ? `<span class="pill co">${esc(c.co)}</span>` : ''}
+      ${idxNote}
+    </div>`;
+}
+
+function groupHeaderHTML(label, count, code){
+  return `<div class="subhead">
+      ${code?`<span class="dept-code">${esc(code)}</span> `:''}${esc(label)} <span class="dept-count group-count">(${count})</span>
+    </div>`;
+}
+
+/* ---------------- Version A — matches what's currently live ---------------- */
+function renderA(){
+  const groupBy = document.getElementById('aGroup').value;
+  const sorted = sortHoDFirst(CREW); // the one live Sort option: "By department (HoD first)"
+  let html = '';
+  if(groupBy==='hotel'){
+    const buckets = {'Has hotel':[], 'No hotel':[]};
+    sorted.forEach(c=> buckets[c.hotel?'Has hotel':'No hotel'].push(c));
+    ['Has hotel','No hotel'].forEach(key=>{
+      if(!buckets[key].length) return;
+      html += groupHeaderHTML(key, buckets[key].length, '');
+      html += buckets[key].map(c=>rowHTML(c, {showDept:true, hideDeptPill:true})).join('');
+    });
+  } else {
+    DEPARTMENTS.forEach(dept=>{
+      const items = sorted.filter(c=>c.department===dept);
+      if(!items.length) return;
+      html += groupHeaderHTML(dept, items.length, DEPARTMENT_CODES[dept]);
+      html += items.map(c=>rowHTML(c, {hideDeptPill:true})).join('');
+    });
+  }
+  document.getElementById('aList').innerHTML = html || '<div class="empty-note">No crew match.</div>';
+}
+
+/* ---------------- Version B — original drafted spec ---------------- */
+function sortByB(list, sortBy){
+  const l = list.slice();
+  if(sortBy==='name') return l.sort((a,b)=>a.name.localeCompare(b.name));
+  if(sortBy==='role') return l.sort((a,b)=>a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
+  if(sortBy==='co') return l.sort((a,b)=>(a.co||'￿').localeCompare(b.co||'￿') || a.name.localeCompare(b.name));
+  if(sortBy==='added') return l.sort((a,b)=>a.addedIdx-b.addedIdx);
+  // seniority (default)
+  return l.sort((a,b)=> seniorityRank(a.role)-seniorityRank(b.role) || a.name.localeCompare(b.name));
+}
+function renderB(){
+  const groupBy = document.getElementById('bGroup').value;
+  const sortBy = document.getElementById('bSort').value;
+  const rowOpts = {showIdx: sortBy==='added', showCoPill: groupBy!=='co' && groupBy!=='deptco'};
+  let html = '';
+
+  if(groupBy==='none'){
+    html = sortByB(CREW, sortBy).map(c=>rowHTML(c, {...rowOpts, showDept:true, hideDeptPill:true})).join('');
+  } else if(groupBy==='dept'){
+    DEPARTMENTS.forEach(dept=>{
+      const items = sortByB(CREW.filter(c=>c.department===dept), sortBy);
+      if(!items.length) return;
+      html += groupHeaderHTML(dept, items.length, DEPARTMENT_CODES[dept]);
+      html += items.map(c=>rowHTML(c, {...rowOpts, hideDeptPill:true})).join('');
+    });
+  } else if(groupBy==='co'){
+    const companies = [...new Set(CREW.map(c=>c.co||'—'))].sort((a,b)=> a==='—'?1 : b==='—'?-1 : a.localeCompare(b));
+    companies.forEach(co=>{
+      const items = sortByB(CREW.filter(c=>(c.co||'—')===co), sortBy);
+      if(!items.length) return;
+      html += groupHeaderHTML(co, items.length, '');
+      html += items.map(c=>rowHTML(c, {...rowOpts, showDept:true, hideDeptPill:true})).join('');
+    });
+  } else if(groupBy==='role'){
+    const roles = [...new Set(CREW.map(c=>c.role))].sort((a,b)=>seniorityRank(a)-seniorityRank(b) || a.localeCompare(b));
+    roles.forEach(role=>{
+      const items = sortByB(CREW.filter(c=>c.role===role), sortBy);
+      if(!items.length) return;
+      html += groupHeaderHTML(role, items.length, '');
+      html += items.map(c=>rowHTML(c, {...rowOpts, showDept:true, hideRole:true, hideDeptPill:true})).join('');
+    });
+  } else if(groupBy==='deptco'){
+    DEPARTMENTS.forEach(dept=>{
+      const deptItems = CREW.filter(c=>c.department===dept);
+      if(!deptItems.length) return;
+      html += groupHeaderHTML(dept, deptItems.length, DEPARTMENT_CODES[dept]);
+      const companies = [...new Set(deptItems.map(c=>c.co||'—'))].sort((a,b)=> a==='—'?1 : b==='—'?-1 : a.localeCompare(b));
+      companies.forEach(co=>{
+        const items = sortByB(deptItems.filter(c=>(c.co||'—')===co), sortBy);
+        if(!items.length) return;
+        html += `<div class="hint" style="margin:4px 0 4px 4px; font-weight:600;">${esc(co)} (${items.length})</div>`;
+        html += items.map(c=>rowHTML(c, {...rowOpts, hideDeptPill:true})).join('');
+      });
+    });
+  }
+  document.getElementById('bList').innerHTML = html || '<div class="empty-note">No crew match.</div>';
+}
+
+renderA();
+renderB();
+</script>
+</body>
+</html>
