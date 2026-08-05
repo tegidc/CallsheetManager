@@ -118,6 +118,11 @@
     font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
     color:var(--tape); margin:26px 0 12px; padding-bottom:0; border-bottom:none;}
   .sd-block:first-child .sd-block-head{margin-top:0;}
+  /* A collapsible head that opens its own .section rather than sitting in a run of
+     .sd-blocks — it needs no top margin because the .section already spaces it.
+     Was seven copies of style="margin:0 0 12px; font-size:15px" (the font-size a
+     no-op: .sd-block-head is already 15px). Add the class, don't re-inline it. */
+  .sd-block-head.flush{margin:0 0 12px;}
   .sd-block-head .dept-caret{font-size:11px; color:inherit;}
   .sd-block-head > button{margin-left:12px; flex:0 0 auto;}
   .sd-block-head:hover{color:var(--text);}
@@ -433,6 +438,10 @@
   .crew-header-selectall input{margin:0;}
   .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
+  /* The row of trailing checkboxes + "Clear filters" at the bottom of a filter
+     panel. Was inline on the Crew panel's closing div; a second filter panel
+     (Budget's day filter) needed the same row, so it's a class now. */
+  .filter-panel-foot{margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
   .filter-chips label{font-size:var(--fs-meta); display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
   .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--tint-3);
     border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:var(--fs-meta);}
@@ -2396,7 +2405,7 @@ function toggleAllTechBlocks(){ setAllTechBlocksCollapsed(!allBlocksCollapsed(te
 function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = techBlocks[key];
   return `<div class="section" id="techBlock-${key}">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+    <div class="sd-block-head flush">
       <span class="sd-block-head-toggle" onclick="toggleTechBlock('${key}')"><span class="dept-caret" id="ttc-${key}">${open?'▾':'▸'}</span> ${title}</span>
       ${headerActionsHTML||''}
     </div>
@@ -2574,10 +2583,10 @@ function renderTasksSection(p, days){
   const open = tasksSectionOpen;
   const openTaskCount = (p.tasks||[]).filter(t=>!t.completed).length;
   return `<div class="section" id="tasksSection">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
-      <span class="sd-block-head-toggle" onclick="toggleTasksSection()"><span class="dept-caret" id="tasks-block">${open?'▾':'▸'}</span> Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}</span>
+    <div class="sd-block-head flush">
+      <span class="sd-block-head-toggle" onclick="toggleTasksSection()"><span class="dept-caret">${open?'▾':'▸'}</span> Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}</span>
     </div>
-    <div id="tasksb-block" style="display:${open?'':'none'}">
+    <div style="display:${open?'':'none'}">
       ${taskFlagPillsHTML(flagItems)}
       <div class="subhead" style="margin-top:18px;">Add a task</div>
       <div class="grid g2" style="margin-bottom:8px;">
@@ -2796,8 +2805,8 @@ function aiScanSectionHTML(p){
     `<span class="pill">${icon('doc')} ${esc(f.filename)} <span onclick="removeAiScanPendingFile(${i})" style="cursor:pointer;" title="Remove">${icon('close')}</span></span>`).join('')}</div>` : '';
   const errorHTML = aiScanError ? `<div class="ai-error">${esc(aiScanError)}</div>` : '';
   return `<div class="section" id="aiScanSection">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
-      <span class="sd-block-head-toggle" onclick="toggleAiScanBlock()"><span class="dept-caret" id="aisc-block">${open?'▾':'▸'}</span> ${icon('sparkle')} AI Scan</span>
+    <div class="sd-block-head flush">
+      <span class="sd-block-head-toggle" onclick="toggleAiScanBlock()"><span class="dept-caret">${open?'▾':'▸'}</span> ${icon('sparkle')} AI Scan</span>
     </div>
     <div id="aisb-block" style="display:${open?'':'none'}">
       <div class="hint" style="margin-bottom:10px;">Chat about the project, or attach a briefing document (PDF, .docx, .txt) — Claude proposes shoot dates, locations and crew as you go. Nothing is added until you tick a proposal. This conversation isn't saved — it starts over if you leave and come back.</div>
@@ -3231,7 +3240,7 @@ function projectCrewFilterPanelHTML(assignedAll, days){
         </select>` : ''}
       </div>
     </div>
-    <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+    <div class="filter-panel-foot">
       <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
       <label title="Show everyone who does NOT match the filter above, instead of everyone who does"><input type="checkbox" ${f.inverse?'checked':''} onchange="toggleProjectFilterFlag('inverse', this.checked)"> Inverse</label>
@@ -3687,17 +3696,17 @@ function hotelSummaryHTML(){
     </div>`;
   const inner = costFieldHTML + (!data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
     <div class="hint" style="margin:0 0 12px;">${esc(data.summary)}</div>
-    <h4 style="margin:12px 0 6px;">Room-booking table</h4>
+    <div class="subhead">Room-booking table</div>
     <table><tr><th>Room No.</th><th>Name</th><th>Date from</th><th>Date to</th><th>Total nights</th></tr>
     ${data.roomBooking.map(r=>`<tr><td>${r.roomNo}</td><td>${esc(r.name)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td><td>${r.totalNights}</td></tr>`).join('')}
     </table>
-    <h4 style="margin:14px 0 6px;">Per-night table</h4>
+    <div class="subhead">Per-night table</div>
     <table><tr><th>Night</th><th>Rooms</th><th>Names</th></tr>
     ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`);
   return `<div class="section" id="hotelSummarySection">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+    <div class="sd-block-head flush">
       <span class="sd-block-head-toggle" onclick="toggleHotelSummaryBlock()"><span class="dept-caret" id="hsmc-summary">${open?'▾':'▸'}</span> Hotel summary</span>
     </div>
     <div id="hsmb-summary" style="display:${open?'':'none'}">${inner}</div>
@@ -3780,7 +3789,7 @@ function renderCateringExport(){
         ${day.lCount?`<tr><td>Lunch</td><td>${day.lCount}</td></tr>`:''}
         ${day.dCount?`<tr><td>Dinner</td><td>${day.dCount}</td></tr>`:''}
       </table>
-      ${day.dietaryNotes.length ? `<h4 style="margin:10px 0 4px;">Dietary requirements</h4><table>
+      ${day.dietaryNotes.length ? `<h3>Dietary requirements</h3><table>
         <tr><th>Name</th><th>Type</th><th>Specific</th></tr>
         ${day.dietaryNotes.map(n=>`<tr><td>${esc(n.name)}</td><td>${esc(n.general)}</td><td>${esc(n.specific)}</td></tr>`).join('')}
       </table>` : ''}
@@ -3890,7 +3899,7 @@ function cateringSummaryHTML(){
   const inner = `${fieldsHTML}<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyCateringSummaryGrid()">${icon('copy')} Copy catering summary</button></div>`;
   return `<div class="section" id="cateringSummarySection">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+    <div class="sd-block-head flush">
       <span class="sd-block-head-toggle" onclick="toggleCateringSummaryBlock()"><span class="dept-caret" id="csmc-summary">${open?'▾':'▸'}</span> Catering summary</span>
     </div>
     <div id="csmb-summary" style="display:${open?'':'none'}">${inner}</div>
@@ -4027,7 +4036,7 @@ function transportSummaryHTML(){
   const inner = `${fieldsHTML}<div id="tsmGridWrap">${transportSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyTransportSummary()">${icon('copy')} Copy transport summary</button></div>`;
   return `<div class="section" id="transportSummarySection">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+    <div class="sd-block-head flush">
       <span class="sd-block-head-toggle" onclick="toggleTransportSummaryBlock()"><span class="dept-caret" id="tsmc-summary">${open?'▾':'▸'}</span> Transport summary</span>
     </div>
     <div id="tsmb-summary" style="display:${open?'':'none'}">${inner}</div>
@@ -4599,7 +4608,7 @@ function toggleAllPreviewBlocks(){ setAllPreviewBlocksCollapsed(!allBlocksCollap
 function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = previewBlocks[key];
   return `<div class="section">
-    <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
+    <div class="sd-block-head flush">
       <span class="sd-block-head-toggle" onclick="togglePreviewBlock('${key}')"><span class="dept-caret" id="pvc-${key}">${open?'▾':'▸'}</span> ${title}</span>
       ${headerActionsHTML||''}
     </div>
@@ -4773,7 +4782,7 @@ async function saveCrewRateToDatabase(crewId, context){
   flashStatus(`crsStatus-${context}-${crewId}`, 'Saved to database');
 }
 
-let budgetView = 'department'; // 'department' | 'person' | 'day'
+let budgetView = 'department'; // 'department' | 'person' | 'day' | 'costs'
 function setBudgetView(view){ budgetView = view; renderProjectBody(); }
 // true = itemized (every figure ex-VAT, VAT broken out at the top); false =
 // baked in (VAT folded silently into every figure, one Total). The toggle's
@@ -4817,9 +4826,55 @@ function toggleBudgetVatRegistered(crewId, checked){
   renderProjectBody();
 }
 
+/* ---- Budget day filter (Phase Refinement) ---------------------------------
+   "What does this shoot cost if I only count these days?" — a scope question
+   that applies to all four views at once, so it's a filter on the data rather
+   than a fifth view. Empty set = every day, so the default is exactly the
+   project-wide budget that was there before.
+
+   Built in the Crew tab's Filter idiom deliberately (crewToolbarHTML() row +
+   .filter-panel rendered BELOW the row, never inside it — a full-width panel in
+   a flex row distorts its alignment every time it opens), and the day chips are
+   the same markup as projectCrewFilter's Days sub-section. No OR/AND mode here:
+   days are being summed, not matched against a person, so "or" is the only
+   meaning the selection can have. */
+let budgetDayFilter = new Set();
+let budgetFilterOpen = false;
+function toggleBudgetFilterPanel(){ budgetFilterOpen = !budgetFilterOpen; renderProjectBody(); }
+function toggleBudgetFilterDay(dayId, on){
+  if(on) budgetDayFilter.add(dayId); else budgetDayFilter.delete(dayId);
+  renderProjectBody();
+}
+function clearBudgetDayFilter(){ budgetDayFilter.clear(); renderProjectBody(); }
+/* Ticked ids are re-checked against the project's CURRENT days on every read, so
+   a deleted shoot day — or switching to another project, since this state is
+   global like crewGridView/budgetView — can never leave the filter selecting
+   nothing and quietly showing a £0.00 budget. Nothing live ticked = show all. */
+function budgetSelectedDays(){ return projectDays().filter(d=>budgetDayFilter.has(d.id)); }
+function budgetDayFilterCount(){ return budgetSelectedDays().length; }
+function budgetFilteredDays(){
+  const kept = budgetSelectedDays();
+  return kept.length ? kept : projectDays();
+}
+function budgetFilterPanelHTML(){
+  const all = projectDays();
+  const chips = all.length ? all.map(d=>
+      `<label><input type="checkbox" ${budgetDayFilter.has(d.id)?'checked':''} onchange="toggleBudgetFilterDay('${d.id}', this.checked)"> Day ${esc(d.dayNum||'?')}</label>`
+    ).join('') : '<span class="hint">No shoot days yet.</span>';
+  const n = budgetDayFilterCount();
+  return `<div class="filter-panel">
+    <div><div class="hint" style="margin-bottom:4px;">Shoot days</div><div class="filter-chips">${chips}</div></div>
+    <div class="filter-panel-foot">
+      <span class="hint">${n ? `Costing ${n} of ${all.length} day${all.length===1?'':'s'} — every figure below is for those days only.`
+                            : 'All days. Tick any to cost part of the shoot.'}</span>
+      ${n ? `<span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearBudgetDayFilter()">Clear filters</span>` : ''}
+    </div>
+  </div>`;
+}
+
 function buildBudgetData(){
   const p = currentProject();
-  const days = projectDays();
+  const days = budgetFilteredDays();
   const crew = projectCrew(p);
   const hotelCosts = getHotelCosts(p);
 
@@ -4849,13 +4904,25 @@ function buildBudgetData(){
 
   const cateringGrid = buildCateringSummaryGrid();
   const transportSummary = buildTransportSummary();
-  const cateringTotal = cateringGrid ? cateringGrid.totalCost : 0;
-  const travelTotal = transportSummary ? transportSummary.totalCost : 0;
+  // Both grids are the Catering/Travel tabs' OWN summaries, always built for the
+  // whole shoot, so their .totalCost is project-wide by definition. Sum their
+  // per-day columns against the days actually in scope instead — with no day
+  // filter set that's every column, i.e. the same number .totalCost gave.
+  const dayNumsInScope = new Set(days.map(d=>d.dayNum));
+  const sumDailyCost = g => g ? g.cols.filter(c=>dayNumsInScope.has(c.dayNum))
+                                      .reduce((s,c)=>s+c.dailyCost, 0) : 0;
+  const cateringTotal = sumDailyCost(cateringGrid);
+  const travelTotal = sumDailyCost(transportSummary);
   // Room-nights counted directly off the day records rather than via
   // buildHotelSummary(), which filters down to "active" nights only and would
   // need label-matching to recover one specific day's figure — this way, the
   // project-wide and per-day totals below share the exact same calculation.
-  const preNightRooms = (p.hotelNightBefore||[]).length;
+  // The night before Day 1 is only a cost if Day 1 itself is in scope. projectDays()
+  // is day-ordered and `days` preserves that order, so when Day 1 IS in scope it's
+  // still days[0] — which keeps the `i===0` fold-in below correct either way.
+  const firstProjectDay = projectDays()[0];
+  const preNightRooms = (firstProjectDay && days.some(d=>d.id===firstProjectDay.id))
+    ? (p.hotelNightBefore||[]).length : 0;
   const dayHotelRooms = days.map(d=>(d.hotelNights||[]).length);
   const hotelTotal = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
 
@@ -5009,19 +5076,19 @@ function budgetCostsViewHTML(){
   return `
     <div class="hint" style="margin-bottom:14px;">Same cost fields as the Hotel/Catering/Travel tabs under Crew —
       a change made here or there updates both.</div>
-    <h4 style="margin:0 0 8px;">Catering</h4>
+    <div class="subhead">Catering</div>
     <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px;">
       ${costFieldHTML('ccCostB', 'Est. cost per Breakfast', cateringCosts.b)}
       ${costFieldHTML('ccCostL', 'Est. cost per Lunch', cateringCosts.l)}
       ${costFieldHTML('ccCostD', 'Est. cost per Dinner', cateringCosts.d)}
       ${costFieldHTML('ccCostDelivery', 'Delivery cost', cateringCosts.delivery)}
     </div>
-    <h4 style="margin:0 0 8px;">Travel</h4>
+    <div class="subhead">Travel</div>
     <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px;">
       ${costFieldHTML('tsCostPublic', 'Est. public transport cost/day', transportCosts.publicPerDay)}
       ${costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', transportCosts.mileage)}
     </div>
-    <h4 style="margin:0 0 8px;">Hotel</h4>
+    <div class="subhead">Hotel</div>
     <div style="display:flex; gap:18px; flex-wrap:wrap;">
       ${costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight)}
     </div>`;
@@ -5039,6 +5106,14 @@ function renderProjectBudget(body){
   const viewSwitcher = `<div class="tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
+  // Same construction as the Crew tab's Filter and Preview & Export's Format panel:
+  // one toggle in a crewToolbarHTML() row, panel rendered below the row, not in it.
+  const dayFilterCount = budgetDayFilterCount();
+  const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleBudgetFilterPanel()">
+    <span class="dept-caret">${budgetFilterOpen?'▾':'▸'}</span> Filter${dayFilterCount?` (${dayFilterCount} day${dayFilterCount>1?'s':''})`:''}
+  </span>`;
+  const filterRow = crewToolbarHTML('', filterToggleSpan, '')
+    + (budgetFilterOpen ? budgetFilterPanelHTML() : '');
   const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
     : budgetView==='day' ? budgetDayViewHTML(data)
     : budgetView==='costs' ? budgetCostsViewHTML()
@@ -5049,6 +5124,7 @@ function renderProjectBudget(body){
       <div class="hint">Cost visibility only — crew day rates, and the catering/travel/hotel costs already
         entered on their own tabs. Not a working budget: location fees aren't included, and there's nothing
         here to edit as a line-item budget.</div>
+      ${filterRow}
       <div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(data)}</div>
       ${viewSwitcher}
       ${viewHTML}

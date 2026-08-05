@@ -79,7 +79,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `crewCateringBlockHTML()` — renders one crew member's per-day breakfast/lunch/dinner checkbox rows in the catering grid. Department/Lead Company hidden, role display is Show-as-or-role, display-only (Phase S) — [Crew]
 - `getCateringMeals()` / `toggleMeal()` — read/write which meals a crew member is down for on a given day — [Crew]
 - `toggleAllMealForPerson()` — toggles one meal type on/off across every day for a person — [Crew]
-- `buildCateringExport()` / `renderCateringExport()` / `copyCateringExport()` — build, render and copy a per-day catering headcount + dietary-notes list. Lives only in Preview & Export (T-6.5), left as-is by Phase P2 — [Crew, Preview & Export]
+- `buildCateringExport()` / `renderCateringExport()` / `copyCateringExport()` — build, render and copy a per-day catering headcount + dietary-notes list. Lives only in Preview & Export (T-7.5), left as-is by Phase P2 — [Crew, Preview & Export]
 - `getCateringCosts()` / `saveCateringCosts()` — read/persist the project's per-meal costs (`p.cateringCosts.{b,l,d,delivery}`), Phase P2 — [Crew]
 - `buildCateringSummaryGrid()` (Phase P2) — the Catering tab's own summary data: Breakfast/Lunch/Dinner counts per day plus a computed Daily cost (meal counts × their unit costs, plus a delivery fee charged once per meal type per day, only when that meal's count is >0 that day) — distinct from `buildCateringExport()`'s per-day list shape — [Crew]
 - `cateringSummaryGridBodyHTML()` / `renderCateringSummaryGridSection()` (Phase P2) — render the grid (rows=meals+Daily cost, columns=days) into `#csmGridWrap`, re-rendered on cost-field input without touching the cost inputs themselves (same targeted-refresh pattern as `renderTechSpecsRoundup()`) — [Crew]
@@ -94,7 +94,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `toggleHotelNight()` / `toggleHotelPre()` — toggle whether a crew member is booked a hotel room for a shoot night / the night before — [Crew]
 - `abbreviateName()` — "first initial + last name" display form (e.g. "A. Shaw"), used by the per-night table's Names column — [Crew]
 - `buildHotelSummary()` (Phase O, replaces the old Preview-tab `buildHotelExport`) — per-person hotel aggregation: resolves each person's actual booked-night dates (incl. "night before Day 1") into a check-in/check-out range and total-nights count, sorted earliest check-in first then most nights first (`orderIndex`), and reused by the per-night table's Names ordering so both views stay in the same person order — [Crew]
-- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: a cost field ("Est. cost per room/night", id `hcRoomNight`, Phase AD — moved here from Budget, same `getHotelCosts()`/`saveHotelCosts()` pair, same `field-inline` markup as Catering's cost fields) above room-booking table (Room No./Name/Date from–to/Total nights), then per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-6.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once, which is also why the cost field shows up on both (same precedent as Travel's cost fields at T-7.4). Autosave for `hcRoomNight` is wired per-screen: `renderProjectCrew()`'s `body.oninput` when `crewGridView==='hotel'`, and `renderProjectPreview()`'s scoped `e.target.id==='hcRoomNight'` check (alongside the Travel fields, Phase AD) — [Crew, Budget, Preview & Export]
+- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: a cost field ("Est. cost per room/night", id `hcRoomNight`, Phase AD — moved here from Budget, same `getHotelCosts()`/`saveHotelCosts()` pair, same `field-inline` markup as Catering's cost fields) above room-booking table (Room No./Name/Date from–to/Total nights), then per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-7.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once, which is also why the cost field shows up on both (same precedent as Travel's cost fields at T-7.4). Autosave for `hcRoomNight` is wired per-screen: `renderProjectCrew()`'s `body.oninput` when `crewGridView==='hotel'`, and `renderProjectPreview()`'s scoped `e.target.id==='hcRoomNight'` check (alongside the Travel fields, Phase AD) — [Crew, Budget, Preview & Export]
 - `jumpToHotelSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Hotel sub-tab: expands `hotelSummaryOpen` if collapsed, then scrolls `#hotelSummarySection` into view — [Crew]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
 - `addCrewToProject()` / `removeCrewFromProject()` — add/remove a crew member from the current project's roster — [Crew]
@@ -269,6 +269,33 @@ Preview & Export stays the export surface.
   a full re-render, so the field the user is typing in doesn't lose focus (same rule
   as `renderCateringSummaryGridSection()`/`renderTransportSummaryGridSection()`) —
   [Budget]
+- `budgetDayFilter` / `budgetFilterOpen` / `toggleBudgetFilterPanel()` /
+  `toggleBudgetFilterDay()` / `clearBudgetDayFilter()` / `budgetSelectedDays()` /
+  `budgetDayFilterCount()` / `budgetFilteredDays()` / `budgetFilterPanelHTML()`
+  (Phase Refinement) — **the Budget day filter.** A Set of shoot-day ids; empty
+  means every day, so the default is exactly the project-wide budget that was
+  there before. Deliberately a filter on the data rather than a fifth view —
+  "which days am I costing" scopes all four views at once, so it sits above the
+  view switcher, not inside it. `buildBudgetData()` reads `budgetFilteredDays()`
+  in place of `projectDays()`, which is the single line that scopes crew day
+  rates, `daysWorked`, the per-day rows and the hotel room-night count together.
+  Built in the Crew tab's Filter idiom (a `crewToolbarHTML()` row whose
+  `.filter-panel` renders BELOW it, never inside it) with the same day-chip
+  markup as `projectCrewFilter`'s Days sub-section. No OR/AND mode: days are
+  being *summed*, not matched against a person, so "or" is the only meaning the
+  selection can carry — [Budget]
+  - Ticked ids are re-checked against the project's current days on every read
+    (`budgetSelectedDays()`), so a deleted shoot day — or switching project,
+    since this state is global like `crewGridView`/`budgetView` — can't leave the
+    filter selecting nothing and silently show a £0.00 budget. Nothing live
+    ticked falls back to all days — [Budget]
+  - Catering and Travel extras are scoped by summing `cateringGrid.cols` /
+    `transportSummary.cols` for the days in scope rather than reading their
+    `.totalCost`, which is always the whole shoot (those grids are the
+    Catering/Travel tabs' own project-wide summaries). The night before Day 1
+    only counts when Day 1 is itself in scope. **Verified**: on ROW 2026 (6
+    days) each day costed alone sums to exactly the unfiltered project total,
+    so nothing is double-counted or dropped — [Budget]
 - `renderBudgetSummaryBar()` (Phase AF) — the targeted refresh behind
   `budgetCostsViewHTML()`'s autosave; re-renders `budgetSummaryBarHTML()` into
   `#budgetSummaryBarWrap` only — [Budget]
@@ -358,7 +385,8 @@ Preview & Export stays the export surface.
 - `flashStatus()` — the discreet "Saved" status flash shared by every save button and autosave — [Shared/utility functions]
 - `copyText()` — the single clipboard path for every Copy button: async API with a textarea fallback, optional confirm message — [Shared/utility functions]
 - `deptHeaderHTML()` — the one canonical collapsible group header (caret + optional code + label + count), shared by the project Crew tab, the crew database and Position Assignments — [Shared/utility functions]
-- `expandCollapseAllHTML()` — the "Expand all · Collapse all" strip. Takes an optional third `extraLinkHTML` arg appended after Collapse all (Phase P3 uses this on the Tech tab for the "Summary" jump-link) — [Shared/utility functions]
+- `expandCollapseAllHTML(onclickExpr, extraLinkHTML, allCollapsed, groupId)` — the "Expand all · Collapse all" strip. `extraLinkHTML` is the **second** argument, appended after the toggle (Phase P3 uses it on the Tech tab for the "Summary" jump-link); `groupId` gives the toggle its `eca-<id>` id so `refreshExpandCollapseAll()` can keep the label honest. Every caller that wants no extra link passes `undefined` in that second slot — [Shared/utility functions]
+  - ⚠️ Corrected in Phase Refinement: this entry (and the Phase Detail section near the bottom) previously documented the arg order as `(fnName, arg, extraLinkHTML, allCollapsed)`, which no call site has ever used — [Shared/utility functions]
 - `applyBlockState()` / `toggleBlock()` / `setAllBlocksCollapsed()` — collapsible-block plumbing shared by Preview & Export (`pv` prefix) and the Shoot Day editor (`sd` prefix) — [Shared/utility functions]
 - `refreshTabScrollCues()` — wraps any horizontally-overflowing `.tabs` strip so it shows an edge-fade scroll cue, and clears the cue at the end of the scroll (mobile) — [Shared/utility functions]
 - `GRID_ROW_SELECTOR` / `checkboxesIn()` — the row selector and per-row day/meal checkbox list used by the grid keyboard navigation handler. `checkboxesIn` is scoped to `.crewgrid-check` so the row's bulk-select checkbox is excluded — [Shared/utility functions]
@@ -486,6 +514,7 @@ coarse information first, finest detail last.
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
+| T-6.0 | · Day filter | Phase Refinement — tick shoot days to cost only part of the shoot. Scopes all four views at once, so it sits above the switcher, not in it. No ticks = whole project | `budgetFilterPanelHTML()` |
 | T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
 | T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
 | T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override) with its Save-to-database icon (Phase AG), VAT checkbox (Phase AH), Days worked, Subtotal | `budgetPersonViewHTML()` |
@@ -535,6 +564,13 @@ coarse information first, finest detail last.
 | **G-4** | Sample data reset | Wipe and reload the demo data set | `resetAndReseed()` |
 | **G-5** | New project form | Create a project (auto-creates its first shoot day) | `renderNewProject()` |
 | **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
+| **G-7** | Autosave & "Saved" flash | The debounced per-key autosave behind Overview/cost fields, and the status flash every save path shares | `scheduleAutosave()` / `flashStatus()` |
+
+## X — Server-side
+
+| Code | Section | What it is | Entry point |
+|---|---|---|---|
+| **X-1** | AI Scan Edge Function | The only server-side code in the project: a thin Supabase Edge Function proxying the Anthropic API so the key never reaches the browser | `supabase/functions/ai-scan/index.ts` |
 
 ## Style audit — pattern names (Phase Style Review)
 
@@ -660,6 +696,40 @@ saved?" arrives as you type and either outcome continues from where you already 
 Both paths still end where they always did (`addLocToProject()` / `saveLocation()`
 with `locFormContext` set). The Shoot Day form's `quickAddLocationForDay()` is a
 different entry point on a different screen and was left alone.
+
+## The design system, as decided (Phase Refinement)
+
+A consistency pass over everything built since Phase U (Budget, AI Scan, Overview
+Tasks, Settings, Add Location, and the X–AE / AF–AH batches). No behaviour
+changed; the one addition is Budget's day filter, which was asked for.
+
+**A collapsible head that opens its own `.section` uses `.sd-block-head.flush`.**
+Seven places had grown the identical inline `style="margin:0 0 12px;
+font-size:15px"` on `.sd-block-head` — Tech blocks, Overview Tasks, AI Scan, the
+Hotel/Catering/Transport summaries and Preview & Export's blocks. The
+`font-size` was a **no-op** (`.sd-block-head` is already 15px), which is the tell
+that nobody knew what the class already did. One modifier class now, same pixels.
+Budget's Per Day rows keep their own `margin:14px 0 0` inline — those are rows in
+a list, not section heads, and it's a single site.
+
+**There is no `h4` rule, so a bare `<h4>` renders as browser default.** Only
+`.ki-item h4` is styled. Six headings had drifted onto bare `<h4>` and were
+rendering in the browser's default serif — Budget's Costs tab (Catering / Travel
+/ Hotel), the Hotel summary's two table headings, and the catering export's
+"Dietary requirements". Now `.subhead` outside a card, `<h3>` inside one
+(`.card h3` and `.subhead` are deliberately identical — see the Label family).
+⚠️ If a new sub-heading is needed, use one of those two. Don't reach for `h4`.
+
+**`.filter-panel-foot`** — the trailing checkbox/"Clear filters" row at the
+bottom of a filter panel. Was inline on the Crew panel's closing `div`; Budget's
+day filter needed the same row, so it's a class.
+
+**Vestigial ids removed.** Overview Tasks and AI Scan copied the
+`${prefix}c-`/`${prefix}b-` id convention from the `applyBlockState` blocks
+without the mechanism that reads them — both toggles call `renderProjectBody()`
+instead. `tasks-block`, `tasksb-block` and `aisc-block` were looked up by
+nothing and are gone. The summary blocks' `hsmc-`/`csmc-`/`tsmc-` ids are **not**
+vestigial — those really do go through `applyBlockState()`.
 
 ## The design system, as decided (Phase Detail)
 
@@ -901,7 +971,7 @@ sidebar items read too dim, the fix is a named `--tape-light` token rather than 
 return to a stray hex.
 
 **Expand/collapse.** One toggling text control, never two links side by side:
-`expandCollapseAllHTML(fnName, arg, extraLinkHTML, allCollapsed)` renders "Expand all"
+`expandCollapseAllHTML(onclickExpr, extraLinkHTML, allCollapsed, groupId)` renders "Expand all"
 while everything is collapsed and "Collapse all" otherwise, so only the available
 action shows. Callers pass current state. The Phase V rotating chevron is gone; the
 `.expandall-caret` rule was removed with it.
