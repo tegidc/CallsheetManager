@@ -361,7 +361,91 @@ Two defects it documents, both checkable against the font request on line 8 of
 - **Jost 700 is used but not loaded** — `.dept-code` and the mobile checkbox tick ask
   for it, so the browser synthesises a fake bold. Jost is requested at 400/500/600.
 
+## The design system, as decided (Phase Fonts)
+
+Applied from the `style-audit-fonts.html` decisions. **Where this contradicts the
+Phase Style Review section below, this wins** — several things were deliberately
+reversed. The direction is "a cleanly printed paper form, with deviations for
+usability".
+
+**Type scale.** Four tokens, one job each: `--fs-name` 14px (names, primary rows),
+`--fs-field` 13px (form controls and table data), `--fs-meta` 12px (secondary text,
+hints, header controls), `--fs-ctl` 11px (Oswald labels). Replaced eight Jost sizes
+running 9–14px, several differing by half a pixel. Tiny caret/glyph sizes (9px) are
+left alone — they aren't text.
+
+**Fonts.** Three roles confirmed: Fraunces display headings, Oswald labels, Jost
+everything else. **Every Oswald label is 11px / 1.2px tracking** — one size, one
+tracking, no exceptions. Case is *not* forced: uppercasing field labels made them
+~40% wider and wrapped them out of the label column, so `label`, `.pill` and
+`.posn-dept-badge` keep their natural case.
+
+**Header controls are Jost, not Oswald.** Select all, Filter, Expand/Collapse all,
+Summary and the row-level All are things you click, not captions — `--fs-meta`,
+sentence case, no tracking. Oswald's uppercase tracking made them read as headings.
+
+**Font loading.** Fraunces requests 700 only (500 was loaded and never used).
+`.dept-code` dropped from Jost 700 — which was never in the request and rendered as
+synthetic bold — to the 600 used everywhere else.
+
+**Fields are ruled lines, not boxes.** No fill, no border, no radius: a single
+`--field-line` rule under the writing area only. Because the label sits in its own
+column the rule starts where the writing starts, which is what marks a field as
+fillable. 13px text, 6px/8px padding. Focus turns the rule brand green via
+`box-shadow` so nothing shifts as you tab. `select.pill-select` is now the same
+control — same Jost, same size, same rule — instead of a green pill.
+
+**Two line weights, and they are not interchangeable.** `--line` is
+`rgba(17,10,8,.10)` for *drawn divisions* (heading rules, table cells). `--field-line`
+is `rgba(17,10,8,.30)` for *form fields*. A 10% line is too faint to read as "fill this
+in", so fields need their own weight — don't collapse these back together.
+
+**Checkboxes are an X on a box that never changes fill.** `appearance:none` plus a
+`::after` `\00D7`. `accent-color` is gone. The mobile day-chips match: X, and the
+checked state is the mark and a darker outline only — no background change.
+
+**Sections have no frame** (model C). No border, no fill, no padding — the Pattern A
+heading rule divides, margin spaces. `.formgroup` likewise. Boxes are kept *only*
+where one means something: `.card` (the call sheet preview — a sheet of paper, and it
+carries a stronger 20% border so it reads as one), dialogs, transient panels
+(`.filter-panel`, `.bulk-edit-panel`) and open editing states.
+
+**No drawn line between rows.** `.crewgrid-row`, `.roles-grid-row`,
+`.crewgrid-catering-person` and `.cam-row` have no bottom rule — the department
+heading does the dividing. This took Crew from 55 drawn dividers to 0, and Catering
+from 121 to 0. Table cells in Preview & Export keep theirs: that is functional row
+structure on a document that gets printed, not decoration.
+
+**The row-level "All" is one control in one place** — a Jost text link in the row's
+final column, on Days/Hotel *and* Catering. Previously a bordered button on the right
+for Days/Hotel and a left-hand Oswald text link for Catering.
+
+**Two greens, one hue.** `--tape` `#017756` for light backgrounds, `--tape-light`
+`#0FA47A` for dark. The sidebar uses `--tape-light`: 6.17:1 versus 3.52:1 for the
+brand green, so active items clear AA. No warm secondary hue was added.
+⚠️ Lightening the sidebar instead is *not* a middle option — brand green only reaches
+4.5:1 against backgrounds lighter than about `#E8E8E8`, and it gets worse before it
+gets better (1.24:1 against mid-grey `#777`). A lighter sidebar means a near-white
+one, which also forces the sidebar text from ivory to ink.
+
+**Left alone by decision.** Tech Specs still flows rather than aligning — the short
+values justify it. The icon set is unchanged, including the three unused icons.
+
+### Fixed here: the tint tokens were dead
+
+Commit `50238c5` rewrote `rgba(1,119,86,…)` → `var(--tint-N)` with a `sed` that also
+hit the `:root` declarations, leaving `--tint-1:var(--tint-1)` and so on. A
+self-referential custom property is invalid at computed-value time, so **all four
+tints resolved to transparent from `50238c5` until this phase** — every panel tint,
+badge fill and editing-state highlight was silently absent. Restored to literals.
+Lesson: never `sed` a token name across a file that also contains its definition.
+
 ## The design system, as decided (Phase Style Review)
+
+> Superseded in places by the Phase Fonts section above — notably boxes (sections now
+> have none), inputs (now ruled lines, not filled boxes), the sidebar green, and the
+> row dividers. Read that section first.
+
 
 The audit's exported decisions are now applied to `index.html`. This is the reference
 for what the app's styling *should* be — check here before adding a new heading,

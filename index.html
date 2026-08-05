@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Call Sheet App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /*
@@ -18,8 +18,16 @@
   */
   :root{
     --bg:#FFFFFF;            /* White (was Ivory #FFFFF5) — matches --panel for a seamless flat feel */
-    --panel:#FFFFFF; --panel-2:#EEF5F2; --line:rgba(17,10,8,.14);
-    --tape:#017756;          /* Sea Green — primary brand accent */
+    --panel:#FFFFFF; --panel-2:#EEF5F2;
+    /* Drawn dividing lines — deliberately faint (Fonts Review). Used for rules
+       between rows and under headings, NOT for form fields. */
+    --line:rgba(17,10,8,.10);
+    /* Form fields are ruled underlines now, and a 10% line is too faint to read as
+       "fill this in" — so fields get their own, stronger weight. */
+    --field-line:rgba(17,10,8,.30);
+    --tape:#017756;          /* Sea Green — primary brand accent, LIGHT backgrounds */
+    --tape-light:#0FA47A;    /* same hue lifted for DARK backgrounds — 6.17:1 on the
+                                sidebar vs 3.52:1 for --tape (Fonts Review) */
     --tape-ink:#FFFFF5;      /* Ivory text on Sea Green */
     --danger:#a4321f;
     --text:#110A08;          /* Black */
@@ -31,13 +39,18 @@
     /* Brand-green background tints. Style Review collapsed nine hand-written rgba()
        values down to four tokens — two "barely there" levels for panels vs editing
        states, then medium/strong for badges and active controls. */
-    --tint-1:var(--tint-1);   /* panels: filter, bulk-edit, formgroup, day-override */
-    --tint-2:var(--tint-2);   /* editing / overridden row states */
-    --tint-3:var(--tint-3);   /* badges, hover fills, bulk action bar */
-    --tint-4:var(--tint-4);   /* active controls — must stay distinct from tint-3 */
+    --tint-1:rgba(1,119,86,.03);   /* panels: filter, bulk-edit, formgroup, day-override */
+    --tint-2:rgba(1,119,86,.05);   /* editing / overridden row states */
+    --tint-3:rgba(1,119,86,.10);   /* badges, hover fills, bulk action bar */
+    --tint-4:rgba(1,119,86,.14);   /* active controls — must stay distinct from tint-3 */
     /* Default box: white fill, 8px radius, 10px padding (Style Review) */
     --box-radius:8px; --box-pad:10px;
-    --field-label-w:104px;   /* label column for inline fields — keeps rows aligned */
+    /* TYPE SCALE (Fonts Review). Body ladder collapsed from eight sizes to three:
+       --fs-name for names and primary rows, --fs-meta for secondary text and hints,
+       --fs-ctl for controls and labels. --fs-field is the one extra value, pinned by
+       the separate "tighter inputs" decision, and belongs to form controls only. */
+    --fs-name:14px; --fs-field:13px; --fs-meta:12px; --fs-ctl:11px;
+    --field-label-w:112px;   /* label column for inline fields — keeps rows aligned */
     --sidew:230px;
     --side-bg:#110A08; --side-text:#FFFFF5; --side-line:rgba(255,255,245,.14); --side-hover:rgba(255,255,245,.08);
   }
@@ -58,27 +71,30 @@
   .brand .dot{width:10px; height:10px; border-radius:2px; background:var(--tape); transform:rotate(45deg);}
   .brand strong{font-family:var(--disp); font-size:16px; letter-spacing:.3px; color:var(--side-text);}
 
-  .side-label{font-family:var(--label); font-size:10.5px; letter-spacing:1.6px; color:rgba(255,255,245,.55);
+  .side-label{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:rgba(255,255,245,.55);
     text-transform:uppercase; margin:16px 6px 6px;}
-  .side-item{padding:8px 10px; border-radius:7px; font-size:13.5px; cursor:pointer; color:var(--side-text);
+  .side-item{padding:8px 10px; border-radius:7px; font-size:var(--fs-field); cursor:pointer; color:var(--side-text);
     display:flex; align-items:center; gap:8px; margin-bottom:2px;}
   .side-item:hover{background:var(--side-hover);}
-  /* Sidebar accents use the brand green directly — Style Review removed the drifted
-     mint #5fd6ac in favour of brand-only colour. Note this is a deliberate contrast
-     trade: #017756 on the near-black sidebar measures ~3.5:1, below the 4.5:1 AA
-     minimum for 13px text. Flagged and chosen knowingly; revisit if it reads too dim. */
-  .side-item.active{background:var(--side-hover); color:var(--tape); font-weight:600;}
-  .side-item .ico{opacity:.85; font-size:13px;}
-  .side-proj{padding:7px 10px; border-radius:7px; font-size:13px; cursor:pointer; margin-bottom:2px; color:var(--side-text);}
+  /* Sidebar accents use --tape-light, the brand hue lifted for dark backgrounds
+     (Fonts Review). #0FA47A measures 6.17:1 on the sidebar against 3.52:1 for the
+     brand green, so active items clear AA without introducing a second identity. */
+  .side-item.active{background:var(--side-hover); color:var(--tape-light); font-weight:600;}
+  .side-item .ico{opacity:.85; font-size:var(--fs-meta);}
+  .side-proj{padding:7px 10px; border-radius:7px; font-size:var(--fs-field); cursor:pointer; margin-bottom:2px; color:var(--side-text);}
   .side-proj:hover{background:var(--side-hover);}
-  .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:var(--tape); font-weight:600; border-left:2px solid var(--tape); padding-left:8px;}
-  .side-proj .code{font-family:var(--label); letter-spacing:.5px; font-size:11px; color:rgba(255,255,245,.5); display:block;}
-  .side-proj.active .code{color:var(--tape); opacity:.9;}
-  .side-new{margin-top:6px; width:100%; text-align:left; font-size:12.5px; color:rgba(255,255,245,.6); background:transparent; border:1px dashed var(--side-line);}
-  .side-new:hover{color:var(--tape); border-color:var(--tape);}
-  .side-empty{font-size:12px; color:rgba(255,255,245,.45); padding:4px 10px; font-style:italic;}
+  .side-proj.active{background:linear-gradient(90deg, rgba(1,119,86,.35), transparent); color:var(--tape-light); font-weight:600; border-left:2px solid var(--tape-light); padding-left:8px;}
+  .side-proj .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:rgba(255,255,245,.5); display:block;}
+  .side-proj.active .code{color:var(--tape-light); opacity:.9;}
+  .side-new{margin-top:6px; width:100%; text-align:left; font-size:var(--fs-meta); color:rgba(255,255,245,.6); background:transparent; border:1px dashed var(--side-line);}
+  .side-new:hover{color:var(--tape-light); border-color:var(--tape-light);}
+  .side-empty{font-size:var(--fs-meta); color:rgba(255,255,245,.45); padding:4px 10px; font-style:italic;}
 
-  .section{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:14px;}
+  /* SECTIONS HAVE NO FRAME (Fonts Review, model C). A section is divided by its
+     heading rule alone — no border, no fill, no padding. Margin does the spacing.
+     Boxes are kept only where one genuinely means something: the call sheet preview
+     (.card, a sheet of paper), dialogs, transient panels, and open editing states. */
+  .section{background:none; border:none; border-radius:0; padding:0; margin-bottom:26px;}
   /* PATTERN A — the one tab-entry heading style (Style Review).
      Fraunces 700 15px, brand green, with a thin grey rule that starts after the
      words and sits on the text's vertical centre. Green at rest, black on hover
@@ -112,7 +128,7 @@
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
   .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
-  label{display:block; font-family:var(--label); font-size:11px; letter-spacing:.3px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+  label{display:block; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--muted); margin-bottom:4px; font-weight:500;}
 
   /* FIELDS SIT ON A LINE, NOT STACKED (Style Review).
      In a one- or two-up grid — where a short value used to get a needlessly
@@ -144,9 +160,9 @@
   .ts-field > select, .ts-field > input[type=text],
   .field-inline > select, .field-inline > input[type=text]{width:auto; min-width:0; flex:0 1 auto;}
   /* [type=text] is needed to out-specify the global input[type=text]{width:100%} */
-  .ts-field input[type=text]{width:152px; padding:6px 8px; font-size:13px;}
+  .ts-field input[type=text]{width:152px; padding:6px 8px; font-size:var(--fs-field);}
   .ts-field > .hint, .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
-  .ts-banner{font-size:12px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
+  .ts-banner{font-size:var(--fs-meta); color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
     border-radius:6px; padding:7px 10px; margin-bottom:12px;}
   .ts-banner.differs{background:var(--tint-3); border-color:var(--tape); color:var(--text);}
   .ts-banner span{color:var(--tape); cursor:pointer; text-decoration:underline; margin-left:6px;}
@@ -155,34 +171,59 @@
      name, not per camera column — each camera line is its own left-to-right unit
      (designation, body, shorthand), stacked rather than column-aligned across cameras. */
   .cam-row{display:grid; grid-template-columns:minmax(150px,1fr) minmax(0,2fr) 60px; gap:10px; align-items:start;
-    padding:11px 0; border-bottom:1px solid var(--line);}
-  .cam-row:last-child{border-bottom:none;}
+    padding:11px 0;}
   .cam-who strong{font-family:var(--body); font-weight:600; font-size:14px;}
-  .cam-tags{font-family:var(--mono); font-size:10.5px; margin-top:4px; line-height:1.5;}
+  .cam-tags{font-family:var(--mono); font-size:var(--fs-ctl); margin-top:4px; line-height:1.5;}
   /* align-items:flex-start stops "+ Add camera" stretching the full column width */
   .cam-cams{display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0;}
   .cam-cams > .cam-cam-line{align-self:stretch;}
   .cam-cam-line{display:flex; align-items:center; gap:6px;}
-  .cam-badge{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:.3px; color:var(--tape);
+  .cam-badge{font-family:var(--label); font-size:var(--fs-ctl); font-weight:600; letter-spacing:1.2px; color:var(--tape);
     background:var(--tint-3); border-radius:5px; padding:5px 7px; flex:0 0 auto; white-space:nowrap;}
-  .cam-body-input, .cam-shorthand-input{font-size:12px; padding:5px 7px; min-height:0; width:auto; flex:1 1 0; min-width:0;}
+  .cam-body-input, .cam-shorthand-input{font-size:var(--fs-field); padding:5px 7px; min-height:0; width:auto; flex:1 1 0; min-width:0;}
   .cam-reorder{display:flex; flex-direction:column; gap:4px; align-items:center;}
   .cam-reorder .icon-btn[disabled]{opacity:.25; cursor:default;}
   .req::after{content:' *'; color:var(--danger);}
+  /* FIELDS ARE RULED LINES, NOT FILLED BOXES (Fonts Review).
+     No fill and no box — just a rule under the part you write in. Because the label
+     sits in its own column, the rule starts where the writing starts, which is what
+     marks the field as fillable. Focus thickens the rule to brand green rather than
+     moving anything, so nothing shifts as you tab through a form. */
   input[type=text], input[type=date], textarea, select{
-    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
-    color:var(--text); padding:8px 9px; font-family:var(--body); font-size:13.5px;}
-  input:focus, textarea:focus, select:focus{outline:none; border-color:var(--tape);}
-  input[readonly]{opacity:.7;}
-  textarea{resize:vertical; min-height:56px; line-height:1.5;}
+    width:100%; background:transparent; border:none; border-radius:0;
+    border-bottom:1px solid var(--field-line);
+    color:var(--text); padding:6px 8px 5px; font-family:var(--body); font-size:var(--fs-field);}
+  input[type=text]:hover, input[type=date]:hover, textarea:hover, select:hover{
+    border-bottom-color:var(--text);}
+  input:focus, textarea:focus, select:focus{
+    outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
+  input[readonly]{opacity:.7; border-bottom-style:dotted;}
+  textarea{resize:vertical; min-height:52px; line-height:1.5;}
 
-  button{font-family:var(--body); font-weight:600; font-size:13px; cursor:pointer; border-radius:7px;
+  /* CHECKBOXES: an X, not a tick, and the box never changes fill (Fonts Review).
+     The native control with accent-color painted a solid green box when checked;
+     this draws an ink X on a box that stays white, so a filled-in grid reads like a
+     marked-up paper form. Only the mark changes — never the background. */
+  input[type=checkbox]{
+    appearance:none; -webkit-appearance:none; width:16px; height:16px; margin:0;
+    border:1.5px solid #8d8880; border-radius:3px; background:#fff;
+    position:relative; cursor:pointer; flex:0 0 auto; vertical-align:middle;}
+  input[type=checkbox]::after{
+    content:'\00D7'; position:absolute; inset:0; display:flex; align-items:center;
+    justify-content:center; font-family:var(--body); font-weight:500; font-size:15px;
+    line-height:1; color:var(--text); opacity:0;}
+  input[type=checkbox]:checked{border-color:var(--text);}
+  input[type=checkbox]:checked::after{opacity:1;}
+  input[type=checkbox]:hover{border-color:var(--text);}
+  input[type=checkbox]:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+
+  button{font-family:var(--body); font-weight:600; font-size:var(--fs-field); cursor:pointer; border-radius:7px;
     border:1px solid var(--line); background:var(--panel-2); color:var(--text); padding:8px 13px;}
   button:hover{border-color:var(--tape);} button:active{transform:translateY(1px);}
   button.primary{background:var(--tape); color:var(--tape-ink); border-color:var(--tape);}
-  button.danger{color:var(--danger);} button.small{padding:5px 9px; font-size:12px;}
+  button.danger{color:var(--danger);} button.small{padding:5px 9px; font-size:var(--fs-meta);}
   .icon-btn{display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0;
-    border:none; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; border-radius:5px;
+    border:none; background:transparent; color:var(--muted); font-size:var(--fs-meta); cursor:pointer; border-radius:5px;
     vertical-align:middle; margin-left:2px; line-height:1;}
   .icon-btn:hover{color:var(--tape); background:var(--tint-3);}
   .icon-btn.active{color:var(--tape); background:var(--tint-4);}
@@ -193,7 +234,7 @@
   .ic svg{display:block; width:100%; height:100%;}
   .icon-btn .ic{width:14px; height:14px; vertical-align:middle;}
   .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;}
-  .status{font-size:12px; color:var(--muted);}
+  .status{font-size:var(--fs-meta); color:var(--muted);}
 
   /* Page headline follows the preview-card pattern picked in the Style Review:
      a large all-caps display title, with upper-and-lower-case sub information
@@ -203,14 +244,14 @@
     text-transform:uppercase; margin:0; color:var(--text);}
   .page-head .eyebrow{font-family:var(--body); font-size:13px; letter-spacing:0; color:var(--muted);
     text-transform:none; margin-top:2px;}
-  .page-head .code{font-family:var(--label); letter-spacing:.5px; font-size:12.5px; color:var(--tape); margin-top:4px;}
+  .page-head .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:var(--tape); margin-top:4px;}
 
   .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
-  .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:12.5px; letter-spacing:.8px;
+  .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px;
     color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;}
   .tab.active{color:var(--tape); border-color:var(--tape);}
   .tabs.daytabs{margin-bottom:14px;}
-  .tabs.daytabs .tab{padding:7px 13px; font-size:11.5px;}
+  .tabs.daytabs .tab{padding:7px 13px; font-size:var(--fs-ctl);}
   .tab.daytab-add{color:var(--tape); opacity:.85;}
   .tab.daytab-add:hover{opacity:1;}
 
@@ -234,7 +275,7 @@
   .sched-tools{align-items:center;}
   .sched-shift{display:inline-flex; align-items:center; gap:6px; padding:4px 8px;
     border:1px solid var(--line); border-radius:8px; background:var(--panel-2);}
-  .sched-shift select{width:auto; padding:5px 7px; font-size:12px;}
+  .sched-shift select{width:auto; padding:5px 7px; font-size:var(--fs-field);}
   .sched-shift .hint{margin:0; white-space:nowrap;}
   .rows-add .row{grid-template-columns:1fr 1fr 34px;}
 
@@ -246,56 +287,61 @@
   .inline-form-card{border:1px solid var(--tape); border-top:none; border-radius:0 0 var(--box-radius) var(--box-radius); padding:var(--box-pad); margin-bottom:8px; background:var(--panel);}
   /* Names and record titles: geometric sans (--body) at 14px everywhere (Style Review) */
   .list-card .meta strong{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text);}
-  .list-card .meta div{color:var(--muted); font-size:12.5px; margin-top:2px;}
+  .list-card .meta div{color:var(--muted); font-size:var(--fs-meta); margin-top:2px;}
   .list-card .actions{display:flex; gap:6px; flex-wrap:wrap;}
-  .empty-note{color:var(--muted); font-size:13px; font-style:italic;}
+  .empty-note{color:var(--muted); font-size:var(--fs-meta); font-style:italic;}
 
   .searchresults{position:relative;}
   .srlist{border:1px solid var(--line); border-radius:6px; background:var(--panel-2); margin-top:4px; max-height:200px; overflow:auto;}
-  .sritem{padding:7px 9px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--line);}
+  .sritem{padding:7px 9px; font-size:var(--fs-meta); cursor:pointer; border-bottom:1px solid var(--line);}
   .sritem:last-child{border-bottom:none;} .sritem:hover{background:var(--panel-2);}
   .mapembed{width:100%; height:220px; border:1px solid var(--line); border-radius:8px; margin-top:8px;}
 
-  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; margin-bottom:16px;}
+  .card{background:var(--panel); border:1px solid rgba(17,10,8,.20); border-radius:var(--box-radius); padding:16px; margin-bottom:16px;}
   .card h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; color:var(--tape); margin:16px 0 8px; text-transform:uppercase;
     display:flex; align-items:center; gap:8px;}
   .card h3::after{content:''; flex:1; height:1px; background:var(--line);}
   .card h3:first-child{margin-top:0;}
   .card .line1{font-family:var(--disp); font-weight:700; font-size:22px; color:var(--text);}
-  .card .sub{color:var(--muted); font-size:13px; margin-top:2px;}
-  .card table{width:100%; border-collapse:collapse; font-size:13px;}
+  .card .sub{color:var(--muted); font-size:var(--fs-meta); margin-top:2px;}
+  .card table{width:100%; border-collapse:collapse; font-size:var(--fs-field);}
   /* two-column key-info block at top of call sheet preview */
   .key-info-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px 28px; margin:16px 0 20px;
     padding:14px 16px; background:var(--panel-2); border-radius:8px; border:1px solid var(--line);}
   .ki-col{display:flex; flex-direction:column; gap:12px;}
   .ki-item h4{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
     color:var(--tape); margin:0 0 4px;}
-  .ki-item{font-size:13px; line-height:1.5;}
+  .ki-item{font-size:var(--fs-field); line-height:1.5;}
   .ki-item ul{margin:4px 0 0; padding-left:18px;}
   .card td, .card th{padding:5px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
-  .card th{color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;}
+  .card th{color:var(--muted); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
   .card ul{margin:4px 0; padding-left:18px;}
-  .section table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  .section table{width:100%; border-collapse:collapse; font-size:var(--fs-field);}
   .section td, .section th{padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
-  .section th{color:var(--tape); font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;}
-  pre#waText{white-space:pre-wrap; word-break:break-word; font-family:var(--mono); font-size:12.5px;
+  .section th{color:var(--tape); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
+  pre#waText{white-space:pre-wrap; word-break:break-word; font-family:var(--mono); font-size:var(--fs-meta);
     background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:14px; line-height:1.6; max-height:420px; overflow:auto;}
-  .hint{font-size:12px; color:var(--muted); margin-top:6px;}
-  .pill{display:inline-block; font-family:var(--label); font-size:10px; font-weight:500; padding:2px 8px; border-radius:20px;
-    background:#EEF5F2; color:var(--muted); letter-spacing:.4px; vertical-align:middle;}
+  .hint{font-size:var(--fs-meta); color:var(--muted); margin-top:6px;}
+  .pill{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; padding:2px 8px; border-radius:20px;
+    background:var(--panel-2); color:var(--muted); letter-spacing:1.2px; vertical-align:middle;}
   .pill.dept{background:var(--tint-3); color:var(--tape);}
+  /* Inline pickers (department, company) are just fields (Fonts Review): same Jost,
+     same size, same ruled underline as a typed input — to the person filling the form
+     it's another thing to fill in, so it shouldn't look like a coloured tag. Keeps the
+     compact inline sizing and the custom arrow; loses the green pill. */
   select.pill-select{
     appearance:none; -webkit-appearance:none; -moz-appearance:none;
-    background-color:var(--tint-3); color:var(--tape); border:1px solid transparent;
-    border-radius:20px; font-family:var(--label); font-size:10px; font-weight:500; letter-spacing:.4px;
-    padding:2px 20px 2px 9px; cursor:pointer; vertical-align:middle; margin-left:2px; max-width:180px;
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23017756' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
-    background-repeat:no-repeat; background-position:right 6px center; background-size:9px;
+    background-color:transparent; color:var(--text); border:none;
+    border-bottom:1px solid var(--field-line); border-radius:0;
+    font-family:var(--body); font-size:var(--fs-field); font-weight:400; letter-spacing:0;
+    width:auto; padding:6px 18px 5px 2px; cursor:pointer; vertical-align:middle; margin-left:2px; max-width:180px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23110A08' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat; background-position:right 4px center; background-size:9px;
   }
-  select.pill-select:hover{border-color:var(--tape);}
-  select.pill-select:focus{outline:none; border-color:var(--tape);}
+  select.pill-select:hover{border-bottom-color:var(--text);}
+  select.pill-select:focus{outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
   select.pill-select.empty{
-    background-color:var(--panel-2); color:var(--muted);
+    color:var(--muted);
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236f6a63' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
   }
   /* LABEL FAMILY (Style Review) — one look for every small uppercase label:
@@ -318,27 +364,30 @@
   .posn-company-group:first-child .posn-company-header{margin-top:0;}
   .posn-company-header:hover{color:var(--text);}
   .posn-company-body{margin-left:2px;}
-  .posn-name{font-size:13px; display:flex; flex-direction:column; gap:1px;}
+  .posn-name{font-size:var(--fs-field); display:flex; flex-direction:column; gap:1px;}
   .subhead.dept-toggle:hover{color:var(--tape);}
   .dept-caret{font-size:9px; width:10px; display:inline-block;}
-  .dept-code{color:var(--tape); font-weight:700; letter-spacing:.6px;}
+  .dept-code{color:var(--tape); font-weight:600; letter-spacing:1.2px;}
   .dept-count{color:var(--muted); font-weight:400;}
   /* Same label type as the Crew tab's Select all / Filter row, so every header
      control across the app reads at one weight and size (Style Review). */
-  .dept-toggle-all{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+  .dept-toggle-all{font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none;
     color:var(--muted); text-align:right; margin-bottom:8px;}
   .dept-toggle-all span{cursor:pointer;}
   .dept-toggle-all span:hover{color:var(--tape);}
   /* filter panel — shared look for the Crew database and Crew-on-project filters */
   .filter-toggle{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;
-    font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;}
+    font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none; color:var(--muted); margin-bottom:8px;}
   .filter-toggle:hover{color:var(--tape);}
   /* Crew tab header row (Phase V) — Select all + Filter left-aligned, Expand/Collapse
      all + Summary right-aligned, all sharing one font/size so nothing reads as bolder
      or bigger than its neighbours. The Filter panel itself renders below this row,
      not inside it, so opening it can't distort the row's alignment. */
+  /* Header controls (Select all / Filter / Expand-collapse / Summary / All) are in
+     the BODY font, not the label font (Fonts Review) — they're things you click,
+     not captions, and Oswald's uppercase tracking made them read as headings. */
   .crew-header-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
-    gap:6px 16px; font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    gap:6px 16px; font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none;
     color:var(--muted); margin-bottom:8px;}
   .crew-header-left, .crew-header-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
   .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
@@ -346,18 +395,17 @@
   .crew-header-selectall input{margin:0;}
   .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
-  .filter-chips label{font-size:12px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
+  .filter-chips label{font-size:var(--fs-meta); display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
   .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--tint-3);
-    border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;}
+    border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:var(--fs-meta);}
   .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
   .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   /* Roles tab (Phase S) — proper tidy columns instead of one packed inline row.
      Controls | Name | Role | Department (reference-only) | Show as. */
   .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 92px minmax(120px,1fr); align-items:center; column-gap:10px;}
   .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
-  .roles-grid-header{font-family:var(--label); font-size:11px; font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
-  .roles-grid-row{padding:8px 0; border-bottom:1px solid var(--line);}
-  .roles-grid-row:last-child{border-bottom:none;}
+  .roles-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
+  .roles-grid-row{padding:8px 0;}
   .roles-grid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .roles-grid-controls{display:flex; align-items:center; gap:0;}
   .roles-grid-name{min-width:0; font-family:var(--body); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -370,7 +418,7 @@
     display:flex; align-items:center; gap:8px;}
   .modal-box h3::after{content:''; flex:1; height:1px; background:var(--line);}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
-  .formgroup{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
+  .formgroup{border:none; border-radius:0; padding:0; margin-bottom:16px; background:none;}
   .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;
     display:flex; align-items:center; gap:8px;}
   .formgroup > .fg-title::after{content:''; flex:1; height:1px; background:var(--line);}
@@ -380,12 +428,12 @@
   summary.fg-title::before{content:'▸'; font-size:9px; transition:transform .15s ease; display:inline-block;}
   details[open] > summary.fg-title::before{transform:rotate(90deg);}
   summary.fg-title:hover{opacity:.75;}
-  .private-note{font-size:11px; color:var(--muted); background:rgba(164,50,31,.08); border:1px solid rgba(164,50,31,.28);
+  .private-note{font-size:var(--fs-meta); color:var(--muted); background:rgba(164,50,31,.08); border:1px solid rgba(164,50,31,.28);
     border-radius:6px; padding:6px 9px; margin-bottom:8px;}
   .private-note b{color:var(--danger);}
   .taglist{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
   .crewrow-select{display:grid; grid-template-columns:46px 1fr 100px 34px; gap:8px; align-items:start; margin-bottom:8px; padding-top:6px;}
-  .posn-dept-badge{font-family:var(--label); font-size:10px; font-weight:600; letter-spacing:.4px; color:var(--tape);
+  .posn-dept-badge{font-family:var(--label); font-size:var(--fs-ctl); font-weight:600; letter-spacing:1.2px; color:var(--tape);
     background:var(--tint-3); border-radius:5px; padding:6px 4px; text-align:center; align-self:center;}
   /* shared crew identity block — used by every crew list in the app */
   .crew-ident{min-width:0;}
@@ -409,33 +457,40 @@
   .day-override-form{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--tint-1);}
   .day-override-form .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
-  select.pill-select.copro{background-color:rgba(17,10,8,.06); color:var(--text);}
-  select.pill-select.copro.empty{background-color:transparent; color:var(--muted);}
+  select.pill-select.copro{color:var(--text);}
+  select.pill-select.copro.empty{color:var(--muted);}
   .crewgrid{display:grid; grid-template-columns:minmax(200px,1fr) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px; align-items:center; column-gap:6px;}
   .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
-  .crewgrid-header{font-family:var(--label); font-size:11px; font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
-  .crewgrid-row{padding:8px 0; border-bottom:1px solid var(--line);}
-  .crewgrid-row:last-child{border-bottom:none;}
+  .crewgrid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
+  /* No rule between people — the department heading does the dividing (Fonts Review) */
+  .crewgrid-row{padding:8px 0;}
   .crewgrid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .crewgrid-row-name{min-width:0;}
   .crewgrid-row-name .icon-btn{margin-left:0; margin-right:2px;}
   .crewgrid-check{display:flex; justify-content:center;}
   .crewview-tabs{margin-bottom:12px;}
-  .crewgrid-check input{width:16px; height:16px; accent-color:var(--tape);}
+  .crewgrid-check input{width:16px; height:16px;}
   /* catering: three stacked rows per person (Breakfast/Lunch/Dinner), kept compact
      so three rows don't feel like three times the space of one */
-  .crewgrid-catering-person{border-bottom:1px solid var(--line); padding-bottom:4px; margin-bottom:4px;}
-  .crewgrid-catering-person:last-child{border-bottom:none; margin-bottom:0;}
+  .crewgrid-catering-person{padding-bottom:6px; margin-bottom:6px;}
+  .crewgrid-catering-person:last-child{margin-bottom:0;}
   .meal-subrow{margin-top:1px;}
   .meal-subrow .meal-cell input{width:13px; height:13px;}
+  .meal-subrow .meal-cell input::after{font-size:12px;}
   .meal-row-label-wrap{display:flex; align-items:center; gap:8px; min-width:0; padding-left:2px;}
   .meal-row-label{font-family:var(--label); font-size:11px; font-weight:500; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape);}
-  .meal-row-all{font-family:var(--label); font-size:10px; color:var(--muted);
-    cursor:pointer; flex-shrink:0;}
+  .meal-row-all{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);
+    cursor:pointer; flex-shrink:0; text-align:right;}
   .meal-row-all:hover{color:var(--tape);}
   .crewgrid-remove{display:flex; align-items:center; justify-content:flex-end; gap:2px;}
-  .all-toggle-btn{padding:3px 8px; font-size:11px;}
+  /* Row-level "All": a text control in the body font, always in the row's final
+     column so it lines up down the page (Fonts Review). Was a bordered button on
+     Days/Hotel and a left-hand text link on Catering — now one thing, one place. */
+  .all-toggle-btn{background:none; border:none; padding:0; min-height:0;
+    font-family:var(--body); font-weight:400; font-size:var(--fs-meta); color:var(--muted);
+    cursor:pointer; text-align:right;}
+  .all-toggle-btn:hover{color:var(--tape); border:none;}
   .crewgrid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
 
   /* scrollable wrapper for wide preview tables */
@@ -457,7 +512,7 @@
       width:44px; height:44px; min-width:44px; border-radius:9px; font-size:17px; line-height:1;
       display:flex; align-items:center; justify-content:center; padding:0;
     }
-    .topbar .burger:hover{border-color:var(--tape);}
+    .topbar .burger:hover{border-color:var(--tape-light);}
     .topbar .tb-title{font-family:var(--disp); font-weight:700; font-size:16px; white-space:nowrap;
       overflow:hidden; text-overflow:ellipsis;}
     .topbar .tb-dot{width:9px; height:9px; border-radius:2px; background:var(--tape); transform:rotate(45deg); flex:0 0 auto;}
@@ -540,7 +595,7 @@
     .sc-move{flex-direction:row; gap:8px;}
     .sc-move .icon-btn{width:44px; height:44px; border:1px solid var(--line); background:var(--panel);}
     .sc-move .ic{width:16px; height:16px;}
-    .rows-sched .row .sc-select{width:24px; height:24px; accent-color:var(--tape); justify-self:end; margin:0;}
+    .rows-sched .row .sc-select{width:24px; height:24px; justify-self:end; margin:0;}
     /* "insert a row here" is hover-revealed on desktop, which touch can never do —
        so on mobile it becomes a permanently visible button in the control strip
        rather than being dropped. Keeps mid-schedule insertion available on a phone. */
@@ -602,8 +657,8 @@
     .crewgrid-check{
       position:relative; display:inline-flex; align-items:center; justify-content:center;
       border:1px solid var(--line); border-radius:20px; padding:0 13px;
-      margin:0 6px 6px 0; background:var(--panel-2); min-height:44px; min-width:52px;
-      transition:background .12s ease, border-color .12s ease;
+      margin:0 6px 6px 0; background:#fff; min-height:44px; min-width:52px;
+      transition:border-color .12s ease;
     }
     .crewgrid-check::before{
       content:attr(data-day); font-family:var(--label); font-size:13px;
@@ -611,11 +666,12 @@
     }
     /* tick appears only when on, and reserves no space when off */
     .crewgrid-check::after{
-      content:'✓'; font-size:13px; font-weight:700; color:var(--tape);
+      content:'\00D7'; font-size:16px; font-weight:500; color:var(--text);
       width:0; overflow:hidden; opacity:0; transition:width .12s ease, opacity .12s ease;
     }
-    .crewgrid-check:has(input:checked){background:var(--tint-4); border-color:var(--tape);}
-    .crewgrid-check:has(input:checked)::before{color:var(--tape); font-weight:600;}
+    /* checked state is the X and a darker outline only — the fill never changes */
+    .crewgrid-check:has(input:checked){border-color:var(--text);}
+    .crewgrid-check:has(input:checked)::before{color:var(--text); font-weight:600;}
     .crewgrid-check:has(input:checked)::after{width:1.1em; opacity:1; margin-left:5px;}
     /* inset:-1px, not 0 — absolute children position against the PADDING box, so
        inset:0 would leave the chip's 1px border ring untappable */
@@ -2616,10 +2672,9 @@ function crewCateringBlockHTML(c, days){
     return `<div class="crewgrid meal-subrow" style="--daycols:${days.length};">
       <div class="meal-row-label-wrap">
         <span class="meal-row-label">${label}</span>
-        <span class="meal-row-all" onclick="toggleAllMealForPerson('${c.id}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span>
       </div>
       ${cells}
-      <div></div>
+      <div class="crewgrid-remove"><span class="meal-row-all" onclick="toggleAllMealForPerson('${c.id}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
     </div>`;
   };
   return `<div class="crewgrid-catering-person">
