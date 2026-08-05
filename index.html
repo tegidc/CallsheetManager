@@ -2478,10 +2478,6 @@ function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
    --------------------------------------------------------------------------- */
 let tasksSectionOpen = false;            // collapsed by default, same convention as AI Scan/summary blocks
 function toggleTasksSection(){ tasksSectionOpen = !tasksSectionOpen; renderProjectBody(); }
-let taskFlagsSettingsOpen = false;
-function toggleTaskFlagsSettings(){ taskFlagsSettingsOpen = !taskFlagsSettingsOpen; renderProjectBody(); }
-async function toggleTaskFlagRule(field, checked){ await setSetting(field, checked); renderProjectBody(); }
-
 let showCompletedTasks = false;
 function toggleShowCompletedTasks(){ showCompletedTasks = !showCompletedTasks; renderProjectBody(); }
 
@@ -2523,13 +2519,6 @@ function taskFlagPillsHTML(items){
   if(!items.length) return '<div class="empty-note">No flags right now.</div>';
   return `<div class="taglist">${items.map(it=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="${it.onclick}" title="Click to fix">⚠ ${esc(it.label)}</span>`).join('')}</div>`;
 }
-function taskFlagsSettingsHTML(){
-  const rules = [['flagNoLocation','Shoot day with no location'],['flagNoCrew','Shoot day with no crew'],['flagNoDayRate','Crew member with no day rate']];
-  return `<div class="filter-panel">
-    <div class="filter-chips">${rules.map(([f,label])=>`<label><input type="checkbox" ${appSettings[f]!==false?'checked':''} onchange="toggleTaskFlagRule('${f}', this.checked)"> ${esc(label)}</label>`).join('')}</div>
-  </div>`;
-}
-
 async function addProjectTask(){
   const p = currentProject(); if(!p) return;
   const title = (val('taskTitleInput')||'').trim();
@@ -2582,9 +2571,6 @@ function tasksListHTML(p){
 
 function renderTasksSection(p, days){
   const flagItems = buildTaskFlags(p, days);
-  const flagsToggleSpan = `<span class="crew-header-filter" onclick="toggleTaskFlagsSettings()">
-      <span class="dept-caret">${taskFlagsSettingsOpen?'▾':'▸'}</span> Flags${flagItems.length?` (${flagItems.length})`:''}
-    </span>`;
   const open = tasksSectionOpen;
   const openTaskCount = (p.tasks||[]).filter(t=>!t.completed).length;
   return `<div class="section" id="tasksSection">
@@ -2592,8 +2578,6 @@ function renderTasksSection(p, days){
       <span class="sd-block-head-toggle" onclick="toggleTasksSection()"><span class="dept-caret" id="tasks-block">${open?'▾':'▸'}</span> Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}</span>
     </div>
     <div id="tasksb-block" style="display:${open?'':'none'}">
-      ${crewToolbarHTML('', flagsToggleSpan, '')}
-      ${taskFlagsSettingsOpen ? taskFlagsSettingsHTML() : ''}
       ${taskFlagPillsHTML(flagItems)}
       <div class="subhead" style="margin-top:18px;">Add a task</div>
       <div class="grid g2" style="margin-bottom:8px;">
