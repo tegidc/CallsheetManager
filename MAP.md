@@ -170,7 +170,10 @@ Every screen needs the same handful of records. These are the single place that 
 ## Preview & Export
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
-- `exportFormat` / `exportSections` / `EXPORT_SECTION_LABELS` / `setExportFormat()` / `toggleExportSection()` / `exportOptionsHTML()` (Phase Q) — **the two independent export choices.** `exportFormat` ('printable' | 'whatsapp') picks the output SHAPE; `exportSections` ({tech, catering, hotels, travel}, all true by default) picks WHICH optional content areas that shape carries. Session state, not persisted — same rule as `previewBlocks`/`crewGridView`: this is "what am I sending right now", not a project property. Excel is deliberately **not** a third format — see the Phase Q section at the bottom of this file — [Preview & Export]
+- `exportFormat` / `exportSections` / `EXPORT_SECTION_LABELS` / `setExportFormat()` / `toggleExportSection()` (Phase Q) — **the two independent export choices.** `exportFormat` ('printable' | 'whatsapp') picks the output SHAPE; `exportSections` ({tech, catering, hotels, travel}, all true by default) picks WHICH optional content areas that shape carries. Session state, not persisted — same rule as `previewBlocks`/`crewGridView`: this is "what am I sending right now", not a project property. Excel is deliberately **not** a third format — see the Phase Q section at the bottom of this file — [Preview & Export]
+- `exportPanelOpen` / `toggleExportPanel()` / `exportHiddenSectionCount()` / `exportOptionsHTML()` / `exportPanelHTML()` (Phase Q follow-up) — **the Format panel, built in the Crew tab's Filter idiom**: a `crewToolbarHTML()` row carrying one `.crew-header-filter` toggle (caret + "Format: Printable/WhatsApp" + "(N sections hidden)" when any are unticked), with a `.filter-panel` rendered BELOW the row, never inside it — a full-width panel in a flex row distorts its alignment every time it opens, the same note `projectCrewFilterPanelHTML()` carries. Include uses plain `.filter-chips` labels, so it inherits the Crew filter's chip styling instead of a bespoke rule set. The panel holds both output actions (Copy, Download .xlsx) and so starts **open**, unlike the Crew Filter — [Preview & Export]
+- `exportOutputText()` / `copyExportOutput()` (Phase Q follow-up) — the single Copy path for the whole tab, replacing the old per-block `copyWA()`. Built from data via `buildWAText(buildFullData(d))`, **not** scraped off the preview card: a collapsed block is `display:none` and `innerText` silently skips it, so a DOM-scraped copy would quietly depend on which blocks happened to be open. Both formats copy the same plain-text call sheet honouring the Include checkboxes; only the button label differs ("Copy for WhatsApp" / "Copy as text") — [Preview & Export]
+  - REMOVED in the Phase Q follow-up (do not look for it): `copyWA()` — the WhatsApp block's own Copy button, now redundant with the panel's
 - `renderProjectPreview()` — renders the Preview & Export tab body for the current `exportFormat`: printable = call sheet card + the ticked section blocks + Excel; WhatsApp = the text block alone (the sections are inside the text). Only one shape is in the DOM at a time, so `generatePreview()`/`renderPreviewCard()` both guard for a missing element rather than assuming it. Also wires the Travel block's cost-field autosave, scoped by target id — a bare `body.oninput` would fire on the Include checkboxes too, and `saveTransportCosts()` reading fields no longer in the DOM would write both rates back as 0 — [Preview & Export]
 - `buildFullData()` — assembles the complete RESOLVED data set for a shoot day (crew, locations, schedule, tech specs, weather) used by every export. Each position's `role` is `c.showAs||c.role` — the one place a crew member's "Show as" cosmetic override (Phase R item 3) actually reaches the call sheet/WhatsApp text/Excel output; `canonicalRole` (`c.role`, un-cosmeticised) rides alongside it purely so seniority ranking can look the role up in `ROLES_BY_DEPT`/`ROLE_SENIORITY`, since a free-text "Show as" usually won't match a saved role name. Splits the day's positions three ways (Phase N item 3): `positions` (crew, canonical department order, Client/Talent excluded), `clientPositions`, `talentPositions` — Client and Talent stand apart from the crew departments in every output instead of sorting in among them. `coProductionGroups` (by company) is untouched by that split. Returns `positions`/`clientPositions`/`talentPositions`/each `coProductionGroups[].people` all pre-sorted by `positionOutputCompare()` — [Preview & Export, Shared/utility functions]
   - tech specs go through `resolveTechSpecs()`, NOT the raw `day.techSpecs`: a day stores only what DIFFERS from the project defaults (`saveShootDay` deletes the key when nothing differs), so reading it raw exported blank tech specs for every day sitting on the defaults — fixed in Phase U
@@ -178,7 +181,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `generatePreview()` — regenerates and re-renders all preview/export blocks for the selected day — [Preview & Export]
 - `renderTechSpecsSection()` / `copyTechSpecsText()` / `copyTechSpecs()` — render and copy the tech specs reference block, day-resolved (`resolveTechSpecs`/`resolveCameras` via `buildFullData`). Table markup comes from the shared `techSpecsRoundupBodyHTML()`/`cameraDesignationRows()` (Phase P1), also used by the Tech tab's project-level `renderTechSpecsRoundup()` (T-4.4) — [Preview & Export, Tech Specs]
 - `renderPreviewCard()` / `positionsTableHTML()` — render the formatted call sheet preview card; `positionsTableHTML()` is the shared Dept/Position/Name/Call/Phone table markup behind the Client block (before Position assignments), the crew Position assignments block, the Talent block (after it), and each co-production group (Phase N item 3) — [Preview & Export]
-- `buildWAText()` / `pushPeopleLines()` / `copyWA()` — build and copy the WhatsApp-formatted plain-text call sheet; `pushPeopleLines()` is the shared "*HEADING*" + per-person lines block behind CLIENT/POSITIONS/TALENT/each co-production group, same ordering as the preview card (Phase N item 3) — [Preview & Export]
+- `buildWAText()` / `pushPeopleLines()` — build the WhatsApp-formatted plain-text call sheet (copying is `copyExportOutput()`'s job now); `pushPeopleLines()` is the shared "*HEADING*" + per-person lines block behind CLIENT/POSITIONS/TALENT/each co-production group, same ordering as the preview card (Phase N item 3) — [Preview & Export]
 - `downloadExcel()` / `pushPeopleRows()` — build and download the multi-sheet Excel call sheet (via SheetJS); `pushPeopleRows()` is the shared heading-row + table-row block behind CLIENT/POSITION ASSIGNMENTS/TALENT/each co-production group in the Call Sheet aoa, same ordering as the other two outputs (Phase N item 3). Since Phase Q it emits one sheet per **ticked** section (Tech Specs / Hotel / Catering / Travel) on top of the always-present Call Sheet — a section with no data produces no sheet whether ticked or not, since an empty tab is worse than a missing one — [Preview & Export]
 - `techSpecsLines()` / `hotelSummaryLines()` / `cateringOrderLines()` / `transportSummaryLines()` (Phase Q) — the four sections as arrays of text lines, each returning `null` when there's nothing to say. Extracted from the bodies of the four Copy buttons so the WhatsApp export appends **exactly** the text those buttons produce rather than a second rendering of the same data. `techSpecsLines()` takes resolved `buildFullData()` output, not a raw day, so it can't reintroduce the raw-`day.techSpecs` bug Phase U fixed — [Preview & Export]
 
@@ -282,14 +285,14 @@ coarse information first, finest detail last.
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
-| T-6.0 | · Format & Include | Printable/WhatsApp selector + the four section checkboxes that gate all three outputs (Phase Q) | `exportOptionsHTML()` |
+| T-6.0 | · Format panel | Collapsible Filter-style panel: Printable/WhatsApp selector, the four section checkboxes that gate all three outputs, and both output actions (Copy, Download .xlsx) | `exportPanelHTML()` |
 | T-6.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
 | T-6.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) — same Client/Positions/Talent/co-production ordering as T-6.1 | `buildWAText()` |
 | T-6.2b | · Hotel summary | Same room-booking table + per-night table as T-2.3's Hotel summary, shown again here below the WhatsApp text | `hotelSummaryHTML()` |
 | T-6.3 | · Tech specs | Camera/technical crew reference + camera designations, per the selected shoot day (resolved override vs. project default). Kept here as-is even after Phase P1 added the project-level version at T-4.4 — this one stays day-aware, T-4.4 doesn't | `renderTechSpecsSection()` |
 | T-6.4 | · Transport summary | Same cost fields + per-day method-count grid as T-2.4, shown here too when Travel is ticked (Phase Q) | `transportSummaryHTML()` |
 | T-6.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
-| T-6.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-6.1 | `downloadExcel()` |
+| T-6.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-6.1. No longer a block of its own: it's the Download .xlsx button in T-6.0 | `downloadExcel()` |
 
 ## D — Databases (project-independent, the source of truth)
 
@@ -387,11 +390,29 @@ output — a formatted call sheet you print, or plain text you paste into a chat
 them into one list of five options would have forced a choice between "WhatsApp" and
 "WhatsApp with hotels", which is not a choice anybody has.
 
+**The Format panel is the Filter component, reused.** Same construction as the Crew
+tab's Filter: a `.crew-header-filter` toggle in a `crewToolbarHTML()` row, with the
+`.filter-panel` below the row rather than inside it, and Include rendered as plain
+`.filter-chips` labels so it inherits the chip styling instead of a bespoke rule set
+(the first cut had its own `.export-include*` rules — those are gone). The toggle
+summarises state the way the Filter's `(N)` count does: current format, plus
+"(N sections hidden)" when any are unticked.
+⚠️ It starts **open**, unlike the Crew Filter. It holds the tab's two output ACTIONS,
+and hiding the button you came to press behind a caret is the same mistake
+`pvBlockHTML()` already avoids by keeping Copy buttons visible in collapsed headers.
+
+**One Copy button for the whole tab.** The WhatsApp block's own Copy moved into the
+panel and `copyWA()` is gone — two buttons doing one job is how things drift.
+`exportOutputText()` builds from data rather than scraping the preview card, because
+a collapsed block is `display:none` and `innerText` skips it: a DOM-scraped copy
+would quietly depend on which blocks happened to be open. Both formats copy the same
+plain-text call sheet honouring the Include checkboxes; only the label differs.
+
 **Excel is not a third format.** It is the printable content in a spreadsheet
 container: same call sheet, same sections, same order, just a different file to hand
-to an accountant or a caterer. So it stays a download button inside the printable
-shape rather than a third radio option, and it obeys the same four checkboxes — one
-sheet per ticked section on top of the always-present Call Sheet. A section with no
+to an accountant or a caterer. So it's a download button in the Format panel rather
+than a third radio option, and it obeys the same four checkboxes — one sheet per
+ticked section on top of the always-present Call Sheet. A section with no
 data produces no sheet whether ticked or not; an empty tab is worse than a missing
 one. If Excel ever needs a genuinely different content shape it earns a third format
 then, not before.

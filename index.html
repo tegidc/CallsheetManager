@@ -428,17 +428,6 @@
   .crew-header-row label, .crew-header-row span{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;}
   .crew-header-row label:hover, .crew-header-row span:hover{color:var(--tape);}
   .crew-header-selectall input{margin:0;}
-  /* Preview & Export "Include" row (Phase Q). Same reasoning as .crew-header-row
-     above — these are controls, not captions, so they take Jost --fs-meta and the
-     global label{} rule has to be overridden for the checkbox labels. The one real
-     caption ("Include") keeps the Oswald label look. */
-  .export-include{display:flex; align-items:center; flex-wrap:wrap; gap:6px 16px; margin-top:12px;}
-  .export-include-label{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
-    text-transform:uppercase; color:var(--tape);}
-  .export-include label.export-include-item{font-family:var(--body); font-size:var(--fs-meta);
-    letter-spacing:0; text-transform:none; font-weight:400; color:var(--muted); margin:0;
-    display:inline-flex; align-items:center; gap:5px; cursor:pointer; user-select:none;}
-  .export-include label.export-include-item:hover{color:var(--tape);}
   .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
   .filter-chips label{font-size:var(--fs-meta); display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
@@ -3906,7 +3895,9 @@ function renderProjectDays(body){
    next day too. Each section's header keeps its Copy button visible even while
    collapsed (see pvBlockHTML) — collapsing is about scanning the page fast, not
    about hiding the one action you actually came here for. */
-let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, catering:true, excel:true };
+/* No 'excel' key since Phase Q follow-up: the Excel download is a button in the
+   Format panel now, not a collapsible block of its own. */
+let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, catering:true };
 /* ---- collapsible block plumbing, shared by Preview & Export and the Shoot Day editor ----
    Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
    only thing that differed between them was the id prefix, so that's the parameter. */
@@ -3955,25 +3946,52 @@ function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
 let exportFormat = 'printable';                                       // 'printable' | 'whatsapp'
 let exportSections = { tech:true, catering:true, hotels:true, travel:true };
 const EXPORT_SECTION_LABELS = { tech:'Tech specs', catering:'Catering', hotels:'Hotels', travel:'Travel' };
+/* Open by default, unlike the Crew tab's Filter. This panel isn't a refinement you
+   reach for occasionally — it holds the tab's two output ACTIONS (Copy, Download
+   .xlsx), and hiding the thing you came here to press behind a caret would be the
+   same mistake pvBlockHTML already avoids by keeping Copy buttons in collapsed
+   block headers. It still collapses when you want the preview at full height. */
+let exportPanelOpen = true;
 function setExportFormat(f){ exportFormat = f; renderProjectBody(); }
 function toggleExportSection(key, checked){ exportSections[key] = checked; renderProjectBody(); }
+function toggleExportPanel(){ exportPanelOpen = !exportPanelOpen; renderProjectBody(); }
+function exportHiddenSectionCount(){ return Object.keys(exportSections).filter(k=>!exportSections[k]).length; }
+/* The one text form of the call sheet, honouring the Include checkboxes. Built from
+   data rather than scraped off the preview card, because a collapsed block's markup
+   is display:none and innerText would silently skip it — the copy would quietly
+   depend on which blocks happened to be open. */
+function exportOutputText(){
+  const d = currentDay(); if(!d) return '';
+  return buildWAText(buildFullData(d));
+}
+function copyExportOutput(){ return copyText(exportOutputText(), 'Copied!'); }
+/* Format + Include + the two output actions, in the Crew tab's Filter idiom:
+   a .crew-header-row toggle with a caret and a summary of the current state, and a
+   .filter-panel below it (never inside the row — a full-width panel in a flex row
+   distorts its alignment every time it opens, same note as projectCrewFilterPanelHTML). */
 function exportOptionsHTML(){
+  const hidden = exportHiddenSectionCount();
+  const toggle = `<span class="crew-header-filter" onclick="toggleExportPanel()">
+      <span class="dept-caret">${exportPanelOpen?'▾':'▸'}</span> Format: ${exportFormat==='whatsapp'?'WhatsApp':'Printable'}${hidden?` (${hidden} section${hidden>1?'s':''} hidden)`:''}
+    </span>`;
+  return crewToolbarHTML('', toggle, '') + (exportPanelOpen ? exportPanelHTML() : '');
+}
+function exportPanelHTML(){
   const fmtTab = (key, label) => `<div class="tab ${exportFormat===key?'active':''}" onclick="setExportFormat('${key}')">${label}</div>`;
-  const boxes = Object.keys(EXPORT_SECTION_LABELS).map(key=>`
-    <label class="export-include-item">
-      <input type="checkbox" ${exportSections[key]?'checked':''} onchange="toggleExportSection('${key}', this.checked)">
-      ${esc(EXPORT_SECTION_LABELS[key])}
-    </label>`).join('');
-  return `<div class="section">
-    <h2>Format</h2>
-    <div class="tabs">${fmtTab('printable','Printable')}${fmtTab('whatsapp','WhatsApp')}</div>
-    <div class="export-include">
-      <span class="export-include-label">Include</span>
-      ${boxes}
+  const boxes = Object.keys(EXPORT_SECTION_LABELS).map(key=>
+    `<label><input type="checkbox" ${exportSections[key]?'checked':''} onchange="toggleExportSection('${key}', this.checked)"> ${esc(EXPORT_SECTION_LABELS[key])}</label>`).join('');
+  return `<div class="filter-panel">
+    <div><div class="hint" style="margin-bottom:4px;">Format</div>
+      <div class="tabs">${fmtTab('printable','Printable')}${fmtTab('whatsapp','WhatsApp')}</div></div>
+    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Include</div>
+      <div class="filter-chips">${boxes}</div></div>
+    <div class="toolbar" style="margin-top:12px;">
+      <button class="small primary" onclick="copyExportOutput()">${icon('copy')} ${exportFormat==='whatsapp'?'Copy for WhatsApp':'Copy as text'}</button>
+      <button class="small" onclick="downloadExcel()">${icon('download')} Download .xlsx</button>
     </div>
-    <p class="hint" style="margin-top:8px;">${exportFormat==='whatsapp'
+    <p class="hint" style="margin-top:10px;">${exportFormat==='whatsapp'
       ? 'Plain text for a chat app — the ticked sections are appended to the message. Untick Tech specs for the version that goes to the full crew.'
-      : 'The formatted call sheet — print it, save it as a PDF, or download the same content as .xlsx below.'}</p>
+      : 'The formatted call sheet — print it or save it as a PDF. Copy gives you the same call sheet as plain text; the .xlsx carries one sheet per ticked section.'}</p>
   </div>`;
 }
 function renderProjectPreview(body){
@@ -3990,13 +4008,9 @@ function renderProjectPreview(body){
     ${exportSections.tech ? '<div id="techSpecsSection"></div>' : ''}
     ${exportSections.hotels ? hotelSummaryHTML() : ''}
     ${exportSections.catering ? '<div id="cateringExportSection"></div>' : ''}
-    ${exportSections.travel ? transportSummaryHTML() : ''}
-    ${pvBlockHTML('excel', 'Excel export', '', `
-      <button class="primary" onclick="downloadExcel()">${icon('download')} Download .xlsx</button>
-      <p class="hint">Opens in Excel, Numbers, or Google Sheets (File → Import). One sheet per ticked section.</p>`)}`
+    ${exportSections.travel ? transportSummaryHTML() : ''}`
   : `
-    ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
-      `<pre id="waText"></pre>`)}`);
+    ${pvBlockHTML('whatsapp', 'WhatsApp text', '', `<pre id="waText"></pre>`)}`);
   const d = days.find(x=>x.id===currentShootDayId);
   generatePreview(d);
   if(printable && exportSections.catering) renderCateringExport();
@@ -5471,7 +5485,6 @@ function buildWAText(d){
   if(exportSections.travel){ const t=transportSummaryLines(); if(t){ L.push('','*TRAVEL*'); t.forEach(l=>L.push(l)); } }
   return L.join('\n');
 }
-function copyWA(){ return copyText(document.getElementById('waText').textContent); }
 /* pushes a heading row, a Dept/Position/Name/Call/Phone header row, and one row per
    person — the shared Excel block for Client, Position assignments, Talent and each
    co-production group */
