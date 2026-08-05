@@ -890,13 +890,27 @@ function deptHeaderHTML(label, count, collapsed, onclickJS, code){
    links became one control that shows only the action available right now —
    "Expand all" while everything is collapsed, "Collapse all" otherwise. Text,
    not chevrons, in the same label type as Select all / Filter. */
-function expandCollapseAllHTML(fnName, arg, extraLinkHTML, allCollapsed){
-  const a = arg===undefined ? '' : `, '${arg}'`;
+/* Single toggling expand/collapse link (Style Review): the two side-by-side links
+   became one control that shows only the action available right now.
+
+   `onclickExpr` must be a TOGGLE that works out the direction when it is clicked, not
+   a setter with true/false baked in. Blocks are collapsed by direct DOM updates
+   (applyBlockState) rather than a re-render, so anything baked into this markup goes
+   stale the moment the state changes: the control kept saying "Collapse all" and kept
+   passing `true`, so a second click did nothing until some other action re-rendered
+   the page. `groupId` lets refreshExpandCollapseAll() keep the label honest. */
+function expandCollapseAllHTML(onclickExpr, extraLinkHTML, allCollapsed, groupId){
   const label = allCollapsed ? 'Expand all' : 'Collapse all';
+  const idAttr = groupId ? ` id="eca-${groupId}"` : '';
   return `<div class="dept-toggle-all">
-      <span onclick="${fnName}(${allCollapsed?'false':'true'}${a})">${label}</span>${extraLinkHTML ? ` · ${extraLinkHTML}` : ''}
+      <span${idAttr} onclick="${onclickExpr}">${label}</span>${extraLinkHTML ? ` · ${extraLinkHTML}` : ''}
     </div>`;
 }
+function refreshExpandCollapseAll(groupId, allCollapsed){
+  const el = document.getElementById('eca-'+groupId);
+  if(el) el.textContent = allCollapsed ? 'Expand all' : 'Collapse all';
+}
+function allBlocksCollapsed(state){ return Object.values(state).every(v=>!v); }
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
 /* Heads of Department (c.isHoD) pinned to the top of any department roster, then alphabetical */
 function sortHoDFirst(list){ return list.slice().sort((a,b)=> (b.isHoD?1:0)-(a.isHoD?1:0) || (a.name||'').localeCompare(b.name||'')); }
@@ -2162,6 +2176,7 @@ function renderProjectOverview(body){
 let techBlocks = { defaults:true, cameras:true, roundup:false };
 function toggleTechBlock(key){ toggleBlock(techBlocks, 'tt', key); }
 function setAllTechBlocksCollapsed(collapsed){ setAllBlocksCollapsed(techBlocks, 'tt', collapsed); }
+function toggleAllTechBlocks(){ setAllTechBlocksCollapsed(!allBlocksCollapsed(techBlocks)); }
 function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = techBlocks[key];
   return `<div class="section" id="techBlock-${key}">
@@ -2181,7 +2196,7 @@ function renderProjectTech(body){
   const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
   const continuous = p.continuousNumbering!==false;
   body.innerHTML = `
-    ${expandCollapseAllHTML('setAllTechBlocksCollapsed', undefined, `<span onclick="jumpToTechRoundup()">Summary</span>`, Object.values(techBlocks).every(v=>!v))}
+    ${expandCollapseAllHTML('toggleAllTechBlocks()', `<span onclick="jumpToTechRoundup()">Summary</span>`, allBlocksCollapsed(techBlocks), 'tt')}
     ${techBlockHTML('defaults', 'Tech specs — project defaults', '', `
       <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
       ${techSpecFieldsHTML('pj')}
@@ -3679,12 +3694,17 @@ function applyBlockState(state, prefix, key){
   if(bodyEl) bodyEl.style.display = state[key] ? '' : 'none';
   if(caret)  caret.textContent    = state[key] ? '▾' : '▸';
 }
-function toggleBlock(state, prefix, key){ state[key] = !state[key]; applyBlockState(state, prefix, key); }
+function toggleBlock(state, prefix, key){
+  state[key] = !state[key]; applyBlockState(state, prefix, key);
+  refreshExpandCollapseAll(prefix, allBlocksCollapsed(state));
+}
 function setAllBlocksCollapsed(state, prefix, collapsed){
   Object.keys(state).forEach(key=>{ state[key] = !collapsed; applyBlockState(state, prefix, key); });
+  refreshExpandCollapseAll(prefix, allBlocksCollapsed(state));
 }
 function togglePreviewBlock(key){ toggleBlock(previewBlocks, 'pv', key); }
 function setAllPreviewBlocksCollapsed(collapsed){ setAllBlocksCollapsed(previewBlocks, 'pv', collapsed); }
+function toggleAllPreviewBlocks(){ setAllPreviewBlocksCollapsed(!allBlocksCollapsed(previewBlocks)); }
 function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
   const open = previewBlocks[key];
   return `<div class="section">
@@ -3703,7 +3723,7 @@ function renderProjectPreview(body){
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
   body.innerHTML = dayTabsBarHTML(days) + `
-    ${expandCollapseAllHTML('setAllPreviewBlocksCollapsed', undefined, undefined, Object.values(previewBlocks).every(v=>!v))}
+    ${expandCollapseAllHTML('toggleAllPreviewBlocks()', undefined, allBlocksCollapsed(previewBlocks), 'pv')}
     <div class="card" id="previewCard"></div>
     ${pvBlockHTML('whatsapp', 'WhatsApp text', `<button class="small primary" onclick="copyWA()">${icon('copy')} Copy for WhatsApp</button>`,
       `<pre id="waText"></pre><p class="hint">This is the version for the full crew — tech specs are kept out of it.</p>`)}
@@ -3994,6 +4014,10 @@ function toggleDeptCollapse(dept){
   if(collapsedDepts.has(dept)) collapsedDepts.delete(dept); else collapsedDepts.add(dept);
   renderCrewList();
 }
+function toggleAllCrewDbDepts(deptsCSV){
+  const present = deptsCSV.split(',');
+  setAllDeptsCollapsed(!present.every(d=>collapsedDepts.has(d)), deptsCSV);
+}
 function setAllDeptsCollapsed(collapsed, deptsCSV){
   const deptsPresent = deptsCSV.split(',');
   collapsedDepts = collapsed ? new Set(deptsPresent) : new Set();
@@ -4014,7 +4038,7 @@ function renderCrewList(){
   Object.keys(buckets).forEach(d=>{ buckets[d] = sortCrewDbGroup(buckets[d]); });
   const deptsPresent = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
   const deptsCSV = deptsPresent.join(',');
-  const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML('setAllDeptsCollapsed', deptsCSV, undefined, deptsPresent.every(d=>collapsedDepts.has(d))) : '';
+  const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML(`toggleAllCrewDbDepts('${deptsCSV}')`, undefined, deptsPresent.every(d=>collapsedDepts.has(d)), 'depts') : '';
   const html = deptsPresent.map(d=>{
     const collapsed = collapsedDepts.has(d);
     return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`)
@@ -4447,6 +4471,7 @@ function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return 
 let shootDayBlocks = { general:true, schedule:true, positions:true, tech:true };
 function toggleShootDayBlock(key){ toggleBlock(shootDayBlocks, 'sd', key); }
 function setAllShootDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(shootDayBlocks, 'sd', collapsed); }
+function toggleAllShootDayBlocks(){ setAllShootDayBlocksCollapsed(!allBlocksCollapsed(shootDayBlocks)); }
 function sdBlock(key, title, inner){
   const open = shootDayBlocks[key];
   return `<div class="sd-block">
@@ -4533,7 +4558,7 @@ function shootDayBuildHTML(){
       <div id="cameraDesigList"></div>
     </div>`;
 
-  return expandCollapseAllHTML('setAllShootDayBlocksCollapsed', undefined, undefined, Object.values(shootDayBlocks).every(v=>!v))
+  return expandCollapseAllHTML('toggleAllShootDayBlocks()', undefined, allBlocksCollapsed(shootDayBlocks), 'sd')
        + sdBlock('general','General information', general)
        + sdBlock('schedule','Schedule', schedule)
        + sdBlock('positions','Position assignments', positions)

@@ -403,6 +403,19 @@ so it writes only when the value actually changed and focus has left — tabbing
 66 rows saves nothing. It deliberately does **not** re-render, which would steal focus
 from wherever you tabbed to next.
 
+**Expand/Collapse-all must decide direction at click time.** `expandCollapseAllHTML()`
+takes an `onclickExpr` that calls a *toggle* (`toggleAllShootDayBlocks()`,
+`toggleAllTechBlocks()`, `toggleAllPreviewBlocks()`, `toggleAllCrewDbDepts(csv)`) —
+never a setter with `true`/`false` baked in. Blocks collapse via direct DOM updates
+in `applyBlockState()` rather than a re-render, so anything baked into that markup
+goes stale immediately: the control kept saying "Collapse all" *and* kept passing
+`true`, so a second click did nothing until another action re-rendered the page.
+`toggleBlock()` and `setAllBlocksCollapsed()` both call
+`refreshExpandCollapseAll(prefix, …)` to keep the label honest, which also covers
+collapsing every block one at a time. Affected Shoot Days (`sd`), Tech (`tt`) and
+Preview & Export (`pv`); the Crew database toggle was already correct because
+`setAllDeptsCollapsed()` re-renders.
+
 **The crew grid name column is capped.** `minmax(200px,340px)` with a trailing
 `minmax(0,1fr)` so spare width lands after the row. It was `minmax(200px,1fr)`, which
 swallowed everything — 342px at seven day-columns but **562px at two**, stranding the
