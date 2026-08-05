@@ -862,7 +862,9 @@ const HEADER_FONTS = {
 /* Only families already in the Google Fonts request on line 8 (plus two system stacks)
    are offered — adding a family here means adding it to that <link> too, or it renders
    as the fallback and nobody notices. */
-const SETTINGS_DEFAULTS = { headerFont:'fraunces', brand:'#017756', brandLight:'#0FA47A' };
+// flagNo* are the Overview Tasks box's auto-flag rule toggles (Phase Tasks) —
+// site-wide, not per-project, so a rule silenced once stays off everywhere.
+const SETTINGS_DEFAULTS = { headerFont:'fraunces', brand:'#017756', brandLight:'#0FA47A', flagNoLocation:true, flagNoCrew:true, flagNoDayRate:true };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -2293,7 +2295,7 @@ function renderProjectOverview(body){
   const p = currentProject();
   const days = projectDays(p.id);
   body.innerHTML = `
-    ${bareMinimumWarningsHTML(p, days)}
+    ${renderTasksSection(p, days)}
     <div class="section">
       <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
@@ -2410,18 +2412,133 @@ function copyProjectTechSpecsText(){
   return L.join('\n');
 }
 function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
-/* Overview "bare minimums" — visual nudges only, never a hard blocker. Each one
-   jumps straight to where it can be fixed. */
-function bareMinimumWarningsHTML(p, days){
+/* ---------------------------------------------------------------------------
+   Overview: Tasks — merged auto-flags + manual tasks, one box (Phase Tasks).
+   Auto-flags are dumb rule-checks against current project data, computed live
+   on every render — never persisted, never manually dismissed. A flag simply
+   stops appearing once its condition no longer holds. Manual tasks are
+   persisted per-project records the user creates by hand. Both live in this
+   one merged section, replacing the old standalone "Bare minimums" box.
+   --------------------------------------------------------------------------- */
+let taskFlagsSettingsOpen = false;
+function toggleTaskFlagsSettings(){ taskFlagsSettingsOpen = !taskFlagsSettingsOpen; renderProjectBody(); }
+async function toggleTaskFlagRule(field, checked){ await setSetting(field, checked); renderProjectBody(); }
+
+let showCompletedTasks = false;
+function toggleShowCompletedTasks(){ showCompletedTasks = !showCompletedTasks; renderProjectBody(); }
+
+/* Each rule has its own site-wide on/off toggle in appSettings (persisted to
+   db:settings, same mechanism as the header font/brand colour) — not
+   per-project, so trying all three and turning off whichever proves noisy
+   sticks across every project. */
+function buildTaskFlags(p, days){
   const items = [];
   const noDateDays = days.filter(d=>!d.date);
   if(noDateDays.length) items.push({ label:`${noDateDays.length} shoot day${noDateDays.length>1?'s':''} missing a date`, onclick:`currentShootDayId='${noDateDays[0].id}';goProjectTab('days')` });
   if(!(p.locationIds||[]).length) items.push({ label:'No locations added yet', onclick:`goProjectTab('locations')` });
   if(!(p.crewIds||[]).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
-  if(!items.length) return '';
-  return `<div class="section" style="border-color:var(--danger)">
-    <h2 style="color:var(--danger)">Bare minimums</h2>
-    <div class="taglist">${items.map(it=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="${it.onclick}" title="Click to fix">⚠ ${esc(it.label)}</span>`).join('')}</div>
+
+  if(appSettings.flagNoLocation!==false){
+    days.filter(d=>!d.locationId).forEach(d=>{
+      items.push({ label:`No location — ${shootDayLabel(d)}`, onclick:`currentShootDayId='${d.id}';goProjectTab('days')` });
+    });
+  }
+  if(appSettings.flagNoCrew!==false){
+    days.filter(d=>!(d.positions||[]).length).forEach(d=>{
+      items.push({ label:`No crew — ${shootDayLabel(d)}`, onclick:`crewGridView='days';goProjectTab('crew')` });
+    });
+  }
+  // Grouped into ONE pill, not one per person — unlike the two day-based rules
+  // above (where the brief explicitly asked for one flag per day), a project
+  // can easily carry 60+ crew, and a flag per no-rate person would flood this
+  // box. Clicking jumps to Budget's Per Person view, where every no-rate
+  // person is already listed together with an inline field to fix it.
+  // Guarded with a typeof check so this rule degrades to a no-op, not an
+  // error, if Budget's resolveCrewRate() isn't present in some future branch.
+  if(appSettings.flagNoDayRate!==false && typeof resolveCrewRate==='function'){
+    const noRateCount = projectCrew(p).filter(c=>!resolveCrewRate(c,p).hasRate).length;
+    if(noRateCount) items.push({ label:`${noRateCount} crew member${noRateCount>1?'s':''} with no day rate set`, onclick:`budgetView='person';goProjectTab('budget')` });
+  }
+  return items;
+}
+function taskFlagPillsHTML(items){
+  if(!items.length) return '<div class="empty-note">No flags right now.</div>';
+  return `<div class="taglist">${items.map(it=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="${it.onclick}" title="Click to fix">⚠ ${esc(it.label)}</span>`).join('')}</div>`;
+}
+function taskFlagsSettingsHTML(){
+  const rules = [['flagNoLocation','Shoot day with no location'],['flagNoCrew','Shoot day with no crew'],['flagNoDayRate','Crew member with no day rate']];
+  return `<div class="filter-panel">
+    <div class="filter-chips">${rules.map(([f,label])=>`<label><input type="checkbox" ${appSettings[f]!==false?'checked':''} onchange="toggleTaskFlagRule('${f}', this.checked)"> ${esc(label)}</label>`).join('')}</div>
+  </div>`;
+}
+
+async function addProjectTask(){
+  const p = currentProject(); if(!p) return;
+  const title = (val('taskTitleInput')||'').trim();
+  if(!title) return;
+  const note = (val('taskNoteInput')||'').trim();
+  p.tasks = p.tasks || [];
+  p.tasks.push({ id:uid(), title, note, completed:false, createdAt:new Date().toISOString() });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function toggleProjectTask(taskId, checked){
+  const p = currentProject(); if(!p) return;
+  const t = (p.tasks||[]).find(x=>x.id===taskId); if(!t) return;
+  t.completed = checked;
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function deleteProjectTask(taskId){
+  const p = currentProject(); if(!p) return;
+  p.tasks = (p.tasks||[]).filter(x=>x.id!==taskId);
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+function taskListItemHTML(t){
+  return `<div class="list-card">
+    <div class="meta">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+        <input type="checkbox" ${t.completed?'checked':''} onchange="toggleProjectTask('${t.id}', this.checked)">
+        <strong style="${t.completed?'text-decoration:line-through; color:var(--muted);':''}">${esc(t.title)}</strong>
+      </label>
+      ${t.note ? `<div>${esc(t.note)}</div>` : ''}
+    </div>
+    <div class="actions">
+      <button class="icon-btn danger-ic" onclick="deleteProjectTask('${t.id}')" title="Delete task" aria-label="Delete task">${icon('trash')}</button>
+    </div>
+  </div>`;
+}
+/* Completed tasks hide by default behind a count toggle rather than sitting
+   struck-through in the main list — a reasonable default per the brief, not
+   a hard requirement; revisit if it feels wrong once used for real. */
+function tasksListHTML(p){
+  const tasks = p.tasks || [];
+  const open = tasks.filter(t=>!t.completed);
+  const done = tasks.filter(t=>t.completed);
+  const openHTML = open.length ? open.map(taskListItemHTML).join('') : '<div class="empty-note">No tasks yet.</div>';
+  const doneToggle = done.length ? `<div class="hint" style="cursor:pointer; margin-top:8px;" onclick="toggleShowCompletedTasks()">${showCompletedTasks?'▾':'▸'} Show completed (${done.length})</div>` : '';
+  const doneHTML = (showCompletedTasks && done.length) ? `<div style="margin-top:8px;">${done.map(taskListItemHTML).join('')}</div>` : '';
+  return `${openHTML}${doneToggle}${doneHTML}`;
+}
+
+function renderTasksSection(p, days){
+  const flagItems = buildTaskFlags(p, days);
+  const flagsToggleSpan = `<span class="crew-header-filter" onclick="toggleTaskFlagsSettings()">
+      <span class="dept-caret">${taskFlagsSettingsOpen?'▾':'▸'}</span> Flags${flagItems.length?` (${flagItems.length})`:''}
+    </span>`;
+  return `<div class="section" id="tasksSection">
+    <h2>Tasks</h2>
+    ${crewToolbarHTML('', flagsToggleSpan, '')}
+    ${taskFlagsSettingsOpen ? taskFlagsSettingsHTML() : ''}
+    ${taskFlagPillsHTML(flagItems)}
+    <div class="subhead" style="margin-top:18px;">Add a task</div>
+    <div class="grid g2" style="margin-bottom:8px;">
+      <div><label>Title</label><input type="text" id="taskTitleInput" placeholder="e.g. Confirm parking permit" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+      <div><label>Note (optional)</label><input type="text" id="taskNoteInput" placeholder="Optional detail" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+    </div>
+    <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
+    ${tasksListHTML(p)}
   </div>`;
 }
 async function saveProjectTechSpecs(){
