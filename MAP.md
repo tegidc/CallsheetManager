@@ -41,7 +41,8 @@ Every screen needs the same handful of records. These are the single place that 
 - `buildCrewSummary()` / `buildLocationSummary()` — compact `{id, name, role}`/`{id, name}` projections of the FULL `crewDB`/`locationsDB` (not just this project's roster) sent with every request, so Claude can propose a `match_id` against anyone already in either database — [Overview]
 - `fileToContentBlock()` / `fileToBase64()` / `fileToText()` — turn an attached file into an Anthropic content block client-side. PDF → base64 `document` block (Claude reads PDFs natively, no extraction needed). `.docx` → plain text via `mammoth.js` (the API has no native docx support). `.txt`/anything else → read as plain text. 15MB cap per file — [Overview]
 - `stripAiScanDisplayFields()` — strips the display-only `_filename` property (stashed on file blocks purely so `aiScanMessageHTML()` can show an attachment's name) before any message array reaches the actual API request — [Overview]
-- `renderWelcome()` — renders the landing screen shown when no project is open — [Overview]
+- `renderWelcome()` — renders the landing screen shown when no project is open. Above the existing "Get started" section (Phase Y) sits a two-button toolbar: "Recent" (`goRecentProject()`, disabled when there's no project to jump to, labelled with that project's name) and "+ New" (`goNewProject()`, the same entry point the sidebar's "+ New project" and this screen's own "+ New project" button already use — no second code path) — [Overview]
+- `mostRecentProject()` / `goRecentProject()` (Phase Y) — `mostRecentProject()` sorts `projectsDB` by `lastOpenedAt` (falls back to `0`, so a never-opened project sorts last, not first) and returns the top one, or `null`; `goRecentProject()` opens it via the normal `openProject()`. `lastOpenedAt` is a plain epoch-ms timestamp, stamped by `openProject()` itself on every open — no separate "mark as viewed" call needed — [Overview]
 - `resetAndReseed()` — wipes and reloads sample data for a fresh demo state — [Overview]
 - `seedSampleData()` — populates the databases with sample crew/locations/projects/days for demo purposes — [Overview]
 - `renderNewProject()` — renders the "create new project" form — [Overview]
@@ -59,14 +60,14 @@ Every screen needs the same handful of records. These are the single place that 
 - `setCrewGridView()` — switches which crew matrix (days/hotel/travel/catering) is shown and re-renders — [Crew]
 - `toggleAllProjectDeptsCollapsed()` (Phase V) — the single Expand-all/Collapse-all toggle used in the crew header row: flips based on current state (expand if every visible group is collapsed, otherwise collapse all) rather than offering two separate always-on links; delegates to `setAllProjectDeptsCollapsed()` — [Crew]
 - `projectCrewFilter` / `projectCrewFilterOpen` — the ONE shared filter/sort/group-by state for "Crew on this project", global so it survives `setCrewGridView()` tab switches. Now also holds `days` (Set of shoot day ids) and `daysMode` ('or'/'and') — the multiselect Days filter (Phase T item 3) — [Crew]
-- `matchesCrewFilterState()` — shared match rules (depts, lead company, roles, exclude-Talent, exclude-other-companies) used by both this screen's filter and the Crew database's. Does NOT include the Days filter — the Crew database screen has no project/shoot-day context, so that's a separate check (`personMatchesProjectDayFilter`) only applied on the project screen — [Crew, Shared/utility functions]
+- `matchesCrewFilterState()` — shared match rules (depts, lead company, roles, exclude-Talent, exclude-other-companies) used by both this screen's filter and the Crew database's. Does NOT include the Days filter — the Crew database screen has no project/shoot-day context, so that's a separate check (`personMatchesProjectDayFilter`) only applied on the project screen. Lead company match (Phase AC) treats the sentinel `'__blank__'` as "no lead company set" (`!c.coProductionCompany`), distinct from `''` which means "no company filter active, show all" — the project Filter panel's Lead Company `<select>` only offers a "Blank" option when at least one assigned crew member actually has no lead company (`hasBlankCompany`) — [Crew, Shared/utility functions]
 - `personMatchesProjectDayFilter()` — the Days filter (Phase T item 3): matches if the person has a position on any (`daysMode:'or'`) or every (`daysMode:'and'`) of the selected shoot days. An OR/AND `<select>` appears next to the day checkboxes once 2+ days are picked — [Crew]
-- `personMatchesProjectFilter()` / `personHasHotel()` / `sortProjectCrewGroup()` / `buildProjectCrewGroups()` — filter (`matchesCrewFilterState` + `personMatchesProjectDayFilter`), "has hotel" test, in-group sort and dept-or-hotel grouping for the assigned crew list — [Crew]
-- `toggleProjectCrewFilterPanel()` / `toggleProjectFilterDept()` / `toggleProjectFilterRole()` / `toggleProjectFilterDay()` / `setProjectFilterField()` / `toggleProjectFilterFlag()` / `clearProjectCrewFilter()` / `projectCrewActiveFilterCount()` / `projectCrewFilterPanelHTML()` — collapsible filter panel state and rendering, including the Days filter-chips + OR/AND select (Phase T item 3) — [Crew]
+- `personMatchesProjectFilter()` / `personHasHotel()` / `sortProjectCrewGroup()` / `buildProjectCrewGroups()` — filter (`matchesCrewFilterState` + `personMatchesProjectDayFilter`), "has hotel" test, in-group sort and dept-or-hotel grouping for the assigned crew list. `personMatchesProjectFilter()` flips its own result when `projectCrewFilter.inverse` is set (Phase AE "Inverse" checkbox) — everyone who does NOT match the active criteria, rather than everyone who does; the day filter is included in what gets inverted — [Crew]
+- `toggleProjectCrewFilterPanel()` / `toggleProjectFilterDept()` / `toggleProjectFilterRole()` / `toggleProjectFilterDay()` / `setProjectFilterField()` / `toggleProjectFilterFlag()` / `clearProjectCrewFilter()` / `projectCrewActiveFilterCount()` / `projectCrewFilterPanelHTML()` — collapsible filter panel state and rendering, including the Days filter-chips + OR/AND select (Phase T item 3), the Roles filter-chips sub-section (Phase AB — its own collapse toggle, `projectCrewFilterRolesOpen`/`toggleProjectFilterRolesSection()`, independent of the panel's own open/closed state) and the Inverse checkbox (Phase AE, `toggleProjectFilterFlag('inverse', …)` — no new setter needed, the existing generic flag setter covers it) — [Crew]
 - `projectCrewSelected` / `toggleCrewSelected()` / `toggleSelectAllFilteredCrew()` / `clearCrewSelection()` / `bulkRemoveSelectedFromProject()` / `bulkActionBarHTML()` — bulk-select (checkbox swapped in for the view/eye icon via `crewIdentityHTML`'s `bulkSelect` option) and the bulk "Remove from project" action. `toggleSelectAllFilteredCrew()` is the "Select all" checkbox next to Expand/Collapse all (Phase T item 2) — it's always handed exactly the currently-filtered/visible crew ids, never the full project roster, so it only ever selects what the active filter is showing — [Crew]
 - `selectedEditTargets(crewId)` (Phase Bulk Edit) — **the selected-set bulk-edit pattern.** Every per-field editor on the Crew tab calls this first: if `crewId` is part of the current multi-select AND at least one other person is also selected, it returns every selected id; otherwise just `[crewId]`. The caller then loops its own field-specific mutation over the returned ids and does ONE `saveDB`/render at the end — this is the reusable "which ids does this edit apply to" decision, not a per-field bulk-edit implementation. Wired into `toggleCrewOnDay()` (Days on site), `toggleHotelNight()` / `toggleHotelPre()` (Hotel), `toggleMeal()` (Catering), `setTravelMethod()` (Travel), `saveQuickShowAs()` (Roles — Show as) and `setActiveRole()` (Roles — role/department; only on a direct user pick, i.e. `skipSave` falsy — the internal `skipSave:true` calls used to reactivate a replacement role after `removeRoleFromCrew()` do NOT fan out, since that's a single-person consistency fixup, not a user edit). `bulkActionBarHTML()` shows a one-line hint ("Editing a field for one selected person applies it to all N") whenever 2+ are selected. Deliberately NOT wired into `toggleAllForPerson()` / `toggleAllMealForPerson()` (the per-person "All" button) — that's a different axis (all days for one person), mixing it with cross-person propagation would be confusing — [Crew]
 - `bulkEditOpen` / `toggleBulkEdit()` / `bulkEditPanelHTML()` / `applyBulkLeadCompany()` — bulk-edit panel opened from the bulk-action bar; currently just Lead Company, the field Phase R moved off the main Roles row — [Crew]
-- `crewRolesRowHTML()` — renders one person's row in the Roles tab as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (saved-roles taglist only — no add-role picker here any more) | Department (read-only, `deptLabelHTML`) | Show as. "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew]
+- `crewRolesRowHTML()` — renders one person's row in the Roles tab as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (saved-roles taglist only — no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
 - `showAsQuickEditHTML()` / `saveQuickShowAs()` — inline "Show as" quick-edit, used on the Roles row. Renders via the same `.icon-btn` pencil button as every other edit affordance in the row (Phase S item 2) rather than a separately-styled control — [Crew]
 - `groupedCrewOptionsHTML()` — builds `<option>` groups (by department) for crew-picker selects — [Crew]
 - `crewAssignRowHTML()` — renders one crew row in the "days on site"/"hotel" grid. Department badge and Lead Company pill are hidden (Phase S item 6) and role display falls back to Show-as (`showAsOrRole`, item 8) — this row no longer offers any role editing (the old per-row role quick-edit was removed; role/department/Show-as are only ever edited on the Roles tab) — [Crew]
@@ -89,7 +90,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `toggleHotelNight()` / `toggleHotelPre()` — toggle whether a crew member is booked a hotel room for a shoot night / the night before — [Crew]
 - `abbreviateName()` — "first initial + last name" display form (e.g. "A. Shaw"), used by the per-night table's Names column — [Crew]
 - `buildHotelSummary()` (Phase O, replaces the old Preview-tab `buildHotelExport`) — per-person hotel aggregation: resolves each person's actual booked-night dates (incl. "night before Day 1") into a check-in/check-out range and total-nights count, sorted earliest check-in first then most nights first (`orderIndex`), and reused by the per-night table's Names ordering so both views stay in the same person order — [Crew]
-- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: room-booking table (Room No./Name/Date from–to/Total nights) first, per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-6.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once — [Crew, Preview & Export]
+- `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: a cost field ("Est. cost per room/night", id `hcRoomNight`, Phase AD — moved here from Budget, same `getHotelCosts()`/`saveHotelCosts()` pair, same `field-inline` markup as Catering's cost fields) above room-booking table (Room No./Name/Date from–to/Total nights), then per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-6.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once, which is also why the cost field shows up on both (same precedent as Travel's cost fields at T-7.4). Autosave for `hcRoomNight` is wired per-screen: `renderProjectCrew()`'s `body.oninput` when `crewGridView==='hotel'`, and `renderProjectPreview()`'s scoped `e.target.id==='hcRoomNight'` check (alongside the Travel fields, Phase AD) — [Crew, Budget, Preview & Export]
 - `jumpToHotelSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Hotel sub-tab: expands `hotelSummaryOpen` if collapsed, then scrolls `#hotelSummarySection` into view — [Crew]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
 - `addCrewToProject()` / `removeCrewFromProject()` — add/remove a crew member from the current project's roster — [Crew]
@@ -161,7 +162,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `syncShootDayCount()` — grows the shoot day count immediately (blank new days), or (when shrinking) expands an inline checkbox picker instead of deciding for the user — [Shoot Days]
 - `shootDayReductionPending` / `shootDayLabel()` / `toggleShootDayReductionPick()` / `cancelShootDayReduction()` / `confirmShootDayReduction()` / `shootDayReductionPanelHTML()` — the inline "select N days to remove" picker (Phase T item 1) shown on the Overview tab under the Shoot days count field when shrinking it, replacing the old sequence of native `prompt()` popups. Confirm is disabled until exactly the required number of days is ticked — [Shoot Days]
 - `toggleShootDayBlock()` / `setAllShootDayBlocksCollapsed()` / `sdBlock()` — collapse/expand and render the shoot day editor's collapsible sub-sections — [Shoot Days]
-- `shootDayBuildHTML()` — builds the full shoot day editor form markup (general info, schedule, positions, tech) — [Shoot Days]
+- `shootDayBuildHTML()` — builds the full shoot day editor form markup (general info, schedule, positions, tech). The Production Brief textarea (`#sdBrief`) auto-grows to fit its content as typed (Phase X, `autoGrowTextarea()`) instead of staying a fixed height behind a manual drag-resize handle — [Shoot Days]
 - `projectCrewOptions()` — builds crew `<option>` list scoped to the current project, for shoot-day pickers — [Shoot Days]
 - `addSdLocRow()` / `onSdLocationChange()` / `onSdAddLocChange()` — add and react to changes in a shoot day's primary/additional location pickers — [Shoot Days]
 - `quickAddLocationForDay()` — quick-creates a new location record directly from the shoot day form — [Shoot Days]
@@ -185,12 +186,12 @@ Every screen needs the same handful of records. These are the single place that 
 ## Budget
 
 Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already
-entered elsewhere in the app rather than owning any of its own, with one exception: no
-per-project hotel rate existed anywhere before this phase, so `getHotelCosts()`/
-`saveHotelCosts()` were added, same `{field: Number(val)||0}` shape as
-`getCateringCosts()`/`getTransportCosts()`. Deliberately excludes location fees (one
-fee can span several shoot days, not handled here) and offers no editable line-item
-budget or export of its own — Preview & Export stays the export surface.
+entered elsewhere in the app rather than owning any of its own — including hotel cost
+per room/night (`getHotelCosts()`/`saveHotelCosts()`, Phase Budget originally, moved to
+the Hotel tab in Phase AD so Budget's relationship to it now matches Catering/Travel:
+read-only). Deliberately excludes location fees (one fee can span several shoot days,
+not handled here) and offers no editable line-item budget or export of its own —
+Preview & Export stays the export surface.
 
 - `VAT_RATE` — fixed at 0.20 (UK standard). Not project-configurable — a real rate
   input is out of scope for a cost-visibility phase — [Budget]
@@ -210,11 +211,15 @@ budget or export of its own — Preview & Export stays the export surface.
   edited inline on the Per Person view, no separate edit affordance (matches the
   Phase Detail "Show as" decision — a plain input, not a pencil-and-save control) —
   [Budget]
-- `getHotelCosts()` / `saveHotelCosts()` — the one cost rate Budget owns itself
-  (`p.hotelCosts.perRoomNight`), since Catering/Travel already have theirs on their
-  own tabs — [Budget]
+- `getHotelCosts()` / `saveHotelCosts()` (Phase AD, moved from Budget to the Hotel
+  tab) — read/persist `p.hotelCosts.perRoomNight`, same `{field: Number(val)||0}` shape
+  as `getCateringCosts()`/`getTransportCosts()`. The field itself now lives in
+  `hotelSummaryHTML()` (id `hcRoomNight`) — same place Catering/Travel keep theirs —
+  Budget only calls `getHotelCosts()` to read it — [Crew, Budget]
 - `budgetView` / `setBudgetView()` — which of the three views (`department` /
-  `person` / `day`) is showing, same pattern as `crewGridView` — [Budget]
+  `person` / `day`) is showing, same pattern as `crewGridView`. Displayed in the tab
+  switcher as Per Department / Per Day / Per Person (Phase AA) — the switcher's own
+  key order, `viewLabels`, not `budgetView`'s internal naming — [Budget]
 - `budgetVatToggle` / `toggleBudgetVat()` — itemized (every figure ex-VAT, VAT broken
   out as its own line in the summary bar) vs baked in (VAT folded silently into every
   figure everywhere, one Total). Extras (catering/travel/hotel) never carry VAT in
@@ -255,7 +260,10 @@ budget or export of its own — Preview & Export stays the export surface.
   the three views. Per Person's row order is canonical department order then
   `sortHoDFirst()` within it — there's no existing sortable-table (click-a-column)
   pattern anywhere in this app to extend, so this is a fixed, sensible order rather
-  than a new UI paradigm built for one screen — [Budget]
+  than a new UI paradigm built for one screen. Per Person's "Days worked" column is
+  labelled "Days" and centered (Phase AA); its Day rate `.budget-rate-input` field is
+  left-aligned and 64px (Phase AA, was right-aligned/84px) — same class/input reused
+  verbatim by `crewRolesRowHTML()`'s Rate column (Phase Z) — [Budget, Crew]
 
 ## Preview & Export
 
@@ -283,6 +291,7 @@ budget or export of its own — Preview & Export stays the export surface.
 - `uid()` — generates a short random unique id — [Shared/utility functions]
 - `esc()` — HTML-escapes a string for safe interpolation into templates — [Shared/utility functions]
 - `val()` / `setv()` — get/set the trimmed value of a form input by element id — [Shared/utility functions]
+- `autoGrowTextarea()` (Phase X) — resizes a textarea's height to fit its content (`scrollHeight`); wired via `oninput` where a textarea needs to auto-grow, and called once after any programmatic `setv()` fill (setting `.value` directly doesn't fire `input`) — first user: the Production Brief textarea (`#sdBrief`, T-5.2) — [Shared/utility functions, Shoot Days]
 - `icon()` / `ICONS` — look up and wrap an inline SVG icon by name — [Shared/utility functions]
 - `flashStatus()` — the discreet "Saved" status flash shared by every save button and autosave — [Shared/utility functions]
 - `copyText()` — the single clipboard path for every Copy button: async API with a textarea fallback, optional confirm message — [Shared/utility functions]
@@ -310,7 +319,7 @@ budget or export of its own — Preview & Export stays the export surface.
 - `renderSide()` — renders the left sidebar (project list, nav) — [Shared/utility functions]
 - `toggleDrawer()` / `closeDrawer()` — open/close the mobile navigation drawer — [Shared/utility functions]
 - `setTopbarTitle()` — updates the mobile top bar's title text — [Shared/utility functions]
-- `goDatabase()` / `goNewProject()` / `openProject()` / `goProjectTab()` — top-level router functions that change `route`/`currentProjectId`/`currentProjectTab` and re-render — [Shared/utility functions]
+- `goDatabase()` / `goNewProject()` / `openProject()` / `goProjectTab()` — top-level router functions that change `route`/`currentProjectId`/`currentProjectTab` and re-render. `openProject()` also stamps that project's `lastOpenedAt` (Phase Y, `Date.now()`) and saves it — the signal `mostRecentProject()` reads for the Welcome screen's "Recent" button — [Shared/utility functions, Overview]
 - `renderMain()` — dispatches the main panel render based on the current route — [Shared/utility functions]
 - `projCode()` — derives a project's short display code — [Shared/utility functions]
 - `fmtDate()` — formats an ISO date string as a human-readable date — [Shared/utility functions]

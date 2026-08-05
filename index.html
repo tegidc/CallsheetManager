@@ -438,9 +438,10 @@
     border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:var(--fs-meta);}
   .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
   .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
-  /* Roles tab (Phase S) — proper tidy columns instead of one packed inline row.
-     Controls | Name | Role | Department (reference-only) | Show as. */
+  /* Roles tab (Phase S, reordered Phase Z) — proper tidy columns instead of one
+     packed inline row. Controls | Name | Role | Rate | Show as. */
   .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 92px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  .roles-grid-rate{white-space:nowrap;}
   .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .roles-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
   .roles-grid-row{padding:8px 0;}
@@ -552,7 +553,7 @@
   .budget-vat-toggle label{display:flex; align-items:center; gap:7px; margin:0;
     font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer;}
-  .budget-rate-input{width:84px; text-align:right;}
+  .budget-rate-input{width:64px; text-align:left;}
   .budget-extras-row td{padding-top:14px;}
   .budget-total-row td{padding-top:10px; border-top:1.5px solid var(--field-line);
     font-weight:600;}
@@ -1275,6 +1276,7 @@ const uid = () => 'id_' + Date.now().toString(36) + Math.random().toString(36).s
 const esc = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const val = id => (document.getElementById(id)?.value || '').trim();
 const setv = (id,v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
+function autoGrowTextarea(el){ if(!el) return; el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 
 /* ---- canonical record lookups ----
    Every screen reaches for the same handful of records. These are the single place
@@ -1557,7 +1559,16 @@ window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer();
 function goDatabase(which){ route={screen:'db-'+which}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
 function goNewProject(){ route={screen:'new-project'}; closeDrawer(); renderSide(); renderMain(); }
 function goSettings(){ route={screen:'settings'}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
-function openProject(id){ currentProjectId=id; route={screen:'project'}; currentProjectTab='overview'; closeDrawer(); renderSide(); renderMain(); }
+function openProject(id){
+  currentProjectId=id; route={screen:'project'}; currentProjectTab='overview'; closeDrawer(); renderSide(); renderMain();
+  const p = projById(id);
+  if(p){ p.lastOpenedAt = Date.now(); saveDB('db:projects', projectsDB); }
+}
+function mostRecentProject(){
+  if(!projectsDB.length) return null;
+  return projectsDB.slice().sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0))[0];
+}
+function goRecentProject(){ const p=mostRecentProject(); if(p) openProject(p.id); }
 function goProjectTab(tab){ currentProjectTab=tab; renderMain(); window.scrollTo(0,0); }
 
 function renderMain(){
@@ -1639,8 +1650,13 @@ function previewSetting(field, value){ appSettings[field] = value; applyAppSetti
 
 function renderWelcome(m){
   setTopbarTitle('Call Sheets');
+  const recent = mostRecentProject();
   m.innerHTML = `
     <div class="page-head"><h1>Call Sheet App</h1><div class="eyebrow">${esc(COMPANY)}</div></div>
+    <div class="toolbar" style="margin-bottom:16px;">
+      <button class="primary" onclick="goRecentProject()" ${recent?'':'disabled'}>Recent${recent?(': '+esc(recent.title||recent.client||'')):''}</button>
+      <button onclick="goNewProject()">+ New</button>
+    </div>
     <div class="section">
       <h2>Get started</h2>
       <p style="font-size:14px; line-height:1.6;">Build call sheets from reusable Crew and Location databases. Add a crew member or location once and it's available to every project.</p>
@@ -2978,8 +2994,10 @@ function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
    One shared filter state across every view-switcher tab (Roles/Days on
    site/Hotel/Travel/Catering) — it's a module-level global, so switching
    tabs via setCrewGridView() never resets it. */
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
 let projectCrewFilterOpen = false;
+let projectCrewFilterRolesOpen = false;
+function toggleProjectFilterRolesSection(){ projectCrewFilterRolesOpen = !projectCrewFilterRolesOpen; renderProjectBody(); }
 let projectCrewSelected = new Set();
 /* shared by both filter panels (Crew on this project + Crew database) — each
    keeps its own filter-state object but the matching rules are identical.
@@ -2988,7 +3006,8 @@ let projectCrewSelected = new Set();
    a separate check only for the project screen, see personMatchesProjectFilter. */
 function matchesCrewFilterState(c, f){
   if(f.depts.size && !f.depts.has(deptBucketKey(c.department))) return false;
-  if(f.company && (c.coProductionCompany||'')!==f.company) return false;
+  if(f.company==='__blank__' && (c.coProductionCompany||'')) return false;
+  else if(f.company && f.company!=='__blank__' && (c.coProductionCompany||'')!==f.company) return false;
   if(f.roles.size && !(c.roles||[]).some(r=>f.roles.has(r))) return false;
   if(f.excludeTalent && deptBucketKey(c.department)==='Talent') return false;
   if(f.excludeOtherCompanies && (c.coProductionCompany||'')) return false;
@@ -3005,7 +3024,10 @@ function personMatchesProjectDayFilter(c){
   const onDay = d => (d.positions||[]).some(pos=>pos[0]===c.id);
   return f.daysMode==='and' ? days.every(onDay) : days.some(onDay);
 }
-function personMatchesProjectFilter(c){ return matchesCrewFilterState(c, projectCrewFilter) && personMatchesProjectDayFilter(c); }
+function personMatchesProjectFilter(c){
+  const matches = matchesCrewFilterState(c, projectCrewFilter) && personMatchesProjectDayFilter(c);
+  return projectCrewFilter.inverse ? !matches : matches;
+}
 function personHasHotel(c, p, days){
   if(((p&&p.hotelNightBefore)||[]).includes(c.id)) return true;
   return days.some(d=>(d.hotelNights||[]).includes(c.id));
@@ -3041,16 +3063,17 @@ function toggleProjectFilterDay(dayId, checked){
 function setProjectFilterField(field, value){ projectCrewFilter[field] = value; renderProjectBody(); }
 function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = checked; renderProjectBody(); }
 function clearProjectCrewFilter(){
-  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
   renderProjectBody();
 }
 function projectCrewActiveFilterCount(){
   const f = projectCrewFilter;
-  return f.depts.size + f.roles.size + f.days.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0);
+  return f.depts.size + f.roles.size + f.days.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0) + (f.inverse?1:0);
 }
 function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
   const companies = [...new Set(assignedAll.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const hasBlankCompany = assignedAll.some(c=>!c.coProductionCompany);
   const rolesInUse = [...new Set(assignedAll.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
   const deptChecks = DEPARTMENTS.filter(d=>assignedAll.some(c=>deptBucketKey(c.department)===d))
     .map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleProjectFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
@@ -3067,6 +3090,7 @@ function projectCrewFilterPanelHTML(assignedAll, days){
       <div><label>Lead company</label><select onchange="setProjectFilterField('company', this.value)">
         <option value="">All companies</option>
         ${companies.map(co=>`<option value="${esc(co)}" ${f.company===co?'selected':''}>${esc(co)}</option>`).join('')}
+        ${hasBlankCompany ? `<option value="__blank__" ${f.company==='__blank__'?'selected':''}>Blank</option>` : ''}
       </select></div>
       <div><label>Sort</label><select onchange="setProjectFilterField('sort', this.value)">
         <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
@@ -3077,7 +3101,10 @@ function projectCrewFilterPanelHTML(assignedAll, days){
         <option value="hotel" ${f.groupBy==='hotel'?'selected':''}>Has hotel / No hotel</option>
       </select></div>
     </div>
-    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Roles</div><div class="filter-chips">${roleChecks}</div></div>
+    <div style="margin-top:10px;">
+      <div class="hint" style="margin-bottom:4px;cursor:pointer;" onclick="toggleProjectFilterRolesSection()"><span class="dept-caret">${projectCrewFilterRolesOpen?'▾':'▸'}</span> Roles${f.roles.size?` (${f.roles.size} selected)`:''}</div>
+      ${projectCrewFilterRolesOpen ? `<div class="filter-chips">${roleChecks}</div>` : ''}
+    </div>
     <div style="margin-top:10px;">
       <div class="hint" style="margin-bottom:4px;">Days <span style="text-transform:none;">(who's on which shoot day)</span></div>
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -3091,6 +3118,7 @@ function projectCrewFilterPanelHTML(assignedAll, days){
     <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
       <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
+      <label title="Show everyone who does NOT match the filter above, instead of everyone who does"><input type="checkbox" ${f.inverse?'checked':''} onchange="toggleProjectFilterFlag('inverse', this.checked)"> Inverse</label>
       <span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearProjectCrewFilter()">Clear filters</span>
     </div>
   </div>`;
@@ -3251,7 +3279,7 @@ function renderProjectCrew(body){
           <div class="roles-grid-header"></div>
           <div class="roles-grid-header">Name</div>
           <div class="roles-grid-header">Role</div>
-          <div class="roles-grid-header">Department</div>
+          <div class="roles-grid-header">Rate</div>
           <div class="roles-grid-header">Show as</div>
         </div>`;
       const groupsHTML = groups.map(g=>{
@@ -3317,10 +3345,13 @@ function renderProjectCrew(body){
     ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); renderCateringSummaryGridSection(); })
     : crewGridView==='travel'
     ? () => scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); })
+    : crewGridView==='hotel'
+    ? () => scheduleAutosave('hotelCosts', () => saveHotelCosts())
     : null;
 }
-/* Roles tab row (Phase S) — tidy grid columns: CONTROLS | Name | Role | Department | Show as.
-   Department is read-only reference (implied by the active saved role — see setActiveRole).
+/* Roles tab row (Phase S, reordered Phase Z) — tidy grid columns: CONTROLS | Name | Role | Rate | Show as.
+   Department was dropped in Phase Z (redundant with the group headers); Rate is the same
+   per-project day-rate override as Budget's Per Person view (resolveCrewRate/saveCrewRateOverride).
    "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (crewFormHTML)
    or the bulk-edit panel — neither appears on this main row. Phone is not shown here either. */
 function crewRolesRowHTML(c){
@@ -3328,11 +3359,12 @@ function crewRolesRowHTML(c){
   const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
   const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
   const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
+  const rate = resolveCrewRate(c, currentProject());
   return `<div class="roles-grid roles-grid-row ${isEditing?'roles-grid-row-editing':''}">
     <div class="roles-grid-controls">${selectCb}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}${copyBadge}</div>
     <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${rolesTagListHTML(c)}</span></div>
-    <div class="roles-grid-cell" data-label="Department">${deptLabelHTML(c)}</div>
+    <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveCrewRateOverride('${c.id}', this.value)"></div>
     <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(c)}</div>
     ${crewExpansionHTML(c, 'roles-grid-editform')}
   </div>`;
@@ -3529,9 +3561,15 @@ function toggleHotelSummaryBlock(){
   applyBlockState({summary:hotelSummaryOpen}, 'hsm', 'summary');
 }
 function hotelSummaryHTML(){
+  const p = currentProject();
+  const hotelCosts = getHotelCosts(p);
   const data = buildHotelSummary();
   const open = hotelSummaryOpen;
-  const inner = !data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
+  const costFieldHTML = `<div class="field-inline" style="margin-bottom:14px;">
+      <label for="hcRoomNight">Est. cost per room/night</label>
+      <input type="text" inputmode="decimal" id="hcRoomNight" value="${hotelCosts.perRoomNight||''}" placeholder="0.00" style="width:90px;">
+    </div>`;
+  const inner = costFieldHTML + (!data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
     <div class="hint" style="margin:0 0 12px;">${esc(data.summary)}</div>
     <h4 style="margin:12px 0 6px;">Room-booking table</h4>
     <table><tr><th>Room No.</th><th>Name</th><th>Date from</th><th>Date to</th><th>Total nights</th></tr>
@@ -3541,7 +3579,7 @@ function hotelSummaryHTML(){
     <table><tr><th>Night</th><th>Rooms</th><th>Names</th></tr>
     ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
-    <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`;
+    <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`);
   return `<div class="section" id="hotelSummarySection">
     <div class="sd-block-head" style="margin:0 0 12px; font-size:15px;">
       <span class="sd-block-head-toggle" onclick="toggleHotelSummaryBlock()"><span class="dept-caret" id="hsmc-summary">${open?'▾':'▸'}</span> Hotel summary</span>
@@ -4532,18 +4570,18 @@ function exportPanelHTML(){
 // not a real budgeting tool, so a fixed rate is the deliberate scope line.
 const VAT_RATE = 0.20;
 
-/* Hotel is the one cost area with no existing per-project rate anywhere in the
-   app (Catering/Travel already have getCateringCosts()/getTransportCosts()) —
-   added here, same {field: Number(val)||0} shape as those two. */
+/* Room rate lives on the Hotel tab (hotelSummaryHTML, field id hcRoomNight) —
+   moved here from Budget in Phase AD so it matches how Catering/Travel already
+   own their own rates (getCateringCosts()/getTransportCosts()), same
+   {field: Number(val)||0} shape as those two. Budget only reads it. */
 function getHotelCosts(p){
   const c = (p && p.hotelCosts) || {};
   return { perRoomNight: Number(c.perRoomNight)||0 };
 }
 async function saveHotelCosts(){
   const p = currentProject(); if(!p) return;
-  p.hotelCosts = { perRoomNight: Number(val('bgHotelRate'))||0 };
+  p.hotelCosts = { perRoomNight: Number(val('hcRoomNight'))||0 };
   await saveDB('db:projects', projectsDB);
-  renderProjectBody();
 }
 
 /* Best-effort numeric extraction from the crew database's free-text Fee/rate
@@ -4747,12 +4785,12 @@ function budgetPersonViewHTML(data){
   const ordered = DEPARTMENTS.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
   const noRateCount = data.people.filter(pp=>!pp.hasRate).length;
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th>Days worked</th><th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">Days</th><th>Subtotal</th></tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
       <td><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveCrewRateOverride('${pp.id}', this.value)"></td>
-      <td>${pp.daysWorked}</td>
+      <td style="text-align:center;">${pp.daysWorked}</td>
       <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
     </tr>`).join('')}
   </table></div>
@@ -4783,27 +4821,20 @@ function budgetDayViewHTML(data){
 }
 
 function renderProjectBudget(body){
-  const p = currentProject();
   const data = buildBudgetData();
-  const viewLabels = {department:'Per Department', person:'Per Person', day:'Per Day'};
+  const viewLabels = {department:'Per Department', day:'Per Day', person:'Per Person'};
   const viewSwitcher = `<div class="tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
   const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
     : budgetView==='day' ? budgetDayViewHTML(data)
     : budgetDepartmentViewHTML(data);
-  const hotelCosts = getHotelCosts(p);
   body.innerHTML = `
     <div class="section">
       <h2>Budget at a glance</h2>
       <div class="hint">Cost visibility only — crew day rates, and the catering/travel/hotel costs already
         entered on their own tabs. Not a working budget: location fees aren't included, and there's nothing
         here to edit as a line-item budget.</div>
-      <div class="field-inline" style="margin-top:10px;">
-        <label for="bgHotelRate">Hotel cost per room/night</label>
-        <input type="text" inputmode="decimal" id="bgHotelRate" value="${hotelCosts.perRoomNight||''}" placeholder="0.00" style="width:90px;" onchange="saveHotelCosts()">
-        <span class="hint">The one rate Budget needs that isn't set elsewhere — Catering/Travel costs are entered on their own tabs.</span>
-      </div>
       ${budgetSummaryBarHTML(data)}
       ${viewSwitcher}
       ${viewHTML}
@@ -4829,15 +4860,18 @@ function renderProjectPreview(body){
   const d = days.find(x=>x.id===currentShootDayId);
   generatePreview(d);
   if(printable && exportSections.catering) renderCateringExport();
-  /* The Travel block brings its own cost inputs (same markup as the Crew tab's), so
-     they need the same autosave wiring here. Scoped to those two field ids on
+  /* The Travel and Hotel blocks bring their own cost inputs (same markup as the Crew
+     tab's), so they need the same autosave wiring here. Scoped to those field ids on
      purpose: a bare body.oninput would also fire on the Include checkboxes, and
-     saveTransportCosts() reading fields that are no longer in the DOM would write
-     both rates back as 0. */
-  body.oninput = (printable && exportSections.travel)
-    ? (e) => { if(e.target && (e.target.id==='tsCostPublic' || e.target.id==='tsCostMileage'))
-        scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); }); }
-    : null;
+     saveTransportCosts()/saveHotelCosts() reading fields that are no longer in the
+     DOM would write those rates back as 0. */
+  body.oninput = (e) => {
+    if(!e.target) return;
+    if(printable && exportSections.travel && (e.target.id==='tsCostPublic' || e.target.id==='tsCostMileage'))
+      scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); });
+    else if(printable && exportSections.hotels && e.target.id==='hcRoomNight')
+      scheduleAutosave('hotelCosts', () => saveHotelCosts());
+  };
 }
 function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
 /* shared record shape — used by addShootDay, createProject (auto first day), and syncShootDayCount */
@@ -5600,7 +5634,7 @@ function shootDayBuildHTML(){
       </div>
       <div class="subhead">Production brief</div>
       <label>The scenes / setups being shot today — one per line</label>
-      <textarea id="sdBrief"></textarea>
+      <textarea id="sdBrief" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
       <div class="subhead">Parking / arrival (this day)</div>
       <textarea id="sdParking"></textarea>
       <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
@@ -5982,6 +6016,7 @@ function populateShootDay(d){
   renderPositionAssignments(); refreshAddPosnPick();
   setTechSpecFields('ts', resolveTechSpecs(d));
   setv('sdBrief',(d.brief||[]).join('\n')); setv('sdParking',d.parking); setv('sdNotes',d.notes);
+  autoGrowTextarea(document.getElementById('sdBrief'));
   updateHospitalDisplay();
   updateParkingLookupDisplay();
   renderCameraDesignations('day');
