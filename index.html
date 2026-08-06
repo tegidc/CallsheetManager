@@ -2552,10 +2552,9 @@ function renderProjectOverview(body){
       <div class="toolbar" style="margin-top:12px;">
         <span class="status" id="ovStatus"></span>
       </div>
+      ${quickAddSectionHTML(p)}
     </div>
-    ${quickAddSectionHTML(p)}
     ${renderTasksSection(p, days)}
-    ${aiScanSectionHTML(p)}
     <div class="section">
       <h2>Danger zone</h2>
       <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
@@ -2657,9 +2656,9 @@ function copyProjectTechSpecsText(){
 function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
 /* ============================================================================
    Overview: Quick add (Phase Quick Add) — a shortcut, not a fourth place to
-   manage anything. One shoot date, one location or one crew member at a time,
-   without leaving Overview; everything added here is edited normally on its
-   own tab afterwards.
+   manage anything. One shoot date, one location, one crew member, or an AI Scan
+   chat turn at a time, without leaving Overview; everything added here is
+   edited normally on its own tab afterwards.
 
    Deliberately NOT a parallel implementation. Every commit path below calls
    the same function AI Scan's accept flow and the unified Add Location flow
@@ -2676,12 +2675,25 @@ function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
    Crew has no such widget yet, so quickCrewResultsHTML() below is a
    line-for-line mirror of locAddResultsHTML() rather than a new idea.
 
+   AI Chat (formerly its own standalone "AI Scan" section, folded in here per
+   user request) is the fourth button, same row and style as the other three.
+   It's the odd one out functionally — a whole chat interface, not a small
+   form — but it opens in the exact same slot the other three panels use
+   (`quickAddMode==='ai'`), so from the outside it behaves like any other
+   quick-add control. aiScanChatBodyHTML() carries the actual chat markup;
+   everything about AI Scan's own state (aiScanMessages, proposals, etc.) is
+   untouched — only its container and open/close toggle moved.
+
+   No collapsible header/divider around the row itself, on request — the four
+   buttons sit directly at the bottom of the Project details card, always
+   visible, not behind their own disclosure toggle the way Tasks/AI Scan
+   (when it was standalone) were.
+
    Draft fields are held outside the DOM for the reason aiScanDraftText
    documents: renderProjectBody() replaces the whole tab body on every state
    change, which would otherwise wipe half-typed input.
    ============================================================================ */
-let quickAddOpen = false;                 // collapsed by default, same convention as Tasks/AI Scan
-let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' — one control open at a time
+let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' | 'ai' — one control open at a time
 let quickAddError = null;                 // e.g. "Pick a date first."
 /* Keys are the shoot-day RECORD field names, deliberately — the quick form is the
    same "Day details" + "Production brief" set as the Shoot Days tab's General
@@ -2693,13 +2705,8 @@ let quickCrewQuery = '';
 let quickCrewNewOpen = false;             // the "create new crew member" mini-form
 let quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
 
-function toggleQuickAddSection(){
-  quickAddOpen = !quickAddOpen;
-  if(!quickAddOpen) resetQuickAdd();
-  renderProjectBody();
-}
-/* Clicking the control that's already open closes it — the box should never
-   need a separate Cancel button to get back to three plain buttons. */
+/* Clicking the control that's already open closes it — the row should never
+   need a separate Cancel button to get back to four plain buttons. */
 function setQuickAddMode(mode){
   const same = quickAddMode === mode;
   resetQuickAdd();
@@ -2711,6 +2718,7 @@ function setQuickAddMode(mode){
     const n = String(projectDays().length + 1);
     quickDayDraft.dayNum = n; quickDayDraft.dayTotal = n;
   }
+  if(quickAddMode === 'ai') checkAiScanConfigured();   // fire-and-forget; re-renders if it learns something — same call the old standalone toggle made on open
   renderProjectBody();
 }
 /* Called both from here and from the shared add functions the three controls
@@ -2776,7 +2784,14 @@ async function quickAddNewCrew(){
   renderProjectBody();
 }
 function quickAddSectionHTML(p){
-  const open = quickAddOpen;
+  // AI Chat is a different project than the one this chat session belongs to
+  // — start fresh, same rule aiScanSectionHTML used to apply itself before
+  // this moved in here: "each AI Scan session starts fresh" rather than
+  // leaking one project's proposals/history into another's chat.
+  if(aiScanProjectId !== p.id){
+    aiScanMessages = []; aiScanProposals = {}; aiScanProjectId = p.id;
+    aiScanPendingFiles = []; aiScanError = null; aiScanPendingUserMsg = null; aiScanBusy = false;
+  }
   const mode = quickAddMode;
   const btn = (key, label) => `<button class="small ${mode===key?'primary':''}" onclick="setQuickAddMode('${key}')">+ ${label}</button>`;
   let bodyHTML = '';
@@ -2827,21 +2842,21 @@ function quickAddSectionHTML(p){
           <div class="toolbar"><button class="small primary" onclick="quickAddNewCrew()">${icon('save')} Add crew member</button></div>
           <div class="hint" style="margin-top:6px;">Just enough to get them on the project — phone, rate and the rest are on the Crew tab.</div>
         </div>` : ''}`;
+  } else if(mode === 'ai'){
+    bodyHTML = aiScanChatBodyHTML();
   }
-  return `<div class="section" id="quickAddSection">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleQuickAddSection()"><span class="dept-caret">${open?'▾':'▸'}</span> Quick add</span>
+  // No section wrapper / collapsible header here on request — this renders
+  // directly inside the Project details card, below its own toolbar, always
+  // visible rather than behind a "Quick add" disclosure.
+  return `<div id="quickAddSection" style="margin-top:14px;">
+    <div class="toolbar" style="margin-bottom:${mode?'12px':'0'};">
+      ${btn('day','Shoot date')}
+      ${btn('loc','Location')}
+      ${btn('crew','Crew')}
+      ${btn('ai','AI Chat')}
     </div>
-    <div style="display:${open?'':'none'}">
-      <div class="hint" style="margin-bottom:10px;">Add one shoot date, location or crew member without leaving Overview. Everything added here is edited normally on its own tab.</div>
-      <div class="toolbar" style="margin-bottom:${mode?'12px':'0'};">
-        ${btn('day','Shoot date')}
-        ${btn('loc','Location')}
-        ${btn('crew','Crew')}
-      </div>
-      ${quickAddError ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(quickAddError)}</div>` : ''}
-      ${bodyHTML}
-    </div>
+    ${quickAddError ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(quickAddError)}</div>` : ''}
+    ${bodyHTML}
   </div>`;
 }
 /* ---------------------------------------------------------------------------
@@ -2989,7 +3004,6 @@ const AI_SCAN_ENDPOINT = 'https://ioueoaasqnseuhrtzhbz.supabase.co/functions/v1/
 // exposure, just reused as the Edge Function's bearer token.
 const AI_SCAN_ANON_KEY = 'sb_publishable_roKbOQwNFveMHtT0OeJk5A_R1jvrKdr';
 
-let aiScanOpen = false;                 // collapsed by default, same convention as every other Overview/summary block
 let aiScanProjectId = null;             // which project aiScanMessages currently belongs to
 let aiScanMessages = [];                // [{role, content:[...blocks]}] — Anthropic message shape, frontend-only
 let aiScanProposals = {};               // {toolUseId: {type, input, status:'pending'|'accepted_new'|'accepted_match'|'discarded', matchLabel}}
@@ -3004,12 +3018,6 @@ let aiScanPendingUserMsg = null;        // optimistic preview of the in-flight u
 // here and fed back into the template's value= so it survives re-renders;
 // val('aiScanInput') is still used to read it at the moment Send is clicked.
 let aiScanDraftText = '';
-
-function toggleAiScanBlock(){
-  aiScanOpen = !aiScanOpen;
-  if(aiScanOpen) checkAiScanConfigured();   // fire-and-forget; re-renders if it learns something
-  renderProjectBody();
-}
 
 /* R14: AI Scan needs ANTHROPIC_API_KEY set as a Supabase secret by hand. Until this
    check existed the feature looked completely normal and only failed at the moment
@@ -3208,15 +3216,13 @@ function aiScanMessageHTML(msg){
     ${parts}
   </div>`;
 }
-function aiScanSectionHTML(p){
-  // a different project than the one this session belongs to — start fresh,
-  // matching "each AI Scan session starts fresh" rather than leaking one
-  // project's proposals/history into another's chat
-  if(aiScanProjectId !== p.id){
-    aiScanMessages = []; aiScanProposals = {}; aiScanProjectId = p.id;
-    aiScanPendingFiles = []; aiScanError = null; aiScanPendingUserMsg = null; aiScanBusy = false;
-  }
-  const open = aiScanOpen;
+/* The AI Chat panel body — formerly the whole of the standalone "AI Scan"
+   section (its own .section, header and open/close toggle). Now just the
+   panel content for quickAddMode==='ai', same slot the other three quick-add
+   controls render into. Project-switch reset moved to quickAddSectionHTML(),
+   since that's the function that now runs on every Overview render regardless
+   of which control (if any) is open. */
+function aiScanChatBodyHTML(){
   const displayMessages = aiScanPendingUserMsg ? [...aiScanMessages, aiScanPendingUserMsg] : aiScanMessages;
   const turnsHTML = displayMessages.map(aiScanMessageHTML).filter(Boolean).join('');
   const chipsHTML = aiScanPendingFiles.length ? `<div class="ai-attachments">${aiScanPendingFiles.map((f,i)=>
@@ -3229,25 +3235,19 @@ function aiScanSectionHTML(p){
          <code>supabase secrets set ANTHROPIC_API_KEY=…</code> once — it's a credential, so it can't be
          done from inside the app.</div>`
     : '';
-  return `<div class="section" id="aiScanSection">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleAiScanBlock()"><span class="dept-caret">${open?'▾':'▸'}</span> ${icon('sparkle')} AI Scan</span>
-    </div>
-    ${open ? notConfiguredHTML : ''}
-    <div id="aisb-block" style="display:${open?'':'none'}">
-      <div class="hint" style="margin-bottom:10px;">Chat about the project, or attach a briefing document (PDF, .docx, .txt) — Claude proposes shoot dates, locations and crew as you go. Nothing is added until you tick a proposal. This conversation isn't saved — it starts over if you leave and come back.</div>
-      <div class="ai-chat" id="aiScanChat">${turnsHTML || '<div class="empty-note">Say something about the project, or attach a briefing document, to get started.</div>'}</div>
-      ${errorHTML}
-      ${aiScanBusy ? `<div class="hint" style="margin-bottom:8px;">Thinking…</div>` : ''}
-      ${chipsHTML}
-      <div class="ai-input-row">
-        <input type="file" id="aiScanFileInput" accept=".pdf,.docx,.txt" multiple style="display:none" onchange="handleAiScanFileInput(this)">
-        <button class="icon-btn" onclick="document.getElementById('aiScanFileInput').click()" title="Attach a document" aria-label="Attach a document" ${aiScanBusy?'disabled':''}>${icon('paperclip')}</button>
-        <input type="text" id="aiScanInput" placeholder="Tell me about the shoot…" value="${esc(aiScanDraftText)}" oninput="aiScanDraftText=this.value" ${aiScanBusy?'disabled':''} onkeydown="if(event.key==='Enter'){event.preventDefault();sendAiScanMessage();}">
-        <button class="icon-btn" onclick="sendAiScanMessage()" title="Send" aria-label="Send" ${aiScanBusy?'disabled':''}>${icon('send')}</button>
-      </div>
-    </div>
-  </div>`;
+  return `
+    ${notConfiguredHTML}
+    <div class="hint" style="margin-bottom:10px;">Chat about the project, or attach a briefing document (PDF, .docx, .txt) — Claude proposes shoot dates, locations and crew as you go. Nothing is added until you tick a proposal. This conversation isn't saved — it starts over if you leave and come back.</div>
+    <div class="ai-chat" id="aiScanChat">${turnsHTML || '<div class="empty-note">Say something about the project, or attach a briefing document, to get started.</div>'}</div>
+    ${errorHTML}
+    ${aiScanBusy ? `<div class="hint" style="margin-bottom:8px;">Thinking…</div>` : ''}
+    ${chipsHTML}
+    <div class="ai-input-row">
+      <input type="file" id="aiScanFileInput" accept=".pdf,.docx,.txt" multiple style="display:none" onchange="handleAiScanFileInput(this)">
+      <button class="icon-btn" onclick="document.getElementById('aiScanFileInput').click()" title="Attach a document" aria-label="Attach a document" ${aiScanBusy?'disabled':''}>${icon('paperclip')}</button>
+      <input type="text" id="aiScanInput" placeholder="Tell me about the shoot…" value="${esc(aiScanDraftText)}" oninput="aiScanDraftText=this.value" ${aiScanBusy?'disabled':''} onkeydown="if(event.key==='Enter'){event.preventDefault();sendAiScanMessage();}">
+      <button class="icon-btn" onclick="sendAiScanMessage()" title="Send" aria-label="Send" ${aiScanBusy?'disabled':''}>${icon('send')}</button>
+    </div>`;
 }
 
 /* ---- file attachments ---- */
