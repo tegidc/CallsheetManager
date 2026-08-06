@@ -617,6 +617,18 @@
   .filter-inverted{font-family:var(--label); font-size:10px; letter-spacing:1px;
     text-transform:uppercase; color:var(--danger); border:1px solid var(--danger);
     border-radius:3px; padding:0 4px; margin-left:4px; vertical-align:1px;}
+  /* R17 — the undo toast. Sits above everything, bottom-left so it never covers the
+     primary actions on the right, and stays out of the mobile drawer's way. */
+  .undo-toast{position:fixed; left:18px; bottom:18px; z-index:900; display:flex; align-items:center; gap:14px;
+    background:var(--text); color:#FBFAF8; border-radius:8px; padding:11px 14px;
+    font-family:var(--body); font-size:var(--fs-meta); box-shadow:0 6px 22px rgba(0,0,0,.28);
+    max-width:min(420px, calc(100vw - 36px));}
+  .undo-toast .undo-action{font-weight:600; color:var(--tape-light); cursor:pointer; white-space:nowrap;}
+  .undo-toast .undo-action:hover{text-decoration:underline;}
+  .undo-toast .undo-close{cursor:pointer; opacity:.6; display:inline-flex;}
+  .undo-toast .undo-close:hover{opacity:1;}
+  .undo-toast svg{width:13px; height:13px;}
+  @media(max-width:600px){ .undo-toast{left:12px; right:12px; bottom:12px; max-width:none;} }
   .ai-attachments{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
   .ai-input-row{display:flex; align-items:center; gap:8px;}
   .ai-input-row input[type=text]{flex:1;}
@@ -3141,12 +3153,77 @@ async function saveProjectOverview(silent){
   const h1=document.querySelector('.page-head h1'); if(h1) h1.textContent = p.title;
   const codeEl=document.querySelector('.page-head .code'); if(codeEl) codeEl.textContent = projCode(p);
 }
+/* ---- R17: undo for destructive actions ------------------------------------
+   Scope is deliberately deletes + bulk edits, not a general edit history. Those are
+   the actions that actually lose work with no way back — and bulk edit sharpened
+   that considerably, since one click can now rewrite 60 people at once.
+
+   It works by snapshotting whole collections before the action and restoring them
+   if Undo is pressed. That's crude, but it's exactly right for this app's shape:
+   every mutation already ends in "saveDB the whole collection", so a snapshot IS
+   the unit of change, and restoring one can't half-apply.
+
+   Restoring has to REASSIGN (crewDB = …) rather than splice, because deleteCrew()
+   and friends reassign too — so the snapshot must become the live array itself, not
+   be poured into whatever array happens to be there. */
+const UNDO_WINDOW_MS = 10000;
+let undoPending = null;   // {label, snaps:[{key,data}], timer}
+
+function undoCollectionFor(key){
+  return { 'db:crew':crewDB, 'db:locations':locationsDB, 'db:projects':projectsDB,
+           'db:shootdays':shootDaysDB, 'db:coprocompanies':coProCompaniesList }[key];
+}
+function undoRestoreCollection(key, data){
+  switch(key){
+    case 'db:crew':          crewDB = data; break;
+    case 'db:locations':     locationsDB = data; break;
+    case 'db:projects':      projectsDB = data; break;
+    case 'db:shootdays':     shootDaysDB = data; break;
+    case 'db:coprocompanies':coProCompaniesList = data; break;
+  }
+}
+/* Call AFTER the confirm() has passed but BEFORE anything is mutated. */
+function beginUndo(keys){
+  return keys.map(k=>({ key:k, data:dbClone(undoCollectionFor(k)) }));
+}
+function finishUndo(label, snaps){
+  if(undoPending && undoPending.timer) clearTimeout(undoPending.timer);
+  undoPending = { label, snaps, timer:setTimeout(dismissUndo, UNDO_WINDOW_MS) };
+  renderUndoToast();
+}
+function dismissUndo(){
+  if(undoPending && undoPending.timer) clearTimeout(undoPending.timer);
+  undoPending = null; renderUndoToast();
+}
+async function undoLastAction(){
+  if(!undoPending) return;
+  const snaps = undoPending.snaps;
+  dismissUndo();
+  for(const s of snaps){ undoRestoreCollection(s.key, s.data); await saveDB(s.key, s.data); }
+  // A deleted project/day may have been the open one — bounce out rather than
+  // leaving the screen pointed at a record that has just come back differently.
+  if(currentProjectId && !projById(currentProjectId)){ route={screen:'welcome'}; currentProjectId=null; }
+  renderSide(); renderMain();
+}
+function renderUndoToast(){
+  let el = document.getElementById('undoToast');
+  if(!undoPending){ if(el) el.remove(); return; }
+  if(!el){ el = document.createElement('div'); el.id='undoToast'; document.body.appendChild(el); }
+  el.className = 'undo-toast';
+  el.innerHTML = `<span>${esc(undoPending.label)}</span>
+    <span class="undo-action" onclick="undoLastAction()">Undo</span>
+    <span class="undo-close" onclick="dismissUndo()" title="Dismiss">${icon('close')}</span>`;
+}
+
 async function deleteProject(id){
   if(!confirm('Delete this project and all its shoot days? Crew and locations in your databases are not affected.')) return;
+  const proj = projById(id);
+  const snaps = beginUndo(['db:projects','db:shootdays']);
   projectsDB = projectsDB.filter(p=>p.id!==id);
   shootDaysDB = shootDaysDB.filter(d=>d.projectId!==id);
   await saveDB('db:projects', projectsDB); await saveDB('db:shootdays', shootDaysDB);
   route={screen:'welcome'}; currentProjectId=null; renderSide(); renderMain();
+  finishUndo(`Deleted project "${(proj&&(proj.title||proj.client))||''}" and its shoot days.`, snaps);
 }
 
 /* ---------- Project Crew ---------- */
@@ -3454,10 +3531,12 @@ async function bulkRemoveSelectedFromProject(){
   const p = currentProject(); if(!p) return;
   const n = projectCrewSelected.size;
   if(!n || !confirm(`Remove ${n} crew member(s) from this project?`)) return;
+  const snaps = beginUndo(['db:projects']);
   p.crewIds = (p.crewIds||[]).filter(id=>!projectCrewSelected.has(id));
   projectCrewSelected.clear();
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
+  finishUndo(`Removed ${n} crew member${n>1?'s':''} from this project.`, snaps);
 }
 /* bulk edit (item 2b) — right now just Lead Company, the one field this phase
    moved off the main "Crew on this project" row. Extend bulkEditPanelHTML /
@@ -3487,10 +3566,13 @@ async function applyBulkLeadCompany(){
       await saveDB('db:coprocompanies', coProCompaniesList);
     }
   }
+  const n = projectCrewSelected.size;
+  const snaps = beginUndo(['db:crew']);
   crewDB.forEach(c=>{ if(projectCrewSelected.has(c.id)) c.coProductionCompany = value; });
   await saveDB('db:crew', crewDB);
   bulkEditOpen = false;
   renderProjectBody();
+  finishUndo(`Set lead company on ${n} crew member${n>1?'s':''}.`, snaps);
 }
 function bulkActionBarHTML(){
   if(!projectCrewSelected.size) return '';
@@ -5513,9 +5595,12 @@ async function addShootDay(){
 }
 async function deleteShootDay(id){
   if(!confirm('Delete this shoot day?')) return;
+  const label = (()=>{ const d = dayById(id); return d ? shootDayLabel(d) : 'shoot day'; })();
+  const snaps = beginUndo(['db:shootdays']);
   shootDaysDB = shootDaysDB.filter(d=>d.id!==id);
   if(currentShootDayId===id) currentShootDayId = null;
   await saveDB('db:shootdays', shootDaysDB); renderProjectBody();
+  finishUndo(`Deleted ${label}.`, snaps);
 }
 /* Overview "shoot days" count field — kept in sync both ways with the actual
    Shoot Days list. Growing it creates blank new days (same shape as + New day).
@@ -6040,10 +6125,13 @@ async function saveCrew(){
 }
 async function deleteCrew(id){
   if(!confirm('Delete this crew member from the database?')) return;
+  const who = (crewById(id)||{}).name || 'crew member';
+  const snaps = beginUndo(['db:crew','db:projects']);
   crewDB = crewDB.filter(x=>x.id!==id);
   projectsDB.forEach(p=>{ if(p.crewIds) p.crewIds = p.crewIds.filter(x=>x!==id); });
   await saveDB('db:crew', crewDB); await saveDB('db:projects', projectsDB);
   renderCrewList();
+  finishUndo(`Deleted ${who} from the crew database.`, snaps);
 }
 
 /* ============================================================ LOCATIONS DATABASE */
@@ -6154,10 +6242,13 @@ async function saveLocation(){
 }
 async function deleteLocation(id){
   if(!confirm('Delete this location?')) return;
+  const where = (locById(id)||{}).name || 'location';
+  const snaps = beginUndo(['db:locations','db:projects']);
   locationsDB = locationsDB.filter(x=>x.id!==id);
   projectsDB.forEach(p=>{ if(p.locationIds) p.locationIds = p.locationIds.filter(x=>x!==id); });
   await saveDB('db:locations', locationsDB); await saveDB('db:projects', projectsDB);
   renderLocationsList();
+  finishUndo(`Deleted ${where} from the locations database.`, snaps);
 }
 
 /* --- address search --- */

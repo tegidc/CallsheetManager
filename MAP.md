@@ -568,7 +568,8 @@ coarse information first, finest detail last.
 | **G-4** | Sample data reset | Wipe and reload the demo data set | `resetAndReseed()` |
 | **G-5** | New project form | Create a project (auto-creates its first shoot day) | `renderNewProject()` |
 | **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
-| **G-7** | Autosave & "Saved" flash | The debounced per-key autosave behind Overview/cost fields, and the status flash every save path shares | `scheduleAutosave()` / `flashStatus()` |
+| **G-7** | Undo toast | Phase R/R17 — ~10s "Undo" after a delete or bulk edit, restoring a pre-action snapshot | `finishUndo()` / `undoLastAction()` |
+| **G-8** | Autosave & "Saved" flash | The debounced per-key autosave behind Overview/cost fields, and the status flash every save path shares | `scheduleAutosave()` / `flashStatus()` |
 
 ## X — Server-side
 
@@ -780,6 +781,33 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   `toggleBlock`/`applyBlockState` plumbing (prefix `bc`) rather than a fourth
   hand-rolled toggle. Open by default: unlike a summary block you glance at, this tab
   exists to be typed into — [Budget]
+
+- `UNDO_WINDOW_MS` / `undoPending` / `beginUndo()` / `finishUndo()` / `dismissUndo()` /
+  `undoLastAction()` / `renderUndoToast()` / `undoCollectionFor()` /
+  `undoRestoreCollection()` (**R17**) — **undo for destructive actions only**, per the
+  brief: the four deletes (project, crew, location, shoot day), the bulk
+  remove-from-project, and the bulk Lead Company edit. Not a general edit history.
+  Those are the actions that lose work with no way back, and bulk edit sharpened that
+  considerably since one click can rewrite 60 people at once — [Shared/utility functions]
+  - It snapshots whole collections before the action and restores them on Undo. Crude
+    on paper, but exactly right for this app's shape: every mutation already ends in
+    "saveDB the whole collection", so a snapshot IS the unit of change and a restore
+    can't half-apply — [Shared/utility functions]
+  - ⚠️ `undoRestoreCollection()` **reassigns** (`crewDB = data`) rather than splicing,
+    because `deleteCrew()`/`deleteLocation()`/`deleteProject()` reassign too — the
+    snapshot has to become the live array, not be poured into whatever array happens
+    to be there. This is the opposite of `applyMergedDB()` (R18), which splices *because*
+    it must keep the existing array identity for held references. Don't unify them —
+    [Shared/utility functions]
+  - `beginUndo(keys)` is called AFTER the `confirm()` passes but BEFORE any mutation;
+    `finishUndo(label, snaps)` after the save. A cancelled confirm never reaches either,
+    so no toast appears for an action that didn't happen — [Shared/utility functions]
+  - `undoLastAction()` bounces to the welcome screen if the currently-open project no
+    longer exists, rather than leaving the UI pointed at a record that just came back —
+    [Shared/utility functions]
+  - `.undo-toast` is bottom-left so it never covers the primary actions on the right;
+    the Undo link uses `--tape-light`, the AA-compliant green for dark backgrounds —
+    [Shared/utility functions]
 
 ## Refinement review page (Phase Refinement)
 
