@@ -428,6 +428,13 @@
     gap:6px 16px; font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none;
     color:var(--muted); margin-bottom:8px;}
   .crew-header-left, .crew-header-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  /* R1 — Budget's Copy / Export. Inherits the toolbar's Jost/--fs-meta/muted
+     treatment like every other header control (they're things you click, not
+     captions), and goes brand green on hover the same way. */
+  .budget-output{display:flex; align-items:center; gap:14px;}
+  .budget-output > span{display:inline-flex; align-items:center; gap:5px; cursor:pointer;}
+  .budget-output > span:hover{color:var(--tape);}
+  .budget-output svg{width:13px; height:13px;}
   .crew-header-right{margin-left:auto;}
   /* Select all is a <label>, so the global label{} rule was giving it Oswald 11px
      while its neighbours were Jost 12px. Put it back in the toolbar's own font. */
@@ -5025,18 +5032,55 @@ function budgetFilteredDays(){
   const kept = budgetSelectedDays();
   return kept.length ? kept : projectDays();
 }
+/* R16 — a department filter, and R4 — a sort, for Per Person. Both live in the SAME
+   panel as the day filter rather than becoming per-view controls: like the day
+   filter, "which departments am I costing" is a scope question that every view
+   answers, so filtering here keeps the summary bar, Per Department, Per Day and Per
+   Person all telling the same story. The sort is the one genuinely Per-Person-only
+   control (the other views have their own inherent order), so it's labelled as such. */
+let budgetDeptFilter = new Set();
+let budgetSort = 'dept';
+function toggleBudgetFilterDept(dept, on){
+  if(on) budgetDeptFilter.add(dept); else budgetDeptFilter.delete(dept);
+  renderProjectBody();
+}
+function setBudgetSort(v){ budgetSort = v; renderProjectBody(); }
+function clearBudgetDayFilter(){ budgetDayFilter.clear(); budgetDeptFilter.clear(); renderProjectBody(); }
+function budgetActiveFilterCount(){ return budgetDayFilterCount() + budgetDeptFilter.size; }
+
 function budgetFilterPanelHTML(){
   const all = projectDays();
   const chips = all.length ? all.map(d=>
       `<label><input type="checkbox" ${budgetDayFilter.has(d.id)?'checked':''} onchange="toggleBudgetFilterDay('${d.id}', this.checked)"> Day ${esc(d.dayNum||'?')}</label>`
     ).join('') : '<span class="hint">No shoot days yet.</span>';
-  const n = budgetDayFilterCount();
+  // Only departments actually present on this project — same rule as the Crew panel.
+  const p = currentProject();
+  const present = DEPARTMENTS.filter(d=>projectCrew(p).some(c=>deptBucketKey(c.department)===d));
+  const deptChips = present.length ? present.map(d=>
+      `<label><input type="checkbox" ${budgetDeptFilter.has(d)?'checked':''} onchange="toggleBudgetFilterDept('${d}', this.checked)"> ${esc(d)}</label>`
+    ).join('') : '<span class="hint">No crew on this project yet.</span>';
+  const n = budgetDayFilterCount(), dn = budgetDeptFilter.size;
+  const scope = [];
+  if(n)  scope.push(`${n} of ${all.length} day${all.length===1?'':'s'}`);
+  if(dn) scope.push(`${dn} department${dn>1?'s':''}`);
   return `<div class="filter-panel">
     <div><div class="hint" style="margin-bottom:4px;">Shoot days</div><div class="filter-chips">${chips}</div></div>
+    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChips}</div></div>
+    <div class="grid g3" style="margin-top:10px;">
+      <div><label for="budgetSortPick">Sort (Per Person)</label>
+        <select id="budgetSortPick" onchange="setBudgetSort(this.value)">
+          <option value="dept"     ${budgetSort==='dept'?'selected':''}>By department (HoD first)</option>
+          <option value="name"     ${budgetSort==='name'?'selected':''}>By name</option>
+          <option value="cost"     ${budgetSort==='cost'?'selected':''}>By cost (highest first)</option>
+          <option value="rate"     ${budgetSort==='rate'?'selected':''}>By day rate (highest first)</option>
+          <option value="days"     ${budgetSort==='days'?'selected':''}>By days worked (most first)</option>
+          <option value="noRate"   ${budgetSort==='noRate'?'selected':''}>Missing a day rate first</option>
+        </select></div>
+    </div>
     <div class="filter-panel-foot">
-      <span class="hint">${n ? `Costing ${n} of ${all.length} day${all.length===1?'':'s'} — every figure below is for those days only.`
-                            : 'All days. Tick any to cost part of the shoot.'}</span>
-      ${n ? `<span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearBudgetDayFilter()">Clear filters</span>` : ''}
+      <span class="hint">${scope.length ? `Costing ${scope.join(' · ')} — every figure below is for those only.`
+                                        : 'Whole project. Tick any day or department to narrow it.'}</span>
+      ${scope.length ? `<span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearBudgetDayFilter()">Clear filters</span>` : ''}
     </div>
   </div>`;
 }
@@ -5047,7 +5091,12 @@ function buildBudgetData(){
   const crew = projectCrew(p);
   const hotelCosts = getHotelCosts(p);
 
-  const people = crew.map(c=>{
+  // R16 — department scope. Applied to the people list itself, so the summary bar,
+  // Per Department, Per Day and Per Person can't disagree about what's being costed.
+  const crewInScope = budgetDeptFilter.size
+    ? crew.filter(c=>budgetDeptFilter.has(deptBucketKey(c.department)))
+    : crew;
+  const people = crewInScope.map(c=>{
     const {rate, hasRate, isOverride} = resolveCrewRate(c, p);
     const daysWorked = days.filter(d=>(d.positions||[]).some(pos=>pos[0]===c.id)).length;
     const subtotal = rate * daysWorked;
@@ -5131,7 +5180,7 @@ function buildBudgetData(){
   return {
     people, departments, cateringTotal, travelTotal, hotelTotal, extrasTotal,
     crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
-    hasCrew: crew.length>0, hasDays: days.length>0
+    hasCrew: crewInScope.length>0, hasDays: days.length>0
   };
 }
 
@@ -5183,7 +5232,7 @@ function budgetPersonViewHTML(data){
   // There's no existing sortable-table (click-a-column-header) pattern
   // anywhere in this app to extend, so this stays a fixed, sensible order
   // rather than inventing a new UI paradigm for one screen.
-  const ordered = DEPARTMENTS.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
+  const ordered = budgetOrderedPeople(data);
   const noRateCount = data.people.filter(pp=>!pp.hasRate).length;
   return `<div class="tablewrap"><table>
     <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT</th><th style="text-align:center;">Days</th><th>Subtotal</th></tr>
@@ -5242,25 +5291,33 @@ function budgetCostsViewHTML(){
       <label for="${id}">${label}</label>
       <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
     </div>`;
+  // R16 — the three cost groups collapse, via the same shared applyBlockState
+  // plumbing (prefix 'bc') as every other collapsible block, rather than a
+  // hand-rolled toggle. Open by default: this tab exists to be typed into.
+  const group = (key, title, fields) => `<div class="sd-block">
+      <div class="sd-block-head flush" style="margin-top:${key==='catering'?'0':'18px'};">
+        <span class="sd-block-head-toggle" onclick="toggleBudgetCostBlock('${key}')">
+          <span class="dept-caret" id="bcc-${key}">${budgetCostBlocks[key]?'▾':'▸'}</span> ${title}
+        </span>
+      </div>
+      <div id="bcb-${key}" style="display:${budgetCostBlocks[key]?'':'none'};">
+        <div style="display:flex; gap:18px; flex-wrap:wrap;">${fields}</div>
+      </div>
+    </div>`;
   return `
     <div class="hint" style="margin-bottom:14px;">Same cost fields as the Hotel/Catering/Travel tabs under Crew —
       a change made here or there updates both.</div>
-    <div class="subhead">Catering</div>
-    <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px;">
-      ${costFieldHTML('ccCostB', 'Est. cost per Breakfast', cateringCosts.b)}
-      ${costFieldHTML('ccCostL', 'Est. cost per Lunch', cateringCosts.l)}
-      ${costFieldHTML('ccCostD', 'Est. cost per Dinner', cateringCosts.d)}
-      ${costFieldHTML('ccCostDelivery', 'Delivery cost', cateringCosts.delivery)}
-    </div>
-    <div class="subhead">Travel</div>
-    <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px;">
-      ${costFieldHTML('tsCostPublic', 'Est. public transport cost/day', transportCosts.publicPerDay)}
-      ${costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', transportCosts.mileage)}
-    </div>
-    <div class="subhead">Hotel</div>
-    <div style="display:flex; gap:18px; flex-wrap:wrap;">
-      ${costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight)}
-    </div>`;
+    ${expandCollapseAllHTML('toggleAllBudgetCostBlocks()', undefined, allBlocksCollapsed(budgetCostBlocks), 'bc')}
+    ${group('catering', 'Catering',
+        costFieldHTML('ccCostB', 'Est. cost per Breakfast', cateringCosts.b)
+      + costFieldHTML('ccCostL', 'Est. cost per Lunch', cateringCosts.l)
+      + costFieldHTML('ccCostD', 'Est. cost per Dinner', cateringCosts.d)
+      + costFieldHTML('ccCostDelivery', 'Delivery cost', cateringCosts.delivery))}
+    ${group('travel', 'Travel',
+        costFieldHTML('tsCostPublic', 'Est. public transport cost/day', transportCosts.publicPerDay)
+      + costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', transportCosts.mileage))}
+    ${group('hotel', 'Hotel',
+        costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight))}`;
 }
 /* Targeted refresh of just the summary bar after a Costs-tab cost field autosaves —
    same "don't blow away the field the user is still typing in" rule as
@@ -5269,6 +5326,93 @@ function renderBudgetSummaryBar(){
   const el = document.getElementById('budgetSummaryBarWrap'); if(!el) return;
   el.innerHTML = budgetSummaryBarHTML(buildBudgetData());
 }
+/* R4 — the Per Person row order, in ONE place so the screen and the Copy/Excel
+   export can't drift apart. Default stays canonical department order, HoD first
+   within it (what every other crew list does when nothing is chosen); the rest
+   answer the questions a cost screen actually gets asked. Ties fall back to name so
+   the order is stable rather than depending on however the array happened to arrive. */
+/* R16 — the Costs tab's three groups, on the shared collapsible plumbing (prefix
+   'bc') rather than a fourth hand-rolled toggle. Open by default: unlike a summary
+   block you glance at, this tab exists to be typed into. */
+let budgetCostBlocks = { catering:true, travel:true, hotel:true };
+function toggleBudgetCostBlock(key){ toggleBlock(budgetCostBlocks, 'bc', key); }
+function toggleAllBudgetCostBlocks(){ setAllBlocksCollapsed(budgetCostBlocks, 'bc', !allBlocksCollapsed(budgetCostBlocks)); }
+
+function budgetOrderedPeople(data){
+  const byName = (a,b)=>(a.name||'').localeCompare(b.name||'');
+  if(budgetSort==='dept') return DEPARTMENTS.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
+  return [...data.people].sort((a,b)=>{
+    switch(budgetSort){
+      case 'name':   return byName(a,b);
+      case 'cost':   return (b.display-a.display) || byName(a,b);
+      case 'rate':   return ((b.hasRate?b.rate:-1)-(a.hasRate?a.rate:-1)) || byName(a,b);
+      case 'days':   return (b.daysWorked-a.daysWorked) || byName(a,b);
+      // "no rate on file" is a to-do list, so those come first, then by name
+      case 'noRate': return (Number(a.hasRate)-Number(b.hasRate)) || byName(a,b);
+      default:       return byName(a,b);
+    }
+  });
+}
+
+/* R1 — Budget was the only summary screen in the app with no way to get the numbers
+   out; every other one (hotel, catering, travel, tech) has had a Copy since its own
+   phase. Built from the SAME buildBudgetData() the screen renders from, so the copy
+   and the screen can never disagree — and it honours the active day/department
+   filter, because a budget you send while filtered should say so rather than quietly
+   exporting the whole project. Rows mirror the visible view, not a fixed shape. */
+function budgetExportRows(data){
+  const fmt = n => '£'+(n||0).toFixed(2);
+  const rows = [];
+  const scope = [];
+  const allDays = projectDays();
+  if(budgetDayFilterCount()) scope.push(`${budgetDayFilterCount()} of ${allDays.length} days`);
+  if(budgetDeptFilter.size)  scope.push([...budgetDeptFilter].join(', '));
+  if(scope.length) rows.push(['Filtered to', scope.join(' · ')], []);
+  budgetVatToggle
+    ? rows.push(['Total (ex-VAT)', fmt(data.totalExVat)], ['VAT', fmt(data.vatTotal)], ['Total (inc-VAT)', fmt(data.totalIncVat)])
+    : rows.push(['Total', fmt(data.totalIncVat)]);
+  rows.push([]);
+  if(budgetView==='person'){
+    rows.push(['Name','Role','Day rate','VAT','Days','Subtotal']);
+    budgetOrderedPeople(data).forEach(pp=>rows.push([
+      pp.name, pp.role||'', pp.hasRate?fmt(pp.rate):'no rate on file',
+      pp.vatRegistered?'Yes':'No', pp.daysWorked, pp.hasRate?fmt(pp.display):'—']));
+  } else if(budgetView==='day'){
+    rows.push(['Day','Location','Total']);
+    data.perDay.forEach(d=>rows.push([`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.total)]));
+  } else {
+    rows.push(['Department','Cost']);
+    data.departments.forEach(d=>rows.push([d.dept, fmt(d.total)]));
+    rows.push(['Catering', fmt(data.cateringTotal)], ['Travel', fmt(data.travelTotal)],
+              ['Hotels', fmt(data.hotelTotal)],
+              ['Total', fmt(budgetVatToggle ? data.totalExVat : data.totalIncVat)]);
+  }
+  return rows;
+}
+function budgetExportTitle(){
+  const p = currentProject();
+  const viewLabel = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Per Department'}[budgetView] || 'Budget';
+  return `BUDGET — ${(p&&(p.title||p.client))||''} — ${viewLabel}`;
+}
+function copyBudget(){
+  const data = buildBudgetData();
+  // two-column rows read as "label: value"; wider rows as a spaced table row
+  const out = [budgetExportTitle(), ''];
+  budgetExportRows(data).forEach(r=>{
+    if(!r.length) return out.push('');
+    out.push(r.length===2 ? `${r[0]}: ${r[1]}` : r.join('  |  '));
+  });
+  copyText(out.join('\n'), 'Budget copied');
+}
+function downloadBudgetExcel(){
+  const data = buildBudgetData();
+  const aoa = [[budgetExportTitle()], []].concat(budgetExportRows(data).map(r=>r.length?r:['']));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Budget');
+  const p = currentProject();
+  XLSX.writeFile(wb, `budget-${((p&&(p.title||p.client))||'project').replace(/[^\w-]+/g,'-').toLowerCase()}.xlsx`);
+}
+
 function renderProjectBudget(body){
   const data = buildBudgetData();
   const viewLabels = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Costs'};
@@ -5277,11 +5421,18 @@ function renderProjectBudget(body){
   </div>`;
   // Same construction as the Crew tab's Filter and Preview & Export's Format panel:
   // one toggle in a crewToolbarHTML() row, panel rendered below the row, not in it.
-  const dayFilterCount = budgetDayFilterCount();
+  const activeFilters = budgetActiveFilterCount();
   const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleBudgetFilterPanel()">
-    <span class="dept-caret">${budgetFilterOpen?'▾':'▸'}</span> Filter${dayFilterCount?` (${dayFilterCount} day${dayFilterCount>1?'s':''})`:''}
+    <span class="dept-caret">${budgetFilterOpen?'▾':'▸'}</span> Filter${activeFilters?` (${activeFilters})`:''}
   </span>`;
-  const filterRow = crewToolbarHTML('', filterToggleSpan, '')
+  // Copy/Export sit in the toolbar's right slot — the same place the Crew tab keeps
+  // its whole-list actions. Hidden on the Costs tab, which is inputs, not figures.
+  const outputHTML = budgetView==='costs' ? '' :
+    `<span class="budget-output">
+       <span onclick="copyBudget()" title="Copy this view as text">${icon('copy')} Copy</span>
+       <span onclick="downloadBudgetExcel()" title="Download this view as .xlsx">${icon('download')} Export</span>
+     </span>`;
+  const filterRow = crewToolbarHTML('', filterToggleSpan, outputHTML)
     + (budgetFilterOpen ? budgetFilterPanelHTML() : '');
   const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
     : budgetView==='day' ? budgetDayViewHTML(data)

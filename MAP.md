@@ -518,7 +518,7 @@ coarse information first, finest detail last.
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
-| T-6.0 | · Day filter | Phase Refinement — tick shoot days to cost only part of the shoot. Scopes all four views at once, so it sits above the switcher, not in it. No ticks = whole project | `budgetFilterPanelHTML()` |
+| T-6.0 | · Filter & output | Phase Refinement/R16 — tick shoot days and/or departments to cost part of the shoot, plus the Per Person sort (R4) and the Copy/Export controls (R1). Scopes all four views at once, so it sits above the switcher, not in it. Nothing ticked = whole project | `budgetFilterPanelHTML()` / `copyBudget()` |
 | T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
 | T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
 | T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override) with its Save-to-database icon (Phase AG), VAT checkbox (Phase AH), Days worked, Subtotal | `budgetPersonViewHTML()` |
@@ -754,6 +754,32 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   unconditional. Phase Overview Reorder had already removed every UI path to them, so
   they had been permanently `true` with no way to reach them — kept then "in case a UI
   returns", declined now. Do not re-add without a UI — [Overview]
+
+- `budgetDeptFilter` / `toggleBudgetFilterDept()` / `budgetActiveFilterCount()`
+  (**R16**) — a department scope, living in the SAME panel as the day filter rather
+  than becoming a per-view control. Applied to the people list inside
+  `buildBudgetData()`, so the summary bar, Per Department, Per Day and Per Person
+  can't disagree about what's being costed. `clearBudgetDayFilter()` clears both.
+  **Verified**: filtering to Cinematography produces £26,400, exactly the figure that
+  department's row shows in the unfiltered Per Department view — [Budget]
+- `budgetSort` / `setBudgetSort()` / `budgetOrderedPeople()` (**R4**) — Per Person is
+  sortable: department (default, HoD-first — the order every other crew list uses when
+  nothing is chosen), name, cost, day rate, days worked, or missing-a-rate-first (a
+  to-do list, so those come first). Ties fall back to name so the order is stable
+  rather than depending on however the array arrived. The ordering lives in ONE
+  function used by both the screen and the export, so they can't drift — [Budget]
+- `budgetExportRows()` / `budgetExportTitle()` / `copyBudget()` /
+  `downloadBudgetExcel()` (**R1**) — Budget was the only summary screen in the app
+  with no way to get the numbers out. Built from the same `buildBudgetData()` the
+  screen renders from, and honouring the active filter (a budget sent while filtered
+  should say so — the export leads with a "Filtered to" line rather than quietly
+  emitting the whole project). Rows mirror the visible view. Hidden on the Costs tab,
+  which is inputs rather than figures — [Budget]
+- `budgetCostBlocks` / `toggleBudgetCostBlock()` / `toggleAllBudgetCostBlocks()`
+  (**R16**) — the Costs tab's three groups collapse, on the shared
+  `toggleBlock`/`applyBlockState` plumbing (prefix `bc`) rather than a fourth
+  hand-rolled toggle. Open by default: unlike a summary block you glance at, this tab
+  exists to be typed into — [Budget]
 
 ## Refinement review page (Phase Refinement)
 
