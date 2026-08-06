@@ -2553,6 +2553,7 @@ function renderProjectOverview(body){
         <span class="status" id="ovStatus"></span>
       </div>
     </div>
+    ${quickAddSectionHTML(p)}
     ${renderTasksSection(p, days)}
     ${aiScanSectionHTML(p)}
     <div class="section">
@@ -2562,6 +2563,10 @@ function renderProjectOverview(body){
   // autosave: ~1s after the user stops typing anywhere in this tab, save project
   // details silently (no alert, no button flash — just the existing "Saved" text)
   body.oninput = () => scheduleAutosave('overview', () => saveProjectOverview(true));
+  // Quick add: land the cursor in the field the user just opened, same as the
+  // Locations tab does for its own search box.
+  if(quickAddMode === 'loc') document.getElementById('locAddSearch')?.focus();
+  else if(quickAddMode === 'crew') document.getElementById(quickCrewNewOpen ? 'quickCrewName' : 'quickCrewSearch')?.focus();
   const chatEl = document.getElementById('aiScanChat');
   if(chatEl) chatEl.scrollTop = chatEl.scrollHeight;
 }
@@ -2649,6 +2654,164 @@ function copyProjectTechSpecsText(){
   return L.join('\n');
 }
 function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
+/* ============================================================================
+   Overview: Quick add (Phase Quick Add) — a shortcut, not a fourth place to
+   manage anything. One shoot date, one location or one crew member at a time,
+   without leaving Overview; everything added here is edited normally on its
+   own tab afterwards.
+
+   Deliberately NOT a parallel implementation. Every commit path below calls
+   the same function AI Scan's accept flow and the unified Add Location flow
+   already call:
+     shoot day      → addShootDayFromProposal()  (which reuses makeShootDayRecord())
+     location — existing → addLocToProject()
+     location — new      → startNewLocationFromSearch() → locFormHTML()/saveLocation()
+     crew — existing     → addCrewToProject()
+     crew — new          → addNewCrewFromProposal()
+   The location control goes further and reuses the Locations tab's actual
+   search widget (locAddQuery / onLocAddInput() / locAddResultsHTML() /
+   #locFormWrap) rather than a lookalike — the two are never on screen at the
+   same time, since they live on different tabs of the same body element.
+   Crew has no such widget yet, so quickCrewResultsHTML() below is a
+   line-for-line mirror of locAddResultsHTML() rather than a new idea.
+
+   Draft fields are held outside the DOM for the reason aiScanDraftText
+   documents: renderProjectBody() replaces the whole tab body on every state
+   change, which would otherwise wipe half-typed input.
+   ============================================================================ */
+let quickAddOpen = false;                 // collapsed by default, same convention as Tasks/AI Scan
+let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' — one control open at a time
+let quickAddError = null;                 // e.g. "Pick a date first."
+let quickDayDraft = { date:'', label:'', notes:'' };
+let quickCrewQuery = '';
+let quickCrewNewOpen = false;             // the "create new crew member" mini-form
+let quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
+
+function toggleQuickAddSection(){
+  quickAddOpen = !quickAddOpen;
+  if(!quickAddOpen) resetQuickAdd();
+  renderProjectBody();
+}
+/* Clicking the control that's already open closes it — the box should never
+   need a separate Cancel button to get back to three plain buttons. */
+function setQuickAddMode(mode){
+  const same = quickAddMode === mode;
+  resetQuickAdd();
+  quickAddMode = same ? null : mode;
+  if(quickAddMode === 'loc') locAddQuery = '';   // shared with the Locations tab widget
+  renderProjectBody();
+}
+/* Called both from here and from the shared add functions the three controls
+   end in, so the box returns to its resting state whichever entry point the
+   user actually finished through. */
+function resetQuickAdd(){
+  quickAddMode = null; quickAddError = null;
+  quickDayDraft = { date:'', label:'', notes:'' };
+  quickCrewQuery = ''; quickCrewNewOpen = false;
+  quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
+}
+async function quickAddShootDay(){
+  if(!quickDayDraft.date){ quickAddError = 'Pick a date first.'; renderProjectBody(); return; }
+  const { date, label, notes } = quickDayDraft;
+  await addShootDayFromProposal(date, label, notes);   // same path as AI Scan's propose_shoot_date accept
+  resetQuickAdd();
+  renderProjectBody();
+}
+function onQuickCrewInput(q){
+  quickCrewQuery = q;
+  const el = document.getElementById('quickCrewResults');
+  if(el) el.innerHTML = quickCrewResultsHTML();   // results only — re-rendering the tab would steal focus mid-word
+}
+function quickCrewResultsHTML(){
+  const p = currentProject(); if(!p) return '';
+  const assignedIds = p.crewIds||[];
+  const q = quickCrewQuery.trim();
+  const ql = q.toLowerCase();
+  const blob = c => (c.name+' '+(c.role||'')+' '+(c.department||'')).toLowerCase();
+  const matches = crewDB.filter(c=>!assignedIds.includes(c.id)).filter(c=>!ql || blob(c).includes(ql)).slice(0,8);
+  const rows = matches.map(c=>`<div class="sritem" onclick="addCrewToProject('${c.id}')">
+      <strong>${esc(c.name)}</strong>${(c.role||c.department)?`<div class="hint">${esc([c.role,c.department].filter(Boolean).join(' — '))}</div>`:''}
+    </div>`).join('');
+  let note = '';
+  if(!matches.length){
+    const alreadyOn = ql && crewDB.some(c=>assignedIds.includes(c.id) && blob(c).includes(ql));
+    note = `<div class="sritem" style="cursor:default; color:var(--muted);">${
+      alreadyOn ? 'Already on this project.'
+      : q ? `No saved crew member matches “${esc(q)}”.`
+      : 'Everyone in the database is already on this project.'}</div>`;
+  }
+  return rows + note + `<div class="sritem" style="color:var(--tape);" onclick="startNewCrewFromSearch()">${
+    q ? `+ Create new crew member “${esc(q)}”` : '+ Create a new crew member'}</div>`;
+}
+function startNewCrewFromSearch(){
+  quickCrewNewOpen = true;
+  quickCrewDraft = { name: quickCrewQuery.trim(), dept: DEPARTMENTS[0], role:'' };
+  renderProjectBody();
+}
+async function quickAddNewCrew(){
+  const name = (quickCrewDraft.name||'').trim();
+  if(!name){ quickAddError = 'Give them a name first.'; renderProjectBody(); return; }
+  // same path as AI Scan's propose_crew "add as new" accept
+  await addNewCrewFromProposal(name, quickCrewDraft.dept, quickCrewDraft.role);
+  resetQuickAdd();
+  renderProjectBody();
+}
+function quickAddSectionHTML(p){
+  const open = quickAddOpen;
+  const mode = quickAddMode;
+  const btn = (key, label) => `<button class="small ${mode===key?'primary':''}" onclick="setQuickAddMode('${key}')">+ ${label}</button>`;
+  let bodyHTML = '';
+  if(mode === 'day'){
+    bodyHTML = `
+      <div class="grid g2" style="margin-bottom:8px;">
+        <div><label class="req">Date</label><input type="date" id="quickDayDate" value="${esc(quickDayDraft.date)}" oninput="quickDayDraft.date=this.value"></div>
+        <div><label>Label (optional)</label><input type="text" id="quickDayLabel" value="${esc(quickDayDraft.label)}" placeholder="e.g. Studio interviews" oninput="quickDayDraft.label=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddShootDay();}"></div>
+      </div>
+      <div style="margin-bottom:8px;"><label>Notes (optional)</label><input type="text" id="quickDayNotes" value="${esc(quickDayDraft.notes)}" oninput="quickDayDraft.notes=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddShootDay();}"></div>
+      <div class="toolbar"><button class="small primary" onclick="quickAddShootDay()">${icon('save')} Add shoot day</button></div>`;
+  } else if(mode === 'loc'){
+    // the Locations tab's own widget, ids and all — see the note above
+    bodyHTML = `
+      <div class="searchresults">
+        <input type="text" id="locAddSearch" placeholder="Search saved locations…" value="${esc(locAddQuery)}" oninput="onLocAddInput(this.value)" autocomplete="off">
+        <div class="srlist" id="locAddResults">${locAddResultsHTML()}</div>
+      </div>
+      <div id="locFormWrap" style="display:none; margin-top:12px;"></div>`;
+  } else if(mode === 'crew'){
+    bodyHTML = `
+      <div class="searchresults">
+        <input type="text" id="quickCrewSearch" placeholder="Search saved crew…" value="${esc(quickCrewQuery)}" oninput="onQuickCrewInput(this.value)" autocomplete="off">
+        <div class="srlist" id="quickCrewResults">${quickCrewResultsHTML()}</div>
+      </div>
+      ${quickCrewNewOpen ? `
+        <div style="margin-top:12px;">
+          <div class="grid g2" style="margin-bottom:8px;">
+            <div><label class="req">Name</label><input type="text" id="quickCrewName" value="${esc(quickCrewDraft.name)}" oninput="quickCrewDraft.name=this.value"></div>
+            <div><label>Role</label><input type="text" id="quickCrewRole" value="${esc(quickCrewDraft.role)}" placeholder="e.g. Gaffer" oninput="quickCrewDraft.role=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddNewCrew();}"></div>
+          </div>
+          <div style="margin-bottom:8px;"><label>Department</label>
+            <select id="quickCrewDept" onchange="quickCrewDraft.dept=this.value">${DEPARTMENTS.map(d=>`<option value="${esc(d)}" ${quickCrewDraft.dept===d?'selected':''}>${esc(d)}</option>`).join('')}</select>
+          </div>
+          <div class="toolbar"><button class="small primary" onclick="quickAddNewCrew()">${icon('save')} Add crew member</button></div>
+          <div class="hint" style="margin-top:6px;">Just enough to get them on the project — phone, rate and the rest are on the Crew tab.</div>
+        </div>` : ''}`;
+  }
+  return `<div class="section" id="quickAddSection">
+    <div class="sd-block-head flush">
+      <span class="sd-block-head-toggle" onclick="toggleQuickAddSection()"><span class="dept-caret">${open?'▾':'▸'}</span> Quick add</span>
+    </div>
+    <div style="display:${open?'':'none'}">
+      <div class="hint" style="margin-bottom:10px;">Add one shoot date, location or crew member without leaving Overview. Everything added here is edited normally on its own tab.</div>
+      <div class="toolbar" style="margin-bottom:${mode?'12px':'0'};">
+        ${btn('day','Shoot date')}
+        ${btn('loc','Location')}
+        ${btn('crew','Crew')}
+      </div>
+      ${quickAddError ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(quickAddError)}</div>` : ''}
+      ${bodyHTML}
+    </div>
+  </div>`;
+}
 /* ---------------------------------------------------------------------------
    Overview: Tasks — merged auto-flags + manual tasks, one box (Phase Tasks).
    Auto-flags are dumb rule-checks against current project data, computed live
@@ -4693,6 +4856,7 @@ async function addCrewToProject(id){
   id = id || val('addCrewPick'); if(!id) return;
   const p = currentProject();
   p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(id)) p.crewIds.push(id);
+  resetQuickAdd();   // also Overview Quick Add's "existing crew member" path
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeCrewFromProject(id){
@@ -4832,6 +4996,7 @@ async function addLocToProject(id){
   const p = currentProject();
   p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(id)) p.locationIds.push(id);
   locAddOpen = false; locAddQuery = '';
+  resetQuickAdd();   // this is also Overview Quick Add's location path — put that box back to rest
   await saveDB('db:projects', projectsDB); renderProjectBody();
 }
 async function removeLocFromProject(id){
@@ -6295,6 +6460,7 @@ async function saveLocation(){
     if(p){ p.locationIds = p.locationIds||[]; if(!p.locationIds.includes(merged.id)) p.locationIds.push(merged.id); await saveDB('db:projects', projectsDB); }
     closeLocForm();
     locAddOpen = false; locAddQuery = '';   // the add flow is finished — collapse it back to the one button
+    resetQuickAdd();                        // ditto if the flow was started from Overview Quick Add
     renderProjectBody();
   } else {
     closeLocForm(); renderLocationsList();
