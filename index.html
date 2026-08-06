@@ -2567,6 +2567,7 @@ function renderProjectOverview(body){
   // Locations tab does for its own search box.
   if(quickAddMode === 'loc') document.getElementById('locAddSearch')?.focus();
   else if(quickAddMode === 'crew') document.getElementById(quickCrewNewOpen ? 'quickCrewName' : 'quickCrewSearch')?.focus();
+  else if(quickAddMode === 'day') autoGrowTextarea(document.getElementById('quickDayBrief'));   // same as fillShootDayForm() does for sdBrief
   const chatEl = document.getElementById('aiScanChat');
   if(chatEl) chatEl.scrollTop = chatEl.scrollHeight;
 }
@@ -2682,7 +2683,12 @@ function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
 let quickAddOpen = false;                 // collapsed by default, same convention as Tasks/AI Scan
 let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' — one control open at a time
 let quickAddError = null;                 // e.g. "Pick a date first."
-let quickDayDraft = { date:'', label:'', notes:'' };
+/* Keys are the shoot-day RECORD field names, deliberately — the quick form is the
+   same "Day details" + "Production brief" set as the Shoot Days tab's General
+   information card (T-5.2), so there's nothing to translate on the way in and no
+   parallel vocabulary to keep in step. `brief` is the raw textarea text here and
+   becomes an array via parseBriefLines() at commit, exactly as saveShootDay() does. */
+let quickDayDraft = { dayNum:'', dayTotal:'', date:'', allCrewCall:'', brief:'' };
 let quickCrewQuery = '';
 let quickCrewNewOpen = false;             // the "create new crew member" mini-form
 let quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
@@ -2699,6 +2705,12 @@ function setQuickAddMode(mode){
   resetQuickAdd();
   quickAddMode = same ? null : mode;
   if(quickAddMode === 'loc') locAddQuery = '';   // shared with the Locations tab widget
+  if(quickAddMode === 'day'){
+    // Day # and the total both prefill to what this new day would be, so the
+    // count climbs on its own as days are added and neither has to be typed.
+    const n = String(projectDays().length + 1);
+    quickDayDraft.dayNum = n; quickDayDraft.dayTotal = n;
+  }
   renderProjectBody();
 }
 /* Called both from here and from the shared add functions the three controls
@@ -2706,14 +2718,21 @@ function setQuickAddMode(mode){
    user actually finished through. */
 function resetQuickAdd(){
   quickAddMode = null; quickAddError = null;
-  quickDayDraft = { date:'', label:'', notes:'' };
+  quickDayDraft = { dayNum:'', dayTotal:'', date:'', allCrewCall:'', brief:'' };
   quickCrewQuery = ''; quickCrewNewOpen = false;
   quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
 }
 async function quickAddShootDay(){
-  if(!quickDayDraft.date){ quickAddError = 'Pick a date first.'; renderProjectBody(); return; }
-  const { date, label, notes } = quickDayDraft;
-  await addShootDayFromProposal(date, label, notes);   // same path as AI Scan's propose_shoot_date accept
+  if(!quickDayDraft.date){ quickAddError = 'Pick a shoot date first.'; renderProjectBody(); return; }
+  // same commit path as AI Scan's propose_shoot_date accept, and the same
+  // field-for-field mapping saveShootDay() uses on the Shoot Days tab
+  await addShootDayRecord({
+    dayNum: quickDayDraft.dayNum,
+    dayTotal: quickDayDraft.dayTotal,
+    date: quickDayDraft.date,
+    allCrewCall: quickDayDraft.allCrewCall,
+    brief: parseBriefLines(quickDayDraft.brief)
+  });
   resetQuickAdd();
   renderProjectBody();
 }
@@ -2762,13 +2781,26 @@ function quickAddSectionHTML(p){
   const btn = (key, label) => `<button class="small ${mode===key?'primary':''}" onclick="setQuickAddMode('${key}')">+ ${label}</button>`;
   let bodyHTML = '';
   if(mode === 'day'){
+    // Same field set, labels, classes and widths as the Shoot Days tab's
+    // "Day details" + "Production brief" (T-5.2) — deliberately the same form,
+    // minus the parts that need a day to already exist (locations, schedule,
+    // tech specs, parking, notes). Different DOM ids from the real form's
+    // sd* ones on purpose: those are read by saveShootDay()/fillShootDayForm()
+    // against the currently-selected day, and sdDate carries an onDayChanged()
+    // handler — sharing ids here would be sharing behaviour we don't want.
     bodyHTML = `
-      <div class="grid g2" style="margin-bottom:8px;">
-        <div><label class="req">Date</label><input type="date" id="quickDayDate" value="${esc(quickDayDraft.date)}" oninput="quickDayDraft.date=this.value"></div>
-        <div><label>Label (optional)</label><input type="text" id="quickDayLabel" value="${esc(quickDayDraft.label)}" placeholder="e.g. Studio interviews" oninput="quickDayDraft.label=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddShootDay();}"></div>
+      <div class="subhead">Day details</div>
+      <div class="ts-grid">
+        <div class="ts-field"><label>Day #</label><input type="text" id="quickDayNum" class="fld-xs" value="${esc(quickDayDraft.dayNum)}" oninput="quickDayDraft.dayNum=this.value"></div>
+        <div class="ts-field"><label>of (total)</label><input type="text" id="quickDayTotal" class="fld-xs" value="${esc(quickDayDraft.dayTotal)}" oninput="quickDayDraft.dayTotal=this.value"></div>
+        <div class="ts-field"><label class="req">Shoot date</label><input type="date" id="quickDayDate" class="fld-date" value="${esc(quickDayDraft.date)}" oninput="quickDayDraft.date=this.value"></div>
+        <div class="ts-field"><label>All-crew call</label><input type="text" id="quickDayAllCall" class="fld-sm" placeholder="08:00" value="${esc(quickDayDraft.allCrewCall)}" oninput="quickDayDraft.allCrewCall=this.value"></div>
       </div>
-      <div style="margin-bottom:8px;"><label>Notes (optional)</label><input type="text" id="quickDayNotes" value="${esc(quickDayDraft.notes)}" oninput="quickDayDraft.notes=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddShootDay();}"></div>
-      <div class="toolbar"><button class="small primary" onclick="quickAddShootDay()">${icon('save')} Add shoot day</button></div>`;
+      <div class="subhead">Production brief</div>
+      <label>The scenes / setups being shot today — one per line</label>
+      <textarea id="quickDayBrief" oninput="quickDayDraft.brief=this.value;autoGrowTextarea(this)" style="overflow:hidden;resize:none;">${esc(quickDayDraft.brief)}</textarea>
+      <div class="toolbar" style="margin-top:12px;"><button class="small primary" onclick="quickAddShootDay()">${icon('save')} Add shoot day</button></div>
+      <div class="hint" style="margin-top:6px;">Everything else — locations, schedule, crew, tech specs — is on the Shoot Days tab.</div>`;
   } else if(mode === 'loc'){
     // the Locations tab's own widget, ids and all — see the note above
     bodyHTML = `
@@ -3015,15 +3047,30 @@ async function checkAiScanConfigured(){
    more fragile than a small dedicated constructor. addShootDayFromProposal
    DOES reuse the actual shared makeShootDayRecord() — the one piece of this
    that already took a data-only shape. ------------------------------------- */
-async function addShootDayFromProposal(date, label, notes){
+/* The one commit path for "create a shoot day from plain field values", shared by
+   AI Scan's propose_shoot_date accept and Overview Quick add. Starts from the real
+   makeShootDayRecord() so a day made here is indistinguishable from one made with
+   + New day (starter schedule, empty positions, the lot), then overlays whichever
+   fields the caller actually has. Only non-empty values overlay, so a caller that
+   knows nothing about, say, allCrewCall keeps the record default rather than
+   blanking it. */
+async function addShootDayRecord(fields){
   const p = currentProject(); if(!p) return null;
   const rec = makeShootDayRecord(currentProjectId, p);
-  if(date) rec.date = date;
-  if(label) rec.brief = [label];
-  if(notes) rec.notes = notes;
+  Object.entries(fields||{}).forEach(([k,v])=>{
+    if(v===undefined || v===null || v==='') return;
+    if(Array.isArray(v) && !v.length) return;
+    rec[k] = v;
+  });
   shootDaysDB.push(rec);
   await saveDB('db:shootdays', shootDaysDB);
   return rec;
+}
+/* AI Scan's shape: the model proposes a single-line label, which is a one-line
+   production brief. Kept as a named wrapper so the accept path reads the same as
+   its sibling addNewLocationFromProposal()/addNewCrewFromProposal(). */
+async function addShootDayFromProposal(date, label, notes){
+  return addShootDayRecord({ date, brief: label?[label]:[], notes });
 }
 async function addNewLocationFromProposal(name, addressOrNotes){
   const p = currentProject(); if(!p || !name) return null;
@@ -5798,6 +5845,11 @@ function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
 /* starter schedule for every new shoot day — [time, duration, description] rows,
    same shape rowsOf()/addSchedRow() already read and write */
 const STARTER_SCHEDULE = [['','','CALL'], ['','',''], ['','1hr','LUNCH'], ['','','WRAP']];
+/* `brief` is stored as an array of lines everywhere (call sheet output joins it
+   back up). One definition of "textarea text → brief array", shared by the Shoot
+   Day form's save and Overview Quick add, so the two can't drift on whitespace
+   or blank-line handling. */
+function parseBriefLines(text){ return (text||'').split('\n').map(s=>s.trim()).filter(Boolean); }
 function makeShootDayRecord(projectId, p){
   const existing = shootDaysDB.filter(d=>d.projectId===projectId);
   return { id: uid(), projectId, dayNum: existing.length+1, dayTotal: existing.length+1,
@@ -7036,7 +7088,7 @@ async function saveShootDay(thenGenerate){
   const tsOv = {};
   TECHSPEC_FIELDS.forEach(f=>{ if((entered[f]||'') !== (projTS[f]||'')) tsOv[f] = entered[f]; });
   if(Object.keys(tsOv).length) d.techSpecs = tsOv; else delete d.techSpecs;
-  d.brief=val('sdBrief').split('\n').map(s=>s.trim()).filter(Boolean);
+  d.brief=parseBriefLines(val('sdBrief'));
   d.parking=val('sdParking'); d.notes=val('sdNotes');
   await saveDB('db:shootdays',shootDaysDB);
   flashStatus('sdStatus');
