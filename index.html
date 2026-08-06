@@ -2864,7 +2864,7 @@ async function addShootDayFromProposal(date, label, notes){
 }
 async function addNewLocationFromProposal(name, addressOrNotes){
   const p = currentProject(); if(!p || !name) return null;
-  const rec = { id:uid(), name, address:addressOrNotes||'', lat:null, lon:null,
+  const rec = { id:uid(), name, address:addressOrNotes||'', fee:'', lat:null, lon:null,
     onsiteContactName:'', onsiteContactPhone:'', accessInfo:'', recceInfo:'', parkingInfo:'', hospital:null, nearestParking:null };
   locationsDB.push(rec);
   await saveDB('db:locations', locationsDB);
@@ -5231,6 +5231,28 @@ function buildBudgetData(){
   const departments = DEPARTMENTS.filter(d=>deptCounts[d]).map(d=>
     ({dept:d, code:DEPARTMENT_CODES[d]||'', total:deptTotals[d]||0}));
 
+  /* R2 — location fees. A fee is entered once on the location record, then spread
+     evenly across the shoot days that location is actually used on, so Per Day and
+     the day filter stay honest rather than a lump landing arbitrarily on Day 1.
+     A location used on 3 days at £900 contributes £300 to each of them; filter to
+     one of those days and you see £300, not £900 and not nothing.
+     Days are counted across the WHOLE project, not just the days in scope — the
+     per-day share is a property of the deal, and mustn't change size depending on
+     what the filter happens to be showing. A location with no day assigned can't be
+     apportioned, so it's charged whole (better visible than silently dropped).
+     Uses parseRateNumber(), the same free-text reader as the crew rate field. */
+  const usesLocation = (d, locId) => d.locationId===locId
+    || (d.additionalLocationIds||[]).some(pair=>pair[0]===locId);
+  const locationFeeForDays = dayList => (p.locationIds||[]).reduce((sum, locId)=>{
+    const loc = locById(locId); if(!loc) return sum;
+    const fee = parseRateNumber(loc.fee); if(!fee) return sum;
+    const totalDaysUsed = projectDays().filter(d=>usesLocation(d, locId)).length;
+    if(!totalDaysUsed) return sum + (dayList===days ? fee : 0);   // unassigned: charge once, project-wide only
+    const perDay = fee / totalDaysUsed;
+    return sum + perDay * dayList.filter(d=>usesLocation(d, locId)).length;
+  }, 0);
+  const locationTotal = locationFeeForDays(days);
+
   const cateringGrid = buildCateringSummaryGrid();
   const transportSummary = buildTransportSummary();
   // Both grids are the Catering/Travel tabs' OWN summaries, always built for the
@@ -5257,7 +5279,7 @@ function buildBudgetData(){
 
   const crewTotalExVat = people.reduce((s,pp)=>s+pp.subtotal, 0);
   const vatTotal = people.reduce((s,pp)=>s+pp.vat, 0);
-  const extrasTotal = cateringTotal + travelTotal + hotelTotal;
+  const extrasTotal = cateringTotal + travelTotal + hotelTotal + locationTotal;
   const totalExVat = crewTotalExVat + extrasTotal;
   const totalIncVat = totalExVat + vatTotal;
 
@@ -5279,17 +5301,19 @@ function buildBudgetData(){
     // the night before Day 1 has no shoot-day row of its own — folds into Day 1
     const rooms = dayHotelRooms[i] + (i===0 ? preNightRooms : 0);
     const dayHotel = rooms * hotelCosts.perRoomNight;
+    const dayLocation = locationFeeForDays([d]);
     const crewDisplay = dayDepartments.reduce((s,dd)=>s+dd.total, 0);
     const loc = d.locationId ? locById(d.locationId) : null;
     return {
       dayId:d.id, dayNum:d.dayNum, locationLabel: loc ? loc.name : '',
       departments:dayDepartments, catering:dayCatering, travel:dayTravel, hotel:dayHotel,
-      total: crewDisplay + dayCatering + dayTravel + dayHotel
+      location:dayLocation,
+      total: crewDisplay + dayCatering + dayTravel + dayHotel + dayLocation
     };
   });
 
   return {
-    people, departments, cateringTotal, travelTotal, hotelTotal, extrasTotal,
+    people, departments, cateringTotal, travelTotal, hotelTotal, locationTotal, extrasTotal,
     crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
     hasCrew: crewInScope.length>0, hasDays: days.length>0
   };
@@ -5311,9 +5335,9 @@ function budgetSummaryBarHTML(data){
    scoped to that single day" per the brief. Extras rows are always their own
    labelled block, never folded into a department — a catering or travel bill
    isn't any one department's cost. */
-function budgetDeptExtrasTableHTML(departments, catering, travel, hotel, total, extrasLabel){
+function budgetDeptExtrasTableHTML(departments, catering, travel, hotel, total, extrasLabel, location){
   const fmt = n => '£'+(n||0).toFixed(2);
-  if(!departments.length && !catering && !travel && !hotel){
+  if(!departments.length && !catering && !travel && !hotel && !location){
     return '<div class="empty-note">Nothing to cost yet.</div>';
   }
   return `<div class="tablewrap"><table>
@@ -5323,16 +5347,17 @@ function budgetDeptExtrasTableHTML(departments, catering, travel, hotel, total, 
     <tr><td>Catering</td><td>${fmt(catering)}</td></tr>
     <tr><td>Travel</td><td>${fmt(travel)}</td></tr>
     <tr><td>Hotels</td><td>${fmt(hotel)}</td></tr>
+    <tr><td>Locations</td><td>${fmt(location)}</td></tr>
     <tr class="budget-total-row"><td>Total</td><td>${fmt(total)}</td></tr>
   </table></div>`;
 }
 
 function budgetDepartmentViewHTML(data){
-  if(!data.hasCrew && !data.cateringTotal && !data.travelTotal && !data.hotelTotal){
+  if(!data.hasCrew && !data.cateringTotal && !data.travelTotal && !data.hotelTotal && !data.locationTotal){
     return '<div class="empty-note">No crew assigned to this project yet.</div>';
   }
   const displayTotal = budgetVatToggle ? data.totalExVat : data.totalIncVat;
-  return budgetDeptExtrasTableHTML(data.departments, data.cateringTotal, data.travelTotal, data.hotelTotal, displayTotal, 'Project-wide extras');
+  return budgetDeptExtrasTableHTML(data.departments, data.cateringTotal, data.travelTotal, data.hotelTotal, displayTotal, 'Project-wide extras', data.locationTotal);
 }
 
 function budgetPersonViewHTML(data){
@@ -5376,7 +5401,7 @@ function budgetDayViewHTML(data){
         <strong>${fmt(d.total)}</strong>
       </div>
       <div id="bdb-${d.dayId}" style="display:${open?'':'none'}; margin-top:10px;">
-        ${budgetDeptExtrasTableHTML(d.departments, d.catering, d.travel, d.hotel, d.total, 'Day extras')}
+        ${budgetDeptExtrasTableHTML(d.departments, d.catering, d.travel, d.hotel, d.total, 'Day extras', d.location)}
       </div>
     </div>`;
   }).join('');
@@ -5495,7 +5520,7 @@ function budgetExportRows(data){
     rows.push(['Department','Cost']);
     data.departments.forEach(d=>rows.push([d.dept, fmt(d.total)]));
     rows.push(['Catering', fmt(data.cateringTotal)], ['Travel', fmt(data.travelTotal)],
-              ['Hotels', fmt(data.hotelTotal)],
+              ['Hotels', fmt(data.hotelTotal)], ['Locations', fmt(data.locationTotal)],
               ['Total', fmt(budgetVatToggle ? data.totalExVat : data.totalIncVat)]);
   }
   return rows;
@@ -5553,7 +5578,7 @@ function renderProjectBudget(body){
     <div class="section">
       <h2>Budget at a glance</h2>
       <div class="hint">Cost visibility only — crew day rates, and the catering/travel/hotel costs already
-        entered on their own tabs. Not a working budget: location fees aren't included, and there's nothing
+        entered on their own tabs. Not a working budget: there's nothing
         here to edit as a line-item budget.</div>
       ${filterRow}
       <div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(data)}</div>
@@ -6216,6 +6241,12 @@ function locFormHTML(l){
       <div><label>On-site contact name</label><input type="text" id="nlContactName" value="${esc(l.onsiteContactName||'')}"></div>
       <div><label>On-site contact phone</label><input type="text" id="nlContactPhone" value="${esc(l.onsiteContactPhone||'')}"></div>
     </div>
+    <div class="grid g2" style="margin:0 0 10px;">
+      <div><label for="nlFee">Location fee</label>
+        <input type="text" inputmode="decimal" id="nlFee" class="fld-md" value="${esc(l.fee||'')}" placeholder="0.00">
+        <div class="hint" style="margin-top:4px;">Total fee for this location, whatever the deal is. Budget spreads it evenly across the shoot days it's used on, so the Per&nbsp;Day view and the day filter stay honest.</div>
+      </div>
+    </div>
     <label>Access info</label><textarea id="nlAccess">${esc(l.accessInfo||'')}</textarea>
     <label style="margin-top:10px;">Recce info / link</label><textarea id="nlRecce">${esc(l.recceInfo||'')}</textarea>
     <label style="margin-top:10px;">Parking</label><textarea id="nlParking">${esc(l.parkingInfo||'')}</textarea>
@@ -6251,7 +6282,7 @@ function editLocation(id){
 async function saveLocation(){
   const name = val('nlName'); if(!name){ alert('Location name is required'); return; }
   const id = val('locEditId');
-  const rec = { id:id||uid(), name, address:val('nlAddress'), lat:locFormState.lat, lon:locFormState.lon,
+  const rec = { id:id||uid(), name, address:val('nlAddress'), fee:val('nlFee'), lat:locFormState.lat, lon:locFormState.lon,
     onsiteContactName:val('nlContactName'), onsiteContactPhone:val('nlContactPhone'),
     accessInfo:val('nlAccess'), recceInfo:val('nlRecce'), parkingInfo:val('nlParking'), hospital:locFormState.hospital, nearestParking:locFormState.parking };
   const existing = locById(id);

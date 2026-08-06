@@ -193,9 +193,10 @@ Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data
 entered elsewhere in the app rather than owning any of its own — including hotel cost
 per room/night (`getHotelCosts()`/`saveHotelCosts()`, Phase Budget originally, moved to
 the Hotel tab in Phase AD so Budget's relationship to it now matches Catering/Travel:
-read-only). Deliberately excludes location fees (one fee can span several shoot days,
-not handled here) and offers no editable line-item budget or export of its own —
-Preview & Export stays the export surface.
+read-only). Location fees were originally excluded for exactly the reason that made them awkward
+(one fee can span several shoot days); **R2 added them**, apportioned per day — see
+`locationFeeForDays()` below. Budget also gained its own Copy/Export in R1, so
+Preview & Export is no longer the only export surface.
 
 - `VAT_RATE` — fixed at 0.20 (UK standard). Not project-configurable — a real rate
   input is out of scope for a cost-visibility phase — [Budget]
@@ -823,6 +824,29 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   - `HEADER_FONTS` was renamed to `FONT_CHOICES`: once all three roles read the same
     pool the old name was actively misleading. Do not look for `HEADER_FONTS` —
     [Shared/utility functions]
+
+- `locationFeeForDays()` / `locationTotal` / `loc.fee` (**R2**) — **location fees, the
+  one cost Budget used to exclude.** Entered once on the location record (`nlFee`,
+  free text read by the same `parseRateNumber()` as the crew rate field) and spread
+  **evenly across the shoot days that location is actually used on**, so Per Day and
+  the day filter stay honest instead of a lump landing arbitrarily on Day 1: £900 over
+  3 days contributes £300 to each — [Budget, Locations]
+  - ⚠️ The per-day share is divided by the days used across the **whole project**, not
+    the days currently in scope. The share is a property of the deal and must not
+    change size depending on what the filter happens to be showing — [Budget]
+  - A location used on a day via `d.locationId` **or** `d.additionalLocationIds` counts
+    (`usesLocation()`). A location with no day assigned can't be apportioned, so it's
+    charged whole against the project-wide figure only — visible beats silently
+    dropped — [Budget]
+  - Adds a **Locations** row to `budgetDeptExtrasTableHTML()` (shared by the
+    project-wide Per Department view and each Per Day breakdown) and to the export.
+    Budget's own description no longer says location fees aren't included, and the
+    "nothing to cost" empty states now test `locationTotal` too, so a project with only
+    a location fee doesn't render as empty — [Budget]
+  - **Verified**: a £900 fee on a location used across all 6 ROW 2026 days produced
+    £150 per day, summed back to exactly £900, raised the project total by exactly
+    £900, and filtering to one of those days showed £150 rather than the whole fee —
+    [Budget]
 
 ## Refinement review page (Phase Refinement)
 
