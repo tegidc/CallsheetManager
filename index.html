@@ -930,7 +930,7 @@ const COMPANY = 'Little Film Productions';
    documentElement, so no rule needs to know settings exist. That is also why the two
    former hand-written rgba(1,119,86,…) one-offs became --tint-5/--tint-6: a token
    that isn't a token can't follow the brand colour. */
-const HEADER_FONTS = {
+const FONT_CHOICES = {
   fraunces:  { label:'Fraunces (default — stands in for Moret)', stack:"'Fraunces', Georgia, serif" },
   oswald:    { label:'Oswald (the real brand font)',             stack:"'Oswald', sans-serif" },
   jost:      { label:'Jost (stands in for Futura PT)',           stack:"'Jost', 'Futura PT', sans-serif" },
@@ -939,10 +939,14 @@ const HEADER_FONTS = {
 };
 /* Only families already in the Google Fonts request on line 8 (plus two system stacks)
    are offered — adding a family here means adding it to that <link> too, or it renders
-   as the fallback and nobody notices. */
-// flagNo* are the Overview Tasks box's auto-flag rule toggles (Phase Tasks) —
-// site-wide, not per-project, so a rule silenced once stays off everywhere.
-const SETTINGS_DEFAULTS = { headerFont:'fraunces', brand:'#017756', brandLight:'#0FA47A' };
+   as the fallback and nobody notices.
+   R15: this pool now feeds all THREE font roles, not just headings — hence the rename
+   from HEADER_FONTS. The three roles are the same three the design system has always
+   had (Fraunces display / Oswald label / Jost body); settings just makes each one
+   choosable instead of only the first. `headerFont` keeps its original key so
+   settings saved before R15 still load. */
+const SETTINGS_DEFAULTS = { headerFont:'fraunces', labelFont:'oswald', bodyFont:'jost',
+                            brand:'#017756', brandLight:'#0FA47A' };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -955,8 +959,12 @@ function hexToRgbTriple(hex){
 const TINT_ALPHAS = [.03, .05, .10, .14, .35, .28];
 function applyAppSettings(){
   const root = document.documentElement.style;
-  const font = HEADER_FONTS[appSettings.headerFont] || HEADER_FONTS.fraunces;
-  root.setProperty('--disp', font.stack);
+  // Same mechanism as before, three times: write the token the stylesheet already
+  // declares, so no CSS rule needs to know settings exist.
+  const stackFor = (key, fallback) => (FONT_CHOICES[appSettings[key]] || FONT_CHOICES[fallback]).stack;
+  root.setProperty('--disp',  stackFor('headerFont','fraunces'));
+  root.setProperty('--label', stackFor('labelFont','oswald'));
+  root.setProperty('--body',  stackFor('bodyFont','jost'));
   const brand = appSettings.brand || SETTINGS_DEFAULTS.brand;
   const light = appSettings.brandLight || SETTINGS_DEFAULTS.brandLight;
   root.setProperty('--tape', brand);
@@ -1744,24 +1752,49 @@ function renderMain(){
    existing navigation pattern for "project-independent thing you go and look at" is
    the sidebar screen (Crew database, Locations database), and a modal cog would have
    been a second pattern for no gain. Same .page-head / .section markup as those. */
+/* R15 — Settings' sections collapse, on the same shared plumbing (prefix 'st') as
+   every other collapsible block, rather than being the one screen that ignores the
+   standing rule. Open by default: it's a short screen you come to in order to change
+   something, so starting it collapsed would just add a click. */
+let settingsBlocks = { fonts:true, colours:true, preview:true, company:true };
+function toggleSettingsBlock(key){ toggleBlock(settingsBlocks, 'st', key); }
+function toggleAllSettingsBlocks(){ setAllBlocksCollapsed(settingsBlocks, 'st', !allBlocksCollapsed(settingsBlocks)); }
+function settingsBlockHTML(key, title, inner){
+  const open = settingsBlocks[key];
+  return `<div class="sd-block section">
+    <div class="sd-block-head flush">
+      <span class="sd-block-head-toggle" onclick="toggleSettingsBlock('${key}')">
+        <span class="dept-caret" id="stc-${key}">${open?'▾':'▸'}</span> ${esc(title)}
+      </span>
+    </div>
+    <div id="stb-${key}" style="display:${open?'':'none'};">${inner}</div>
+  </div>`;
+}
+
 function renderSettings(m){
   setTopbarTitle('Settings');
-  const fontOptions = Object.keys(HEADER_FONTS).map(k=>
-    `<option value="${k}" ${appSettings.headerFont===k?'selected':''}>${esc(HEADER_FONTS[k].label)}</option>`).join('');
+  /* R15 — one pool, three roles. Each select writes its own token, so the three
+     jobs the design system has always had (display / label / body) are now each
+     choosable rather than only the first. */
+  const fontPicker = (settingKey, id, label, hint) => `<div>
+      <label for="${id}">${esc(label)}</label>
+      <select id="${id}" onchange="setSetting('${settingKey}', this.value); renderMain();">
+        ${Object.keys(FONT_CHOICES).map(k=>
+          `<option value="${k}" ${appSettings[settingKey]===k?'selected':''}>${esc(FONT_CHOICES[k].label)}</option>`).join('')}
+      </select>
+      <div class="hint" style="margin-top:4px;">${esc(hint)}</div>
+    </div>`;
   m.innerHTML = `
     <div class="page-head"><h1>Settings</h1><div class="eyebrow">${esc(COMPANY)}</div></div>
-    <div class="section">
-      <h2>Call sheet headers</h2>
-      <div class="grid g2">
-        <div>
-          <label for="setHeaderFont">Header font</label>
-          <select id="setHeaderFont" onchange="setSetting('headerFont', this.value); renderMain();">${fontOptions}</select>
-        </div>
+    ${expandCollapseAllHTML('toggleAllSettingsBlocks()', undefined, allBlocksCollapsed(settingsBlocks), 'st')}
+    ${settingsBlockHTML('fonts', 'Fonts', `
+      <div class="grid g3">
+        ${fontPicker('headerFont','setHeaderFont','Display / headings','Section headings, shoot-day block headings and the call sheet preview title.')}
+        ${fontPicker('labelFont','setLabelFont','Labels','The small uppercase field labels, column headers and department codes.')}
+        ${fontPicker('bodyFont','setBodyFont','Body text','Everything else — names, form fields, table data, buttons.')}
       </div>
-      <p class="hint" style="margin-top:8px;">Used for every display heading — the call sheet preview title, section headings and shoot-day block headings. The WhatsApp text is plain text, so it can't carry a font; this reaches the preview card and the printable output.</p>
-    </div>
-    <div class="section">
-      <h2>Brand colours</h2>
+      <p class="hint" style="margin-top:8px;">These are the three roles the app has always used (Fraunces display, Oswald labels, Jost body) — you can now pick each one rather than only the headings. Only families already loaded by the page are offered; anything else would silently render as a fallback. The WhatsApp export is plain text, so it can't carry a font.</p>`)}
+    ${settingsBlockHTML('colours', 'Brand colours', `
       <div class="grid g2">
         <div>
           <label for="setBrand">Brand colour (light backgrounds)</label>
@@ -1777,10 +1810,8 @@ function renderSettings(m){
       <p class="hint" style="margin-top:8px;">The brand colour drives every heading, label and green tint, including the call sheet output. The sidebar sits on a near-black background, so it takes a lifted version of the same hue — the default pair is #017756 / #0FA47A, which clears AA contrast in both places. Pick something too dark for the sidebar and active items will be hard to read.</p>
       <div class="toolbar" style="margin-top:12px;">
         <button onclick="resetAppSettings()">${icon('refresh')} Reset to brand defaults</button>
-      </div>
-    </div>
-    <div class="section">
-      <h2>Preview</h2>
+      </div>`)}
+    ${settingsBlockHTML('preview', 'Preview', `
       <div class="card" style="margin-top:0;">
         <div class="line1">${esc(COMPANY)} · Sample Client — Sample Project</div>
         <div class="sub">Monday 1 June 2026 · Day 1 of 3 · All-crew call 08:00</div>
@@ -1791,14 +1822,12 @@ function renderSettings(m){
           <tr><td>CIN</td><td>DOP</td><td>Sample Name</td><td>08:30</td></tr>
         </table></div>
       </div>
-    </div>
-    <div class="section">
-      <h2>Company</h2>
+      <p class="hint" style="margin-top:8px;">All three fonts appear here: the title and "Position assignments" heading are display, the column headers are labels, the rest is body text.</p>`)}
+    ${settingsBlockHTML('company', 'Company', `
       <div class="grid g2">
         <div><label>Production company</label><input type="text" value="${esc(COMPANY)}" readonly></div>
       </div>
-      <p class="hint" style="margin-top:8px;">Single company for now. Per-company logos and details are deliberately not built — that waits until the app is used by anyone outside ${esc(COMPANY)}.</p>
-    </div>`;
+      <p class="hint" style="margin-top:8px;">Single company for now. Per-company logos and details are deliberately not built — that waits until the app is used by anyone outside ${esc(COMPANY)}.</p>`)}`;
 }
 /* apply without persisting — the colour picker fires oninput continuously while
    dragging, and one Supabase write per pixel of hue is not a good trade */

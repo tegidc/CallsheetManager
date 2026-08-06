@@ -404,7 +404,7 @@ Preview & Export stays the export surface.
 - `duplicateCrew()` — clones a crew record as a starting point for a new one — [Shared/utility functions]
 - `coProPillSelect()` / `quickSetCoPro()` / `coProCompaniesList` — render and update a crew member's co-production company assignment — [Shared/utility functions]
 - `crewIdentityHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab) — [Shared/utility functions]
-- `appSettings` / `SETTINGS_DEFAULTS` / `HEADER_FONTS` / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, plus (Phase Tasks) the three Overview auto-flag rule toggles (`flagNoLocation`/`flagNoCrew`/`flagNoDayRate`) — same object, same persistence, just not all of it is styling. Persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
+- `appSettings` / `SETTINGS_DEFAULTS` / `FONT_CHOICES` (**renamed from `HEADER_FONTS` in Phase R/R15** — it now feeds all three font roles, not just headings) / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, plus (Phase Tasks) the three Overview auto-flag rule toggles (`flagNoLocation`/`flagNoCrew`/`flagNoDayRate`) — same object, same persistence, just not all of it is styling. Persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
 - `renderSettings()` / `goSettings()` (Phase Q) — the Settings screen (S-1), reached from the sidebar. A full screen, not a floating cog panel: the app's one existing pattern for a project-independent thing you go and look at is the sidebar screen (Crew database, Locations database), and a modal would have been a second pattern for no gain — [Shared/utility functions]
 - `renderSide()` — renders the left sidebar (project list, nav) — [Shared/utility functions]
 - `toggleDrawer()` / `closeDrawer()` — open/close the mobile navigation drawer — [Shared/utility functions]
@@ -553,7 +553,7 @@ coarse information first, finest detail last.
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
 | **S-1** | **Settings** | App-wide font and brand colour, reached from the sidebar | `renderSettings()` |
-| S-1.1 | · Call sheet headers | Header font for every display heading | `HEADER_FONTS` |
+| S-1.1 | · Fonts | Phase R/R15 — one picker per role: display/headings, labels, body text | `FONT_CHOICES` |
 | S-1.2 | · Brand colours | Brand colour (light backgrounds) + sidebar accent (dark), driving every tint | `applyAppSettings()` |
 | S-1.3 | · Preview | A sample call sheet card, so a pick can be judged before it's used | `renderSettings()` |
 | S-1.4 | · Company | Read-only `COMPANY`. Deliberately not editable — see the Phase Q section | `COMPANY` |
@@ -684,7 +684,7 @@ brand-coloured surface actually reads a token, which is why the two "deliberate
 one-offs" the Style Review left inline — the sidebar active gradient and the
 selected-role/HoD pill — became `--tint-5` and `--tint-6`. A token that isn't a
 token can't follow the brand colour.
-⚠️ Only add a family to `HEADER_FONTS` if it's in the Google Fonts `<link>` on line 8
+⚠️ Only add a family to `FONT_CHOICES` (was `HEADER_FONTS`) if it's in the Google Fonts `<link>` on line 8
 (or a system stack). Anything else silently renders as the fallback.
 
 **No multi-tenancy.** Single hardcoded `COMPANY`, shown read-only on the Settings
@@ -807,6 +807,21 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
     [Shared/utility functions]
   - `.undo-toast` is bottom-left so it never covers the primary actions on the right;
     the Undo link uses `--tape-light`, the AA-compliant green for dark backgrounds —
+    [Shared/utility functions]
+
+- `FONT_CHOICES` / `labelFont` / `bodyFont` / `settingsBlocks` /
+  `toggleSettingsBlock()` / `toggleAllSettingsBlocks()` / `settingsBlockHTML()`
+  (**R15**) — Settings gained **one font picker per role** and collapsible sections.
+  The three roles are the three the design system has always had (Fraunces display →
+  `--disp`, Oswald label → `--label`, Jost body → `--body`); settings just makes each
+  choosable instead of only the first. Same mechanism as before, three times: write
+  the token the stylesheet already declares, so no CSS rule needs to know settings
+  exist. `headerFont` **keeps its original key** so settings saved before R15 still
+  load; `resetAppSettings()` needed no change because it copies `SETTINGS_DEFAULTS`
+  wholesale. Sections collapse on the shared plumbing (prefix `st`), open by default —
+  it's a short screen you visit in order to change something — [Shared/utility functions]
+  - `HEADER_FONTS` was renamed to `FONT_CHOICES`: once all three roles read the same
+    pool the old name was actively misleading. Do not look for `HEADER_FONTS` —
     [Shared/utility functions]
 
 ## Refinement review page (Phase Refinement)
