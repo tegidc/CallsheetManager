@@ -595,6 +595,21 @@
     text-transform:uppercase; color:var(--muted); margin-top:8px;}
   .ai-error{border:1px solid var(--danger); color:var(--danger); border-radius:var(--box-radius);
     padding:9px 11px; font-size:var(--fs-meta); margin-bottom:10px;}
+  /* R14 — "no API key set". Deliberately NOT .ai-error red: nothing has gone wrong
+     and nothing the user did caused it; it's a setup step they're being told about
+     before they waste a message on it. Amber, informational. */
+  .ai-notconfigured{border:1px solid rgba(180,120,10,.45); background:rgba(180,120,10,.07);
+    color:#7a5200; border-radius:var(--box-radius); padding:10px 12px;
+    font-size:var(--fs-meta); line-height:1.5; margin-bottom:10px;
+    display:flex; align-items:flex-start; gap:8px;}
+  .ai-notconfigured code{font-family:var(--mono); font-size:11.5px;
+    background:rgba(180,120,10,.14); padding:1px 5px; border-radius:3px;}
+  .ai-notconfigured .ic, .ai-notconfigured svg{flex:0 0 auto;}
+  /* R13 — an active Inverse flips what the whole list means, so the toggle says so
+     rather than leaving it to a tick buried in the open panel. */
+  .filter-inverted{font-family:var(--label); font-size:10px; letter-spacing:1px;
+    text-transform:uppercase; color:var(--danger); border:1px solid var(--danger);
+    border-radius:3px; padding:0 4px; margin-left:4px; vertical-align:1px;}
   .ai-attachments{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
   .ai-input-row{display:flex; align-items:center; gap:8px;}
   .ai-input-row input[type=text]{flex:1;}
@@ -908,7 +923,7 @@ const HEADER_FONTS = {
    as the fallback and nobody notices. */
 // flagNo* are the Overview Tasks box's auto-flag rule toggles (Phase Tasks) —
 // site-wide, not per-project, so a rule silenced once stays off everywhere.
-const SETTINGS_DEFAULTS = { headerFont:'fraunces', brand:'#017756', brandLight:'#0FA47A', flagNoLocation:true, flagNoCrew:true, flagNoDayRate:true };
+const SETTINGS_DEFAULTS = { headerFont:'fraunces', brand:'#017756', brandLight:'#0FA47A' };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -2610,16 +2625,12 @@ function buildTaskFlags(p, days){
   if(!(p.locationIds||[]).length) items.push({ label:'No locations added yet', onclick:`goProjectTab('locations')` });
   if(!(p.crewIds||[]).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
 
-  if(appSettings.flagNoLocation!==false){
-    days.filter(d=>!d.locationId).forEach(d=>{
-      items.push({ label:`No location — ${shootDayLabel(d)}`, onclick:`currentShootDayId='${d.id}';goProjectTab('days')` });
-    });
-  }
-  if(appSettings.flagNoCrew!==false){
-    days.filter(d=>!(d.positions||[]).length).forEach(d=>{
-      items.push({ label:`No crew — ${shootDayLabel(d)}`, onclick:`crewGridView='days';goProjectTab('crew')` });
-    });
-  }
+  days.filter(d=>!d.locationId).forEach(d=>{
+    items.push({ label:`No location — ${shootDayLabel(d)}`, onclick:`currentShootDayId='${d.id}';goProjectTab('days')` });
+  });
+  days.filter(d=>!(d.positions||[]).length).forEach(d=>{
+    items.push({ label:`No crew — ${shootDayLabel(d)}`, onclick:`crewGridView='days';goProjectTab('crew')` });
+  });
   // Grouped into ONE pill, not one per person — unlike the two day-based rules
   // above (where the brief explicitly asked for one flag per day), a project
   // can easily carry 60+ crew, and a flag per no-rate person would flood this
@@ -2627,7 +2638,7 @@ function buildTaskFlags(p, days){
   // person is already listed together with an inline field to fix it.
   // Guarded with a typeof check so this rule degrades to a no-op, not an
   // error, if Budget's resolveCrewRate() isn't present in some future branch.
-  if(appSettings.flagNoDayRate!==false && typeof resolveCrewRate==='function'){
+  if(typeof resolveCrewRate==='function'){
     const noRateCount = projectCrew(p).filter(c=>!resolveCrewRate(c,p).hasRate).length;
     if(noRateCount) items.push({ label:`${noRateCount} crew member${noRateCount>1?'s':''} with no day rate set`, onclick:`budgetView='person';goProjectTab('budget')` });
   }
@@ -2637,11 +2648,20 @@ function taskFlagPillsHTML(items){
   if(!items.length) return '<div class="empty-note">No flags right now.</div>';
   return `<div class="taglist">${items.map(it=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="${it.onclick}" title="Click to fix">⚠ ${esc(it.label)}</span>`).join('')}</div>`;
 }
+/* R6: the draft Title/Note, held outside the DOM. renderProjectBody() replaces the
+   whole tab body on every state change (this app's pattern everywhere), so an input
+   whose value isn't sourced from state is blanked by any re-render — including
+   collapsing the Tasks box or ticking an existing task. Exactly the problem, and
+   exactly the fix, that aiScanDraftText already documents for the AI Scan box.
+   Cleared only once a task has actually been added. */
+let taskDraftTitle = '';
+let taskDraftNote  = '';
 async function addProjectTask(){
   const p = currentProject(); if(!p) return;
   const title = (val('taskTitleInput')||'').trim();
   if(!title) return;
   const note = (val('taskNoteInput')||'').trim();
+  taskDraftTitle = ''; taskDraftNote = '';
   p.tasks = p.tasks || [];
   p.tasks.push({ id:uid(), title, note, completed:false, createdAt:new Date().toISOString() });
   await saveDB('db:projects', projectsDB);
@@ -2699,8 +2719,8 @@ function renderTasksSection(p, days){
       ${taskFlagPillsHTML(flagItems)}
       <div class="subhead" style="margin-top:18px;">Add a task</div>
       <div class="grid g2" style="margin-bottom:8px;">
-        <div><label>Title</label><input type="text" id="taskTitleInput" placeholder="e.g. Confirm parking permit" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
-        <div><label>Note (optional)</label><input type="text" id="taskNoteInput" placeholder="Optional detail" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+        <div><label>Title</label><input type="text" id="taskTitleInput" value="${esc(taskDraftTitle)}" placeholder="e.g. Confirm parking permit" oninput="taskDraftTitle=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
+        <div><label>Note (optional)</label><input type="text" id="taskNoteInput" value="${esc(taskDraftNote)}" placeholder="Optional detail" oninput="taskDraftNote=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
       </div>
       <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
       ${tasksListHTML(p)}
@@ -2742,7 +2762,38 @@ let aiScanPendingUserMsg = null;        // optimistic preview of the in-flight u
 // val('aiScanInput') is still used to read it at the moment Send is clicked.
 let aiScanDraftText = '';
 
-function toggleAiScanBlock(){ aiScanOpen = !aiScanOpen; renderProjectBody(); }
+function toggleAiScanBlock(){
+  aiScanOpen = !aiScanOpen;
+  if(aiScanOpen) checkAiScanConfigured();   // fire-and-forget; re-renders if it learns something
+  renderProjectBody();
+}
+
+/* R14: AI Scan needs ANTHROPIC_API_KEY set as a Supabase secret by hand. Until this
+   check existed the feature looked completely normal and only failed at the moment
+   somebody typed a message and pressed Send — the worst possible time to find out.
+
+   The probe is free. The Edge Function checks for the key BEFORE it parses the
+   request body and long before it calls Anthropic, so a deliberately malformed POST
+   comes back either "isn't configured yet" (no key) or "Invalid JSON body" (key is
+   set). Either way no Anthropic call is made and no tokens are spent.
+
+   A network/CORS failure leaves the state 'unknown' and shows nothing — the function's
+   CORS is locked to the live github.io origin, so opening index.html straight off disk
+   can't reach it, and crying wolf there would be worse than staying quiet. */
+let aiScanConfigState = 'unknown';   // 'unknown' | 'ok' | 'missing'
+async function checkAiScanConfigured(){
+  if(aiScanConfigState !== 'unknown') return;
+  try{
+    const res = await fetch(AI_SCAN_ENDPOINT, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+AI_SCAN_ANON_KEY, 'apikey':AI_SCAN_ANON_KEY },
+      body:'{'   // deliberately invalid — never reaches the model
+    });
+    const data = await res.json().catch(()=>({}));
+    aiScanConfigState = /isn'?t configured/i.test(data.error || '') ? 'missing' : 'ok';
+  }catch(e){ aiScanConfigState = 'unknown'; return; }
+  if(aiScanConfigState === 'missing') renderProjectBody();
+}
 
 /* ---- committing a ticked proposal into real project data --------------------
    Matched proposals reuse the exact existing add-crew/add-location functions.
@@ -2913,10 +2964,18 @@ function aiScanSectionHTML(p){
   const chipsHTML = aiScanPendingFiles.length ? `<div class="ai-attachments">${aiScanPendingFiles.map((f,i)=>
     `<span class="pill">${icon('doc')} ${esc(f.filename)} <span onclick="removeAiScanPendingFile(${i})" style="cursor:pointer;" title="Remove">${icon('close')}</span></span>`).join('')}</div>` : '';
   const errorHTML = aiScanError ? `<div class="ai-error">${esc(aiScanError)}</div>` : '';
+  // Shown before anything is typed, not after a failed send (R14).
+  const notConfiguredHTML = aiScanConfigState === 'missing'
+    ? `<div class="ai-notconfigured">${icon('sparkle')} <strong>AI Scan isn't set up yet.</strong>
+         The server has no Anthropic API key, so sending a message will fail. Someone needs to run
+         <code>supabase secrets set ANTHROPIC_API_KEY=…</code> once — it's a credential, so it can't be
+         done from inside the app.</div>`
+    : '';
   return `<div class="section" id="aiScanSection">
     <div class="sd-block-head flush">
       <span class="sd-block-head-toggle" onclick="toggleAiScanBlock()"><span class="dept-caret">${open?'▾':'▸'}</span> ${icon('sparkle')} AI Scan</span>
     </div>
+    ${open ? notConfiguredHTML : ''}
     <div id="aisb-block" style="display:${open?'':'none'}">
       <div class="hint" style="margin-bottom:10px;">Chat about the project, or attach a briefing document (PDF, .docx, .txt) — Claude proposes shoot dates, locations and crew as you go. Nothing is added until you tick a proposal. This conversation isn't saved — it starts over if you leave and come back.</div>
       <div class="ai-chat" id="aiScanChat">${turnsHTML || '<div class="empty-note">Say something about the project, or attach a briefing document, to get started.</div>'}</div>
@@ -3473,7 +3532,8 @@ function renderProjectCrew(body){
   // is a full-width block (chips, selects, day checkboxes) and letting it live inside
   // the flex row would distort the row's left/right alignment every time it opens.
   const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleProjectCrewFilterPanel()">
-    <span class="dept-caret">${projectCrewFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}
+    <span class="dept-caret">${projectCrewFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}${
+      projectCrewFilter.inverse ? ` <span class="filter-inverted" title="Showing everyone who does NOT match the filter">inverted</span>` : ''}
   </span>`;
   const filterPanelHTML = projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned, days) : '';
 

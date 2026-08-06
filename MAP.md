@@ -445,10 +445,14 @@ static site.
   `https://tegidc.github.io` only.
   - ⚠️ **This repo has no tool/CLI access to set Supabase secrets, and shouldn't be
     given the actual key value even if it did** — that's a credential, handled outside
-    chat. The Edge Function deploys and runs correctly without it (verified — it
-    returns a clean `"AI Scan isn't configured yet"` error rather than crashing), but
-    AI Scan can't actually talk to Claude until a human runs
-    `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` themselves.
+    chat. The Edge Function deploys and runs correctly without it (it returns a clean
+    `"AI Scan isn't configured yet"` error rather than crashing).
+  - ✅ **The key HAS since been set** (confirmed in Phase R by probing the live
+    function — it now answers `"Invalid JSON body"` to a malformed POST rather than
+    the config error, which means it got past the `Deno.env.get` check). The earlier
+    note here said AI Scan "can't actually talk to Claude until a human runs
+    `supabase secrets set …`"; that is **no longer true** and was stale. The frontend
+    check added in Phase R (`checkAiScanConfigured()`) reads exactly this signal.
   - `propose_shoot_date` (date, label, notes) / `propose_location` (name,
     address_or_notes, optional match_id) / `propose_crew` (name, department — enum of
     `DEPARTMENTS` — role, optional match_id) — the three tools. `match_id` is
@@ -696,6 +700,60 @@ saved?" arrives as you type and either outcome continues from where you already 
 Both paths still end where they always did (`addLocToProject()` / `saveLocation()`
 with `locFormContext` set). The Shoot Day form's `quickAddLocationForDay()` is a
 different entry point on a different screen and was left alone.
+
+## Phase R — the accepted recommendations (R1–R18)
+
+Built from the `refinement-review.html` answers. Items marked **not wanted** (R3, R5,
+R7, R9, R12) were explicitly declined and should not be re-proposed.
+
+- `dbStamp` / `dbBase` / `dbClone()` / `mergeDB()` / `applyMergedDB()` (**R18**) —
+  **the fix for two tabs silently overwriting each other.** `saveDB()` writes a whole
+  collection back on every save, so with a plain upsert the second writer won
+  outright and the first one's edit vanished with no error. Saves are now a *guarded*
+  write — conditional on the row's `updated_at` still matching `dbStamp[key]` — and on
+  a failed guard the remote value is fetched and three-way merged against
+  `dbBase[key]` (the snapshot matching that stamp) before retrying, up to 3 attempts.
+  Per record: whichever side actually changed it wins (ours on a tie), additions from
+  both sides are kept, and a deletion is only honoured against a side still matching
+  base. Works because every record carries a stable `id`; arrays of bare strings
+  (`db:travelmethods`, `db:coprocompanies`) have no identity to merge on, so ours
+  simply wins — they're short config lists, not records — [Shared/utility functions]
+  - `applyMergedDB()` writes the merged result back into the live arrays **in place**
+    (`splice`, never reassign): other code holds references to `crewDB`/`projectsDB`
+    etc., so reassigning would leave half the app rendering the pre-merge copy —
+    [Shared/utility functions]
+  - Stamps store the value **as Postgres returns it**, not the JS string sent. The two
+    differ textually (`…123Z` vs `…123000+00:00`) and only compared equal because
+    Postgres casts them; round-tripping the canonical value removes that reliance —
+    [Shared/utility functions]
+  - ⚠️ Nothing outside `loadDB`/`saveDB` changed. `saveDB(key, value)` is called
+    identically from every call site — don't "help" by adding conflict handling at a
+    call site — [Shared/utility functions]
+- `taskDraftTitle` / `taskDraftNote` (**R6**) — the Tasks Title/Note draft, held
+  outside the DOM for exactly the reason `aiScanDraftText` documents: a re-render
+  replaces the whole tab body and blanks any input not sourced from state, so
+  collapsing the Tasks box or ticking another task used to wipe a half-typed task.
+  Cleared only once a task is actually added — [Overview]
+- `aiScanConfigState` / `checkAiScanConfigured()` (**R14**) — says up front when the
+  server has no Anthropic key, instead of letting the feature look normal and fail at
+  the moment somebody presses Send. **The probe is free**: the Edge Function checks for
+  the key *before* it parses the body and long before it calls Anthropic, so a
+  deliberately malformed POST returns either the config error (no key) or
+  `"Invalid JSON body"` (key set) with no model call. A network/CORS failure leaves the
+  state `'unknown'` and shows nothing — the function's CORS is locked to the live
+  github.io origin, so opening `index.html` off disk can't reach it and a warning there
+  would be crying wolf. Rendered as `.ai-notconfigured` (amber, informational —
+  deliberately not `.ai-error` red: nothing has gone wrong and the user didn't cause
+  it) — [Overview]
+- `.filter-inverted` (**R13**) — an active Inverse now says so on the Crew Filter
+  toggle itself. It flips what the entire list means, and it was previously only
+  visible as a tick buried inside the open panel — [Crew]
+- **R8 — the three orphaned flag settings are deleted.** `flagNoLocation` /
+  `flagNoCrew` / `flagNoDayRate` were removed from `SETTINGS_DEFAULTS` and their
+  `!==false` guards dropped from `buildTaskFlags()`; those three rules are now
+  unconditional. Phase Overview Reorder had already removed every UI path to them, so
+  they had been permanently `true` with no way to reach them — kept then "in case a UI
+  returns", declined now. Do not re-add without a UI — [Overview]
 
 ## Refinement review page (Phase Refinement)
 
