@@ -1371,20 +1371,129 @@ function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
    string like 'db:crew'. Swapping the backend here is the only change needed —
    every .find/.filter/.push elsewhere in the file operates on the in-memory arrays
    these return, exactly as before. */
+/* ---- R18: two tabs must not silently overwrite each other -------------------
+   Every save writes a WHOLE collection back (that's the app's shape — mutate the
+   in-memory array, then saveDB the array). With a plain upsert that means the
+   second tab to save wins outright: add a crew member in one tab while renaming a
+   project in the other, and one of those edits is gone with no error and no trace.
+   This needed no accounts and no second person — two tabs was enough.
+
+   The fix is a guarded write plus a three-way merge, which works precisely BECAUSE
+   every record carries a stable `id`:
+     · dbStamp[key] — the row's updated_at as we last saw it.
+     · dbBase[key]  — a snapshot of the collection as it was at that moment.
+   The write is conditional on updated_at still matching. If it doesn't, somebody
+   else wrote in between, so rather than clobbering them we fetch their version and
+   merge base/ours/theirs per record: whichever side actually CHANGED a record wins,
+   additions from both sides are kept, and a deletion is only honoured against the
+   side that still matches base. Then we retry the guarded write.
+   Nothing outside these two functions changed — saveDB(key, value) is called the
+   same way from ~80 places and still returns a promise. -------------------- */
+const DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings'];
+const isObjDB = key => DB_OBJECT_KEYS.includes(key);
+let dbStamp = {};   // key -> updated_at last seen
+let dbBase  = {};   // key -> deep snapshot matching that stamp
+const dbClone = v => JSON.parse(JSON.stringify(v ?? null));
+
 async function loadDB(key){
+  const empty = () => isObjDB(key) ? {} : [];
   try{
-    const { data, error } = await sb.from('app_data').select('value').eq('key', key).maybeSingle();
-    const isObjKey = key==='db:subdepartments' || key==='db:roleseniority' || key==='db:settings';
-    if(error){ console.error('Supabase load failed ('+key+'):', error.message); return isObjKey ? {} : []; }
-    if(!data) return isObjKey ? {} : [];
+    const { data, error } = await sb.from('app_data').select('value, updated_at').eq('key', key).maybeSingle();
+    if(error){ console.error('Supabase load failed ('+key+'):', error.message); return empty(); }
+    if(!data){ dbStamp[key] = null; dbBase[key] = empty(); return empty(); }
+    dbStamp[key] = data.updated_at;
+    dbBase[key]  = dbClone(data.value);
     return data.value;
-  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return key==='db:subdepartments'||key==='db:roleseniority'||key==='db:settings' ? {} : []; }
+  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return empty(); }
 }
+
+/* Three-way merge of one collection. Arrays of {id:…} records merge per record;
+   plain objects (settings, sub-departments, role seniority) merge per key. Arrays
+   of bare strings (travel methods, co-pro companies) have no identity to merge on,
+   so ours simply wins — they're short config lists, not records. */
+function mergeDB(base, mine, theirs){
+  const same = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  if(Array.isArray(mine) && Array.isArray(theirs)){
+    const keyed = a => Array.isArray(a) && a.every(r => r && typeof r==='object' && r.id);
+    if(!keyed(mine) || !keyed(theirs) || !keyed(base||[])) return mine;
+    const B = new Map((base||[]).map(r=>[r.id,r]));
+    const M = new Map(mine.map(r=>[r.id,r]));
+    const T = new Map(theirs.map(r=>[r.id,r]));
+    const out = [];
+    // their order first (so records added elsewhere keep a stable home), then ours
+    const ids = [...new Set([...theirs.map(r=>r.id), ...mine.map(r=>r.id)])];
+    ids.forEach(id=>{
+      const b = B.get(id), m = M.get(id), t = T.get(id);
+      if(m && t)  { out.push(same(m,b) ? t : m); return; }           // both have it: the side that changed wins, ours on a tie
+      if(m && !t) { if(!b) out.push(m); return; }                    // only ours: new here = keep, else they deleted it
+      if(!m && t) { if(!b) out.push(t); return; }                    // only theirs: new there = keep, else we deleted it
+    });
+    return out;
+  }
+  if(mine && theirs && typeof mine==='object' && typeof theirs==='object'){
+    const out = {...theirs};
+    Object.keys(mine).forEach(k=>{
+      if(!same(mine[k], (base||{})[k]) || !(k in theirs)) out[k] = mine[k];   // we changed it, or it's new here
+    });
+    Object.keys(base||{}).forEach(k=>{ if(!(k in mine) && same((base||{})[k], theirs[k])) delete out[k]; });
+    return out;
+  }
+  return mine;
+}
+
 async function saveDB(key, value){
+  const stamp = () => new Date().toISOString();
   try{
-    const { error } = await sb.from('app_data').upsert({ key, value, updated_at:new Date().toISOString() });
-    if(error) console.error('Supabase save failed ('+key+'):', error.message);
+    for(let attempt=0; attempt<3; attempt++){
+      const now = stamp();
+      // No row yet (or we've never read one): plain upsert, nothing to conflict with.
+      if(dbStamp[key] == null){
+        const { data, error } = await sb.from('app_data')
+          .upsert({ key, value, updated_at:now }).select('updated_at');
+        if(error){ console.error('Supabase save failed ('+key+'):', error.message); return; }
+        // store the stamp AS POSTGRES RETURNS IT, not the JS string we sent: the two
+        // differ textually ('…123Z' vs '…123000+00:00') and only compare equal because
+        // postgres casts them. Round-tripping the canonical value removes that reliance.
+        dbStamp[key] = (data && data[0] && data[0].updated_at) || now;
+        dbBase[key] = dbClone(value); return;
+      }
+      // Guarded write — only lands if nobody else has written since we last looked.
+      const { data, error } = await sb.from('app_data')
+        .update({ value, updated_at:now }).eq('key', key).eq('updated_at', dbStamp[key]).select('updated_at');
+      if(error){ console.error('Supabase save failed ('+key+'):', error.message); return; }
+      if(data && data.length){ dbStamp[key] = data[0].updated_at || now; dbBase[key] = dbClone(value); return; }
+
+      // Guard failed: somebody wrote in between. Take their version, merge, retry.
+      const { data: fresh, error: reErr } = await sb.from('app_data')
+        .select('value, updated_at').eq('key', key).maybeSingle();
+      if(reErr || !fresh){ console.error('Supabase merge re-read failed ('+key+')', reErr && reErr.message); return; }
+      const merged = mergeDB(dbBase[key], value, fresh.value);
+      console.warn(`[${key}] another tab or device wrote while this one was editing — merged both instead of overwriting.`);
+      dbStamp[key] = fresh.updated_at;
+      dbBase[key]  = dbClone(fresh.value);
+      value = merged;
+      applyMergedDB(key, merged);   // put the merged result back into the live in-memory array
+    }
+    console.error('Supabase save gave up after repeated conflicts ('+key+')');
   }catch(e){ console.error('Supabase save exception ('+key+'):', e); }
+}
+
+/* The in-memory arrays are what every screen renders from, and other code holds
+   references to them, so a merge has to be written back IN PLACE (splice, not
+   reassign) or half the app keeps rendering the pre-merge copy. */
+function applyMergedDB(key, merged){
+  const live = { 'db:crew':()=>crewDB, 'db:locations':()=>locationsDB,
+                 'db:projects':()=>projectsDB, 'db:shootdays':()=>shootDaysDB,
+                 'db:travelmethods':()=>travelMethodsList, 'db:coprocompanies':()=>coProCompaniesList }[key];
+  if(live && Array.isArray(merged)){
+    const arr = live(); if(Array.isArray(arr)){ arr.splice(0, arr.length, ...merged); }
+  } else if(key==='db:settings' && merged && typeof merged==='object'){
+    appSettings = Object.assign({}, SETTINGS_DEFAULTS, merged); applyAppSettings();
+  } else if(key==='db:subdepartments' && merged) { SUBDEPARTMENTS_BY_DEPT = merged; }
+  else if(key==='db:roleseniority' && merged)    { ROLE_SENIORITY = merged; }
+  else if(key==='db:roles' && merged && !Array.isArray(merged)) { ROLES_BY_DEPT = merged; }
+  if(typeof renderSide==='function') renderSide();
+  if(typeof renderMain==='function') renderMain();
 }
 
 async function initApp(){
