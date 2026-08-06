@@ -848,6 +848,34 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
     £900, and filtering to one of those days showed £150 rather than the whole fee —
     [Budget]
 
+### Sort / Group-by audit (Phase R, R16 follow-up)
+
+All **7 sort** options and all **13 group-by** options were exercised against the real
+ROW 2026 project (66 crew, 6 days). **Every one runs without error and preserves the
+full roster** — no option silently drops anybody. `daysOnSite` returns 208 rows across
+7 buckets, which is correct and intended: it is the one deliberately multi-bucket
+grouping (a person on 3 days appears in 3 groups).
+
+Two options are **inert on real data — not broken, but currently pointless**, because
+the fields they read have never been filled in:
+
+| Option | State | Why |
+|---|---|---|
+| Group by → Sub-department | One bucket, "No sub-department" | **0 of 66** crew have `subDepartment` set |
+| Sort → "By department (HoD first)" | Identical to "By name" | **0 of 66** crew have `isHoD` set, so the HoD tiebreak does nothing |
+
+⚠️ The second is the more interesting one: **the Heads-of-Department mechanism is
+currently having no effect anywhere in the app.** `sortHoDFirst()` is the default
+ordering for the project crew list, Position Assignments, the crew-database roster and
+Budget's Per Person view — but with no `isHoD` flag set on anyone it degenerates to a
+plain name sort in all four. The control to set it exists (`toggleHoD()`, in the
+Departments & sub-departments admin panel on D-1) and simply hasn't been used. Nothing
+to fix in code; worth knowing before anyone concludes HoD ordering is broken.
+
+Also confirmed sensible rather than suspicious: `vat` yields 2 buckets because the
+roster holds 3 "Yes" and 0 "No" (the rest blank), and `catering` yields 2 because
+"Vegetarian" is the only dietary value in use.
+
 ## Refinement review page (Phase Refinement)
 
 `refinement-review.html` — fourth review page, same click-to-pick + notes +
