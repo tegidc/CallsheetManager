@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase AQ — Gate 1: style, code &amp; architecture audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --disp:'Fraunces',Georgia,serif; --label:'Oswald',sans-serif; --body:'Jost',system-ui,sans-serif;
+    --tape:#017756; --tape-light:#0FA47A; --text:#110A08; --muted:#6b625e;
+    --danger:#a4321f; --amber:#7a5200;
+    --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05);
+    --tint-3:rgba(1,119,86,.10); --tint-4:rgba(1,119,86,.14);
+    --paper:#FBFAF8; --mono:ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--text); font-family:var(--body); font-size:14px; line-height:1.55;}
+  .wrap{max-width:1080px; margin:0 auto; padding:28px 20px 100px;}
+  h1{font-family:var(--disp); font-weight:700; font-size:26px; text-transform:uppercase; margin:0 0 4px; letter-spacing:.3px;}
+  .eyebrow{color:var(--muted); font-size:13px; margin-bottom:20px;}
+  h2{font-family:var(--disp); font-weight:700; font-size:17px; color:var(--tape);
+     display:flex; align-items:center; gap:10px; margin:44px 0 6px;}
+  h2::after{content:''; flex:1; height:1px; background:var(--line);}
+  h3{font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+     color:var(--tape); display:flex; align-items:center; gap:8px; margin:28px 0 10px;}
+  h3::after{content:''; flex:1; height:1px; background:var(--line);}
+  p{margin:8px 0;} .lede{font-size:15px; max-width:80ch;}
+  .muted{color:var(--muted);}
+  code, .mono{font-family:var(--mono); font-size:12.5px; background:rgba(17,10,8,.05); padding:1px 5px; border-radius:3px;}
+  .note{background:var(--tint-1); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:14px 0; max-width:88ch;}
+  .note strong{color:var(--tape);}
+  .note.warn{background:rgba(180,120,10,.07); border-color:rgba(180,120,10,.35);}
+  .note.warn strong{color:var(--amber);}
+
+  /* ---- bucket legend ---- */
+  .buckets{display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 6px;}
+  .bk{border:1px solid var(--line); border-radius:8px; padding:10px 12px; flex:1 1 260px; background:#fff;}
+  .bk .tag{margin-bottom:6px;}
+  .bk p{margin:0; font-size:13px; color:var(--muted);}
+
+  .tag{display:inline-block; font-family:var(--label); font-size:10px; font-weight:700; letter-spacing:1.2px;
+       text-transform:uppercase; padding:2px 8px; border-radius:4px; vertical-align:2px;}
+  .tag-a{background:var(--tint-3); color:var(--tape); border:1px solid var(--tape);}
+  .tag-b{background:rgba(164,50,31,.10); color:var(--danger); border:1px solid var(--danger);}
+  .tag-c{background:rgba(180,120,10,.10); color:var(--amber); border:1px solid rgba(180,120,10,.55);}
+
+  /* ---- finding cards ---- */
+  .item{border:1px solid var(--line); border-radius:10px; background:#fff; padding:16px 18px; margin-bottom:14px;}
+  .item.b{border-left:3px solid var(--danger);}
+  .item.c{border-left:3px solid rgba(180,120,10,.7);}
+  .item.a{border-left:3px solid var(--tape);}
+  .item-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:2px;}
+  .gid{font-family:var(--label); font-weight:700; font-size:15px; letter-spacing:.6px; color:var(--text);}
+  .title{font-family:var(--body); font-weight:600; font-size:15px; flex:1 1 auto; min-width:200px;}
+  .where{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:4px 0 10px;}
+  .field{margin:10px 0 0;}
+  .field .lbl{font-family:var(--label); font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
+              color:var(--tape); display:block; margin-bottom:2px;}
+  .field p{margin:0 0 4px;}
+  .blast{font-size:13px; color:var(--muted); border-top:1px dashed var(--line); margin-top:12px; padding-top:9px;}
+  .blast b{color:var(--text); font-weight:600;}
+  pre.snip{font-family:var(--mono); font-size:12px; background:rgba(17,10,8,.04); border:1px solid var(--line);
+       border-radius:6px; padding:9px 11px; overflow-x:auto; margin:6px 0; line-height:1.5;}
+
+  /* ---- decision controls ---- */
+  .decide{display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:12px;
+          border-top:1px solid var(--line); padding-top:11px;}
+  .decide label{display:inline-flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; color:var(--muted);}
+  .decide input[type=radio]{accent-color:var(--tape); cursor:pointer;}
+  .decide input[type=text]{flex:1 1 240px; min-width:180px; font-family:var(--body); font-size:13px;
+          border:none; border-bottom:1px solid var(--field-line); background:transparent; padding:5px 2px; color:var(--text);}
+  .decide input[type=text]:focus{outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
+
+  table{width:100%; border-collapse:collapse; margin:8px 0 4px; font-size:13px;}
+  th{font-family:var(--label); font-weight:500; font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+     color:var(--tape); text-align:left; padding:7px 9px; border-bottom:1.5px solid var(--line);}
+  td{padding:8px 9px; border-bottom:1px solid var(--line); vertical-align:top;}
+
+  .prose{max-width:82ch;}
+  .prose h4{font-family:var(--body); font-weight:600; font-size:15px; margin:22px 0 4px;}
+  .prose ul{margin:8px 0; padding-left:20px;} .prose li{margin:5px 0;}
+
+  /* ---- export bar ---- */
+  .exportbar{position:sticky; bottom:0; background:var(--paper); border-top:1px solid var(--line);
+             padding:12px 0 14px; margin-top:34px; z-index:5;}
+  button{font-family:var(--body); font-weight:600; font-size:13px; cursor:pointer; border-radius:7px;
+         border:1px solid var(--line); background:#EEF5F2; color:var(--text); padding:9px 14px;}
+  button:hover{border-color:var(--tape);} button.primary{background:var(--tape); color:#FFFFF5; border-color:var(--tape);}
+  #exportOut{width:100%; min-height:220px; font-family:var(--mono); font-size:12px; line-height:1.5;
+             border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:12px; background:#fff;
+             color:var(--text); display:none;}
+  .counts{font-size:13px; color:var(--muted); margin-left:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Phase AQ — Gate 1</h1>
+<div class="eyebrow">Whole-app style, code and architecture audit · <strong>Stage 1 of 2 — audit only, nothing changed</strong><br>
+Cumulative changed code since the last whole-app review (<span class="mono">7aa5af0</span>): <strong>93,280 bytes</strong> across 14 commits — roughly double the 40–50&nbsp;KB Gate&nbsp;1 threshold. Audited at <span class="mono">6eac989</span> (Phase AP).</div>
+
+<p class="lede">Twenty-one findings. Every one is tagged with the bucket it belongs to, and the buckets are kept apart on purpose:
+a cosmetic pass must not quietly carry a behaviour change along with it.</p>
+
+<div class="buckets">
+  <div class="bk"><span class="tag tag-a">A · behaviour-neutral</span>
+    <p>Style, spacing, duplicate CSS, dead code, consolidation. No functional change. Stage 2 can batch these.</p></div>
+  <div class="bk"><span class="tag tag-b">B · behaviour-affecting</span>
+    <p>Real bugs and logic inconsistencies. Each needs its own decision; several deserve their own phase. Does <em>not</em> ride along with a cosmetic pass.</p></div>
+  <div class="bk"><span class="tag tag-c">C · architectural</span>
+    <p>Structural proposals. Each needs its own discussion and almost certainly its own phase. Never bundled into Stage 2.</p></div>
+</div>
+
+<div class="note"><strong>What I checked and found genuinely clean.</strong> Worth stating, because these are the things that
+usually rot: <strong>no duplicate top-level declarations</strong> anywhere in 440 functions — the <span class="mono">clearBudgetDayFilter()</span> class of bug
+(two definitions, the later one silently winning) does not recur. <strong>No dead functions</strong> — all 460 declared functions and
+arrow-consts are referenced from live code, including every one the removed phases left behind. <strong>Render performance is a
+non-issue at current scale</strong>: a full <span class="mono">renderProjectBody()</span> of the 66-crew × 6-day grid measures <strong>4.2&nbsp;ms</strong>, and the
+Budget filter panel <strong>0.38&nbsp;ms</strong>. I went in expecting to file perf findings and the numbers didn't support them — see G14
+for the one responsiveness issue that <em>is</em> real, which is network latency, not CPU.</div>
+
+<div class="note warn"><strong>Verification method.</strong> The two known bugs were reproduced against the live ROW 2026 data in a
+<em>copy</em> of <span class="mono">index.html</span> with <span class="mono">saveDB()</span> and <span class="mono">scheduleAutosave()</span> replaced by stubs. Confirmed afterwards by querying
+<span class="mono">app_data</span> directly: every row's <span class="mono">updated_at</span> predates this session by an hour or more. Nothing was written.</div>
+
+
+<!-- ============================================================ -->
+<h2>A · The two new shared components — do they set a good precedent?</h2>
+<p class="muted">These are the template for everything built after them, so they get looked at first. Short answer:
+<strong>yes, both are well-judged</strong> — the markup/state split is right, and the deliberate asymmetries are correct.
+The problem isn't the components, it's what they left un-shared next door.</p>
+<div id="area-shared"></div>
+
+<h2>B · The design system</h2>
+<div id="area-style"></div>
+
+<h2>C · Duplication</h2>
+<div id="area-dupe"></div>
+
+<h2>D · The save path</h2>
+<p class="muted">R18's guarded write plus three-way merge is the most safety-critical code in the app. The mechanism itself is
+sound and I found no path that bypasses it — every one of the ~90 write sites goes through <span class="mono">saveDB()</span> unchanged, exactly as
+MAP.md says it should. The findings below are about what happens <em>around</em> it.</p>
+<div id="area-save"></div>
+
+<h2>E · Correctness</h2>
+<div id="area-correct"></div>
+
+<h2>F · The two known open bugs — confirmed and characterised</h2>
+<p class="muted">Reproduced, not fixed. Both are more specific than the one-line description suggested.</p>
+<div id="area-known"></div>
+
+<h2>G · Structural</h2>
+<div id="area-arch"></div>
+
+
+<!-- ============================================================ -->
+<h2>Part 3b — What would make Views cheap later</h2>
+<div class="prose">
+
+<div class="note"><strong>The headline, stated plainly so it can't get lost:
+nothing needs restructuring yet. Revisit when Budget is real.</strong> There is no view infrastructure to build, no abstraction
+worth extracting today, and no pattern currently in the app that would actively obstruct a second tool. That is the honest
+answer and I'd rather give it than a speculative redesign. What follows is the reasoning, plus the three cleanups above that
+would <em>also</em> pay off later — and the one thing that genuinely does need deciding before a second tool writes anything.</p></div>
+
+<h4>The single file: at what point does it stop working?</h4>
+<p>7,747 lines — 883 CSS, 6,810 JS, 440 functions, 473&nbsp;KB. That is large, and the instinct is to say it's past due for
+splitting. I don't think it is, and the reasons are specific rather than sentimental.</p>
+<p>The single file is buying real things here. There is no build step, so the deployed artefact <em>is</em> the source — what you
+read is what runs on <span class="mono">github.io</span>, with no sourcemap indirection and no way for the two to drift. Every function is in one
+scope, so the "canonical lookups" discipline MAP.md enforces (<span class="mono">crewById()</span>, <span class="mono">projectDays()</span>, <span class="mono">resolveCrewRate()</span>) actually
+holds — there's no module boundary tempting anyone to re-derive a lookup locally rather than import it. And a single
+<span class="mono">grep</span> answers "who touches this field", which is exactly the question this audit kept needing to answer and could
+always answer cheaply.</p>
+<p>What would make it stop working is not line count, it's <strong>whether one person can still hold the whole thing in view</strong>.
+The signals to watch for, none of which are firing yet:</p>
+<ul>
+<li><strong>Duplicate implementations reappearing because nobody knew the first one existed.</strong> This is the real cost of size,
+and it <em>is</em> starting — G7, G8, G9 and G10 are all "somebody wrote a second copy of something". But they're small
+and local, not structural. Fix them and the signal resets.</li>
+<li><strong>Editing tool struggling with the file.</strong> Not yet an issue at 473&nbsp;KB.</li>
+<li><strong>Two people editing it at once.</strong> This is the one that would force the issue, and it's the same conversation as
+multi-user — not a Views conversation.</li>
+</ul>
+<p><strong>If the day comes, the least disruptive path is not a bundler.</strong> It is splitting the <span class="mono">&lt;style&gt;</span> block into
+<span class="mono">app.css</span> and the <span class="mono">&lt;script&gt;</span> block into two or three plain <span class="mono">&lt;script&gt;</span> files loaded in order — no modules, no imports, no
+build. Everything stays in one global scope, so not a single call site changes; the only thing you lose is the
+single-file property, and the only thing you must get right is load order. That is a two-hour change available at any time,
+which is precisely why it should not be made pre-emptively.</p>
+
+<h4>What is genuinely shared vs. Production-specific — and is the boundary visible?</h4>
+<p>It is <strong>partly</strong> visible, and the part that isn't is the interesting bit.</p>
+<p><em>Cleanly shared already, and would be shared by any view:</em> the storage layer (<span class="mono">loadDB</span>/<span class="mono">saveDB</span>/<span class="mono">mergeDB</span>/<span class="mono">applyMergedDB</span>,
+~100 lines, knows nothing about call sheets); the two databases and their canonical lookups; the design system entirely —
+the four type tokens, six tint tokens and <span class="mono">applyAppSettings()</span>'s "write the token the stylesheet already declares"
+mechanism is genuinely view-agnostic, and it is the strongest piece of architecture in the file; the collapse idiom;
+<span class="mono">esc</span>/<span class="mono">val</span>/<span class="mono">setv</span>/<span class="mono">uid</span>/<span class="mono">fmtDate</span>/<span class="mono">copyText</span>/<span class="mono">flashStatus</span>; the department/role/seniority taxonomy; and the undo mechanism.</p>
+<p><em>Genuinely Production-specific:</em> shoot days as a concept, the schedule editor, camera designations, call sheet
+assembly, the WhatsApp/Excel outputs.</p>
+<p><em>Tangled, and this is the honest answer to the question:</em> <strong>Budget is not actually separable today, because it doesn't
+own its own data.</strong> Every figure Budget shows is read from somewhere else — <span class="mono">p.cateringCosts</span> lives with Catering,
+<span class="mono">p.transportCosts</span> with Travel, <span class="mono">p.hotelCosts</span> with Hotel, <span class="mono">loc.fee</span> on the location record, and days-worked is derived
+from <span class="mono">d.positions</span>, which is the call sheet's own data structure. That is a deliberate and good decision for a
+cost-<em>visibility</em> screen, and MAP.md is right that it's what keeps every view reconciling. But it means the current Budget
+tab is a <em>projection of Production's data</em>, not a separate concern that happens to live in the same file.</p>
+<p><strong>So the split you're planning is the right one, and for a better reason than "it's getting big":</strong> a real Budget tool needs
+line items, quotes, POs, actuals-vs-estimate — data this app has nowhere to put and shouldn't grow a place for. Building
+it separately isn't deferring an integration, it's recognising that the two tools own different data. When it links back
+in as a view, the honest relationship is <em>Budget reads Production's crew/day/cost data; Production reads none of Budget's</em>.
+One-directional. Worth writing down now, because it's much easier to hold that line from the start.</p>
+
+<h4>What would a second tool reading the same <span class="mono">app_data</span> need, in order not to corrupt this one?</h4>
+<p>This is the one part of Part 3b with a concrete answer, and it needs deciding before the second tool writes anything —
+not after.</p>
+<p>R18's guarded write is <strong>necessary and not sufficient</strong> for two tools. It protects two <em>instances of this app</em> because
+both sides run the same <span class="mono">mergeDB()</span> with the same per-record merge rules. A second tool gets none of that for free.
+Specifically:</p>
+<ul>
+<li><strong>The guard is per-key, and a key is a whole collection.</strong> <span class="mono">db:projects</span> is one row holding every project. A Budget
+tool that touches one project's cost fields takes the write lock on <em>all</em> of them, and on every unrelated field of every
+project — <span class="mono">crewIds</span>, <span class="mono">tasks</span>, <span class="mono">travelMethods</span>, the lot. Under any concurrency that's a lot of contention over data it never
+looked at.</li>
+<li><strong>A second tool must implement the same merge, or it will lose edits.</strong> Not "should" — <em>must</em>. If Budget does a plain
+upsert on a failed guard, or simply retries, it silently discards whatever this app wrote in between. <span class="mono">mergeDB()</span> is 30
+lines and is the actual contract between the two tools.</li>
+<li><strong>Deletion semantics are the sharp edge.</strong> <span class="mono">mergeDB()</span> only honours a deletion "against a side still matching base".
+Two tools with different ideas about that will resurrect records.</li>
+<li><strong>Arrays of bare strings don't merge at all</strong> — <span class="mono">db:travelmethods</span> and <span class="mono">db:coprocompanies</span> are last-writer-wins by
+design, which is fine for two tabs of one app and is a data-loss bug the moment a second tool edits them.</li>
+</ul>
+<p><strong>The cheapest thing that makes this safe is not a rewrite.</strong> It is: (a) give Budget its <em>own</em> <span class="mono">db:</span> keys for the data it
+owns, so the two tools' write paths barely intersect; (b) treat the fields Budget reads from this app as read-only on
+Budget's side; and (c) if Budget must write back — the day-rate override is the obvious candidate — port <span class="mono">mergeDB()</span>
+verbatim rather than reimplementing it. G13 matters here: <span class="mono">DB_OBJECT_KEYS</span> is already missing one of its four
+object-shaped keys, and that inconsistency is currently harmless only because the init guards happen to catch it. A
+second tool won't have those guards.</p>
+
+<h4>Which of today's patterns would scale to four views, and which wouldn't</h4>
+<table>
+  <tr><th style="width:34%">Pattern</th><th style="width:16%">At 4 views</th><th>Why</th></tr>
+  <tr><td>CSS custom-property design system</td><td><strong>Scales fine</strong></td><td>No rule knows a view exists. Adding one costs nothing. This is the best-built thing in the file.</td></tr>
+  <tr><td><span class="mono">loadDB</span>/<span class="mono">saveDB</span> as the one choke point</td><td><strong>Scales fine</strong></td><td>Backend swap or key-namespacing is a change in two functions. Exactly the property a second tool needs.</td></tr>
+  <tr><td>Canonical lookups (<span class="mono">crewById</span>, <span class="mono">projectDays</span>…)</td><td><strong>Scales fine</strong></td><td>The right abstraction, and the discipline is actually being kept.</td></tr>
+  <tr><td>Shared-markup / own-state split (<span class="mono">filterPanelFootHTML</span>, <span class="mono">outputMenuRowHTML</span>)</td><td><strong>Scales fine</strong></td><td>The best pattern the recent phases introduced. Share the markup and the one rule; let each caller keep its state and its action. Use it again.</td></tr>
+  <tr><td>Full <span class="mono">innerHTML</span> re-render per state change</td><td><strong>Scales fine, surprisingly</strong></td><td>4.2&nbsp;ms at 66 crew × 6 days. The cost isn't CPU — see G14. Don't "fix" this; the draft-state-outside-the-DOM discipline it forced (<span class="mono">aiScanDraftText</span>, <span class="mono">quickDayDraft</span>, <span class="mono">taskDraftTitle</span>) is well understood and consistently applied.</td></tr>
+  <tr><td>Module-level globals for UI state</td><td><strong>Gets uncomfortable</strong></td><td>~40 of them now. Not a Views problem — none is view-specific — but "which globals must reset on project switch" is already undocumented and already caused R12's declined-but-real complaint. A second view multiplies it.</td></tr>
+  <tr><td>Eight hand-rolled collapsible headers (G2)</td><td><strong>Would hurt</strong></td><td>The one pattern that's actually diverging. Each new view brings sections; each set of sections currently brings a ninth and tenth variant. Fix before, not after.</td></tr>
+  <tr><td>One <span class="mono">db:</span> key per collection</td><td><strong>Would hurt</strong></td><td>See the contention argument above. Only bites with a second <em>writer</em>, which is exactly what's being planned.</td></tr>
+</table>
+
+<h4>Which of today's cleanups also make Views cheaper</h4>
+<p>Three, and only three. The rest are worth doing on their own merits but have nothing to do with Views:</p>
+<ul>
+<li><strong>G2 — one collapsible-section builder.</strong> The single highest-leverage item on this page for a four-view future.
+Every view is a stack of collapsible sections; right now every screen re-invents the header.</li>
+<li><strong>G3 — a spacing scale.</strong> A second tool built against the same design system needs to be able to <em>copy</em> the system.
+Type tokens and tint tokens are copyable today; ~107 hand-written inline margins are not.</li>
+<li><strong>G13 — <span class="mono">DB_OBJECT_KEYS</span>.</strong> Tiny, but it's a correctness statement about the storage contract, which is the one
+thing a second tool has to share exactly.</li>
+</ul>
+<p>Explicitly <em>not</em> recommended: a view registry, a router abstraction, a shared-component library, a state container, or
+extracting anything into modules. Nothing about Preproduction or Edit is specified, and an abstraction shaped for
+imagined requirements is worse than none.</p>
+</div>
+
+
+<!-- ============================================================ -->
+<h2>Also surfaced: R10, never answered</h2>
+<div class="note"><strong>R10 · AI Scan · size M · “Remember the AI Scan conversation.”</strong> Recovered from
+<span class="mono">refinement-review.html</span> line 272. The original wording:
+<em>“Chat history is wiped on every page reload, on purpose for the first build. In practice you'd reload, lose the thread,
+and have to re-attach the brief. Your own notes already flag this as ‘tell us if it turns out to be unwanted’ — from reading
+it, I think it will be.”</em>
+<br><br>It is the only R-item with no recorded answer and no Build Log entry — R3, R5, R7, R9 and R12 were explicitly
+declined, and R1/R2/R4/R6/R8/R13/R14/R15/R16/R17/R18 were built. R11 is queued separately. R10 is simply unanswered.
+It still applies exactly as written: <span class="mono">aiScanMessages</span> is frontend-memory only and is reset on project switch and on
+reload. Not a Gate 1 finding — surfaced so it can be answered rather than lost again.</div>
+
+
+<!-- ============================================================ -->
+<div class="exportbar">
+  <button class="primary" onclick="exportDecisions()">Export my decisions</button>
+  <button onclick="copyExport()">Copy to clipboard</button>
+  <button onclick="document.getElementById('exportOut').style.display='none'">Hide</button>
+  <span class="counts" id="counts"></span>
+  <textarea id="exportOut" spellcheck="false"></textarea>
+</div>
+
+</div>
+
+<script>
+/* Findings are data, rendered once — same construction as the earlier review pages.
+   bucket: 'A' behaviour-neutral | 'B' behaviour-affecting | 'C' architectural */
+const FINDINGS = [
+
+/* ---------- A · the two new shared components ---------- */
+{id:'G1', bucket:'A', area:'area-shared',
+ title:'Three filter panels, two different trigger constructions — and one of them is matched by zero CSS rules',
+ where:'index.html:3953 (Crew on project) · :6080 (Budget) · :6323 (Crew database) · CSS :412–414, :448',
+ wrong:`Phase AO went to real trouble to unify the <em>foot</em> of all three filter panels behind <span class="mono">filterPanelFootHTML()</span>. Their <em>triggers</em> were never unified and have quietly diverged into two constructions with two class names. Crew database uses <span class="mono">&lt;div class="filter-toggle"&gt;</span>, which has its own rule set. Crew-on-project and Budget use <span class="mono">&lt;span class="crew-header-filter"&gt;</span> — and I confirmed in the live page that <strong><span class="mono">.crew-header-filter</span> is matched by exactly 0 CSS rules</strong>. It looks right only because <span class="mono">.crew-header-row span</span> happens to reach it.`,
+ should:`Measured side by side in the running app the three land on the same Jost/12px/muted, differing only in <span class="mono">display</span> (inline-flex vs flex) and <span class="mono">margin-bottom</span> (8px vs 0) — so this is <em>not</em> a visible bug today, and I'm not going to claim it is. It is a structural trap: edit <span class="mono">.filter-toggle</span> and two of the three panels don't follow; edit <span class="mono">.crew-header-row span</span> and the third doesn't. A named class that carries no styling reads as a component and behaves as a label.`,
+ fix:`Add <span class="mono">filterToggleHTML({open, count, onToggle, inverted})</span> next to <span class="mono">filterPanelFootHTML()</span>, following exactly the same split it already established — the markup and the "(N)" rule shared, each panel keeping its own count function and toggle. Give it one real class. Note <span class="mono">outputMenuRowHTML()</span> already takes a <span class="mono">filterHTML</span> slot and Budget hand-builds what it passes in; this is the missing other half of Phase AP.`,
+ blast:'Three call sites, all rendering into the same two toolbar layouts. No state moves. Visual diff should be nil apart from the two properties above, which need a deliberate pick.'},
+
+{id:'G2', bucket:'A', area:'area-shared',
+ title:'Eight hand-rolled builders for one collapsible-section header',
+ where:'index.html:1778 settingsBlockHTML · :2598 techBlockHTML · :2988 renderTasksSection · :4296/:4489/:4626 the three summary blocks · :5198 pvBlockHTML · :5824 budgetDayViewHTML · :5865 budgetCostsViewHTML group() · :6936 sdBlock',
+ wrong:`Every collapsible section in the app is a <span class="mono">.sd-block-head</span> with a caret span, an id pair (<span class="mono">&lt;prefix&gt;c-&lt;key&gt;</span> / <span class="mono">&lt;prefix&gt;b-&lt;key&gt;</span>) and a <span class="mono">display:\${open?'':'none'}</span> body. That shape is written out <strong>eight separate times</strong>. Six of the eight are near-identical — differing only in the wrapper class (<span class="mono">.section</span> vs <span class="mono">.sd-block</span> vs <span class="mono">.sd-block section</span>), whether an id is set, and whether a header action is allowed. <span class="mono">sdBlock()</span> is the odd one out and doesn't use <span class="mono">.flush</span> or <span class="mono">.sd-block-head-toggle</span> at all; <span class="mono">budgetDayViewHTML()</span>'s row carries an inline margin instead.`,
+ should:`"Every section collapsible" is a standing design principle, so this is the app's single most-repeated component — and the one with the least sharing. It is also the direct cause of two smaller findings: the unstyled <span class="mono">.sd-block-body</span> class exists on exactly one of the eight, and the "seven copies of an inline margin" that Phase Refinement fixed with <span class="mono">.flush</span> grew back as inline <span class="mono">margin-top</span> on two more.`,
+ fix:`One <span class="mono">collapsibleSectionHTML({state, prefix, key, title, inner, actions, id, wrapClass})</span>, sitting beside <span class="mono">applyBlockState()</span>/<span class="mono">toggleBlock()</span> which already own the state half. Convert the six near-identical callers; leave <span class="mono">sdBlock()</span> and Budget's Per Day row for a second pass if their differences turn out to be load-bearing. Deletes roughly 50 lines and removes the place where a ninth variant would otherwise be born.`,
+ blast:'Wide but shallow — touches every tab. Pure markup consolidation, no state moves, and the ids stay identical so applyBlockState() is untouched. Needs a visual check on each of the six sections; that is the whole cost.'},
+
+{id:'G3', bucket:'A', area:'area-style',
+ title:'There is no spacing scale — 107 hand-written inline margins across 8 values',
+ where:'throughout; 246 inline style= attributes after </style>, of which ~107 are margins',
+ wrong:`Phase Fonts gave the app four type tokens and did the same job for tints and line weights. Spacing never got the same treatment, so vertical rhythm is set entirely by hand at the point of use: <strong>24×</strong> <span class="mono">margin-bottom:10px</span>, <strong>22×</strong> <span class="mono">margin-top:8px</span>, <strong>22×</strong> <span class="mono">margin-top:10px</span>, <strong>14×</strong> <span class="mono">margin-top:12px</span>, <strong>13×</strong> <span class="mono">margin-bottom:4px</span>, <strong>12×</strong> <span class="mono">margin-bottom:8px</span>, plus 6px/14px/18px stragglers.`,
+ should:`This is the largest remaining gap in the design system and the reason new work drifts: there is nothing to copy, so each new block picks a plausible number. It is also the reason "spacing inconsistencies" is hard to audit — there's no rule to be inconsistent with.`,
+ fix:`Two options, and I'd take the second. (i) Four tokens <span class="mono">--sp-1..4</span> (4/8/12/18) and replace the inline values. (ii) Better and deletes more: most of these sit immediately after a <span class="mono">.subhead</span>, <span class="mono">.toolbar</span>, <span class="mono">.grid</span> or <span class="mono">.hint</span> — let those elements own their own trailing margin in the stylesheet and delete the inline attribute entirely. Expect to remove 60–80 of the 107 outright rather than tokenising them.`,
+ blast:'Large surface, entirely cosmetic, but genuinely needs a screen-by-screen eyeball afterwards — this is the one item on the page where "it compiles" proves nothing. Best done as its own sitting rather than mixed into a batch.'},
+
+/* ---------- B · design system ---------- */
+{id:'G4', bucket:'A', area:'area-style',
+ title:'Mobile still frames sections, contradicting Phase Fonts model C',
+ where:'index.html:782 (.section, ≤900px) · :895 (.section, ≤420px) · :873 (.formgroup, ≤900px); desktop rules :104, :486',
+ wrong:`Phase Fonts decided sections have <strong>no border, no fill, no padding</strong> — margin does the spacing. Desktop obeys: <span class="mono">.section{padding:0}</span>, <span class="mono">.formgroup{padding:0}</span>. The mobile overrides were never removed, so below 900px every section gets <span class="mono">padding:14px 13px</span> (and 13px/11px below 420px) and every formgroup <span class="mono">13px 11px</span>. Confirmed in the running app at 375px: <span class="mono">padding: 13px 11px</span>, on three sections of the Overview tab alone.`,
+ should:'A leftover from when sections had a frame. The padding now indents content against nothing, and does it only on phones — so the mobile layout is subtly a different design from the desktop one, in the one place the design system is most explicit.',
+ fix:'Delete the three overrides. If mobile genuinely needs breathing room the answer is on <span class="mono">.main</span>, which already sets its own mobile padding, not on every section.',
+ blast:'Three CSS rules. Mobile-only visual change: content gains ~11–13px of width on every screen. Check the crew grid and the call sheet card, which are the two widest things on a phone.'},
+
+{id:'G5', bucket:'A', area:'area-style',
+ title:'Off-ladder type sizes have crept back, and --fs-ctl is hardcoded in eight places',
+ where:'CSS :633 (.filter-inverted 10px/1px) · :628 (11.5px) · :849 (10.5px/.4px) · :817 · :772 (13.5px) · :876 (12.5px) · :874/:875/:878; and 11px literals at :321, :332, :376, :482, :487, :523, :551, :592',
+ wrong:`Phase Fonts collapsed "eight Jost sizes running 9–14px, several differing by half a pixel" into four tokens. Since then: <span class="mono">10px</span>, <span class="mono">10.5px</span>, <span class="mono">11.5px</span>, <span class="mono">12.5px</span> and <span class="mono">13.5px</span> have reappeared — the half-pixel sizes specifically, which were the named symptom. Separately, eight rules write <span class="mono">font-size:11px</span> where <span class="mono">var(--fs-ctl)</span> is exactly 11px, and <span class="mono">.filter-inverted</span> also uses <span class="mono">letter-spacing:1px</span> against the label family's 1.2px.`,
+ should:'Individually invisible; collectively it is the ladder being abandoned. The hardcoded 11px matters more than it looks: change <span class="mono">--fs-ctl</span> and eight label rules silently stay behind.',
+ fix:'Replace the eight <span class="mono">11px</span> literals with <span class="mono">var(--fs-ctl)</span>. Snap the off-ladder sizes to the nearest token, or — where a mobile override genuinely wants a bigger control — decide that as a rule ("controls step up one token on mobile") rather than as nine independent numbers.',
+ blast:'Sub-pixel visual change in a dozen places. Zero behaviour. Safe to batch.'},
+
+{id:'G6', bucket:'A', area:'area-style',
+ title:'Dead .grid.g4, three no-op :not(.g4) guards, and two smaller orphans',
+ where:'CSS :141 (.grid.g4) · :156,159,160,162,163,702,703,704 (:not(.g4)) · :715 · :317 (.sritem:hover) · index.html:6342 (.dept-admin-block)',
+ wrong:`Nothing in the app uses <span class="mono">class="grid g4"</span> any more — Phase Detail moved those rows to <span class="mono">.ts-grid</span>/<span class="mono">.ts-field</span>. The rule survives, and so do <strong>eight</strong> <span class="mono">:not(.g4)</span> guards that now exclude nothing. Alongside it: <span class="mono">.sritem:hover{background:var(--panel-2)}</span> is a no-op because <span class="mono">.srlist</span> is already <span class="mono">--panel-2</span>, so the search result list has no hover feedback at all. And <span class="mono">.dept-admin-block</span> has no rule but carries a full inline box (<span class="mono">border/border-radius/padding</span>) that duplicates <span class="mono">.filter-panel</span>'s treatment.`,
+ should:'Orphaned rules are how a stylesheet becomes unreadable — the guards in particular make the inline-label rule look conditional when it isn\'t.',
+ fix:'Delete <span class="mono">.grid.g4</span> and simplify the eight selectors to <span class="mono">:not(.g3)</span>. Give <span class="mono">.sritem:hover</span> a real fill (<span class="mono">--tint-3</span> matches every other hover in the app). Promote <span class="mono">.dept-admin-block</span>\'s inline box to a class, or reuse <span class="mono">.filter-panel</span>.',
+ blast:'Trivial, except the .sritem hover, which is a small deliberate visual addition — flag it as such rather than slipping it in.'},
+
+/* ---------- C · duplication ---------- */
+{id:'G7', bucket:'A', area:'area-dupe',
+ title:'budgetFmt()\'s job is half done — four money formatters survive outside Budget, and they format differently',
+ where:'index.html:4452 cateringSummaryGridBodyHTML · :4502 copyCateringSummaryGrid · :4593 transportSummaryGridBodyHTML · :4641 transportSummaryLines',
+ wrong:`Phase AN found five local <span class="mono">const fmt = n => '£'+(n||0).toFixed(2)</span> inside Budget and collapsed them onto <span class="mono">budgetFmt()</span>. Four more of the same idiom live <em>outside</em> Budget and were missed — and they are worse, because they dropped the currency symbol too: <span class="mono">const fmt = n => (n||0).toFixed(2)</span>. So the Catering and Travel summaries render <strong>“Total catering cost: 1234.00”</strong> and <strong>“Daily cost 240.00”</strong>, with no £ and no thousands separator, while Budget one tab away renders the same class of number as <strong>“£1,234.00”</strong>. This reaches the Copy output and the WhatsApp export too, via <span class="mono">copyCateringSummaryGrid()</span> and <span class="mono">transportSummaryLines()</span>.`,
+ should:'AN\'s stated reason for one formatter was that formatting must never differ between views of the same figure. That reason applies identically here — these are the same pounds, on adjacent tabs, feeding the same export.',
+ fix:'Point all four at <span class="mono">budgetFmt()</span> (move its definition above first use, or leave it — declaration hoisting makes the current order fine). Four one-line changes.',
+ blast:'Visible: currency symbols and separators appear in the Catering and Travel summary grids, their Copy buttons, and the Hotels/Catering/Travel sections of the WhatsApp export. Cosmetic, but it changes text people send out — worth a look before it ships rather than after.'},
+
+{id:'G8', bucket:'A', area:'area-dupe',
+ title:'The three summary blocks are a nine-function copy-paste, plus four copies of one cost-field builder',
+ where:'index.html:4271–4321 hotel · :4468–4507 catering · :4607–4653 transport; costFieldHTML at :4281, :4477, :4616, :5858',
+ wrong:`Hotel, Catering and Transport each have their own <span class="mono">toggleXSummaryBlock()</span>, <span class="mono">jumpToXSummary()</span> and <span class="mono">XSummaryHTML()</span> wrapper — nine functions that differ only in a three-letter id prefix, a title string and a state variable. All three toggles are the same line with a different prefix; all three jump functions are the same three lines with a different element id. Separately, <span class="mono">costFieldHTML</span> — label + a 90px decimal input — is defined <strong>four times</strong>, character-identical in three of them (:4477, :4616, :5858) and inline in the fourth (:4281).`,
+ should:'This is the largest straightforward deletion available. It is also where a fourth summary block would land, and it would arrive as a tenth, eleventh and twelfth function.',
+ fix:`A <span class="mono">{prefix, title, sectionId, open}</span> table plus one <span class="mono">summaryBlockHTML()</span> built on G2's shared header, one <span class="mono">toggleSummaryBlock(prefix)</span> and one <span class="mono">jumpToSummary(prefix)</span>. Lift <span class="mono">costFieldHTML</span> to a single module-level helper. Removes ~70 lines and does not add an abstraction — it removes two.`,
+ blast:'Three tabs under Crew, plus Preview & Export (which renders the Hotel and Transport blocks again) and Budget\'s Costs tab (which uses the fourth costFieldHTML). Ids must stay byte-identical — hcRoomNight/ccCost*/tsCost* are shared across screens by design, and hsm/csm/tsm feed applyBlockState().'},
+
+{id:'G9', bucket:'A', area:'area-dupe',
+ title:'buildProjectCrewGroups() — ten near-identical branches for thirteen group-by options',
+ where:'index.html:3614–3697',
+ wrong:`Five branches (<span class="mono">company</span>, <span class="mono">role</span>, <span class="mono">subDept</span>, <span class="mono">travel</span>, <span class="mono">catering</span>) are literally the same eight lines: bucket by a key function, sort the keys alphabetically with the "blank" label forced last, map to <span class="mono">{key, label, code:'', items:bySort(...)}</span>. Only the key function and the blank label differ. Four more (<span class="mono">hotel</span>, <span class="mono">personType</span>, <span class="mono">vat</span>, <span class="mono">seniority</span>) are the same shape with a fixed key order instead of an alphabetical one.`,
+ should:'Nine of the thirteen options are two pieces of data, not eight lines of code. The three genuinely different ones — <span class="mono">deptCompany</span> (composite), <span class="mono">daysOnSite</span> (multi-bucket) and <span class="mono">dept</span> (canonical order + codes) — earn their own branches and should keep them.',
+ fix:`Two table-driven helpers — <span class="mono">groupAlpha(keyFn, blankLabel)</span> and <span class="mono">groupFixed(keyFn, orderedKeys)</span> — and a lookup object mapping the nine simple options onto them. The three special cases stay as they are. Deletes ~40 lines and makes adding a tenth simple grouping a one-line change instead of an eight-line copy.`,
+ blast:'One function, thirteen options, all exercised by the Phase R sort/group audit. Worth re-running that audit against ROW 2026 afterwards — it is exactly the regression test this change wants.'},
+
+{id:'G10', bucket:'A', area:'area-dupe',
+ title:'"Describe the active budget scope" is written three times, and one of them pluralises differently',
+ where:'index.html:5504–5507 budgetFilterPanelHTML · :5937–5941 budgetExportRows · :6052–6055 budgetOutputPanelHTML',
+ wrong:`The same four lines — build a <span class="mono">scope</span> array from <span class="mono">budgetDayFilterCount()</span> and <span class="mono">budgetDeptFilter</span> — appear three times. Two of them (<span class="mono">budgetExportRows</span> and <span class="mono">budgetOutputPanelHTML</span>) are character-identical. The third pluralises correctly (<span class="mono">day\${all.length===1?'':'s'}</span>) while the other two always say "days", so a one-day project's export header reads "1 of 1 days".`,
+ should:'A copy of a formatting rule is how the export and the screen end up describing the same filter differently — which is the exact failure mode R1 was built to avoid.',
+ fix:'One <span class="mono">budgetScopeParts()</span> returning the array; the three callers join it their own way. Fixes the pluralisation once.',
+ blast:'Budget only. The visible change is the "1 of 1 days" → "1 of 1 day" correction in the export header and output-menu hint.'},
+
+/* ---------- D · the save path ---------- */
+{id:'G11', bucket:'B', area:'area-save',
+ title:'saveDB() swallows every failure, and the caller flashes “Saved” regardless',
+ where:'index.html:1502–1537 (four silent returns: :1511, :1521, :1527, :1535); callers e.g. :3398, :3406, :5374, :7409',
+ wrong:`Every failure path in <span class="mono">saveDB()</span> is <span class="mono">console.error(...)</span> followed by a bare <span class="mono">return</span>: a Supabase error on the initial upsert, an error on the guarded write, a failed merge re-read, and — after three conflicting attempts — "gave up after repeated conflicts". The function returns <span class="mono">undefined</span> in all cases, exactly as it does on success, and never throws. Callers then unconditionally run <span class="mono">flashStatus('ovStatus')</span> / <span class="mono">flashStatus('sdStatus')</span> / <span class="mono">flashStatus(..., 'Saved to database')</span>.`,
+ should:`So the app can tell you it saved when it did not, and the only trace is a console line nobody has open. Offline, mid-flight, or after three genuine conflicts, the user's edit is gone and the UI confirms it landed. This is the most safety-critical code in the app and it is the one place with no failure surface. R18 correctly stopped two tabs overwriting each other; it did not make failure visible.`,
+ fix:`Have <span class="mono">saveDB()</span> return a boolean (or throw), and have <span class="mono">flashStatus()</span> take a failure state — the amber <span class="mono">.ai-notconfigured</span> treatment already exists and is the right register: nothing the user did caused it. At minimum the "gave up after repeated conflicts" path must surface, because that one means <em>data has been discarded</em>. Worth considering a persistent banner rather than a 2-second flash for that case.`,
+ blast:'Touches saveDB() plus the ~15 call sites that flash a status. Everything else calls saveDB() and ignores the result, which stays valid. Its own phase — this is a decision about how the app should behave when the network fails, not a tidy-up.'},
+
+{id:'G12', bucket:'B', area:'area-save',
+ title:'resetAndReseed() wipes the live database, one confirm() from the Welcome screen, with no undo',
+ where:'index.html:1878–1883 · reachable from renderWelcome() :1874 (G-4)',
+ wrong:`<span class="mono">resetAndReseed()</span> sets <span class="mono">crewDB=[]; locationsDB=[]; projectsDB=[]; shootDaysDB=[]</span> and reseeds the OFTV sample data over the top, then <span class="mono">seedSampleData()</span> writes all four collections to Supabase. R17 gave undo to the four deletes and the two bulk edits — but <strong>not to this</strong>, which destroys strictly more than all six combined. There is no <span class="mono">beginUndo()</span> call in it.`,
+ should:`R17's own stated scope is "the actions that actually lose work with no way back". This is the largest such action in the app by an order of magnitude, and it is on the landing screen, which is where someone lands when they are least oriented. The button is styled <span class="mono">.danger</span> and the confirm text is honest, so the affordance is fine — the absence of a net is not. It would take out ROW 2026 (88 crew, 3 projects, 10 shoot days) and, being a write of empty-then-seed rather than a delete, R18's merge would not help.`,
+ fix:'Simplest: <span class="mono">beginUndo(["db:crew","db:locations","db:projects","db:shootdays"])</span> before the wipe and <span class="mono">finishUndo()</span> after, exactly like <span class="mono">deleteProject()</span>. Stronger and probably right: also require typing a confirmation word, or hide the control behind Settings — the sample data has done its job and this is now a live production database.',
+ blast:'One function. The undo snapshot is four whole collections, which is larger than any existing snapshot but the mechanism is identical. Decide the affordance question separately from the undo question.'},
+
+{id:'G13', bucket:'B', area:'area-save',
+ title:'db:roles is missing from DB_OBJECT_KEYS',
+ where:'index.html:1450 DB_OBJECT_KEYS · :1552 applyMergedDB · :1566 initApp · saved at :1207, :1059',
+ wrong:`<span class="mono">DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings']</span>. <span class="mono">db:roles</span> is the fourth object-shaped collection — <span class="mono">ROLES_BY_DEPT</span> is a plain object, written by <span class="mono">confirmAddRoleDialog()</span> and read back in <span class="mono">initApp()</span> — and it is absent from the list, while being explicitly handled in <span class="mono">applyMergedDB()</span> two lines below its three siblings.`,
+ should:`The consequence today is contained: <span class="mono">isObjDB()</span> only feeds <span class="mono">loadDB()</span>'s empty-value default, so a missing row yields <span class="mono">[]</span> instead of <span class="mono">{}</span> — and <span class="mono">initApp()</span> happens to guard with <span class="mono">!Array.isArray(savedRoles)</span>, and <span class="mono">mergeDB()</span>'s object branch happens to tolerate an array as its base. Three separate accidents catch it. I traced them and I believe it is currently harmless — but it is harmless by luck, in the one function that is the storage contract.`,
+ fix:'Add <span class="mono">\'db:roles\'</span> to the array. One word.',
+ blast:'One line, but tagged B rather than A because it changes what loadDB() returns on a missing/errored row. Verify against a project whose db:roles row exists (it does — last written 2026-08-03) and the behaviour is identical.'},
+
+{id:'G14', bucket:'B', area:'area-save',
+ title:'Eleven grid interactions wait for the network round-trip before the screen updates',
+ where:'index.html:4654 toggleCrewOnDay · :4179 toggleHotelNight · :4189 toggleHotelPre · :4329 toggleMeal · :4522 setTravelMethod · :1633 toggleAllForPerson · :1661 toggleAllMealForPerson · :5117 toggleLocOnDay · :4993 addCrewToProject · :5000 removeCrewFromProject · :2944 toggleProjectTask',
+ wrong:`Every one of these follows the same shape: mutate in memory, <span class="mono">await saveDB(...)</span>, <em>then</em> <span class="mono">renderProjectBody()</span>. Verified by inspecting the live function bodies. So ticking one checkbox in the Days-on-site grid does not repaint until Supabase has answered.`,
+ should:`I want to be precise about this, because I went looking for a rendering problem and there isn't one: the re-render itself measures <strong>4.2&nbsp;ms</strong> for the full 66-crew × 6-day grid. The delay is entirely the round-trip — and R18 made it potentially <em>two</em> round-trips, since a failed guard triggers a re-read, a merge and a retry before returning. The core interaction the app is built around is "move down a list answering yes/no", and each yes/no currently costs a network wait. The keyboard navigation at :1599 makes this worse, not better: it invites fast sequential toggling.`,
+ fix:'Render first, save after — <span class="mono">renderProjectBody(); saveDB(...)</span> rather than <span class="mono">await saveDB(...); renderProjectBody()</span>. The in-memory mutation has already happened, so the render is correct regardless. This is only safe once G11 exists: today a failed save is silent, and rendering optimistically before a silent failure would make it worse, not better. <strong>Do G11 first, then this.</strong>',
+ blast:'Eleven functions, all the highest-frequency interactions in the app. Genuinely behaviour-affecting: it changes what the user sees when a save fails, which is why it is coupled to G11. Its own phase, after G11.'},
+
+/* ---------- E · correctness ---------- */
+{id:'G15', bucket:'B', area:'area-correct',
+ title:'Budget joins Catering and Travel costs on dayNum — a free-text, non-unique, mixed-type field',
+ where:'index.html:5629 dayNumsInScope · :5676 cateringCol · :5677 travelCol (buildBudgetData)',
+ wrong:`<span class="mono">buildBudgetData()</span> matches each shoot day to its catering and travel columns with <span class="mono">cols.find(c =&gt; c.dayNum === d.dayNum)</span>, and scopes the extras with <span class="mono">new Set(days.map(d =&gt; d.dayNum))</span>. Everywhere else in the app days are joined on <span class="mono">d.id</span>. <span class="mono">dayNum</span> is a free-text input the user types (Shoot Day form, Quick add, and indirectly the Overview count field), it is not unique, and it is routinely blank — <span class="mono">d.dayNum||'?'</span> appears about twenty times, so blank is an expected state. I also confirmed on the live data that it is <strong>mixed-type</strong>: ROW 2026's six days hold <span class="mono">dayNum</span> as strings, while <span class="mono">makeShootDayRecord()</span> creates it as a number.`,
+ should:`Two days sharing a <span class="mono">dayNum</span> — or two days both blank, which is easier to reach — make <span class="mono">.find()</span> return the first match for both, so Per Day shows one day's catering and travel cost against another day's row, and a day filter selecting one of them silently pulls in the other's cost. Every stated Phase AO reconciliation invariant would still appear to hold, because both sides read the same wrong number. I could not make the mixed types break the join in practice (both sides come from the same <span class="mono">projectDays()</span> array, so they agree), so I am <em>not</em> claiming an active fault from that — but a join key that is user-typed, non-unique, sometimes empty and sometimes a different primitive type is the wrong key.`,
+ fix:'Carry <span class="mono">dayId: d.id</span> on each column in <span class="mono">buildCateringSummaryGrid()</span> and <span class="mono">buildTransportSummary()</span> (both already iterate <span class="mono">projectDays()</span>, so the id is in hand) and join on it. Three lines changed, one added in each builder.',
+ blast:'Budget only, but it touches the aggregator every view and the export read from. Re-run the Phase AO reconciliation checks on ROW 2026 afterwards — the numbers should be identical, which is the point.'},
+
+{id:'G16', bucket:'B', area:'area-correct',
+ title:'saveShootDay() re-stamps the weather “last fetched” date on every autosave',
+ where:'index.html:7392 · displayed at :7333',
+ wrong:`<span class="mono">saveShootDay()</span> rebuilds the whole weather object unconditionally, including <span class="mono">fetchedAt: new Date().toLocaleDateString()</span>. Autosave on the Shoot Days tab fires on any input, roughly a second after typing stops — so editing a schedule row, a call time or the production brief restamps the weather as fetched today, when no fetch happened. A day whose weather was never fetched at all gets a <span class="mono">fetchedAt</span> the first time anything on it is edited, and then reports "Last fetched 07/08/2026".`,
+ should:'The stamp exists to tell you how stale a forecast is, on a screen where that is a real operational question — a forecast pulled three weeks ago for a shoot next Tuesday is worth re-fetching. A stamp that silently refreshes itself is worse than none, because it is confidently wrong.',
+ fix:'Only write <span class="mono">fetchedAt</span> in <span class="mono">fetchWeatherForDay()</span>, where the fetch actually happens; have <span class="mono">saveShootDay()</span> preserve the existing value (<span class="mono">fetchedAt: (d.weather&&d.weather.fetchedAt)||\'\'</span>). Consider storing an ISO timestamp rather than a localised date string while you\'re there — the current one can\'t be compared or sorted.',
+ blast:'One line in saveShootDay(). Existing records keep whatever stamp they have, which will be wrong until the next real fetch — worth saying out loud rather than pretending the fix is retroactive.'},
+
+{id:'G17', bucket:'B', area:'area-correct',
+ title:'Attaching several files to AI Scan keeps only the last error',
+ where:'index.html:3305–3318 handleAiScanFileInput',
+ wrong:`The loop assigns <span class="mono">aiScanError = ...</span> on both the oversize check and the read failure. With multiple files selected, each failure overwrites the previous one, so only the last is ever shown. Attach three files where two are over 15&nbsp;MB and you are told about one of them — and the other silently isn't attached either.`,
+ should:'The brief for AI Scan is that attaching a briefing document is the primary path in. Silently dropping an attachment while reporting a different one is the kind of failure that gets noticed only when the model\'s answer is wrong.',
+ fix:'Collect failures into an array and join them into one message, or push each as its own line. Five-line change.',
+ blast:'AI Scan only, error path only. Small.'},
+
+/* ---------- F · known bugs ---------- */
+{id:'G18', bucket:'B', area:'area-known',
+ title:'KNOWN BUG 1 — “+ Add crew member” does show its form; it opens below the fold and nothing scrolls to it',
+ where:'index.html:6328–6329 renderCrewDatabase · :6636 toggleCrewForm · compare :6812 editLocation and :6084 startNewLocationFromSearch',
+ wrong:`Reproduced against live data. The form is <strong>not</strong> missing: after clicking, <span class="mono">addingCrewNew</span> is <span class="mono">true</span>, the button relabels to "− Cancel", and a 602px-tall, 10&nbsp;KB <span class="mono">.inline-form-card</span> is in the DOM with <span class="mono">display:block</span>. The problem is where. The button is the <em>last element on the page</em>, below all 88 crew in 11 department groups, at document y≈11,685 of a 12,402px page. The form is inserted after it. Measured: scroll position is unchanged by the click (11,069 before and after), and <strong>104px of the 602px form is on screen</strong> — its top edge, at viewport y=616 of a 720px viewport. Since <span class="mono">.inline-form-card</span> has <span class="mono">border-top:none</span>, what actually appears is a borderless sliver at the very bottom edge.`,
+ should:`So the click reads as "nothing happened". The app already knows the answer: the two equivalent flows on the Locations side both call <span class="mono">w.scrollIntoView({behavior:'smooth', block:'nearest'})</span> — <span class="mono">editLocation()</span> at :6812 and <span class="mono">startNewLocationFromSearch()</span> at :6084. <span class="mono">toggleCrewForm()</span> does not. The same button on the project Crew tab (:4054–4055) sits in the same position at the bottom of a long section and has the same shape of problem.`,
+ fix:'Two candidates, and I\'d want the second discussed rather than assumed. (i) Minimal and consistent with the app\'s own precedent: have <span class="mono">toggleCrewForm()</span> scroll the form into view when opening, matching the Locations flow. (ii) Better: put the add form <em>above</em> the list rather than below it, so it opens where the eye already is. Both databases currently bury their add button under the whole list, which is only defensible while the list is short.',
+ blast:'(i) is three lines and touches both call sites of toggleCrewForm(). (ii) is a layout change to two screens and should be looked at rather than reasoned about. Tagged B because it changes what the screen does, not how it looks.'},
+
+{id:'G19', bucket:'B', area:'area-known',
+ title:'KNOWN BUG 2 — dayTotal is stored per record and nothing resyncs it; it should be derived, not stored',
+ where:'index.html:6164–6170 makeShootDayRecord · :7389 saveShootDay · consumed at :7556, :7578, :7627, :7669',
+ wrong:`Confirmed on live ROW 2026 data. All six days hold <span class="mono">dayTotal:'6'</span>. <span class="mono">makeShootDayRecord()</span> builds a seventh with <span class="mono">dayNum: existing.length+1, dayTotal: existing.length+1</span> — i.e. 7 — and touches no other record. Nothing anywhere else updates <span class="mono">dayTotal</span>. So days 1–6 keep printing "Day 1 of 6" on the call sheet preview, the WhatsApp text and the Excel export while day 7 prints "Day 7 of 7". All three add paths (+ New day, Quick add, the Overview count field) behave identically, and deleting a day has the mirror problem. I also confirmed a <strong>type split</strong> in passing: existing days hold <span class="mono">dayNum</span>/<span class="mono">dayTotal</span> as strings, <span class="mono">makeShootDayRecord()</span> creates them as numbers, and <span class="mono">saveShootDay()</span> writes strings — so a project carries both until each day is saved once. See G15, which joins on this field.`,
+ should:`<strong>The elegant fix is to stop storing it.</strong> <span class="mono">dayTotal</span> is not a fact about a shoot day, it is <span class="mono">projectDays(d.projectId).length</span> — derived state that has been persisted, which is exactly why it goes stale. Deriving it at the four consumption points removes the field, removes the resync problem permanently, and removes the migration question, because a derived value doesn't care what is in the old records. The four consumers all already have the day and hence its project.`,
+ fix:'Add <span class="mono">shootDayTotal(d)</span> returning <span class="mono">projectDays(d.projectId).length</span>; use it in <span class="mono">buildFullData()</span> (which feeds all three outputs) and in <span class="mono">techSpecsLines()</span>. Leave the "of (total)" input on the Shoot Day form as a <em>display</em> of the derived number, or drop the field — that is the one decision to make. Existing <span class="mono">dayTotal</span> values can be left in place and ignored; no migration.',
+ blast:'Changes what the call sheet, WhatsApp text and Excel export print for every existing multi-day project — which is the fix, but it is a visible output change and should be its own decision. If the user ever deliberately overrides the total (e.g. "Day 2 of 8" on a shoot that will grow), deriving removes that ability; worth asking before building.'},
+
+/* ---------- G · structural ---------- */
+{id:'G20', bucket:'C', area:'area-arch',
+ title:'seedSampleData() is 580 lines of demo data — 8.5% of the JS — shipped in the production file',
+ where:'index.html:1884–2463',
+ wrong:`The single largest function in the file by a wide margin: 88 hardcoded crew records, two locations, three projects and seven fully-populated shoot days with schedules and position assignments. It is real, useful test data — the Phase R sort/group audit and this audit both leaned on it — but it now sits inside a file whose size is the thing being assessed, and it is the payload of G12's one-click wipe.`,
+ should:'Two separate observations. First, it is the cheapest 8.5% of the file to remove if size ever becomes the problem, and it is the <em>only</em> block that can go without anything else changing. Second, and more to the point: the app has moved from demo to production — the live database holds real ROW 2026 crew with real phone numbers — and the "first-ever load" branch at :1577 that seeds it can only fire on an empty database, which will now never legitimately happen.',
+ fix:'Not a Stage 2 item, and not urgent. When it matters: move the seed to <span class="mono">sample-data.js</span> loaded only by a <span class="mono">?seed</span> query param, or delete it and keep the sample set as a <span class="mono">.json</span> fixture in the repo. Either way <span class="mono">initApp()</span>\'s auto-seed branch should probably go regardless — a genuinely empty database now more likely means "the load failed" than "first run", and silently writing 88 fabricated crew records over that would be bad.',
+ blast:'Architectural. Deleting the auto-seed branch is separately worth a decision on its own — it is a write path that fires on an error condition.'},
+
+{id:'G21', bucket:'C', area:'area-arch',
+ title:'A shoot day\'s locations are two parallel structures for one relationship',
+ where:'index.html:5117 toggleLocOnDay · :5611 usesLocation · :7391 saveShootDay · :5509 buildFullData · locRowHTML :5104',
+ wrong:`"Which locations is this day using" is stored as <span class="mono">d.locationId</span> (a single id, the primary) plus <span class="mono">d.additionalLocationIds</span> (an array of <span class="mono">[id, note]</span> pairs). Every consumer has to check both: <span class="mono">usesLocation()</span> in the budget, <span class="mono">locRowHTML()</span>'s checkbox state, <span class="mono">buildFullData()</span>'s output. <span class="mono">toggleLocOnDay()</span> is the clearest symptom — ticking a box has to decide whether it is setting the primary or appending to the additional list, and unticking has to handle both, including promoting nothing when the primary is cleared (it just goes blank, leaving a day with additional locations and no primary).`,
+ should:`One ordered array — <span class="mono">d.locations = [[id, note], ...]</span>, first entry is the primary — expresses the same thing with one structure, makes "is this location used on this day" a single <span class="mono">.some()</span>, and makes reordering the primary a move rather than a special case. I am flagging this as an observation rather than pushing it: the current shape works, is well understood, and the duplication is contained to five call sites.`,
+ fix:'Not now. It needs a data migration across every existing shoot day, which is disproportionate to the pain. Worth having written down because if the Preproduction view ever cares about locations — and it is the view most likely to — this is the structure it would inherit, and it would be much cheaper to change before that than after.',
+ blast:'Migration across all shoot day records in db:shootdays. Own phase, or never. Recorded, not recommended.'},
+];
+
+/* ---------- render ---------- */
+const bucketClass = {A:'a', B:'b', C:'c'};
+const bucketTag   = {A:'tag-a', B:'tag-b', C:'tag-c'};
+const bucketWord  = {A:'A · behaviour-neutral', B:'B · behaviour-affecting', C:'C · architectural'};
+
+function itemHTML(f){
+  return `<div class="item ${bucketClass[f.bucket]}" id="item-${f.id}">
+    <div class="item-head">
+      <span class="gid">${f.id}</span>
+      <span class="tag ${bucketTag[f.bucket]}">${bucketWord[f.bucket]}</span>
+      <span class="title">${f.title}</span>
+    </div>
+    <div class="where">${f.where}</div>
+    <div class="field"><span class="lbl">What's wrong</span><p>${f.wrong}</p></div>
+    <div class="field"><span class="lbl">Why it matters</span><p>${f.should}</p></div>
+    <div class="field"><span class="lbl">Proposed fix</span><p>${f.fix}</p></div>
+    <div class="blast"><b>Blast radius:</b> ${f.blast}</div>
+    <div class="decide">
+      <label><input type="radio" name="d-${f.id}" value="Accept"> Accept</label>
+      <label><input type="radio" name="d-${f.id}" value="Reject"> Reject</label>
+      <label><input type="radio" name="d-${f.id}" value="Defer"> Defer</label>
+      <label><input type="radio" name="d-${f.id}" value="Own phase"> Own phase</label>
+      <input type="text" id="n-${f.id}" placeholder="Notes…">
+    </div>
+  </div>`;
+}
+['area-shared','area-style','area-dupe','area-save','area-correct','area-known','area-arch'].forEach(area=>{
+  const el = document.getElementById(area);
+  if(el) el.innerHTML = FINDINGS.filter(f=>f.area===area).map(itemHTML).join('');
+});
+
+/* counts */
+(function(){
+  const by = b => FINDINGS.filter(f=>f.bucket===b).length;
+  document.getElementById('counts').textContent =
+    `${FINDINGS.length} findings — ${by('A')} × [A] behaviour-neutral, ${by('B')} × [B] behaviour-affecting, ${by('C')} × [C] architectural.`;
+})();
+
+/* ---------- export ---------- */
+function exportDecisions(){
+  const L = ['PHASE AQ — GATE 1 · DECISIONS',
+             'Audited at 6eac989 · 93,280 bytes changed since 7aa5af0',
+             'Exported ' + new Date().toLocaleString('en-GB'),
+             ''];
+  const groups = {A:[], B:[], C:[]};
+  let answered = 0;
+  FINDINGS.forEach(f=>{
+    const picked = document.querySelector(`input[name="d-${f.id}"]:checked`);
+    const note = (document.getElementById('n-'+f.id).value||'').trim();
+    if(picked) answered++;
+    const plain = f.title.replace(/<[^>]+>/g,'');
+    groups[f.bucket].push(`${f.id}  [${picked?picked.value:'— no decision —'}]  ${plain}` + (note?`\n      note: ${note}`:''));
+  });
+  L.push(`${answered} of ${FINDINGS.length} decided.`, '');
+  [['A','[A] BEHAVIOUR-NEUTRAL — Stage 2 can batch these'],
+   ['B','[B] BEHAVIOUR-AFFECTING — each needs its own decision'],
+   ['C','[C] ARCHITECTURAL — never bundled into Stage 2']].forEach(([k,hdr])=>{
+    if(!groups[k].length) return;
+    L.push(hdr, '-'.repeat(hdr.length));
+    groups[k].forEach(line=>L.push(line));
+    L.push('');
+  });
+  L.push('R10 (AI Scan · remember the conversation) — still unanswered from refinement-review.html.');
+  const out = document.getElementById('exportOut');
+  out.value = L.join('\n');
+  out.style.display = 'block';
+  out.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+async function copyExport(){
+  const out = document.getElementById('exportOut');
+  if(out.style.display==='none' || !out.value) exportDecisions();
+  try{ await navigator.clipboard.writeText(out.value); alert('Decisions copied.'); }
+  catch(e){ out.select(); document.execCommand('copy'); alert('Decisions copied.'); }
+}
+</script>
+</body>
+</html>

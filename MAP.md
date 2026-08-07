@@ -1132,6 +1132,37 @@ writes an entire collection back on every save, so two browser tabs open on the
 same data can silently erase each other's edits. That is a *today* risk, not a
 multi-user one — it needs no accounts, no login and no second person to happen.
 
+⚠️ **R10 is the one item on that page with no recorded answer** — "Remember the AI
+Scan conversation" (size M). R3/R5/R7/R9/R12 were explicitly declined and
+R1/R2/R4/R6/R8/R13–R18 were built; R11 is queued. R10 was simply never answered and
+has no Build Log entry. Surfaced again by Phase AQ — see `gate1-review.html`.
+
+## Gate 1 review page (Phase AQ)
+
+`gate1-review.html` — fifth review page, same standalone / not-linked-from-`index.html`
+convention as `style-audit.html` / `-fonts` / `-detail` / `refinement-review.html`, and
+the same click-to-decide + notes + export system. Covers the whole app, not one area:
+Part 1 style, Part 2 code, Part 3 efficiency/elegance and readiness for Views.
+
+Triggered by the Gate 1 threshold — ~93.2 KB of changed code since the last whole-app
+review (`7aa5af0`), against a 40–50 KB threshold. **21 findings: 10 [A]
+behaviour-neutral, 9 [B] behaviour-affecting, 2 [C] architectural**, each tagged with
+its bucket so a cosmetic pass can't carry a behaviour change along with it.
+
+⚠️ **Stage 1 was audit only — nothing in `index.html` was changed, and this entry is
+the only edit made to this file.** Do not treat any finding on that page as applied.
+Stage 2 applies whatever the user accepts; the [B] and [C] items are explicitly not
+batchable.
+
+Two things worth knowing without opening it: the two known open bugs were reproduced
+and turn out to be more specific than described — "+ Add crew member" *does* render its
+form, but ~104px of 602px lands on screen because the button is the last element on a
+12,400px page and nothing scrolls to it (the Locations equivalents call
+`scrollIntoView`; `toggleCrewForm()` doesn't); and `dayTotal`'s resync problem is
+really a derived-value-that-got-stored problem, so the recommended shape is to delete
+the field rather than sync it. Verified with `saveDB()`/`scheduleAutosave()` stubbed
+and confirmed clean against `app_data`.
+
 ## The design system, as decided (Phase Refinement)
 
 A consistency pass over everything built since Phase U (Budget, AI Scan, Overview
