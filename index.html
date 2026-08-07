@@ -1622,6 +1622,38 @@ async function saveDB(key, value){
   }
 }
 
+/* ---- G14: render first, save after -----------------------------------------
+   The eleven highest-frequency grid interactions used to `await saveDB()` BEFORE
+   re-rendering, so ticking one checkbox in the Days-on-site grid didn't repaint
+   until Supabase had answered — and R18 made that potentially TWO round-trips,
+   since a failed guard triggers a re-read, a merge and a retry. The audit measured
+   the full 66-crew × 6-day re-render at 4.2ms, so none of the sluggishness was
+   rendering; it was all network. The in-memory mutation has already happened by
+   the time we render, so the optimistic render is correct regardless.
+
+   ⚠️ THIS IS ONLY SAFE BECAUSE G11 EXISTS. Every failure inside saveDB() raises
+   the persistent failure banner from the choke point itself, so a save that never
+   lands cannot pass unannounced. If you are ever tempted to simplify G11's error
+   path away, these eleven interactions become fast and SILENTLY LOSSY — which is
+   strictly worse than the slow version this replaced. Do not decouple them.
+
+   ⚠️ A failed save is NEVER rolled back, and that is deliberate:
+     · 'unsaved'   — the edit is still live in memory and every save writes the
+                     WHOLE collection, so the next successful save carries it.
+                     Rolling back would destroy a perfectly good edit.
+     · 'discarded' — applyMergedDB() has already spliced the merged result into the
+                     live arrays and re-rendered, so memory already holds the
+                     resolved state; the banner says it isn't in the database.
+   What we DO on failure is re-render, so the screen is guaranteed to match memory
+   at the moment the banner appears rather than still showing what was painted
+   optimistically before the round-trip. */
+function saveInBackground(key, value){
+  return saveDB(key, value).then(res=>{
+    if(res && !res.ok) renderProjectBody();
+    return res;
+  });
+}
+
 /* G11 — the failure surface. A banner rather than only an inline status, because
    ~80 of saveDB()'s call sites flash nothing at all: they mutate, save and
    re-render, and a failure there was invisible even in principle. The banner is
@@ -1783,7 +1815,7 @@ async function toggleAllForPerson(crewId, kind){
       if(!p.hotelNightBefore.includes(crewId)) p.hotelNightBefore.push(crewId);
       days.forEach(d=>{ d.hotelNights = d.hotelNights||[]; if(!d.hotelNights.includes(crewId)) d.hotelNights.push(crewId); });
     }
-    await saveDB('db:projects', projectsDB);
+    saveInBackground('db:projects', projectsDB);
   } else {
     // 'days' — Days on site
     const allOn = days.length>0 && days.every(d=>(d.positions||[]).some(pos=>pos[0]===crewId));
@@ -1794,8 +1826,9 @@ async function toggleAllForPerson(crewId, kind){
       else if(idx===-1){ d.positions.push([crewId, '', '', '', '']); }
     });
   }
-  await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 /* ---- toggle-all for one meal across every day, for one person (Catering) ---- */
 async function toggleAllMealForPerson(crewId, mealKey){
@@ -1807,8 +1840,9 @@ async function toggleAllMealForPerson(crewId, mealKey){
     d.cateringMeals[crewId][mealKey] = !allOn;
     if(!d.cateringMeals[crewId].b && !d.cateringMeals[crewId].l && !d.cateringMeals[crewId].d) delete d.cateringMeals[crewId];
   });
-  await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 
 /* ============================================================ NAMING */
@@ -3085,8 +3119,9 @@ async function toggleProjectTask(taskId, checked){
   const p = currentProject(); if(!p) return;
   const t = (p.tasks||[]).find(x=>x.id===taskId); if(!t) return;
   t.completed = checked;
-  await saveDB('db:projects', projectsDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
 }
 async function deleteProjectTask(taskId){
   const p = currentProject(); if(!p) return;
@@ -4329,8 +4364,9 @@ async function toggleHotelNight(crewId, dayId, checked){
     if(checked){ if(!d.hotelNights.includes(id)) d.hotelNights.push(id); }
     else { d.hotelNights = d.hotelNights.filter(x=>x!==id); }
   });
-  await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 async function toggleHotelPre(crewId, checked){
   const p = currentProject(); if(!p) return;
@@ -4339,8 +4375,9 @@ async function toggleHotelPre(crewId, checked){
     if(checked){ if(!p.hotelNightBefore.includes(id)) p.hotelNightBefore.push(id); }
     else { p.hotelNightBefore = p.hotelNightBefore.filter(x=>x!==id); }
   });
-  await saveDB('db:projects', projectsDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
 }
 function abbreviateName(name){
   const parts = (name||'').trim().split(/\s+/).filter(Boolean);
@@ -4481,8 +4518,9 @@ async function toggleMeal(crewId, dayId, meal, checked){
     // clean up if all false
     if(!d.cateringMeals[id].b && !d.cateringMeals[id].l && !d.cateringMeals[id].d) delete d.cateringMeals[id];
   });
-  await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 function buildCateringExport(){
   const p = currentProject(); if(!p) return null;
@@ -4678,13 +4716,14 @@ async function setTravelMethod(crewId, selectEl){
     const newOpt = (prompt('Add a new travel method:')||'').trim();
     if(newOpt && !travelMethodsList.includes(newOpt)){
       travelMethodsList.push(newOpt);
-      await saveDB('db:travelmethods', travelMethodsList);
+      saveInBackground('db:travelmethods', travelMethodsList);
     }
     applied = newOpt || '';
   }
   selectedEditTargets(crewId).forEach(id=>{ p.travelMethods[id] = applied; });
-  await saveDB('db:projects', projectsDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
 }
 /* ---- Travel tab's own summary (Phase W) ----
    Travel method is stored once per person per PROJECT (p.travelMethods), not per day —
@@ -4813,8 +4852,9 @@ async function toggleCrewOnDay(crewId, dayId, checked){
       d.positions = d.positions.filter(pos=>pos[0]!==id);
     }
   });
-  await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 /* ---------- Tech Specs & Camera Designations ----------
    Both live at PROJECT level as the default, because they're near-constant across a
@@ -5147,14 +5187,18 @@ async function addCrewToProject(id){
   const p = currentProject();
   p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(id)) p.crewIds.push(id);
   resetQuickAdd();   // also Overview Quick Add's "existing crew member" path
-  await saveDB('db:projects', projectsDB); renderProjectBody();
+  // G14 — render first, save after (see saveInBackground)
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
 }
 async function removeCrewFromProject(id){
   const p = currentProject();
   p.crewIds = (p.crewIds||[]).filter(x=>x!==id);
   shootDaysDB.forEach(d=>{ if(d.projectId===currentProjectId && d.positions) d.positions = d.positions.filter(pos=>pos[0]!==id); });
-  await saveDB('db:projects', projectsDB); await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 
 /* ---------- Project Locations ---------- */
@@ -5276,8 +5320,9 @@ async function toggleLocOnDay(locId, dayId, checked){
     if(d.locationId===locId) d.locationId = '';
     d.additionalLocationIds = d.additionalLocationIds.filter(pair=>pair[0]!==locId);
   }
-  await saveDB('db:shootdays', shootDaysDB);
+  // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 /* takes the id directly now — the old no-arg form read a <select> that the unified
    add flow (Phase Q) replaced with the search result list */

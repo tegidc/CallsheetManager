@@ -519,6 +519,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `loadDB()` / `saveDB()` — the single choke point for reading/writing any app data collection to/from Supabase, keyed by a `db:*` string. **Since Phase AR (G11) `saveDB()` returns a result — `{ok:true}` or `{ok:false, kind, detail}` — and raises the failure banner itself.** The ~80 call sites that ignore the return are still correct; don't add per-call-site error handling (same rule R18 set) — [Shared/utility functions]
 - `DB_OBJECT_KEYS` / `isObjDB()` — which collections are object-shaped rather than arrays of records. Governs exactly ONE thing: the empty value `loadDB()` falls back to on a missing or errored row (`{}` vs `[]`). It does **not** gate merging — `mergeDB()` branches on the runtime shape of what it's handed and `applyMergedDB()` switches on the key by name. `db:roles` was missing from it until Phase AR (**G13**) — [Shared/utility functions]
 - `saveFailure` / `DB_KEY_LABELS` / `reportSaveFailure()` / `clearSaveFailure()` / `dismissSaveFailure()` / `retrySaveFailure()` / `renderSaveFailureBanner()` (**G11**) — the save-failure surface. See the Phase AR section for the two kinds and why they're two — [Shared/utility functions]
+- `saveInBackground(key, value)` (**G14**, Phase AS) — the render-first save path used by the eleven grid interactions. Calls `saveDB()` WITHOUT awaiting it before the render, and re-renders if the result comes back `{ok:false}`. ⚠️ **This is only safe because G11 exists** — see the Phase AS Commit B section. Never roll back a failed save here — [Shared/utility functions]
 - `initApp()` — bootstraps the app: loads all DB collections into memory and does the first render — [Shared/utility functions]
 - `uid()` — generates a short random unique id — [Shared/utility functions]
 - `esc()` — HTML-escapes a string for safe interpolation into templates — [Shared/utility functions]
@@ -1385,6 +1386,78 @@ time that day is saved for any reason.
 unreadable `.docx`, one good): **three separate error lines, and the good file still
 attached.** Previously only the last of the three would have been shown, with the other
 two silently dropped.
+
+### Commit B — G14: render first, save after
+
+The eleven highest-frequency interactions used to `await saveDB()` before repainting,
+so every yes/no in a grid cost a network wait — and R18 made that potentially two
+round-trips. The audit measured the full 66-crew × 6-day re-render at **4.2ms**, so
+none of the delay was rendering. `renderProjectBody(); saveInBackground(…)` replaces
+`await saveDB(…); renderProjectBody()` in all eleven:
+
+`toggleCrewOnDay` · `toggleHotelNight` · `toggleHotelPre` · `toggleMeal` ·
+`setTravelMethod` · `toggleAllForPerson` · `toggleAllMealForPerson` · `toggleLocOnDay` ·
+`addCrewToProject` · `removeCrewFromProject` · `toggleProjectTask`
+
+**Measured: 31ms to repaint against a 250ms simulated round-trip.**
+
+#### ⚠️ The coupling to G11 — do not break this
+
+This change is what the whole AR → AS sequence was ordered around. The `await` used to
+be the only thing coupling the screen to the save actually succeeding. Removing it makes
+the render optimistic, so **G11's failure banner is now the only thing standing between
+the user and a fast, silently lossy grid.** If a future session "simplifies" G11's error
+path, these eleven interactions become silently lossy — strictly worse than the slow
+version this replaced. The two findings are one mechanism; don't decouple them.
+
+**Verified before changing anything, and again after:** all eleven raise the banner on a
+forced failure, because every one goes through `saveDB()` and `saveDB()` reports from the
+choke point itself — no call site has to remember to.
+
+| function | key reported | banner |
+|---|---|---|
+| `toggleCrewOnDay`, `toggleHotelNight`, `toggleMeal`, `toggleAllForPerson`, `toggleAllMealForPerson`, `toggleLocOnDay` | `db:shootdays` | ✓ |
+| `toggleHotelPre`, `setTravelMethod`, `addCrewToProject`, `toggleProjectTask` | `db:projects` | ✓ |
+| `removeCrewFromProject` | both (reports the later one) | ✓ |
+
+#### What the user sees when an optimistic render is contradicted
+
+**A failed save is never rolled back**, and that is deliberate — a future session must not
+"fix" this by reverting the mutation:
+
+- **`'unsaved'`** — the edit is still live in memory, and because every save writes the
+  WHOLE collection, the next successful save of that collection carries it. The screen is
+  therefore *correct*, not stale; the banner says "not saved yet". Rolling back would
+  destroy a perfectly good edit.
+- **`'discarded'`** — `applyMergedDB()` has already spliced the merged result into the
+  live arrays and called `renderMain()`, so memory holds the resolved state and the screen
+  already shows it. The banner says it isn't in the database.
+
+On top of that, `saveInBackground()` re-renders on any failure, so the screen is
+guaranteed to match memory at the moment the banner appears rather than still showing what
+was painted optimistically before the round-trip.
+
+#### Interaction with R18's merge and R17's undo — both checked
+
+- **R18 merge:** simulated a guard failure followed by a successful retry (2 update
+  attempts, remote holding another writer's edit). Both edits survived, and the **screen
+  matched memory** for both checkboxes afterwards — `applyMergedDB()`'s own `renderMain()`
+  supersedes the optimistic paint, so an optimistic render can't outlive a merge that
+  resolved differently.
+- **R17 undo:** untouched — none of the eleven call `beginUndo()`. Re-verified end to end
+  anyway (delete a shoot day → 5 days + toast → Undo → 6 days restored, toast gone), and
+  as a bonus it confirms G19 composes with it: the derived total followed 6 → 5 → 6.
+
+#### Considered and deliberately NOT done: serialising saves per key
+
+Rapid toggling now fires overlapping saves for the same key. That was examined rather than
+assumed safe, and it is safe **because of the shape this app already has**: `saveDB()` is
+handed the live array itself, not a snapshot, so an in-flight save's "mine" is always
+current, and JS's single thread means no mutation can tear. A later save carries
+everything an earlier one did. Adding a per-key promise queue would have changed
+`saveDB()`'s concurrency semantics globally for a problem that isn't there.
+
+**Phases AT / AU / AV / AW remain.**
 
 ## The design system, as decided (Phase Refinement)
 
