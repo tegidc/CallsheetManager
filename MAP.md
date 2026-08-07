@@ -197,7 +197,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `onDayChanged()` — refreshes location/hospital/parking summaries after the selected day changes — [Shoot Days]
 - `updateLocationSummary()` — refreshes the read-only primary-location summary on the day form — [Shoot Days]
 - `updateAmenityDisplay()` / `updateHospitalDisplay()` / `updateParkingLookupDisplay()` — refresh the day form's saved-hospital and saved-parking lines; both are the same lookup with a different field and noun — [Shoot Days]
-- `fetchWeatherForDay()` — fetches forecast weather for the day's date/location from Open-Meteo — [Shoot Days]
+- `fetchWeatherForDay()` / `weatherFetchedLabel()` — fetches forecast weather for the day's date/location from Open-Meteo. ⚠️ **This is the only place `weather.fetchedAt` is ever written** (Phase AR, **G16**) — `saveShootDay()` preserves whatever the record already holds. The stamp exists to say how stale a forecast is, so a save that isn't a fetch must not move it. Written as an ISO timestamp (comparable/sortable); `weatherFetchedLabel()` formats it for display and passes anything non-ISO through verbatim, because records written before AR carry a localised date string and the sample data carries the literal `'sample'` — running those through `Date.parse()` would read `07/08/2026` as month-first and silently redate them — [Shoot Days]
 - `WMO` — lookup table mapping Open-Meteo weather codes to human-readable conditions — [Shoot Days]
 - `saveShootDay()` — validates and persists the current shoot day's form data — [Shoot Days]
 
@@ -430,7 +430,12 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   `Object.keys(state)`, so a day that was never individually toggled would otherwise
   be silently skipped by Expand/Collapse-all — [Budget]
 - `buildBudgetData()` — the one aggregator behind all three views and the summary
-  bar. Days worked = shoot days where `(d.positions||[]).some(pos=>pos[0]===crewId)`,
+  bar. ⚠️ **Catering and Travel columns join to a shoot day on `d.id`, never on
+  `dayNum`** (Phase AR, **G15** — `dayIdsInScope`, and `cols.find(c=>c.dayId===d.id)`).
+  `dayNum` is free text the user types: non-unique, routinely blank, and mixed-type
+  across records. It is a column *heading*, not an identity. Don't reintroduce it as
+  a join key.
+  Days worked = shoot days where `(d.positions||[]).some(pos=>pos[0]===crewId)`,
   the same on-day signal `buildTransportSummary()`/Days-on-site already use. Hotel
   room-nights are counted directly off `d.hotelNights`/`p.hotelNightBefore` rather
   than via `buildHotelSummary()`, which filters to "active" nights only and would
@@ -509,14 +514,16 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 ## Shared/utility functions
 
 - `sb` (Supabase client) — the shared Supabase client instance used by every DB read/write — [Shared/utility functions]
-- `loadDB()` / `saveDB()` — the single choke point for reading/writing any app data collection to/from Supabase, keyed by a `db:*` string — [Shared/utility functions]
+- `loadDB()` / `saveDB()` — the single choke point for reading/writing any app data collection to/from Supabase, keyed by a `db:*` string. **Since Phase AR (G11) `saveDB()` returns a result — `{ok:true}` or `{ok:false, kind, detail}` — and raises the failure banner itself.** The ~80 call sites that ignore the return are still correct; don't add per-call-site error handling (same rule R18 set) — [Shared/utility functions]
+- `DB_OBJECT_KEYS` / `isObjDB()` — which collections are object-shaped rather than arrays of records. Governs exactly ONE thing: the empty value `loadDB()` falls back to on a missing or errored row (`{}` vs `[]`). It does **not** gate merging — `mergeDB()` branches on the runtime shape of what it's handed and `applyMergedDB()` switches on the key by name. `db:roles` was missing from it until Phase AR (**G13**) — [Shared/utility functions]
+- `saveFailure` / `DB_KEY_LABELS` / `reportSaveFailure()` / `clearSaveFailure()` / `dismissSaveFailure()` / `retrySaveFailure()` / `renderSaveFailureBanner()` (**G11**) — the save-failure surface. See the Phase AR section for the two kinds and why they're two — [Shared/utility functions]
 - `initApp()` — bootstraps the app: loads all DB collections into memory and does the first render — [Shared/utility functions]
 - `uid()` — generates a short random unique id — [Shared/utility functions]
 - `esc()` — HTML-escapes a string for safe interpolation into templates — [Shared/utility functions]
 - `val()` / `setv()` — get/set the trimmed value of a form input by element id — [Shared/utility functions]
 - `autoGrowTextarea()` (Phase X) — resizes a textarea's height to fit its content (`scrollHeight`); wired via `oninput` where a textarea needs to auto-grow, and called once after any programmatic `setv()` fill (setting `.value` directly doesn't fire `input`) — first user: the Production Brief textarea (`#sdBrief`, T-5.2) — [Shared/utility functions, Shoot Days]
 - `icon()` / `ICONS` — look up and wrap an inline SVG icon by name — [Shared/utility functions]
-- `flashStatus()` — the discreet "Saved" status flash shared by every save button and autosave — [Shared/utility functions]
+- `flashStatus()` / `flashSaveResult()` — the discreet "Saved" status flash shared by every save button and autosave, and (Phase AR, **G11**) its honest wrapper. **Call `flashSaveResult(elId, await saveDB(…))`, not `flashStatus(elId)`, anywhere a status follows a save** — `flashStatus()` says "Saved" unconditionally and is now only reached via the success branch. On failure `flashSaveResult()` shows "Not saved" (or "Not saved — change lost") in `.status-failed` and deliberately does NOT fade after two seconds — [Shared/utility functions]
 - `copyText()` — the single clipboard path for every Copy button: async API with a textarea fallback, optional confirm message — [Shared/utility functions]
 - `deptHeaderHTML()` — the one canonical collapsible group header (caret + optional code + label + count), shared by the project Crew tab, the crew database and Position Assignments — [Shared/utility functions]
 - `expandCollapseAllHTML(onclickExpr, extraLinkHTML, allCollapsed, groupId)` — the "Expand all · Collapse all" strip. `extraLinkHTML` is the **second** argument, appended after the toggle (Phase P3 uses it on the Tech tab for the "Summary" jump-link); `groupId` gives the toggle its `eca-<id>` id so `refreshExpandCollapseAll()` can keep the label honest. Every caller that wants no extra link passes `undefined` in that second slot — [Shared/utility functions]
@@ -1154,6 +1161,14 @@ the only edit made to this file.** Do not treat any finding on that page as appl
 Stage 2 applies whatever the user accepts; the [B] and [C] items are explicitly not
 batchable.
 
+**Stage 2 progress.** All 21 findings were accepted. **Phase AR** landed G11, G13,
+G16 and G15 — see the Phase AR section. Phases **AS / AT / AU / AV / AW** carry the
+rest; **G14 must not be attempted before G11 is live**, which it now is.
+
+⚠️ **R10 ("Remember the AI Scan conversation") was DECLINED and closed by the user on
+7 Aug 2026.** `gate1-review.html` still lists it as unanswered — that page is stale on
+this point. Do not implement or re-propose it.
+
 Two things worth knowing without opening it: the two known open bugs were reproduced
 and turn out to be more specific than described — "+ Add crew member" *does* render its
 form, but ~104px of 602px lands on screen because the button is the last element on a
@@ -1162,6 +1177,119 @@ form, but ~104px of 602px lands on screen because the button is the last element
 really a derived-value-that-got-stored problem, so the recommended shape is to delete
 the field rather than sync it. Verified with `saveDB()`/`scheduleAutosave()` stubbed
 and confirmed clean against `app_data`.
+
+## Phase AR — Gate 1 Stage 2, part 1 of 5: save path & data correctness
+
+Four Bucket B findings from `gate1-review.html`: **G11, G13, G16, G15**. The other 17
+accepted findings belong to phases AS/AT/AU/AV/AW and were deliberately not pulled
+forward. Verified against the live ROW 2026 London project with `saveDB()` /
+`scheduleAutosave()` stubbed, confirmed clean against `app_data` afterwards (all nine
+row timestamps and byte sizes unchanged).
+
+### G11 — a save that failed must never say "Saved"
+
+Every failure path in `saveDB()` was `console.error(…)` + a bare `return`, so it
+returned `undefined` on failure exactly as on success and the callers flashed "Saved"
+either way. `saveDB()` now returns `{ok:true}` or `{ok:false, kind, detail}`.
+
+**Two kinds, deliberately not one** — conflating them was most of the harm:
+
+| kind | what happened | is anything lost? | treatment |
+|---|---|---|---|
+| `'unsaved'` | the write never landed — network down, Supabase error, failed merge re-read | **No.** The edit is still in the live in-memory collection, and since every save writes the whole collection, the next successful save of that same collection carries it | amber banner, "Not saved yet", inline `Not saved` |
+| `'discarded'` | three guarded writes in a row lost their guard (R18's give-up path) | **Yes.** The merged state exists only in this tab; reload and it is gone | red banner, "Your last change was not saved", inline `Not saved — change lost` |
+
+**Why a banner and not just the inline status.** Only four call sites flash a status
+at all; the other ~80 mutate, save and re-render, and a failure there was invisible
+even in principle. `saveDB()` raises the banner itself so every call site is covered
+without any of them having to remember to — the same "nothing outside `loadDB`/`saveDB`
+changed" discipline R18 set. It persists until the same key saves successfully or the
+user dismisses it; a 2-second flash is the wrong register for "this is not in the
+database". It carries a **Retry save** button (retries the value that failed —
+post-merge for the conflict case, which is the value that should land).
+
+- `'discarded'` **outranks** `'unsaved'` for the same key, so a later network blip
+  can't quietly demote "your change was not saved" to "not saved yet".
+- `clearSaveFailure()` only clears on a success for the **same key** — `db:projects`
+  saving fine says nothing about whether `db:shootdays` ever landed.
+- `saveShootDay(thenGenerate)` no longer jumps to Preview & Export on a failed save:
+  the call sheet it would generate is one the database has never seen.
+- ⚠️ **The eleven grid interactions that `await saveDB()` before rendering were NOT
+  touched** — that is **G14**, deliberately the next phase, and it is only safe now
+  that this exists.
+
+### G13 — `db:roles` was missing from `DB_OBJECT_KEYS`
+
+**What the omission was actually causing:** nothing, but by luck rather than design.
+`DB_OBJECT_KEYS` governs exactly one thing — the empty value `loadDB()` falls back to
+when a row is missing or the read errors (`{}` vs `[]`). It does **not** gate merging:
+`mergeDB()` branches on the runtime shape of the values it is handed, and
+`applyMergedDB()` switches on the key by name, so **`db:roles` has always been merged
+correctly and was never bypassing R18's three-way merge** — worth stating plainly,
+since a key missing from the storage contract is exactly the shape of a quiet
+data-loss bug. The real effect was that a missing/errored `db:roles` read returned
+`[]` instead of `{}`, and three unrelated guards absorbed it: `initApp()`'s
+`!Array.isArray(savedRoles)` check, `mergeDB()`'s tolerance of an array as base, and
+the fact that a null stamp routes to a plain upsert rather than the merge path.
+Behaviour after the fix is identical (verified: `ROLES_BY_DEPT` still an object, the
+`db:roles` row exists and was last written 2026-08-03); the contract is now correct
+rather than accidentally survivable.
+
+### G16 — the weather "last fetched" stamp
+
+`saveShootDay()` rebuilt `d.weather` unconditionally including
+`fetchedAt: new Date().toLocaleDateString()`, and autosave fires on any input on that
+tab — so editing a schedule row restamped the forecast as fetched today. Now written
+**only** in `fetchWeatherForDay()`, as an ISO timestamp; `saveShootDay()` preserves
+whatever the record holds. `weatherFetchedLabel()` formats ISO for display and passes
+legacy localised strings (and the sample data's `'sample'`) through untouched.
+
+> ⚠️ **Not retroactive.** Existing records keep whatever stamp they have, which is
+> wrong until the next real fetch. Saying that out loud rather than implying the fix
+> reaches backwards.
+
+### G15 — Budget's Catering/Travel join key
+
+`buildBudgetData()` matched columns with `cols.find(c=>c.dayNum===d.dayNum)` and
+scoped extras with `new Set(days.map(d=>d.dayNum))`. `dayNum` is free text the user
+types, non-unique, routinely blank (`d.dayNum||'?'` appears ~20 times, so blank is an
+expected state) and mixed-type. `buildCateringSummaryGrid()` and
+`buildTransportSummary()` now carry `dayId: d.id` and the join and scope use it.
+`dayNum` stays on the column purely as its heading.
+
+**Demonstrated on ROW 2026 with Day 4's `dayNum` typed as `"3"`** (in memory only):
+
+| | old join (`dayNum`) | new join (`dayId`) |
+|---|---|---|
+| Day 4's catering cost | £114.00 — *Day 3's figure* | £126.00 |
+| Day filter = Day 4 alone | £240.00 — *both days' costs* | £126.00 |
+
+Not a crash; a wrong number in a budget. Every stated reconciliation invariant still
+appeared to hold, because both sides read the same wrong figure.
+
+**Phase AO reconciliation re-verified on ROW 2026 — identical before and after, which
+is the point.** Read off the rendered screen, not the data object:
+
+| scope | summary VAT | Per Dept VAT column | Per Person VAT column | Per Day VAT sum | Per Day ex-VAT sum |
+|---|---|---|---|---|---|
+| unfiltered | £3,517.00 | £3,517.00 | £3,517.00 | £3,517.00 | £59,890.00 = summary ex-VAT |
+| day 3 only | £617.00 | £617.00 | £617.00 | £617.00 | £10,575.00 |
+| dept = Cinematography | £2,965.00 | £2,965.00 | £2,965.00 | £2,965.00 | £30,440.00 |
+| Cinematography + day 3 | £525.00 | £525.00 | £525.00 | £525.00 | £5,595.00 |
+
+Copy/.xlsx export matches the screen in both Per Department (total row
+£59,890.00 / £3,517.00 / £63,407.00) and Per Day (all six day rows identical to the
+rendered per-day totals).
+
+> ROW 2026's own catering rates are all £0.00, so its catering join is numerically
+> inert — the £114/£126/£240 figures above come from temporarily setting a real lunch
+> rate in memory. Travel (£1,660.00 project-wide) exercises the same join for real.
+
+> ⚠️ The live figures moved between Phase AO and here (ex-VAT £51,290.00 → £59,890.00)
+> because of writes from another session on 7 Aug. The baseline above was re-established
+> immediately before the change, not carried over from AO.
+
+**Still outstanding from Gate 1: phases AS / AT / AU / AV / AW.**
 
 ## The design system, as decided (Phase Refinement)
 

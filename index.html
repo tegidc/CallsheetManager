@@ -645,6 +645,29 @@
   .undo-toast .undo-close:hover{opacity:1;}
   .undo-toast svg{width:13px; height:13px;}
   @media(max-width:600px){ .undo-toast{left:12px; right:12px; bottom:12px; max-width:none;} }
+  /* G11 — the save-failure banner. Top-centre and persistent, not bottom-left and
+     timed like .undo-toast: the undo toast is an offer that expires, this is a
+     statement of fact that stays true until the save succeeds. Amber for "not
+     saved yet" (nothing lost, same informational register as .ai-notconfigured),
+     red for "your change was not saved" (data is actually gone). */
+  .save-banner{position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:950;
+    display:flex; align-items:flex-start; gap:14px;
+    background:#FBF6E9; border:1px solid rgba(180,120,10,.55); color:#5f4100;
+    border-radius:8px; padding:11px 13px; font-family:var(--body); font-size:var(--fs-meta);
+    line-height:1.5; box-shadow:0 6px 22px rgba(0,0,0,.22);
+    max-width:min(620px, calc(100vw - 28px));}
+  .save-banner-lost{background:#FBEDEA; border-color:var(--danger); color:#6d2114;}
+  .save-banner-text{flex:1 1 auto;}
+  .save-banner-detail{font-family:var(--mono); font-size:11px; opacity:.75; margin-top:5px;
+    word-break:break-word;}
+  .save-banner button.small{flex:0 0 auto; margin-top:1px;}
+  .save-banner-close{cursor:pointer; opacity:.6; display:inline-flex; margin-top:2px;}
+  .save-banner-close:hover{opacity:1;}
+  .save-banner svg{width:13px; height:13px;}
+  @media(max-width:600px){ .save-banner{left:12px; right:12px; transform:none;
+    max-width:none; flex-wrap:wrap;} }
+  /* the inline counterpart — a status span that is reporting a failure, not "Saved" */
+  .status-failed{color:var(--danger); font-weight:600;}
   .ai-attachments{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
   .ai-input-row{display:flex; align-items:center; gap:8px;}
   .ai-input-row input[type=text]{flex:1;}
@@ -1375,8 +1398,19 @@ const refreshCrewDatabase = () => renderCrewDatabase(document.getElementById('ma
 /* the discreet "Saved" flash the save buttons and autosave share */
 function flashStatus(elId, text){
   const st = document.getElementById(elId); if(!st) return;
+  st.classList.remove('status-failed');
   st.textContent = text || 'Saved';
   setTimeout(()=>{ const e=document.getElementById(elId); if(e) e.textContent=''; }, 2000);
+}
+/* G11 — the honest version of the above: hand it saveDB()'s result rather than
+   flashing "Saved" unconditionally. On failure it does NOT fade after two seconds,
+   because the thing it is reporting hasn't gone away; the detail and the retry
+   live in the banner saveDB raises, so this only has to stop lying. */
+function flashSaveResult(elId, res, okText){
+  const st = document.getElementById(elId); if(!st) return;
+  if(res && res.ok){ flashStatus(elId, okText); return; }
+  st.classList.add('status-failed');
+  st.textContent = (res && res.kind==='discarded') ? 'Not saved — change lost' : 'Not saved';
 }
 /* one clipboard path for every Copy button — async API with a textarea fallback
    for browsers/contexts that block it. Pass a message to confirm, or omit to copy
@@ -1447,7 +1481,18 @@ function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
    side that still matches base. Then we retry the guarded write.
    Nothing outside these two functions changed — saveDB(key, value) is called the
    same way from ~80 places and still returns a promise. -------------------- */
-const DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings'];
+/* G13 — this list is the app's statement of "which collections are object-shaped
+   rather than arrays of records". It governs exactly ONE thing: the empty value
+   loadDB() falls back to when the row is missing or the read errors ({} vs []).
+   It does NOT gate merging — mergeDB() branches on the runtime shape of the values
+   it is handed, and applyMergedDB() switches on the key by name — so db:roles has
+   always been merged correctly despite being absent here. What its absence actually
+   caused: a missing/errored db:roles read returned [] instead of {}. Three separate
+   guards happened to absorb that (initApp()'s !Array.isArray(savedRoles) check,
+   mergeDB()'s tolerance of an array as base, and the fact that a null stamp routes
+   to a plain upsert rather than the merge path), so no data was lost — but it was
+   harmless by luck in the one function that IS the storage contract. */
+const DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings','db:roles'];
 const isObjDB = key => DB_OBJECT_KEYS.includes(key);
 let dbStamp = {};   // key -> updated_at last seen
 let dbBase  = {};   // key -> deep snapshot matching that stamp
@@ -1499,8 +1544,40 @@ function mergeDB(base, mine, theirs){
   return mine;
 }
 
+/* ---- G11: a save that failed must never say "Saved" -------------------------
+   Every failure path in here used to be console.error(…) followed by a bare
+   `return`, so saveDB() returned undefined on failure exactly as it did on
+   success, and the callers flashed "Saved" either way. Offline, mid-flight, or
+   after three genuine conflicts, the edit had not landed and the UI confirmed it
+   had. R18 stopped two tabs overwriting each other; it did not make failure
+   visible. This does.
+
+   saveDB() now returns {ok:true} or {ok:false, kind, detail}. The ~80 call sites
+   that ignore the return keep working unchanged — the honesty they get is the
+   banner, which saveDB raises itself so that no call site has to remember to.
+
+   TWO kinds, deliberately not one, because they mean opposite things:
+     'unsaved'   — the write never landed (network down, Supabase error, failed
+                   re-read). NOTHING IS LOST: the edit is still in the live
+                   in-memory collection, and because every save writes the whole
+                   collection, the next successful save of that same collection
+                   carries it. The honest words are "not saved yet".
+     'discarded' — three guarded writes in a row lost their guard, so this change
+                   was merged-and-abandoned rather than stored. The merged state
+                   exists only in this tab; reload and it is gone. The honest
+                   words are "your change was not saved", and it gets a red,
+                   persistent banner rather than a 2-second flash.
+   Conflating those two is most of the harm in this finding, so they get different
+   words, different colours and a different register.
+
+   ⚠️ The eleven grid interactions that `await saveDB()` before rendering are NOT
+   touched here — that's G14, and it is only safe once this exists. --------- */
 async function saveDB(key, value){
   const stamp = () => new Date().toISOString();
+  // `value` is reassigned by the merge below, so this deliberately reads it at
+  // call time: a retry should push the merged value, not the pre-merge one.
+  const fail = (kind, detail) => { reportSaveFailure(key, kind, detail, value); return {ok:false, kind, detail}; };
+  const ok   = () => { clearSaveFailure(key); return {ok:true}; };
   try{
     for(let attempt=0; attempt<3; attempt++){
       const now = stamp();
@@ -1508,23 +1585,26 @@ async function saveDB(key, value){
       if(dbStamp[key] == null){
         const { data, error } = await sb.from('app_data')
           .upsert({ key, value, updated_at:now }).select('updated_at');
-        if(error){ console.error('Supabase save failed ('+key+'):', error.message); return; }
+        if(error){ console.error('Supabase save failed ('+key+'):', error.message); return fail('unsaved', error.message); }
         // store the stamp AS POSTGRES RETURNS IT, not the JS string we sent: the two
         // differ textually ('…123Z' vs '…123000+00:00') and only compare equal because
         // postgres casts them. Round-tripping the canonical value removes that reliance.
         dbStamp[key] = (data && data[0] && data[0].updated_at) || now;
-        dbBase[key] = dbClone(value); return;
+        dbBase[key] = dbClone(value); return ok();
       }
       // Guarded write — only lands if nobody else has written since we last looked.
       const { data, error } = await sb.from('app_data')
         .update({ value, updated_at:now }).eq('key', key).eq('updated_at', dbStamp[key]).select('updated_at');
-      if(error){ console.error('Supabase save failed ('+key+'):', error.message); return; }
-      if(data && data.length){ dbStamp[key] = data[0].updated_at || now; dbBase[key] = dbClone(value); return; }
+      if(error){ console.error('Supabase save failed ('+key+'):', error.message); return fail('unsaved', error.message); }
+      if(data && data.length){ dbStamp[key] = data[0].updated_at || now; dbBase[key] = dbClone(value); return ok(); }
 
       // Guard failed: somebody wrote in between. Take their version, merge, retry.
       const { data: fresh, error: reErr } = await sb.from('app_data')
         .select('value, updated_at').eq('key', key).maybeSingle();
-      if(reErr || !fresh){ console.error('Supabase merge re-read failed ('+key+')', reErr && reErr.message); return; }
+      if(reErr || !fresh){
+        console.error('Supabase merge re-read failed ('+key+')', reErr && reErr.message);
+        return fail('unsaved', (reErr && reErr.message) || 'the stored row could not be read back');
+      }
       const merged = mergeDB(dbBase[key], value, fresh.value);
       console.warn(`[${key}] another tab or device wrote while this one was editing — merged both instead of overwriting.`);
       dbStamp[key] = fresh.updated_at;
@@ -1533,7 +1613,65 @@ async function saveDB(key, value){
       applyMergedDB(key, merged);   // put the merged result back into the live in-memory array
     }
     console.error('Supabase save gave up after repeated conflicts ('+key+')');
-  }catch(e){ console.error('Supabase save exception ('+key+'):', e); }
+    return fail('discarded', 'three guarded writes in a row were beaten by another writer');
+  }catch(e){
+    console.error('Supabase save exception ('+key+'):', e);
+    return fail('unsaved', (e && e.message) || String(e));
+  }
+}
+
+/* G11 — the failure surface. A banner rather than only an inline status, because
+   ~80 of saveDB()'s call sites flash nothing at all: they mutate, save and
+   re-render, and a failure there was invisible even in principle. The banner is
+   raised by saveDB itself so every one of them is covered, and it persists until
+   the same key saves successfully or the user dismisses it — a 2-second flash is
+   the wrong register for "this is not in the database". */
+const DB_KEY_LABELS = {
+  'db:crew':'the crew database', 'db:locations':'the locations database',
+  'db:projects':'project details', 'db:shootdays':'shoot days',
+  'db:settings':'settings', 'db:roles':'the roles list',
+  'db:roleseniority':'role seniority', 'db:subdepartments':'sub-departments',
+  'db:travelmethods':'travel methods', 'db:coprocompanies':'production companies'
+};
+let saveFailure = null;   // {key, kind:'unsaved'|'discarded', detail, value, retrying}
+
+function reportSaveFailure(key, kind, detail, value){
+  /* 'discarded' outranks 'unsaved' for the same key: it's the one that means data
+     is actually gone, so a later network blip must not quietly demote the wording
+     from "your change was not saved" to "not saved yet". */
+  const keepWorse = saveFailure && saveFailure.key===key
+                    && saveFailure.kind==='discarded' && kind!=='discarded';
+  saveFailure = { key, value, retrying:false,
+                  kind:   keepWorse ? 'discarded'        : kind,
+                  detail: keepWorse ? saveFailure.detail : detail };
+  renderSaveFailureBanner();
+}
+/* Cleared only by a success on the SAME key — db:projects saving fine says nothing
+   about whether db:shootdays ever landed. */
+function clearSaveFailure(key){
+  if(saveFailure && saveFailure.key===key){ saveFailure = null; renderSaveFailureBanner(); }
+}
+function dismissSaveFailure(){ saveFailure = null; renderSaveFailureBanner(); }
+async function retrySaveFailure(){
+  if(!saveFailure || saveFailure.retrying) return;
+  const f = saveFailure;
+  f.retrying = true; renderSaveFailureBanner();
+  await saveDB(f.key, f.value);   // clears the banner on success, replaces it on a fresh failure
+  if(saveFailure === f) saveFailure.retrying = false;
+  renderSaveFailureBanner();
+}
+function renderSaveFailureBanner(){
+  let el = document.getElementById('saveFailBanner');
+  if(!saveFailure){ if(el) el.remove(); return; }
+  if(!el){ el = document.createElement('div'); el.id='saveFailBanner'; document.body.appendChild(el); }
+  const f = saveFailure, what = DB_KEY_LABELS[f.key] || f.key, lost = f.kind==='discarded';
+  el.className = 'save-banner' + (lost ? ' save-banner-lost' : '');
+  const msg = lost
+    ? `<strong>Your last change was not saved.</strong> Something else kept writing to ${esc(what)} while you were editing, so this change could not be stored. It is still on screen but it is <strong>not in the database</strong> — reload now and it is gone.`
+    : `<strong>Not saved yet.</strong> Couldn't write ${esc(what)} to the database. Nothing has been lost — your changes are still on screen, and the next save of the same data that succeeds will carry them.`;
+  el.innerHTML = `<div class="save-banner-text">${msg}${f.detail?`<div class="save-banner-detail">${esc(f.detail)}</div>`:''}</div>
+    <button type="button" class="small" onclick="retrySaveFailure()"${f.retrying?' disabled':''}>${f.retrying?'Retrying…':'Retry save'}</button>
+    <span class="save-banner-close" onclick="dismissSaveFailure()" title="Dismiss">${icon('close')}</span>`;
 }
 
 /* The in-memory arrays are what every screen renders from, and other code holds
@@ -3394,16 +3532,14 @@ async function saveProjectTechSpecs(){
   TECHSPEC_FIELDS.forEach(f=>{ if(entered[f]) p.techSpecs[f] = entered[f]; else delete p.techSpecs[f]; });
   const numbering = document.getElementById('pjContinuousNumbering');
   if(numbering) p.continuousNumbering = numbering.value!=='reset';
-  await saveDB('db:projects', projectsDB);
-  flashStatus('pjStatus');
+  flashSaveResult('pjStatus', await saveDB('db:projects', projectsDB));
 }
 async function saveProjectOverview(silent){
   const p = currentProject(); if(!p) return;
   const client=val('ovClient'), title=val('ovTitle'), start=val('ovStart');
   if(!client||!title||!start){ if(!silent) alert('Client, working title and initial shoot date are required.'); return; }
   p.client=client; p.title=title; p.startDate=start; p.logline=val('ovLogline'); p.description=val('ovDescription');
-  await saveDB('db:projects', projectsDB);
-  flashStatus('ovStatus');
+  flashSaveResult('ovStatus', await saveDB('db:projects', projectsDB));
   renderSide();
   const h1=document.querySelector('.page-head h1'); if(h1) h1.textContent = p.title;
   const codeEl=document.querySelector('.page-head .code'); if(codeEl) codeEl.textContent = projCode(p);
@@ -4441,7 +4577,11 @@ function buildCateringSummaryGrid(){
     Object.values(meals).forEach(m=>{ if(m.b) b++; if(m.l) l++; if(m.d) dd++; });
     const deliveryFee = (b>0?costs.delivery:0) + (l>0?costs.delivery:0) + (dd>0?costs.delivery:0);
     const dailyCost = (b*costs.b) + (l*costs.l) + (dd*costs.d) + deliveryFee;
-    return { dayNum:d.dayNum, label, b, l, d:dd, dailyCost };
+    /* G15 — dayId is the join key Budget uses to attach this column's cost to a
+       shoot day. dayNum stays for the column HEADING only: it is free text the user
+       types, non-unique, routinely blank and mixed-type, so it identifies a day to a
+       reader but must never identify one to code. */
+    return { dayId:d.id, dayNum:d.dayNum, label, b, l, d:dd, dailyCost };
   });
   const totalCost = cols.reduce((sum,c)=>sum+c.dailyCost, 0);
   return { costs, cols, totalCost };
@@ -4582,7 +4722,9 @@ function buildTransportSummary(){
     const carCount = counts['Own car']||0;
     const publicCount = counts['Public transport']||0;
     const dailyCost = (carCount*costs.mileage) + (publicCount*costs.publicPerDay);
-    return { dayNum:d.dayNum, label, counts, dailyCost };
+    /* G15 — see buildCateringSummaryGrid(): dayId is the join key, dayNum is the
+       column heading. */
+    return { dayId:d.id, dayNum:d.dayNum, label, counts, dailyCost };
   });
   const totalCost = cols.reduce((sum,c)=>sum+c.dailyCost, 0);
   return { costs, usedMethods, cols, totalCost };
@@ -5370,8 +5512,7 @@ async function saveCrewRateToDatabase(crewId, context){
     // "pushes both fields together in one action").
     if(hasRate) c.rate = `£${rate}/day`;
   });
-  await saveDB('db:crew', crewDB);
-  flashStatus(`crsStatus-${context}-${crewId}`, 'Saved to database');
+  flashSaveResult(`crsStatus-${context}-${crewId}`, await saveDB('db:crew', crewDB), 'Saved to database');
 }
 
 let budgetView = 'department'; // 'department' | 'person' | 'day' | 'costs'
@@ -5626,8 +5767,17 @@ function buildBudgetData(){
   // whole shoot, so their .totalCost is project-wide by definition. Sum their
   // per-day columns against the days actually in scope instead — with no day
   // filter set that's every column, i.e. the same number .totalCost gave.
-  const dayNumsInScope = new Set(days.map(d=>d.dayNum));
-  const sumDailyCost = g => g ? g.cols.filter(c=>dayNumsInScope.has(c.dayNum))
+  /* G15 — scoped and joined on d.id, the stable day identity every other screen in
+     the app already uses. This was dayNum: free text the user types, non-unique,
+     routinely blank ('?' is an expected display state) and mixed-type across
+     records. Two days sharing a dayNum — or two both blank, which is easier to
+     reach — made .find() return the first for both, putting one day's catering and
+     travel cost on another day's row, and a day filter picking one of them silently
+     pulled in the other's cost. Not a crash: a wrong number in a budget. Every
+     reconciliation invariant would still have appeared to hold, because both sides
+     read the same wrong figure. */
+  const dayIdsInScope = new Set(days.map(d=>d.id));
+  const sumDailyCost = g => g ? g.cols.filter(c=>dayIdsInScope.has(c.dayId))
                                       .reduce((s,c)=>s+c.dailyCost, 0) : 0;
   const cateringTotal = sumDailyCost(cateringGrid);
   const travelTotal = sumDailyCost(transportSummary);
@@ -5673,8 +5823,8 @@ function buildBudgetData(){
     const dayDepartments = DEPARTMENTS.filter(dd=>dayDeptCounts[dd]).map(dd=>
       ({dept:dd, code:DEPARTMENT_CODES[dd]||'', total:dayDeptTotals[dd]||0,
         exVat:dayDeptExVat[dd]||0, vat:dayDeptVat[dd]||0, incVat:(dayDeptExVat[dd]||0)+(dayDeptVat[dd]||0)}));
-    const cateringCol = cateringGrid ? cateringGrid.cols.find(c=>c.dayNum===d.dayNum) : null;
-    const travelCol = transportSummary ? transportSummary.cols.find(c=>c.dayNum===d.dayNum) : null;
+    const cateringCol = cateringGrid ? cateringGrid.cols.find(c=>c.dayId===d.id) : null;
+    const travelCol = transportSummary ? transportSummary.cols.find(c=>c.dayId===d.id) : null;
     const dayCatering = cateringCol ? cateringCol.dailyCost : 0;
     const dayTravel = travelCol ? travelCol.dailyCost : 0;
     // the night before Day 1 has no shoot-day row of its own — folds into Day 1
@@ -7330,7 +7480,7 @@ function populateShootDay(d){
   document.getElementById('rows-sdaddloc').innerHTML=''; (d.additionalLocationIds||[]).forEach(p=>addSdLocRow(p));
   const w=d.weather;
   setv('wxTemp',w?w.temp:''); setv('wxPrecip',w?w.precip:''); setv('wxCond',w?w.cond:''); setv('wxSun',w?w.sun:'');
-  document.getElementById('weatherStatus').textContent = w&&w.fetchedAt?`Last fetched ${w.fetchedAt}`:'';
+  document.getElementById('weatherStatus').textContent = w&&w.fetchedAt?`Last fetched ${weatherFetchedLabel(w.fetchedAt)}`:'';
   document.getElementById('rows-sched').innerHTML='<div class="row" style="border:none;padding:0;margin:0 0 2px;"><span></span><span></span><label>Time</label><label>Duration</label><label>Description</label><span></span></div>';
   (d.schedule&&d.schedule.length?d.schedule:[[],[]]).forEach(r=>addSchedRow(r));
   renderPositionAssignments(); refreshAddPosnPick();
@@ -7359,6 +7509,16 @@ function updateAmenityDisplay(elId, field, noun){
 }
 function updateHospitalDisplay(){ updateAmenityDisplay('sdHospitalInfo','hospital','hospital'); }
 function updateParkingLookupDisplay(){ updateAmenityDisplay('sdParkingLookupInfo','nearestParking','parking'); }
+/* G16 — fetchedAt is an ISO timestamp from now on, but records written before this
+   carry a localised date string and the sample data carries the literal 'sample'.
+   Only reformat what is unambiguously ISO: passing a legacy "07/08/2026" through
+   Date.parse() would read it as month-first and silently redate it. */
+function weatherFetchedLabel(v){
+  if(!v) return '';
+  if(!/^\d{4}-\d{2}-\d{2}T/.test(v)) return v;
+  const t = Date.parse(v);
+  return isNaN(t) ? v : new Date(t).toLocaleDateString();
+}
 const WMO={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Dense drizzle',61:'Slight rain',63:'Rain',65:'Heavy rain',71:'Slight snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Violent showers',95:'Thunderstorm'};
 async function fetchWeatherForDay(){
   const loc=selectedDayLocation();
@@ -7380,6 +7540,13 @@ async function fetchWeatherForDay(){
     setv('wxTemp',`${Math.round(tMax)}°C / ${Math.round(tMin)}°C`); setv('wxPrecip',precip);
     setv('wxCond',WMO[code]||('Code '+code));
     setv('wxSun',`${(data.daily.sunrise[0]||'').split('T')[1]||''} / ${(data.daily.sunset[0]||'').split('T')[1]||''}`);
+    /* G16 — the "last fetched" stamp moves HERE and only here, because this is the
+       only place a fetch actually happens. Written onto the record in memory and
+       carried to Supabase by the next saveShootDay(), exactly like the four weather
+       fields it sits beside — no extra save of its own. Stored as an ISO timestamp
+       so it can be compared and sorted; weatherFetchedLabel() renders it. */
+    const fetchedDay = currentDay();
+    if(fetchedDay) fetchedDay.weather = Object.assign({}, fetchedDay.weather, {fetchedAt:new Date().toISOString()});
     s.textContent=`Fetched (${source}) just now.`;
   }catch(e){ s.textContent='Fetch failed — check your connection.'; }
 }
@@ -7389,7 +7556,14 @@ async function saveShootDay(thenGenerate){
   d.dayNum=val('sdDayNum'); d.dayTotal=val('sdDayTotal'); d.date=val('sdDate'); d.allCrewCall=val('sdAllCall');
   d.locationId=document.getElementById('sdLocation').value;
   d.additionalLocationIds=rowsOf('rows-sdaddloc',['sdaddloc-sel','sdaddloc-note']);
-  d.weather={temp:val('wxTemp'),precip:val('wxPrecip'),cond:val('wxCond'),sun:val('wxSun'),fetchedAt:new Date().toLocaleDateString()};
+  /* G16 — fetchedAt says how STALE the forecast is, which is a real operational
+     question on this screen. It must therefore only move when a fetch actually
+     happened (fetchWeatherForDay(), which stamps it there). This used to restamp
+     unconditionally, so autosave — which fires on any input on this tab — reported
+     weather as "fetched today" after editing a schedule row. Preserve whatever the
+     record already holds; a day that has never been fetched keeps ''. */
+  d.weather={temp:val('wxTemp'),precip:val('wxPrecip'),cond:val('wxCond'),sun:val('wxSun'),
+             fetchedAt:(d.weather&&d.weather.fetchedAt)||''};
   d.schedule=rowsOf('rows-sched',['sc-time','sc-dur','sc-desc']);
   const prevPositions = d.positions || [];
   const newPositionsRaw = rowsOf('rows-posn',['posn-crew','posn-call']);
@@ -7405,9 +7579,11 @@ async function saveShootDay(thenGenerate){
   if(Object.keys(tsOv).length) d.techSpecs = tsOv; else delete d.techSpecs;
   d.brief=parseBriefLines(val('sdBrief'));
   d.parking=val('sdParking'); d.notes=val('sdNotes');
-  await saveDB('db:shootdays',shootDaysDB);
-  flashStatus('sdStatus');
-  if(thenGenerate) goProjectTab('preview');
+  const saved = await saveDB('db:shootdays',shootDaysDB);
+  flashSaveResult('sdStatus', saved);
+  // Don't walk the user to the export screen off the back of a save that didn't
+  // land — the call sheet they'd generate is one this database has never seen.
+  if(thenGenerate && saved && saved.ok) goProjectTab('preview');
 }
 
 /* ---------- preview / export ---------- */
