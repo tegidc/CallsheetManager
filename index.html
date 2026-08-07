@@ -616,8 +616,10 @@
     margin-bottom:10px; cursor:pointer;}
   .ai-card-status{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
     text-transform:uppercase; color:var(--muted); margin-top:8px;}
+  /* G17 — pre-line so a multi-file attach can report one line per failed file
+     rather than only the last one. Single-line errors are unaffected. */
   .ai-error{border:1px solid var(--danger); color:var(--danger); border-radius:var(--box-radius);
-    padding:9px 11px; font-size:var(--fs-meta); margin-bottom:10px;}
+    padding:9px 11px; font-size:var(--fs-meta); margin-bottom:10px; white-space:pre-line;}
   /* R14 — "no API key set". Deliberately NOT .ai-error red: nothing has gone wrong
      and nothing the user did caused it; it's a setup step they're being told about
      before they waste a message on it. Amber, informational. */
@@ -2005,20 +2007,19 @@ function renderWelcome(m){
         <button onclick="goDatabase('locations')">Open Locations database</button>
       </div>
     </div>
-    <div class="section">
-      <h2>Sample data</h2>
-      <p style="font-size:13.5px; line-height:1.6;">This loads automatically the first time the app opens with nothing saved. If you're seeing an older/smaller version of the sample data, use this to wipe everything and reload the current sample set (OFTV ROW 2026 London, 6 days, plus the LMAOF comedy-club shoot).</p>
-      <div class="toolbar" style="margin-top:10px;">
-        <button class="danger" onclick="resetAndReseed()">${icon('refresh')} Reset &amp; reload sample data</button>
-      </div>
-    </div>`;
+    `;
 }
-async function resetAndReseed(){
-  if(!confirm('This deletes everything currently saved (all crew, locations, projects and shoot days) and reloads the sample data. Continue?')) return;
-  crewDB=[]; locationsDB=[]; projectsDB=[]; shootDaysDB=[];
-  await seedSampleData();
-  renderSide(); renderMain();
-}
+/* G12 — REMOVED: the "Sample data" section and `resetAndReseed()`. It wiped all
+   four collections and reseeded over the top, one confirm() from the landing
+   screen, with no undo — R18's merge couldn't help either, since it was a write
+   of empty-then-seed rather than a delete. Deleted rather than guarded, per the
+   user: "I don't use it and don't imagine I will at this point." Removing it is
+   less code than protecting it, and this is a live production database now.
+   ⚠️ The AUTO-SEED path is untouched and still works: `seedSampleData()` has a
+   second, independent caller in `initApp()` (`if(!crewDB.length && …)`), which is
+   the "loads automatically the first time the app opens with nothing saved"
+   behaviour. `seedSampleData()` itself stays — that's G20 / Phase AV.
+   Do not look for `resetAndReseed()`. */
 async function seedSampleData(){
   // ---- crew (name, role, department, phone) ----
   const crewSeed = [
@@ -2152,7 +2153,7 @@ async function seedSampleData(){
   projectsDB.push(proj);
 
   // ---- Day 1 — Apr 26, Load-in ----
-  const day1={ id:uid(), projectId:proj.id, dayNum:'1', dayTotal:'6', date:'2026-04-26', allCrewCall:'08:00',
+  const day1={ id:uid(), projectId:proj.id, dayNum:'1', date:'2026-04-26', allCrewCall:'08:00',
     locationId:loc.id, additionalLocationIds:[],
     weather:{ temp:'20°C', precip:'10%', cond:'Sunny / Cloudy', sun:'05:43 / 20:15', fetchedAt:'sample' },
     schedule:[
@@ -2181,7 +2182,7 @@ async function seedSampleData(){
   shootDaysDB.push(day1);
 
   // ---- Day 2 — Apr 27, Wedding 1 ----
-  const day2={ id:uid(), projectId:proj.id, dayNum:'2', dayTotal:'6', date:'2026-04-27', allCrewCall:'07:45',
+  const day2={ id:uid(), projectId:proj.id, dayNum:'2', date:'2026-04-27', allCrewCall:'07:45',
     locationId:loc.id, additionalLocationIds:[],
     weather:{ temp:'14°C', precip:'10%', cond:'Sunny / Cloudy', sun:'05:42 / 20:15', fetchedAt:'sample' },
     techSpecs:{},
@@ -2244,7 +2245,7 @@ async function seedSampleData(){
   shootDaysDB.push(day2);
 
   // ---- Day 3 — Apr 28, 90's Flat ----
-  const day3={ id:uid(), projectId:proj.id, dayNum:'3', dayTotal:'6', date:'2026-04-28', allCrewCall:'07:45',
+  const day3={ id:uid(), projectId:proj.id, dayNum:'3', date:'2026-04-28', allCrewCall:'07:45',
     locationId:loc.id, additionalLocationIds:[],
     weather:{ temp:'15°C', precip:'20%', cond:'Sunny / Cloudy', sun:'05:40 / 20:17', fetchedAt:'sample' },
     techSpecs:{},
@@ -2313,7 +2314,7 @@ async function seedSampleData(){
   shootDaysDB.push(day3);
 
   // ---- Day 4 — Apr 29, Detective ----
-  const day4={ id:uid(), projectId:proj.id, dayNum:'4', dayTotal:'6', date:'2026-04-29', allCrewCall:'07:45',
+  const day4={ id:uid(), projectId:proj.id, dayNum:'4', date:'2026-04-29', allCrewCall:'07:45',
     locationId:loc.id, additionalLocationIds:[],
     weather:{ temp:'15°C', precip:'20%', cond:'Sunny / Cloudy', sun:'05:38 / 20:18', fetchedAt:'sample' },
     techSpecs:{},
@@ -2381,7 +2382,7 @@ async function seedSampleData(){
   shootDaysDB.push(day4);
 
   // ---- Day 5 — Apr 30, Museum ----
-  const day5={ id:uid(), projectId:proj.id, dayNum:'5', dayTotal:'6', date:'2026-04-30', allCrewCall:'07:45',
+  const day5={ id:uid(), projectId:proj.id, dayNum:'5', date:'2026-04-30', allCrewCall:'07:45',
     locationId:loc.id, additionalLocationIds:[],
     weather:{ temp:'16°C', precip:'10%', cond:'Sunny / Cloudy', sun:'05:32 / 20:23', fetchedAt:'sample' },
     techSpecs:{},
@@ -2450,7 +2451,7 @@ async function seedSampleData(){
   shootDaysDB.push(day5);
 
   // ---- Day 6 — May 1, Wedding 2 ----
-  const day6={ id:uid(), projectId:proj.id, dayNum:'6', dayTotal:'6', date:'2026-05-01', allCrewCall:'07:45',
+  const day6={ id:uid(), projectId:proj.id, dayNum:'6', date:'2026-05-01', allCrewCall:'07:45',
     locationId:loc.id, additionalLocationIds:[],
     weather:{ temp:'17°C', precip:'20%', cond:'Sunny / Cloudy', sun:'06:05 / 20:01', fetchedAt:'sample' },
     techSpecs:{},
@@ -2535,7 +2536,7 @@ async function seedSampleData(){
     crewIds: lmaofCrewNames.map(n=>nameToId[n]).filter(Boolean), locationIds:[loc2.id], createdAt:new Date().toISOString() };
   projectsDB.push(lmaofProj);
 
-  const lmaofDay={ id:uid(), projectId:lmaofProj.id, dayNum:'1', dayTotal:'1', date:'2026-05-02', allCrewCall:'14:00',
+  const lmaofDay={ id:uid(), projectId:lmaofProj.id, dayNum:'1', date:'2026-05-02', allCrewCall:'14:00',
     locationId:loc2.id, additionalLocationIds:[],
     weather:{ temp:'22°C', precip:'60%', cond:'Sunny / Cloudy', sun:'05:31 / 20:25', fetchedAt:'sample' },
     techSpecs:{},
@@ -2854,7 +2855,7 @@ let quickAddError = null;                 // e.g. "Pick a date first."
    information card (T-5.2), so there's nothing to translate on the way in and no
    parallel vocabulary to keep in step. `brief` is the raw textarea text here and
    becomes an array via parseBriefLines() at commit, exactly as saveShootDay() does. */
-let quickDayDraft = { dayNum:'', dayTotal:'', date:'', allCrewCall:'', brief:'' };
+let quickDayDraft = { dayNum:'', date:'', allCrewCall:'', brief:'' };
 let quickCrewQuery = '';
 let quickCrewNewOpen = false;             // the "create new crew member" mini-form
 let quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
@@ -2867,10 +2868,10 @@ function setQuickAddMode(mode){
   quickAddMode = same ? null : mode;
   if(quickAddMode === 'loc') locAddQuery = '';   // shared with the Locations tab widget
   if(quickAddMode === 'day'){
-    // Day # and the total both prefill to what this new day would be, so the
-    // count climbs on its own as days are added and neither has to be typed.
-    const n = String(projectDays().length + 1);
-    quickDayDraft.dayNum = n; quickDayDraft.dayTotal = n;
+    // Day # prefills to what this new day would be, so the count climbs on its
+    // own as days are added and never has to be typed. (G19 removed the matching
+    // total — it is derived from projectDays().length, not typed or stored.)
+    quickDayDraft.dayNum = String(projectDays().length + 1);
   }
   if(quickAddMode === 'ai') checkAiScanConfigured();   // fire-and-forget; re-renders if it learns something — same call the old standalone toggle made on open
   renderProjectBody();
@@ -2880,7 +2881,7 @@ function setQuickAddMode(mode){
    user actually finished through. */
 function resetQuickAdd(){
   quickAddMode = null; quickAddError = null;
-  quickDayDraft = { dayNum:'', dayTotal:'', date:'', allCrewCall:'', brief:'' };
+  quickDayDraft = { dayNum:'', date:'', allCrewCall:'', brief:'' };
   quickCrewQuery = ''; quickCrewNewOpen = false;
   quickCrewDraft = { name:'', dept:DEPARTMENTS[0], role:'' };
 }
@@ -2890,7 +2891,6 @@ async function quickAddShootDay(){
   // field-for-field mapping saveShootDay() uses on the Shoot Days tab
   await addShootDayRecord({
     dayNum: quickDayDraft.dayNum,
-    dayTotal: quickDayDraft.dayTotal,
     date: quickDayDraft.date,
     allCrewCall: quickDayDraft.allCrewCall,
     brief: parseBriefLines(quickDayDraft.brief)
@@ -2961,7 +2961,9 @@ function quickAddSectionHTML(p){
       <div class="subhead">Day details</div>
       <div class="ts-grid">
         <div class="ts-field"><label>Day #</label><input type="text" id="quickDayNum" class="fld-xs" value="${esc(quickDayDraft.dayNum)}" oninput="quickDayDraft.dayNum=this.value"></div>
-        <div class="ts-field"><label>of (total)</label><input type="text" id="quickDayTotal" class="fld-xs" value="${esc(quickDayDraft.dayTotal)}" oninput="quickDayDraft.dayTotal=this.value"></div>
+<!-- G19 — no "of (total)" field here any more: the total is derived, so there was
+             nothing for it to write. quickDayDraft's keys still mirror the shoot-day
+             RECORD field names exactly, which is the point of that draft object. -->
         <div class="ts-field"><label class="req">Shoot date</label><input type="date" id="quickDayDate" class="fld-date" value="${esc(quickDayDraft.date)}" oninput="quickDayDraft.date=this.value"></div>
         <div class="ts-field"><label>All-crew call</label><input type="text" id="quickDayAllCall" class="fld-sm" placeholder="08:00" value="${esc(quickDayDraft.allCrewCall)}" oninput="quickDayDraft.allCrewCall=this.value"></div>
       </div>
@@ -3443,15 +3445,23 @@ async function fileToContentBlock(file){
 async function handleAiScanFileInput(inputEl){
   const files = [...(inputEl.files||[])];
   inputEl.value = ''; // so re-picking the same file again later still fires onchange
+  /* G17 — collect every failure, don't overwrite. This used to assign aiScanError
+     on each failing file, so picking four files with two bad ones told you about
+     one of them — and the other silently wasn't attached either. Attaching a
+     briefing document is the primary way into AI Scan; a dropped attachment that
+     reports someone else's error only surfaces as a wrong answer later.
+     One line per failure; `.ai-error` carries white-space:pre-line for them. */
+  const failures = [];
   for(const file of files){
-    if(file.size > 15*1024*1024){ aiScanError = `"${file.name}" is over 15MB — attach a smaller file.`; continue; }
+    if(file.size > 15*1024*1024){ failures.push(`"${file.name}" is over 15MB — attach a smaller file.`); continue; }
     try{
       const block = await fileToContentBlock(file);
       aiScanPendingFiles.push({ block, filename: file.name });
     } catch(err){
-      aiScanError = `Couldn't read "${file.name}": ${err.message||err}`;
+      failures.push(`Couldn't read "${file.name}": ${err.message||err}`);
     }
   }
+  aiScanError = failures.length ? failures.join('\n') : null;
   renderProjectBody();
 }
 function removeAiScanPendingFile(idx){ aiScanPendingFiles.splice(idx,1); renderProjectBody(); }
@@ -4188,7 +4198,7 @@ function renderProjectCrew(body){
         <div class="toolbar" style="margin-top:8px;"><button class="primary" onclick="addCrewToProject()">Add to project</button></div>
       ` : '<div class="empty-note">Everyone in your database is already on this project.</div>'}
       <div class="hint">Need someone new? <span style="color:var(--tape);cursor:pointer" onclick="toggleCrewForm()">Add them here</span> — they'll be saved to the Crew database and assigned to this project.</div>
-      ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
+      ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
   body.oninput = crewGridView==='catering'
     ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); renderCateringSummaryGridSection(); })
@@ -6311,9 +6321,16 @@ const STARTER_SCHEDULE = [['','','CALL'], ['','',''], ['','1hr','LUNCH'], ['',''
    Day form's save and Overview Quick add, so the two can't drift on whitespace
    or blank-line handling. */
 function parseBriefLines(text){ return (text||'').split('\n').map(s=>s.trim()).filter(Boolean); }
+/* G19 — the total number of shoot days is NOT a fact about a shoot day. It is
+   projectDays(d.projectId).length, derived, and it is derived HERE and nowhere
+   else. It used to be stored per record (`dayTotal`) and nothing ever resynced
+   it, so adding a 7th day left days 1–6 printing "Day 1 of 6" on the call sheet,
+   the WhatsApp text and the Excel export while day 7 printed "Day 7 of 7".
+   Deleting a day had the mirror problem. Do not reintroduce a stored total. */
+const shootDayTotal = d => d ? projectDays(d.projectId).length : 0;
 function makeShootDayRecord(projectId, p){
   const existing = shootDaysDB.filter(d=>d.projectId===projectId);
-  return { id: uid(), projectId, dayNum: existing.length+1, dayTotal: existing.length+1,
+  return { id: uid(), projectId, dayNum: existing.length+1,
     date: existing.length? '' : (p?p.startDate:''), allCrewCall:'', locationId:'', additionalLocationIds:[],
     weather:null, techSpecs:{}, schedule:STARTER_SCHEDULE.map(r=>r.slice()), positions:[], brief:[], parking:'', notes:'',
     hotelNights:[], cateringMeals:{} };
@@ -6476,7 +6493,7 @@ function renderCrewDatabase(m){
       ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
       <div id="crewList"></div>
       <button class="small" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
-      ${addingCrewNew ? `<div class="inline-form-card" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
+      ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
     </div>`;
   renderCrewList();
 }
@@ -6787,6 +6804,27 @@ function toggleCrewForm(){
   addingCrewNew = !addingCrewNew;
   if(addingCrewNew){ editingCrewId = null; pendingNewCrewRole = ''; }
   refreshCrewScreen();
+  /* G18 — the form was never missing; it opened below the fold. This button is the
+     LAST element on the page, under all 88 crew in 11 department groups, so on the
+     crew database the 602px form landed with ~104px on screen and the click read as
+     "nothing happened". Same call, same options, as the two Locations flows that
+     already got this right — editLocation() and startNewLocationFromSearch(). The
+     `#crewFormWrap` id is shared by both render sites (crew database and the project
+     Crew tab); only one is ever in the DOM at a time, the same precedent as
+     #locFormWrap being shared by the Locations tab and Overview Quick add.
+     refreshCrewScreen() is synchronous innerHTML, so the element exists by here.
+     ⚠️ The behaviour is chosen, not hard-coded 'smooth' as the Locations pair do:
+     with `prefers-reduced-motion: reduce` set, this browser doesn't merely skip the
+     animation, it doesn't scroll AT ALL — measured, over 3.6s, scrollY never left 0
+     while the same call with behavior:'auto' landed the form at viewport y=118. A
+     fix that silently no-ops for anyone with reduced motion on isn't a fix. The two
+     Locations call sites have the same latent hole; not touched here (out of G18's
+     scope) but worth its own decision. */
+  if(addingCrewNew){
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('crewFormWrap')
+      ?.scrollIntoView({behavior: smooth ? 'smooth' : 'auto', block:'nearest'});
+  }
 }
 function closeCrewForm(){
   const id = val('crewEditId');
@@ -7098,7 +7136,10 @@ function shootDayBuildHTML(){
       <div class="subhead">Day details</div>
       <div class="ts-grid">
         <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"></div>
-        <div class="ts-field"><label>of (total)</label><input type="text" id="sdDayTotal" class="fld-xs"></div>
+        <!-- G19 — read-only: the total is derived from how many shoot days the project
+             actually has, so there is nothing here to type. Kept visible rather than
+             removed because "Day 3 of 6" is the context this form is read in. -->
+        <div class="ts-field"><label>of (total)</label><input type="text" id="sdDayTotal" class="fld-xs" readonly tabindex="-1" title="Total shoot days on this project — add or remove days to change it"></div>
         <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
         <div class="ts-field"><label>All-crew call</label><input type="text" id="sdAllCall" class="fld-sm" placeholder="08:00"></div>
       </div>
@@ -7474,7 +7515,8 @@ function rowsOf(containerId, classes){
   ).filter(vals=>vals.some(v=>v!==''));
 }
 function populateShootDay(d){
-  setv('sdDayNum',d.dayNum); setv('sdDayTotal',d.dayTotal); setv('sdDate',d.date); setv('sdAllCall',d.allCrewCall);
+  // G19 — "of (total)" shows the DERIVED total and is read-only (see the field markup)
+  setv('sdDayNum',d.dayNum); setv('sdDayTotal',shootDayTotal(d)); setv('sdDate',d.date); setv('sdAllCall',d.allCrewCall);
   refreshLocationDropdowns(); document.getElementById('sdLocation').value=d.locationId||'';
   updateLocationSummary();
   document.getElementById('rows-sdaddloc').innerHTML=''; (d.additionalLocationIds||[]).forEach(p=>addSdLocRow(p));
@@ -7553,7 +7595,12 @@ async function fetchWeatherForDay(){
 async function saveShootDay(thenGenerate){
   const idx=shootDaysDB.findIndex(x=>x.id===currentShootDayId); if(idx<0) return;
   const d=shootDaysDB[idx];
-  d.dayNum=val('sdDayNum'); d.dayTotal=val('sdDayTotal'); d.date=val('sdDate'); d.allCrewCall=val('sdAllCall');
+  d.dayNum=val('sdDayNum'); d.date=val('sdDate'); d.allCrewCall=val('sdAllCall');
+  /* G19 — shed the stale stored total on the next write of this day. Nothing reads
+     it any more (buildFullData() derives it), so this is tidiness rather than
+     correctness — chosen over a read-path strip precisely so this stays clear of
+     the weather.fetchedAt mixed-format handling AR put in this same function. */
+  delete d.dayTotal;
   d.locationId=document.getElementById('sdLocation').value;
   d.additionalLocationIds=rowsOf('rows-sdaddloc',['sdaddloc-sel','sdaddloc-note']);
   /* G16 — fetchedAt says how STALE the forecast is, which is a real operational
@@ -7697,7 +7744,9 @@ function buildFullData(d){
   const cams = resolveCameras(d);
   const cameraDesignations = cameraDesignationRows(cams);
   return { prodCompany:p.company||COMPANY, shootTitle:[p.client,p.title].filter(Boolean).join(' — '),
-    dayNum:d.dayNum,dayTotal:d.dayTotal,shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
+    // G19 — derived, never read off the record. This is the single point all four
+    // outputs (preview card, WhatsApp text, tech-specs lines, .xlsx) get it from.
+    dayNum:d.dayNum,dayTotal:shootDayTotal(d),shootDate:d.date,allCrewCall:d.allCrewCall, weather:d.weather||{},
     primary,addLocs,positions,clientPositions,talentPositions,coProductionGroups, hospital:primary?primary.hospital:null, schedule:d.schedule||[], brief:d.brief||[], parking:d.parking||'', notes:d.notes||'',
     // resolved, not raw: a day stores only what DIFFERS from the project defaults
     // (saveShootDay deletes d.techSpecs entirely when nothing differs), so reading

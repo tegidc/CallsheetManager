@@ -54,11 +54,12 @@ Every screen needs the same handful of records. These are the single place that 
 - `addShootDayFromProposal()` / `addNewLocationFromProposal()` / `addNewCrewFromProposal()` — the "new record" commit paths. `addShootDayFromProposal()` is now a thin wrapper over `addShootDayRecord()` (AI Scan proposes a single-line label, which is a one-line production brief); kept as a named wrapper so the accept path reads the same as its two siblings. The other two **can't** call `saveCrew()`/`saveLocation()` directly — those read ~25 fields via `val('nc...')`/`val('nl...')` off their own database forms, not parameters — so these mirror their record shape exactly (every field `saveCrew()`'s `rec` object sets) rather than faking a whole form. Matched proposals instead call the real existing `addCrewToProject(id)` / `addLocToProject(id)`. **Despite the `…FromProposal` names, these are no longer AI-only** — Phase Quick Add made Overview's Quick add box a second caller of `addShootDayFromProposal()` and `addNewCrewFromProposal()`. Kept the names rather than renaming, since the AI Scan accept path is still the primary caller and a rename would have churned that code for nothing; treat them as "commit a record from plain field values" — [Overview, Crew, Locations]
   - `addCrewToProject()` gained an optional `id` parameter for this (`id = id || val('addCrewPick')`) — its own call site, unchanged, still works with no argument — [Crew]
 - `buildCrewSummary()` / `buildLocationSummary()` — compact `{id, name, role}`/`{id, name}` projections of the FULL `crewDB`/`locationsDB` (not just this project's roster) sent with every request, so Claude can propose a `match_id` against anyone already in either database — [Overview]
+- `handleAiScanFileInput()` — the attach-files handler. Since Phase AS (**G17**) it collects **every** failure into an array and joins them one per line, rather than assigning `aiScanError` per file and keeping only the last; `.ai-error` carries `white-space:pre-line` for that. Picking four files with two oversize used to report one of them while silently dropping the other — [Overview]
 - `fileToContentBlock()` / `fileToBase64()` / `fileToText()` — turn an attached file into an Anthropic content block client-side. PDF → base64 `document` block (Claude reads PDFs natively, no extraction needed). `.docx` → plain text via `mammoth.js` (the API has no native docx support). `.txt`/anything else → read as plain text. 15MB cap per file — [Overview]
 - `stripAiScanDisplayFields()` — strips the display-only `_filename` property (stashed on file blocks purely so `aiScanMessageHTML()` can show an attachment's name) before any message array reaches the actual API request — [Overview]
 - `renderWelcome()` — renders the landing screen shown when no project is open. Above the existing "Get started" section (Phase Y) sits a two-button toolbar: "Recent" (`goRecentProject()`, disabled when there's no project to jump to, labelled with that project's name) and "+ New" (`goNewProject()`, the same entry point the sidebar's "+ New project" and this screen's own "+ New project" button already use — no second code path) — [Overview]
 - `mostRecentProject()` / `goRecentProject()` (Phase Y) — `mostRecentProject()` sorts `projectsDB` by `lastOpenedAt` (falls back to `0`, so a never-opened project sorts last, not first) and returns the top one, or `null`; `goRecentProject()` opens it via the normal `openProject()`. `lastOpenedAt` is a plain epoch-ms timestamp, stamped by `openProject()` itself on every open — no separate "mark as viewed" call needed — [Overview]
-- `resetAndReseed()` — wipes and reloads sample data for a fresh demo state — [Overview]
+- ⚠️ **REMOVED in Phase AS (G12): `resetAndReseed()` and the Welcome screen's whole "Sample data" section.** It wiped all four collections and reseeded over the top, one `confirm()` from the landing screen, with no undo — and R18's merge couldn't help, since it was a write of empty-then-seed rather than a delete. Deleted rather than guarded, per the user. **The auto-seed path is untouched**: `seedSampleData()` still has its independent caller in `initApp()` (`if(!crewDB.length && !locationsDB.length && !projectsDB.length)`), which is the "loads automatically the first time the app opens with nothing saved" behaviour. Do not look for `resetAndReseed()` — [Overview]
 - `seedSampleData()` — populates the databases with sample crew/locations/projects/days for demo purposes — [Overview]
 - `renderNewProject()` — renders the "create new project" form — [Overview]
 - `previewProjCode()` — live-previews the generated project code while filling in the new-project form — [Overview]
@@ -175,7 +176,8 @@ Every screen needs the same handful of records. These are the single place that 
 - `dayTabsBarHTML()` — renders the row of day-number tabs used to switch between shoot days — [Shoot Days]
 - `renderProjectDays()` — renders the Shoot Days tab body (day tabs + selected day's editor) — [Shoot Days]
 - `selectShootDay()` — sets the active shoot day and re-renders the project body — [Shoot Days]
-- `makeShootDayRecord()` / `STARTER_SCHEDULE` — constructs a new blank shoot day record, seeded with the starter CALL/LUNCH/WRAP schedule — [Shoot Days]
+- `makeShootDayRecord()` / `STARTER_SCHEDULE` — constructs a new blank shoot day record, seeded with the starter CALL/LUNCH/WRAP schedule. Since Phase AS (**G19**) it does **not** set `dayTotal` — see `shootDayTotal()` — [Shoot Days]
+- `shootDayTotal(d)` (**G19**, Phase AS) — `projectDays(d.projectId).length`. ⚠️ **The total number of shoot days is derived, never stored.** It used to be a persisted `dayTotal` per record that nothing resynced, so adding a 7th day left days 1–6 printing "Day 1 of 6" on the call sheet, the WhatsApp text and the .xlsx while day 7 printed "Day 7 of 7"; deleting had the mirror problem. `buildFullData()` is the single place it is derived, which is why all four output consumers were fixed by one change. Don't reintroduce a stored total — [Shoot Days]
 - `addShootDay()` / `deleteShootDay()` — create and remove a shoot day — [Shoot Days]
 - `syncShootDayCount()` — grows the shoot day count immediately (blank new days), or (when shrinking) expands an inline checkbox picker instead of deciding for the user — [Shoot Days]
 - `shootDayReductionPending` / `shootDayLabel()` / `toggleShootDayReductionPick()` / `cancelShootDayReduction()` / `confirmShootDayReduction()` / `shootDayReductionPanelHTML()` — the inline "select N days to remove" picker (Phase T item 1) shown on the Overview tab under the Shoot days count field when shrinking it, replacing the old sequence of native `prompt()` popups. Confirm is disabled until exactly the required number of days is ticked — [Shoot Days]
@@ -558,7 +560,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `toggleDeptCollapse()` / `setAllDeptsCollapsed()` — collapse/expand department groups in the crew database list — [Crew]
 - `toggleProjectDeptCollapse()` / `setAllProjectDeptsCollapsed()` — the same, for the project Crew tab's groups — [Crew]
 - `crewFormHTML()` / `toggleCarFields()` — render the add/edit crew form and react to "has car" toggling. No more free-text Role or manual Department field (Phase R item 1/follow-up): existing crew (`c.id` set) get the live saved-roles tag-list editor; a brand-new crew member gets `newCrewRolePickerHTML()` instead, required to save. Also has the new "Show as" text field. Since Phase AG, the Private section's Fee/rate row also carries a "Day rate (this project)" field next to it, when-and-only-when this form is opened from within a project for an existing crew member (`c.id` set AND `currentProject()` resolves — false on the standalone Crew database screen, which shares this same function but has no project) — same `p.crewRateOverrides`/`resolveCrewRate()`/`saveCrewRateOverride()` field as the Roles row and Budget's Per Person view, with its own `crewRateSaveIconHTML()` Save icon (context `'e'`), not a second copy of the override — [Crew]
-- `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view. `toggleCrewForm()`/`closeCrewForm()` reset `pendingNewCrewRole` when the new-crew form opens/closes — [Crew]
+- `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view. `toggleCrewForm()`/`closeCrewForm()` reset `pendingNewCrewRole` when the new-crew form opens/closes. Since Phase AS (**G18**) `toggleCrewForm()` also scrolls `#crewFormWrap` into view on open — the form was never missing, it opened ~600px below the fold because the button is the last element on a 12,400px page. `#crewFormWrap` is shared by both render sites (crew database and the project Crew tab); only one is in the DOM at a time, same precedent as `#locFormWrap`. ⚠️ It picks `behavior` rather than hard-coding `'smooth'` like `editLocation()`/`startNewLocationFromSearch()` do: **under `prefers-reduced-motion: reduce` this browser does not scroll at all with `behavior:'smooth'`** (measured — scrollY never moved over 3.6s, while `'auto'` landed the form correctly). The two Locations call sites still hard-code `'smooth'` and carry the same latent hole — logged, not fixed here — [Crew]
 - `saveCrew()` — persist a crew record. Refuses to create a brand-new crew member without `pendingNewCrewRole` set ("every crew member needs at least one saved role"); for a new record, role/department/`roles` are derived entirely from that pick. For an existing record, role/department/`roles` are left untouched (they're managed live by `addRoleToCrew`/`setActiveRole` elsewhere, not by this form) — [Crew]
 - `deleteCrew()` — delete a crew record — [Crew]
 - `renderDeptAdminPanel()` / `toggleDeptAdminPanel()` — collapsible "Departments & sub-departments" panel on the Crew database screen: one block per department showing its sub-departments (add/rename/remove), its "Role seniority order" reorder list (Phase N item 2 — up/down via `moveRoleSeniority()`), and its roster, Heads of Department pinned to the top — [Crew]
@@ -709,7 +711,7 @@ coarse information first, finest detail last.
 | **G-1** | Sidebar | Databases, project list, + New project, Settings | `renderSide()` |
 | **G-2** | Mobile top bar & drawer | Burger, title, slide-out nav | `toggleDrawer()` / `setTopbarTitle()` |
 | **G-3** | Welcome screen | Landing state when no project is open | `renderWelcome()` |
-| **G-4** | Sample data reset | Wipe and reload the demo data set | `resetAndReseed()` |
+| ~~**G-4**~~ | ~~Sample data reset~~ | **Removed in Phase AS (G12)** — the section and its button are gone; first-load auto-seeding survives in `initApp()` | — |
 | **G-5** | New project form | Create a project (auto-creates its first shoot day) | `renderNewProject()` |
 | **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
 | **G-7** | Undo toast | Phase R/R17 — ~10s "Undo" after a delete or bulk edit, restoring a pre-action snapshot | `finishUndo()` / `undoLastAction()` |
@@ -1290,6 +1292,99 @@ rendered per-day totals).
 > immediately before the change, not carried over from AO.
 
 **Still outstanding from Gate 1: phases AS / AT / AU / AV / AW.**
+
+## Phase AS — Gate 1 Stage 2, part 2 of 5: behaviour fixes & bugs
+
+Five Bucket B findings, deliberately split across **two commits** so the riskiest one
+is revertable on its own:
+
+- **Commit A** — G12, G18, G19, G17. Four independent fixes.
+- **Commit B** — G14 alone. See its own section below.
+
+Verified against the live ROW 2026 London project with `saveDB()`/`scheduleAutosave()`
+stubbed, confirmed clean against `app_data` afterwards.
+
+### G12 — `resetAndReseed()` deleted
+
+Deleted rather than guarded, per the user: *"I don't use it and don't imagine I will at
+this point."* The button, its `confirm()`, the handler and the Welcome screen's whole
+"Sample data" section are gone.
+
+**The auto-seed path was checked first and is independent** — `seedSampleData()` had
+two callers and only one of them was the button; `initApp()`'s
+`if(!crewDB.length && !locationsDB.length && !projectsDB.length)` branch is untouched.
+Exercised end-to-end (emptied the collections in memory, ran the branch: 77 crew,
+2 projects, 7 shoot days seeded, four `saveDB` calls attempted). `seedSampleData()`
+itself stays — that is **G20 / Phase AV**.
+
+> The section's explanatory copy went with the button. Its remaining sentence described
+> a first-run behaviour the user only ever experiences *before* they could read it, and
+> a landing-screen section with a heading and no control is dead UI. Flagged as a
+> judgement call rather than assumed.
+
+### G18 — "+ Add crew member" opened below the fold
+
+`toggleCrewForm()` now scrolls `#crewFormWrap` into view on open, matching
+`editLocation()` / `startNewLocationFromSearch()`. Measured before and after on the
+live 88-crew database:
+
+| | before | after |
+|---|---|---|
+| scroll on click | 0px | 11,567px |
+| form on screen | ~104px of 602px (17%) | **602px of 602px (100%)** |
+| form top in viewport | y=11,685 (off-screen) | y=118 |
+
+Confirmed by hit-testing `elementFromPoint()` at three viewport heights, not just by
+rectangle maths.
+
+> ⚠️ **Found while verifying, and it changed the fix:** with
+> `prefers-reduced-motion: reduce` set, this browser does not merely skip the animation
+> for `scrollIntoView({behavior:'smooth'})` — **it does not scroll at all.** Measured:
+> scrollY stayed at 0 across 3.6 seconds of polling, while the identical call with
+> `behavior:'auto'` landed the form at viewport y=118 immediately. So `toggleCrewForm()`
+> picks its behaviour instead of hard-coding `'smooth'`. **The two Locations call sites
+> still hard-code `'smooth'` and carry the same latent hole** — left alone as outside
+> G18's scope, but it is a real defect and wants its own decision.
+
+### G19 — `dayTotal` was stored per record and nothing resynced it
+
+Now derived: `shootDayTotal(d)` = `projectDays(d.projectId).length`, resolved in
+`buildFullData()`, which is the single point all four consumers (preview card, WhatsApp
+text, tech-specs lines, .xlsx) read from — so one change fixed all four.
+
+| | before | after |
+|---|---|---|
+| 6 days | Day 1–6 "of 6" | Day 1–6 "of 6" |
+| add a 7th | days 1–6 stuck at **"of 6"**, day 7 "of 7" | **all seven "of 7"** |
+| delete it again | mirror problem | **all six back to "of 6"** |
+
+Also removed: the stored field from `makeShootDayRecord()`, the seven seed records, and
+Quick add's `of (total)` input and its `quickDayDraft.dayTotal` key (there was nothing
+left for it to write; the draft's keys still mirror the record's field names exactly,
+which is the point of that object). The Shoot Day form's `of (total)` input is **kept
+but `readonly`** — "Day 3 of 6" is the context that form is read in, so showing the
+derived number is better than removing it, and read-only is more honest than accepting
+a value that gets ignored.
+
+**Stored-shape decision: strip on next write, not on read, and no migration.**
+`saveShootDay()` does `delete d.dayTotal`, so a record sheds the stale field the next
+time that day is saved for any reason.
+
+- *Why not strip on read:* it is a migration in disguise, and it would put a new special
+  case in `populateShootDay()` — right next to the `weather.fetchedAt` mixed-format
+  handling Phase AR added. Explicitly kept clear of that. (Verified: `fetchedAt` still
+  reads `03/08/2026` unchanged across a save that stripped `dayTotal`.)
+- *Why not leave it inert:* nothing reads it, so correctness doesn't depend on when it
+  goes — but a persisted field that looks authoritative and isn't is exactly what caused
+  this finding.
+
+### G17 — AI Scan kept only the last attachment error
+
+`handleAiScanFileInput()` collects failures into an array and joins them one per line;
+`.ai-error` gained `white-space:pre-line`. Verified with four files (two oversize, one
+unreadable `.docx`, one good): **three separate error lines, and the good file still
+attached.** Previously only the last of the three would have been shown, with the other
+two silently dropped.
 
 ## The design system, as decided (Phase Refinement)
 
