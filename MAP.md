@@ -210,7 +210,9 @@ the Hotel tab in Phase AD so Budget's relationship to it now matches Catering/Tr
 read-only). Location fees were originally excluded for exactly the reason that made them awkward
 (one fee can span several shoot days); **R2 added them**, apportioned per day — see
 `locationFeeForDays()` below. Budget also gained its own Copy/Export in R1, so
-Preview & Export is no longer the only export surface.
+Preview & Export is no longer the only export surface. Since **Phase AP** those two
+export surfaces wear the SAME trigger — see **The output menu** below, and the
+matching cross-reference in **Preview & Export**.
 
 - `VAT_RATE` — fixed at 0.20 (UK standard). Not project-configurable — a real rate
   input is out of scope for a cost-visibility phase — [Budget]
@@ -334,19 +336,37 @@ Preview & Export is no longer the only export surface.
 - `budgetView` / `setBudgetView()` — which of the four views (`department` /
   `person` / `day` / `costs`) is showing, same pattern as `crewGridView`. Displayed in
   the tab switcher as Per Department / Per Day / Per Person / Costs (Phase AA, `costs`
-  added Phase AF) — the switcher's own key order, `viewLabels`, not `budgetView`'s
-  internal naming — [Budget]
+  added Phase AF) — the labels are `BUDGET_VIEW_LABELS` (Phase AP promoted the
+  switcher's own local `viewLabels` to a const so the output menu names the four
+  views identically instead of keeping a second list), not `budgetView`'s internal
+  naming. ⚠️ Phase AP also made `setBudgetView()` reset `budgetExportView` — see
+  **The output menu** — [Budget]
 - `budgetVatToggle` / `toggleBudgetVat()` — itemized (every figure ex-VAT, VAT broken
   out as its own line in the summary bar) vs baked in (VAT folded silently into every
   figure everywhere, one Total). VAT is a property of the PERSON, never of a cost
   type: it attaches only where `c.vatRegistered` says so. Since **Phase AO** that
   covers a person's day rate AND their travel — see **VAT follows the person** below,
-  which also records why Catering/Hotel/Locations are deliberately left out — [Budget]
+  which also records why Catering/Hotel/Locations are deliberately left out.
+  ⚠️ Since **Phase AP** this ONE flag is also what the output menu's VAT choice reads
+  and writes — there is no export-only VAT flag, deliberately. See **The output
+  menu** — [Budget]
 - `budgetPersonDisplay()` — the one function that applies the VAT toggle to a
   person's cost; every rollup (department, day, person-view Subtotal) is built by
   summing this, not the raw subtotal, so the toggle can never go stale in one view
   and not another. The `vat` handed to it is whatever `buildBudgetData()` attributed
   to that PERSON (day rate + travel since AO) — [Budget]
+- `budgetOutputOpen` / `toggleBudgetOutputPanel()` / `budgetExportView` /
+  `budgetExportViewEff()` / `setBudgetExportView()` / `budgetOutputPanelHTML()`
+  (Phase AP) — **Budget's output menu**, behind the shared `outputMenuRowHTML()`
+  trigger. Replaces R1's two direct-fire toolbar controls; ⚠️ Budget's Copy/Export no
+  longer fire on click, they open this. Offers view (all four), VAT footing and
+  copy-vs-.xlsx. `budgetExportView` is `null` by default meaning "the view I'm
+  looking at", so the default is exactly R1's behaviour and the picker isn't a
+  silently-diverging second copy of the view switcher sitting right below it;
+  `setBudgetView()` resets it, so a deliberate override doesn't outlive the
+  deliberation. The trigger is no longer hidden on the Costs tab — the menu can
+  export any view from any view, so hiding it there would hide the way to the other
+  three. See **The output menu** — [Budget]
 
 ### VAT follows the person (Phase AO)
 
@@ -472,7 +492,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
 - `exportFormat` / `exportSections` / `EXPORT_SECTION_LABELS` / `setExportFormat()` / `toggleExportSection()` (Phase Q) — **the two independent export choices.** `exportFormat` ('printable' | 'whatsapp') picks the output SHAPE; `exportSections` ({tech, catering, hotels, travel}, all true by default) picks WHICH optional content areas that shape carries. Session state, not persisted — same rule as `previewBlocks`/`crewGridView`: this is "what am I sending right now", not a project property. Excel is deliberately **not** a third format — see the Phase Q section at the bottom of this file — [Preview & Export]
-- `exportPanelOpen` / `toggleExportPanel()` / `exportHiddenSectionCount()` / `exportOptionsHTML()` / `exportPanelHTML()` (Phase Q follow-up) — **the Format panel, built in the Crew tab's Filter idiom**: a `crewToolbarHTML()` row carrying one `.crew-header-filter` toggle (caret + "Format: Printable/WhatsApp" + "(N sections hidden)" when any are unticked), with a `.filter-panel` rendered BELOW the row, never inside it — a full-width panel in a flex row distorts its alignment every time it opens, the same note `projectCrewFilterPanelHTML()` carries. Include uses plain `.filter-chips` labels, so it inherits the Crew filter's chip styling instead of a bespoke rule set. The panel holds both output actions (Copy, Download .xlsx) and so starts **open**, unlike the Crew Filter — [Preview & Export]
+- `exportPanelOpen` / `toggleExportPanel()` / `exportHiddenSectionCount()` / `exportOptionsHTML()` / `exportPanelBodyHTML()` (Phase Q follow-up; **renamed from `exportPanelHTML()` in Phase AP** — do not look for the old name) — **the Format panel**. Originally built in the Crew tab's Filter idiom with its own `.crew-header-filter` toggle; **Phase AP replaced that toggle with the shared `outputMenuRowHTML()`**, so this tab and Budget now wear one identical Copy/Export trigger — see **The output menu** below, and the matching cross-reference in the **Budget** section. The `.filter-panel` wrapper moved into the shared component, which is why this function now returns the panel's CONTENTS only. The panel's contents themselves are untouched by AP: Format tabs, four Include checkboxes as plain `.filter-chips` labels (so it inherits the Crew filter's chip styling instead of a bespoke rule set), both output actions (Copy, Download .xlsx), and the format hint. It still starts **open**, unlike the Crew Filter, because it holds the actions you came here to press. The state the old text label carried ("Format: Printable", "(N sections hidden)") is now the trigger's `title` tooltip — the panel is normally open, so it's on screen anyway — [Preview & Export]
 - `exportOutputText()` / `copyExportOutput()` (Phase Q follow-up) — the single Copy path for the whole tab, replacing the old per-block `copyWA()`. Built from data via `buildWAText(buildFullData(d))`, **not** scraped off the preview card: a collapsed block is `display:none` and `innerText` silently skips it, so a DOM-scraped copy would quietly depend on which blocks happened to be open. Both formats copy the same plain-text call sheet honouring the Include checkboxes; only the button label differs ("Copy for WhatsApp" / "Copy as text") — [Preview & Export]
   - REMOVED in the Phase Q follow-up (do not look for it): `copyWA()` — the WhatsApp block's own Copy button, now redundant with the panel's
 - `renderProjectPreview()` — renders the Preview & Export tab body for the current `exportFormat`: printable = call sheet card + the ticked section blocks + Excel; WhatsApp = the text block alone (the sections are inside the text). Only one shape is in the DOM at a time, so `generatePreview()`/`renderPreviewCard()` both guard for a missing element rather than assuming it. Also wires the Travel block's cost-field autosave, scoped by target id — a bare `body.oninput` would fire on the Include checkboxes too, and `saveTransportCosts()` reading fields no longer in the DOM would write both rates back as 0 — [Preview & Export]
@@ -540,6 +560,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `crewDbFilter` / `crewDbFilterOpen` / `crewSearchQuery` — Crew database's filter-panel state (same shape as `projectCrewFilter`, no group-by since there's no hotel context) and the free-text search, kept outside the DOM so re-renders don't clear the search box — [Crew]
 - `personMatchesCrewDbFilter()` / `sortCrewDbGroup()` / `toggleCrewDbFilterPanel()` / `toggleCrewDbFilterDept()` / `toggleCrewDbFilterRole()` / `setCrewDbFilterField()` / `toggleCrewDbFilterFlag()` / `clearCrewDbFilter()` / `crewDbActiveFilterCount()` / `crewDbFilterPanelHTML()` — Crew database's filter panel (multiselect departments, lead company, roles, exclude-Talent/exclude-other-companies, sort). Its trailing row is the shared `filterPanelFootHTML()` — see **The filter-panel foot** — and `crewDbActiveFilterCount()` is what gates that row's "Clear filters" link — [Crew]
 - `filterPanelFootHTML()` — **the one trailing row every filter panel ends with**, shared by Crew database (D-1.2), Crew on this project (T-2.6) and Budget (T-6.0). Renders `.filter-panel-foot`: the panel's own exclusion checkboxes, a hint describing the current scope, and a "Clear filters" link **shown only when a filter is actually narrowing what you're looking at**. Only the markup and that visibility rule are shared — each panel passes its own active-filter signal and its own clear action. See **The filter-panel foot** for the full rule and why it isn't more shared than that — [Shared/utility functions, Crew, Budget]
+- `outputMenuRowHTML()` (Phase AP) — **the one Copy/Export trigger + collapsible-panel shell**, shared by Budget (T-6) and Preview & Export (T-7). Same trigger, same shell, deliberately DIFFERENT menu contents: each tab passes its own open flag, its own toggle and its own panel body (`budgetOutputPanelHTML()` / `exportPanelBodyHTML()`). Same split as `filterPanelFootHTML()` — markup and placement shared, state and action not. See **The output menu** for the full rule, the collapse-idiom choice and the VAT decision — [Shared/utility functions, Budget, Preview & Export]
 
 ## Server-side: Supabase Edge Functions (Phase AI Scan)
 
@@ -892,8 +913,18 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   with no way to get the numbers out. Built from the same `buildBudgetData()` the
   screen renders from, and honouring the active filter (a budget sent while filtered
   should say so — the export leads with a "Filtered to" line rather than quietly
-  emitting the whole project). Rows mirror the visible view. Hidden on the Costs tab,
-  which is inputs rather than figures. Since Phase AO each view has **two** row
+  emitting the whole project). Rows mirror the visible view. ⚠️ **Phase AP changed
+  `budgetExportRows(data, view)` and `budgetExportTitle(view)` to take the view as an
+  argument** instead of reading the global `budgetView` — the output menu can export
+  a view you aren't standing on. Still one data path: every figure comes from the
+  `buildBudgetData()` handed in. AP also gave Costs a shape of its own — R1 quietly
+  exported the Per Department shape for it; it now emits the per-unit RATES (through
+  the very same `getCateringCosts()`/`getTransportCosts()`/`getHotelCosts()` getters
+  `budgetCostsViewHTML()` renders from, not a second copy) followed by the extras
+  totals those rates produce, which still come from `buildBudgetData()`. No VAT split
+  on it: per AO's "VAT follows the person" these supplier costs carry none. The .xlsx
+  filename now carries the view too, so exporting all four doesn't leave four files
+  fighting over one name. Since Phase AO each view has **two** row
   shapes, switched on `budgetVatToggle` exactly as the screen does — Per Department
   and Per Day gain Ex-VAT/VAT/Inc-VAT columns and Per Person a VAT amount when
   itemized — so the export still mirrors what's on screen rather than a second
@@ -1191,6 +1222,87 @@ used to always show and now don't. Budget is unchanged (`budgetActiveFilterCount
 is exactly the `scope.length` it already gated on). If a future panel wants the
 link always present, it wants a different rule — argue for it rather than
 passing `active:true`.
+
+## The output menu
+
+Phase AP. Cross-referenced from both the **Budget** and **Preview & Export**
+sections — it belongs to neither.
+
+This app has two export surfaces, and they had two different affordances.
+**Budget** (T-6) fired Copy and Export straight off the toolbar with no menu.
+**Preview & Export** (T-7) hid its output actions inside a panel behind a
+"Format: Printable" text caret. Same job, two idioms, one of them (Preview's)
+the one the user likes.
+
+**The decision, from the user — do not re-litigate it.** ONE trigger on both
+tabs; deliberately DIFFERENT menu contents behind it, sharing one feel. Budget's
+icon+label treatment is the trigger; Preview's collapsible submenu is the shell.
+
+```
+outputMenuRowHTML({open, onToggle, panelHTML, titleText, filterHTML, filterPanelHTML})
+  open            — that tab's own open flag
+  onToggle        — that tab's own toggle call, as an onclick string
+  panelHTML       — that tab's own panel CONTENTS (the .filter-panel wrap is here)
+  titleText       — optional tooltip, for state a collapsed trigger can't show
+  filterHTML      — optional Filter toggle for the row's left slot (Budget only)
+  filterPanelHTML — that Filter's own panel, so it lands above this one and the
+                    two panels stack in the same order as their triggers
+```
+
+**Which collapse idiom, and why not a third one.** The app has two: the
+`sd`/`pv`/`bd`/`bc` block-state objects driven by
+`applyBlockState()`/`toggleBlock()`/`setAllBlocksCollapsed()`, and the
+filter-panel idiom (a plain boolean + a `dept-caret` in a `crewToolbarHTML()`
+row, panel rendered BELOW the row). Budget's filter panel and Preview's format
+panel **both already used the second one**, and it's the one that generalises
+here: `applyBlockState()` toggles a block's display in place, but this panel has
+to render outside the flex row — a full-width panel inside `.crew-header-row`
+distorts its alignment every time it opens, the note
+`projectCrewFilterPanelHTML()` has carried since Phase Refinement. So the
+filter-panel idiom is what got shared, `dept-caret` stays the caret, and nothing
+new was invented.
+
+⚠️ **What is deliberately NOT shared** — same split as `filterPanelFootHTML()`
+(see **The filter-panel foot**). Only the markup and the placement rule live in
+the shared function. Each tab keeps:
+
+- **its own open flag and toggle** — `budgetOutputOpen`/`toggleBudgetOutputPanel()`
+  and `exportPanelOpen`/`toggleExportPanel()`. They even differ in default:
+  Preview's starts **open** (Phase Q's reasoning still stands — it holds the
+  actions you came for), Budget's starts **closed**, because Budget's screen is
+  the thing you came for and the menu is a departure from it.
+- **its own panel contents** — `budgetOutputPanelHTML()` and
+  `exportPanelBodyHTML()`. This is the point of the phase, not a compromise:
+  Preview picks an output SHAPE (Printable/WhatsApp) and which sections ride
+  along; Budget picks WHICH VIEW's figures and on which VAT footing. Folding
+  those into one menu would mean inventing options neither tab wants.
+
+**Styling:** `.output-menu` for the trigger wrap (renamed from `.budget-output`
+— it is no longer Budget's; do not look for the old class), `.output-menu-sep`
+for the dot between Copy and Export. The panel reuses `.filter-panel`.
+
+### ⚠️ The VAT decision — flagged, per the brief
+
+Budget's menu offers a VAT footing, and the summary bar already has an **Itemize
+VAT** checkbox. Two controls silently disagreeing about VAT would be worse than
+either alone, so:
+
+**The menu READS AND WRITES the existing `budgetVatToggle`. There is no
+export-only VAT flag, and one must not be added.** Picking a footing in the menu
+flips the whole screen, visibly; ticking the summary bar's checkbox flips the
+menu. One piece of state, so an export can never quietly disagree with the
+figures the user was just reading — the exact failure mode a private export-only
+flag would have introduced.
+
+The cost of this choice: choosing an export footing changes what's on screen.
+That's the honest trade, and the panel's hint says so out loud ("VAT here is the
+same setting as *Itemize VAT* on the summary bar — changing it changes the
+figures on screen too") rather than leaving it to be discovered.
+
+Note the asymmetry with `budgetExportView`, which is deliberate and not an
+inconsistency: the VIEW is export-only state (you can export Per Person while
+looking at Per Day) because nothing on screen claims otherwise, whereas VAT is a
+footing the screen is actively displaying, so a second one would be a lie.
 
 ## The design system, as decided (Phase Detail)
 

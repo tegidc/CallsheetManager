@@ -428,13 +428,18 @@
     gap:6px 16px; font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none;
     color:var(--muted); margin-bottom:8px;}
   .crew-header-left, .crew-header-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
-  /* R1 — Budget's Copy / Export. Inherits the toolbar's Jost/--fs-meta/muted
+  /* R1 — Budget's Copy / Export, generalised in Phase AP into the ONE output-menu
+     trigger both Budget and Preview & Export wear (was .budget-output; renamed
+     because it is no longer Budget's). Inherits the toolbar's Jost/--fs-meta/muted
      treatment like every other header control (they're things you click, not
      captions), and goes brand green on hover the same way. */
-  .budget-output{display:flex; align-items:center; gap:14px;}
-  .budget-output > span{display:inline-flex; align-items:center; gap:5px; cursor:pointer;}
-  .budget-output > span:hover{color:var(--tape);}
-  .budget-output svg{width:13px; height:13px;}
+  .output-menu{display:flex; align-items:center; gap:14px;}
+  .output-menu > span{display:inline-flex; align-items:center; gap:5px; cursor:pointer;}
+  .output-menu > span:hover{color:var(--tape);}
+  .output-menu svg{width:13px; height:13px;}
+  /* The two words inside the one trigger read as a pair, not two buttons — a
+     hair more space before "Export" so "Copy" and its icon stay grouped. */
+  .output-menu-sep{opacity:.4; margin:0 3px;}
   .crew-header-right{margin-left:auto;}
   /* Select all is a <label>, so the global label{} rule was giving it Oswald 11px
      while its neighbours were Jost 12px. Put it back in the toolbar's own font. */
@@ -3890,6 +3895,45 @@ function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
       <div class="crew-header-right">${rightHTML||''}</div>
     </div>`;
 }
+
+/* ============ outputMenuRowHTML() — the ONE Copy/Export trigger (Phase AP) ============
+   Budget and Preview & Export are the app's two export surfaces and had two
+   different affordances: Budget fired Copy/Export immediately from the toolbar,
+   Preview hid its output actions behind a "Format: Printable" caret. Phase AP gives
+   them ONE trigger — Budget's icon+label treatment — opening ONE panel shell, with
+   deliberately DIFFERENT contents behind it. Same feel, different menu.
+
+   Which collapse idiom: NOT a third toggle. The app has two — the sd/pv/bd/bc block
+   objects driven by applyBlockState()/toggleBlock(), and the filter-panel idiom (a
+   plain boolean + dept-caret in a crewToolbarHTML() row, with the panel rendered
+   BELOW the row). Budget's filter panel and Preview's format panel BOTH already used
+   the second one, and it is the one that generalises: applyBlockState() toggles a
+   block's own display in place, but this panel must render outside the flex row —
+   a full-width panel inside .crew-header-row distorts its alignment every time it
+   opens (the note projectCrewFilterPanelHTML() has carried since Phase Refinement).
+   So the filter-panel idiom is what's shared, and dept-caret stays the caret.
+
+   Split, following Phase AO's filterPanelFootHTML() precedent: only the markup and
+   the placement rule live here. Each tab keeps its OWN open-state flag, its OWN
+   toggle function and its OWN panel contents — see budgetOutputPanelHTML() and
+   exportPanelBodyHTML().
+
+   outputMenuRowHTML({open, onToggle, panelHTML, titleText, filterHTML, filterPanelHTML})
+     open            — that tab's own open flag
+     onToggle        — that tab's own toggle call, as an onclick string
+     panelHTML       — that tab's own panel CONTENTS (the .filter-panel wrap is here)
+     titleText       — optional tooltip, for state the collapsed trigger can't show
+     filterHTML      — optional Filter toggle for the row's left slot (Budget only)
+     filterPanelHTML — that Filter's own panel, so it lands above this one and the
+                       two panels stack in the same order as their triggers          */
+function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='', filterHTML='', filterPanelHTML=''} = {}){
+  const trigger = `<span class="output-menu"><span onclick="${onToggle}"${titleText?` title="${esc(titleText)}"`:''}>
+      <span class="dept-caret">${open?'▾':'▸'}</span>${icon('copy')} Copy<span class="output-menu-sep">·</span>${icon('download')} Export
+    </span></span>`;
+  return crewToolbarHTML('', filterHTML, trigger)
+    + (filterPanelHTML||'')
+    + (open ? `<div class="filter-panel">${panelHTML}</div>` : '');
+}
 function renderProjectCrew(body){
   const p = currentProject();
   const days = projectDays();
@@ -5198,22 +5242,25 @@ function exportOutputText(){
   return buildWAText(buildFullData(d));
 }
 function copyExportOutput(){ return copyText(exportOutputText(), 'Copied!'); }
-/* Format + Include + the two output actions, in the Crew tab's Filter idiom:
-   a .crew-header-row toggle with a caret and a summary of the current state, and a
-   .filter-panel below it (never inside the row — a full-width panel in a flex row
-   distorts its alignment every time it opens, same note as projectCrewFilterPanelHTML). */
+/* Format + Include + the two output actions. Phase AP replaced this row's own
+   "Format: Printable" text toggle with the shared outputMenuRowHTML() trigger, so
+   this tab and Budget wear the same Copy/Export affordance; the panel CONTENTS are
+   untouched. The format/hidden-count summary the old label carried moves to the
+   trigger's tooltip — the panel starts open, so it's normally on screen anyway. */
 function exportOptionsHTML(){
   const hidden = exportHiddenSectionCount();
-  const toggle = `<span class="crew-header-filter" onclick="toggleExportPanel()">
-      <span class="dept-caret">${exportPanelOpen?'▾':'▸'}</span> Format: ${exportFormat==='whatsapp'?'WhatsApp':'Printable'}${hidden?` (${hidden} section${hidden>1?'s':''} hidden)`:''}
-    </span>`;
-  return crewToolbarHTML('', toggle, '') + (exportPanelOpen ? exportPanelHTML() : '');
+  return outputMenuRowHTML({
+    open: exportPanelOpen,
+    onToggle: 'toggleExportPanel()',
+    titleText: `Format: ${exportFormat==='whatsapp'?'WhatsApp':'Printable'}${hidden?` · ${hidden} section${hidden>1?'s':''} hidden`:''}`,
+    panelHTML: exportPanelBodyHTML()
+  });
 }
-function exportPanelHTML(){
+function exportPanelBodyHTML(){
   const fmtTab = (key, label) => `<div class="tab ${exportFormat===key?'active':''}" onclick="setExportFormat('${key}')">${label}</div>`;
   const boxes = Object.keys(EXPORT_SECTION_LABELS).map(key=>
     `<label><input type="checkbox" ${exportSections[key]?'checked':''} onchange="toggleExportSection('${key}', this.checked)"> ${esc(EXPORT_SECTION_LABELS[key])}</label>`).join('');
-  return `<div class="filter-panel">
+  return `
     <div><div class="hint" style="margin-bottom:4px;">Format</div>
       <div class="tabs">${fmtTab('printable','Printable')}${fmtTab('whatsapp','WhatsApp')}</div></div>
     <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Include</div>
@@ -5224,8 +5271,7 @@ function exportPanelHTML(){
     </div>
     <p class="hint" style="margin-top:10px;">${exportFormat==='whatsapp'
       ? 'Plain text for a chat app — the ticked sections are appended to the message. Untick Tech specs for the version that goes to the full crew.'
-      : 'The formatted call sheet — print it or save it as a PDF. Copy gives you the same call sheet as plain text; the .xlsx carries one sheet per ticked section.'}</p>
-  </div>`;
+      : 'The formatted call sheet — print it or save it as a PDF. Copy gives you the same call sheet as plain text; the .xlsx carries one sheet per ticked section.'}</p>`;
 }
 
 /* ============================================================
@@ -5329,7 +5375,21 @@ async function saveCrewRateToDatabase(crewId, context){
 }
 
 let budgetView = 'department'; // 'department' | 'person' | 'day' | 'costs'
-function setBudgetView(view){ budgetView = view; renderProjectBody(); }
+function setBudgetView(view){ budgetView = view; budgetExportView = null; renderProjectBody(); }
+/* Phase AP — which view the OUTPUT menu exports, which is not always the one on
+   screen. null means "whatever I'm looking at", so the default is exactly R1's
+   behaviour (the export mirrors the visible view) and the picker isn't a second,
+   silently-diverging copy of the view switcher sitting right below it. Picking a
+   view in the menu overrides until you switch the on-screen view, which resets it
+   above — the override is deliberate, so it shouldn't outlive the deliberation. */
+let budgetExportView = null;
+function budgetExportViewEff(){ return budgetExportView || budgetView; }
+function setBudgetExportView(view){ budgetExportView = view; renderProjectBody(); }
+/* Phase AP — the output menu's own open flag and toggle, kept local to Budget
+   exactly like budgetFilterOpen; outputMenuRowHTML() shares the markup, not the
+   state. See that function for why the split. */
+let budgetOutputOpen = false;
+function toggleBudgetOutputPanel(){ budgetOutputOpen = !budgetOutputOpen; renderProjectBody(); }
 // true = itemized (every figure ex-VAT, VAT broken out at the top); false =
 // baked in (VAT folded silently into every figure, one Total). The toggle's
 // whole job — see budgetPersonDisplay().
@@ -5867,8 +5927,11 @@ function budgetOrderedPeople(data){
    phase. Built from the SAME buildBudgetData() the screen renders from, so the copy
    and the screen can never disagree — and it honours the active day/department
    filter, because a budget you send while filtered should say so rather than quietly
-   exporting the whole project. Rows mirror the visible view, not a fixed shape. */
-function budgetExportRows(data){
+   exporting the whole project. Rows mirror the visible view, not a fixed shape.
+   Phase AP — `view` is now passed in rather than read off the global budgetView, so
+   the output menu can export a view you aren't currently looking at. Still ONE data
+   path: every figure comes from the buildBudgetData() handed in. */
+function budgetExportRows(data, view){
   const fmt = budgetFmt;
   const rows = [];
   const scope = [];
@@ -5882,7 +5945,7 @@ function budgetExportRows(data){
   rows.push([]);
   // AO — the itemized shapes mirror the screen column-for-column: Per Person gains
   // the VAT amount, Per Department/Per Day the ex-VAT/VAT/inc-VAT breakdown.
-  if(budgetView==='person'){
+  if(view==='person'){
     rows.push(budgetVatToggle
       ? ['Name','Role','Day rate','VAT reg.','Days','VAT','Subtotal']
       : ['Name','Role','Day rate','VAT reg.','Days','Subtotal']);
@@ -5891,11 +5954,37 @@ function budgetExportRows(data){
       pp.vatRegistered?'Yes':'No', pp.daysWorked,
       ...(budgetVatToggle ? [pp.vat?fmt(pp.vat):'—'] : []),
       pp.hasRate?fmt(pp.display):'—']));
-  } else if(budgetView==='day'){
+  } else if(view==='day'){
     rows.push(budgetVatToggle ? ['Day','Location','Ex-VAT','VAT','Inc-VAT'] : ['Day','Location','Total']);
     data.perDay.forEach(d=>rows.push(budgetVatToggle
       ? [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.exVat), fmt(d.vat), fmt(d.incVat)]
       : [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.total)]));
+  } else if(view==='costs'){
+    /* AP — Costs is the one view that isn't a rollup, so R1 quietly exported the
+       Per Department shape for it. Now that the menu names it, it exports what it
+       actually shows: the per-unit RATES, read through the very same
+       getCateringCosts()/getTransportCosts()/getHotelCosts() getters
+       budgetCostsViewHTML() renders from — not a second copy of them — followed by
+       the extras totals those rates produce, which still come from buildBudgetData()
+       like every other figure here. No VAT split: these are supplier costs, and per
+       AO's "VAT follows the person" they carry none. */
+    const p = currentProject();
+    const cc = getCateringCosts(p), tc = getTransportCosts(p), hc = getHotelCosts(p);
+    // Single-cell captions, not two-column headers: these rows are label/value
+    // pairs, and copyBudget() renders a 2-cell row as "label: value" — a
+    // ['Rate','Amount'] header would come out as the nonsense line "Rate: Amount".
+    rows.push(['Rates'],
+      ['Catering — per breakfast', fmt(cc.b)],
+      ['Catering — per lunch', fmt(cc.l)],
+      ['Catering — per dinner', fmt(cc.d)],
+      ['Catering — delivery', fmt(cc.delivery)],
+      ['Travel — public transport per day', fmt(tc.publicPerDay)],
+      ['Travel — mileage (own car, per use)', fmt(tc.mileage)],
+      ['Hotel — per room/night', fmt(hc.perRoomNight)],
+      [],
+      ['Totals'],
+      ['Catering', fmt(data.cateringTotal)], ['Travel', fmt(data.travelTotal)],
+      ['Hotels', fmt(data.hotelTotal)], ['Locations', fmt(data.locationTotal)]);
   } else if(budgetVatToggle){
     rows.push(['Department','Ex-VAT','VAT','Inc-VAT']);
     data.departments.forEach(d=>rows.push([d.dept, fmt(d.exVat), fmt(d.vat), fmt(d.incVat)]));
@@ -5912,33 +6001,76 @@ function budgetExportRows(data){
   }
   return rows;
 }
-function budgetExportTitle(){
+// The output menu's own labels for the four views — same wording as the view
+// switcher (BUDGET_VIEW_LABELS), so the menu can't name a view differently.
+const BUDGET_VIEW_LABELS = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Costs'};
+function budgetExportTitle(view){
   const p = currentProject();
-  const viewLabel = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Per Department'}[budgetView] || 'Budget';
-  return `BUDGET — ${(p&&(p.title||p.client))||''} — ${viewLabel}`;
+  return `BUDGET — ${(p&&(p.title||p.client))||''} — ${BUDGET_VIEW_LABELS[view]||'Budget'}`;
 }
 function copyBudget(){
+  const view = budgetExportViewEff();
   const data = buildBudgetData();
   // two-column rows read as "label: value"; wider rows as a spaced table row
-  const out = [budgetExportTitle(), ''];
-  budgetExportRows(data).forEach(r=>{
+  const out = [budgetExportTitle(view), ''];
+  budgetExportRows(data, view).forEach(r=>{
     if(!r.length) return out.push('');
     out.push(r.length===2 ? `${r[0]}: ${r[1]}` : r.join('  |  '));
   });
   copyText(out.join('\n'), 'Budget copied');
 }
 function downloadBudgetExcel(){
+  const view = budgetExportViewEff();
   const data = buildBudgetData();
-  const aoa = [[budgetExportTitle()], []].concat(budgetExportRows(data).map(r=>r.length?r:['']));
+  const aoa = [[budgetExportTitle(view)], []].concat(budgetExportRows(data, view).map(r=>r.length?r:['']));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Budget');
   const p = currentProject();
-  XLSX.writeFile(wb, `budget-${((p&&(p.title||p.client))||'project').replace(/[^\w-]+/g,'-').toLowerCase()}.xlsx`);
+  // AP — the view is in the filename too, so exporting all four doesn't leave four
+  // files fighting over one name in the downloads folder.
+  const slug = s => String(s||'').replace(/[^\w-]+/g,'-').toLowerCase();
+  XLSX.writeFile(wb, `budget-${slug((p&&(p.title||p.client))||'project')}-${slug(BUDGET_VIEW_LABELS[view])}.xlsx`);
+}
+/* ============ AP — Budget's output menu ============
+   Behind the shared outputMenuRowHTML() trigger. Deliberately NOT the same menu as
+   Preview & Export's: that tab picks an output SHAPE and which sections ride along;
+   this one picks WHICH VIEW's figures, on which VAT footing, and how to take them
+   away. Same trigger, same shell, different contents — that's the phase.
+
+   ⚠️ VAT — the decision, flagged per the brief: this control READS AND WRITES the
+   existing budgetVatToggle ("Itemize VAT" on the summary bar). It is not a second,
+   export-only VAT flag. Picking here flips the whole screen, visibly, and the
+   summary-bar checkbox flips this. One piece of state, so the export can never
+   quietly disagree with the figures the user was just reading — which is the exact
+   failure mode a private export-only flag would have introduced. The cost is that
+   choosing an export footing changes what's on screen; that's the honest trade, and
+   the panel's hint says so out loud rather than leaving it to be discovered. */
+function budgetOutputPanelHTML(){
+  const view = budgetExportViewEff();
+  const viewTab = (key,label)=>`<div class="tab ${view===key?'active':''}" onclick="setBudgetExportView('${key}')">${label}</div>`;
+  const vatTab = (on,label)=>`<div class="tab ${budgetVatToggle===on?'active':''}" onclick="toggleBudgetVat(${on})">${label}</div>`;
+  const scope = [];
+  const allDays = projectDays();
+  if(budgetDayFilterCount()) scope.push(`${budgetDayFilterCount()} of ${allDays.length} days`);
+  if(budgetDeptFilter.size)  scope.push([...budgetDeptFilter].join(', '));
+  return `
+    <div><div class="hint" style="margin-bottom:4px;">View</div>
+      <div class="tabs">${Object.keys(BUDGET_VIEW_LABELS).map(k=>viewTab(k, BUDGET_VIEW_LABELS[k])).join('')}</div></div>
+    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">VAT</div>
+      <div class="tabs">${vatTab(true,'Itemized (ex-VAT + VAT)')}${vatTab(false,'Included in every figure')}</div></div>
+    <div class="toolbar" style="margin-top:12px;">
+      <button class="small primary" onclick="copyBudget()">${icon('copy')} Copy as text</button>
+      <button class="small" onclick="downloadBudgetExcel()">${icon('download')} Download .xlsx</button>
+    </div>
+    <p class="hint" style="margin-top:10px;">${scope.length
+      ? `Exports the ${esc(BUDGET_VIEW_LABELS[view])} view, scoped to your filter (${esc(scope.join(' · '))}) — the export says so at the top.`
+      : `Exports the ${esc(BUDGET_VIEW_LABELS[view])} view for the whole project.`}
+      VAT here is the same setting as <em>Itemize VAT</em> on the summary bar — changing it changes the figures on screen too.</p>`;
 }
 
 function renderProjectBudget(body){
   const data = buildBudgetData();
-  const viewLabels = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Costs'};
+  const viewLabels = BUDGET_VIEW_LABELS;
   const viewSwitcher = `<div class="tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
@@ -5948,15 +6080,19 @@ function renderProjectBudget(body){
   const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleBudgetFilterPanel()">
     <span class="dept-caret">${budgetFilterOpen?'▾':'▸'}</span> Filter${activeFilters?` (${activeFilters})`:''}
   </span>`;
-  // Copy/Export sit in the toolbar's right slot — the same place the Crew tab keeps
-  // its whole-list actions. Hidden on the Costs tab, which is inputs, not figures.
-  const outputHTML = budgetView==='costs' ? '' :
-    `<span class="budget-output">
-       <span onclick="copyBudget()" title="Copy this view as text">${icon('copy')} Copy</span>
-       <span onclick="downloadBudgetExcel()" title="Download this view as .xlsx">${icon('download')} Export</span>
-     </span>`;
-  const filterRow = crewToolbarHTML('', filterToggleSpan, outputHTML)
-    + (budgetFilterOpen ? budgetFilterPanelHTML() : '');
+  /* AP — Copy/Export no longer fire from the toolbar. They keep their place in the
+     right slot and their icons, but now open the shared output menu (see
+     outputMenuRowHTML()). No longer hidden on the Costs tab: the menu can export any
+     of the four views regardless of which one you're standing on, so hiding the
+     trigger there would hide the way to export the other three. */
+  const filterRow = outputMenuRowHTML({
+    open: budgetOutputOpen,
+    onToggle: 'toggleBudgetOutputPanel()',
+    titleText: `Export ${BUDGET_VIEW_LABELS[budgetExportViewEff()]}`,
+    panelHTML: budgetOutputPanelHTML(),
+    filterHTML: filterToggleSpan,
+    filterPanelHTML: budgetFilterOpen ? budgetFilterPanelHTML() : ''
+  });
   const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
     : budgetView==='day' ? budgetDayViewHTML(data)
     : budgetView==='costs' ? budgetCostsViewHTML()
