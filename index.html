@@ -445,10 +445,15 @@
   .crew-header-selectall input{margin:0;}
   .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
-  /* The row of trailing checkboxes + "Clear filters" at the bottom of a filter
-     panel. Was inline on the Crew panel's closing div; a second filter panel
-     (Budget's day filter) needed the same row, so it's a class now. */
+  /* The row of trailing checkboxes + hint + "Clear filters" at the bottom of a
+     filter panel. Was inline on the Crew panel's closing div; a second filter
+     panel (Budget's day filter) needed the same row, so it's a class now. All
+     three panels build this row through filterPanelFootHTML() — see that
+     function for the visibility rule the class exists to carry. */
   .filter-panel-foot{margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
+  /* The "Clear filters" link itself — was the same inline style repeated on
+     each panel; a class so all three can't drift apart. */
+  .filter-clear{cursor:pointer; color:var(--tape);}
   .filter-chips label{font-size:var(--fs-meta); display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
   .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--tint-3);
     border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:var(--fs-meta);}
@@ -3485,6 +3490,38 @@ function toggleAllProjectDeptsCollapsed(deptsCSV){
   setAllProjectDeptsCollapsed(!allCollapsed, deptsCSV);
 }
 function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
+
+/* ============ .filter-panel-foot — shared by all three filter panels ============
+   Crew database (D-1.2), Crew on this project (T-2.6) and Budget (T-6.0) each
+   end their .filter-panel with the same trailing row: whatever exclusion
+   checkboxes that panel owns, a hint describing the current scope, and a
+   "Clear filters" link.
+
+   The rule this function exists to carry: **"Clear filters" only shows when a
+   filter is actually narrowing what you're looking at.** Budget had it right
+   already (its link was gated on there being a live day/department scope); the
+   two Crew panels showed it unconditionally, so it read as a live control on a
+   list nothing was filtering. Gating is now the shared behaviour, not one
+   panel's local detail.
+
+   Only the markup and that visibility rule are shared. Each panel still supplies
+   its own "is a filter active" signal (its existing *ActiveFilterCount(), which
+   deliberately counts filters only — a Sort or Group by choice narrows nothing,
+   so it must not light the link up) and its own clear action, because clearing
+   means resetting that panel's own state object. Don't fold those in here.
+
+     controls — panel-owned checkbox <label>s, already-built HTML ('' if none)
+     hint     — one line of already-escaped text describing the current scope
+     active   — truthy when a filter is live; the ONLY thing gating the link
+     onClear  — the panel's own clear call, as an onclick string             */
+function filterPanelFootHTML({controls='', hint='', active=false, onClear=''} = {}){
+  return `<div class="filter-panel-foot">
+    ${controls}
+    ${hint ? `<span class="hint">${hint}</span>` : ''}
+    ${active && onClear ? `<span class="hint filter-clear" onclick="${onClear}">Clear filters</span>` : ''}
+  </div>`;
+}
+
 /* ---- Crew-on-project filter/group/sort + bulk select ----
    One shared filter state across every view-switcher tab (Roles/Days on
    site/Hotel/Travel/Catering) — it's a module-level global, so switching
@@ -3672,6 +3709,7 @@ function projectCrewActiveFilterCount(){
 }
 function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
+  const activeCount = projectCrewActiveFilterCount();   // gates the shared foot's Clear link
   const companies = [...new Set(assignedAll.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const hasBlankCompany = assignedAll.some(c=>!c.coProductionCompany);
   const rolesInUse = [...new Set(assignedAll.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
@@ -3731,12 +3769,15 @@ function projectCrewFilterPanelHTML(assignedAll, days){
         </select>` : ''}
       </div>
     </div>
-    <div class="filter-panel-foot">
-      <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
+    ${filterPanelFootHTML({
+      controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
-      <label title="Show everyone who does NOT match the filter above, instead of everyone who does"><input type="checkbox" ${f.inverse?'checked':''} onchange="toggleProjectFilterFlag('inverse', this.checked)"> Inverse</label>
-      <span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearProjectCrewFilter()">Clear filters</span>
-    </div>
+      <label title="Show everyone who does NOT match the filter above, instead of everyone who does"><input type="checkbox" ${f.inverse?'checked':''} onchange="toggleProjectFilterFlag('inverse', this.checked)"> Inverse</label>`,
+      hint: activeCount ? `${activeCount} filter${activeCount>1?'s':''} active — the list below is narrowed.`
+                        : 'Showing everyone on this project. Tick anything above to narrow the list.',
+      active: activeCount>0,
+      onClear: 'clearProjectCrewFilter()'
+    })}
   </div>`;
 }
 function toggleCrewSelected(id, checked){
@@ -5344,7 +5385,6 @@ function toggleBudgetFilterDay(dayId, on){
   if(on) budgetDayFilter.add(dayId); else budgetDayFilter.delete(dayId);
   renderProjectBody();
 }
-function clearBudgetDayFilter(){ budgetDayFilter.clear(); renderProjectBody(); }
 /* Ticked ids are re-checked against the project's CURRENT days on every read, so
    a deleted shoot day — or switching to another project, since this state is
    global like crewGridView/budgetView — can never leave the filter selecting
@@ -5368,7 +5408,12 @@ function toggleBudgetFilterDept(dept, on){
   renderProjectBody();
 }
 function setBudgetSort(v){ budgetSort = v; renderProjectBody(); }
-function clearBudgetDayFilter(){ budgetDayFilter.clear(); budgetDeptFilter.clear(); renderProjectBody(); }
+/* Clears BOTH scopes — days and departments. Named clearBudgetFilter(), not
+   ...DayFilter(): R16 added the department scope to this same panel and the
+   function grew to cover it, but the old name stuck and a second, day-only
+   definition of it sat above this one as dead code (the later definition
+   silently won). Both are gone; this is the only one. */
+function clearBudgetFilter(){ budgetDayFilter.clear(); budgetDeptFilter.clear(); renderProjectBody(); }
 function budgetActiveFilterCount(){ return budgetDayFilterCount() + budgetDeptFilter.size; }
 
 function budgetFilterPanelHTML(){
@@ -5400,11 +5445,12 @@ function budgetFilterPanelHTML(){
           <option value="noRate"   ${budgetSort==='noRate'?'selected':''}>Missing a day rate first</option>
         </select></div>
     </div>
-    <div class="filter-panel-foot">
-      <span class="hint">${scope.length ? `Costing ${scope.join(' · ')} — every figure below is for those only.`
-                                        : 'Whole project. Tick any day or department to narrow it.'}</span>
-      ${scope.length ? `<span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearBudgetDayFilter()">Clear filters</span>` : ''}
-    </div>
+    ${filterPanelFootHTML({
+      hint: scope.length ? `Costing ${scope.join(' · ')} — every figure below is for those only.`
+                         : 'Whole project. Tick any day or department to narrow it.',
+      active: budgetActiveFilterCount()>0,   // === scope.length; this panel's gating is unchanged
+      onClear: 'clearBudgetFilter()'
+    })}
   </div>`;
 }
 
@@ -5964,6 +6010,7 @@ function crewDbActiveFilterCount(){
 }
 function crewDbFilterPanelHTML(){
   const f = crewDbFilter;
+  const activeCount = crewDbActiveFilterCount();        // gates the shared foot's Clear link
   const companies = [...new Set(crewDB.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const rolesInUse = [...new Set(crewDB.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
   const deptChecks = DEPARTMENTS.map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleCrewDbFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
@@ -5984,11 +6031,14 @@ function crewDbFilterPanelHTML(){
       </select></div>
     </div>
     <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Roles</div><div class="filter-chips">${roleChecks}</div></div>
-    <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
-      <label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleCrewDbFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
-      <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleCrewDbFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
-      <span class="hint" style="cursor:pointer;color:var(--tape);" onclick="clearCrewDbFilter()">Clear filters</span>
-    </div>
+    ${filterPanelFootHTML({
+      controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleCrewDbFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
+      <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleCrewDbFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>`,
+      hint: activeCount ? `${activeCount} filter${activeCount>1?'s':''} active — the list below is narrowed.`
+                        : 'Showing the whole database. Tick anything above to narrow the list.',
+      active: activeCount>0,
+      onClear: 'clearCrewDbFilter()'
+    })}
   </div>`;
 }
 function renderCrewDatabase(m){

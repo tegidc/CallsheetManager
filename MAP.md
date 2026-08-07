@@ -81,7 +81,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `crewSeniorityBand()` (Phase Sort/Group A) — bands a crew member into "Department leads" / "Mid-level" / "Support / entry level" off the real per-department `roleSeniorityRank(dept, role)` (rank 0 = a department's first/most-senior listed role in `ROLES_BY_DEPT`, so low ranks band together sensibly across departments even though the underlying numbers aren't globally comparable) — not a separate flat seniority list. Used by both the Seniority Sort and Seniority Group by — [Crew]
 - `sortProjectCrewGroup(list, p, days)` (Phase Sort/Group A) — switches on `projectCrewFilter.sort`: `dept` (default, `sortHoDFirst`) / `name` / `role` / `seniority` (via `crewSeniorityBand`'s underlying rank) / `company` (`c.coProductionCompany`) / `daysCount` (most shoot days on site first, via `d.positions`) / `added` (index in `p.crewIds` — the same add-order signal `projectCrew()` relies on elsewhere). Takes `p`/`days` now (not list-only) since `daysCount`/`added` need project context — only ever called from `buildProjectCrewGroups()` — [Crew]
 - `buildProjectCrewGroups(list, p, days)` (Phase Sort/Group A) — switches on `projectCrewFilter.groupBy`, twelve options: `dept` (default) / `deptCompany` (flat composite bucket, e.g. "Cinematography — Creative Dynamic", not a true nested group — avoided touching every `crewGridView` row renderer for a two-level header) / `company` / `role` / `subDept` / `personType` (Crew/Talent/Client, derived off `deptBucketKey`) / `hotel` (existing, via `personHasHotel`) / `travel` (`p.travelMethods[c.id]`) / `vat` (`c.vatRegistered`, strictly `''`/`'Yes'`/`'No'` — same field Budget's VAT calc reads) / `catering` (`c.dietaryGeneral`) / `seniority` (via `crewSeniorityBand`) / `daysOnSite` (**multi-bucket** — a person on 3 shoot days appears in 3 groups, same `(d.positions||[]).some(pos=>pos[0]===c.id)` signal `buildTransportSummary()` uses) / `none` (single ungrouped bucket, still rendered with a header — "All crew" — no `crewGridView` branch currently supports a header-less group). Every non-`dept`/`hotel` bucket set sorts blank/"Not set" values last rather than alphabetically first — [Crew]
-- `toggleProjectCrewFilterPanel()` / `toggleProjectFilterDept()` / `toggleProjectFilterRole()` / `toggleProjectFilterDay()` / `setProjectFilterField()` / `toggleProjectFilterFlag()` / `clearProjectCrewFilter()` / `projectCrewActiveFilterCount()` / `projectCrewFilterPanelHTML()` — collapsible filter panel state and rendering, including the Days filter-chips + OR/AND select (Phase T item 3), the Roles filter-chips sub-section (Phase AB — its own collapse toggle, `projectCrewFilterRolesOpen`/`toggleProjectFilterRolesSection()`, independent of the panel's own open/closed state) and the Inverse checkbox (Phase AE, `toggleProjectFilterFlag('inverse', …)` — no new setter needed, the existing generic flag setter covers it). Sort/Group by (Phase Sort/Group A) each carry a broad curated option list rather than the earlier two/one-option shell — see `sortProjectCrewGroup()`/`buildProjectCrewGroups()` above for what each value does — [Crew]
+- `toggleProjectCrewFilterPanel()` / `toggleProjectFilterDept()` / `toggleProjectFilterRole()` / `toggleProjectFilterDay()` / `setProjectFilterField()` / `toggleProjectFilterFlag()` / `clearProjectCrewFilter()` / `projectCrewActiveFilterCount()` / `projectCrewFilterPanelHTML()` — collapsible filter panel state and rendering, including the Days filter-chips + OR/AND select (Phase T item 3), the Roles filter-chips sub-section (Phase AB — its own collapse toggle, `projectCrewFilterRolesOpen`/`toggleProjectFilterRolesSection()`, independent of the panel's own open/closed state) and the Inverse checkbox (Phase AE, `toggleProjectFilterFlag('inverse', …)` — no new setter needed, the existing generic flag setter covers it). Sort/Group by (Phase Sort/Group A) each carry a broad curated option list rather than the earlier two/one-option shell — see `sortProjectCrewGroup()`/`buildProjectCrewGroups()` above for what each value does. The panel's trailing row (the three exclusion checkboxes + hint + "Clear filters") is the shared `filterPanelFootHTML()` — see **The filter-panel foot** — and `projectCrewActiveFilterCount()` is what gates that row's "Clear filters" link; note it counts filters only, so choosing a Sort or Group by never makes the panel look filtered — [Crew]
 - `projectCrewSelected` / `toggleCrewSelected()` / `toggleSelectAllFilteredCrew()` / `clearCrewSelection()` / `bulkRemoveSelectedFromProject()` / `bulkActionBarHTML()` — bulk-select (checkbox swapped in for the view/eye icon via `crewIdentityHTML`'s `bulkSelect` option) and the bulk "Remove from project" action. `toggleSelectAllFilteredCrew()` is the "Select all" checkbox next to Expand/Collapse all (Phase T item 2) — it's always handed exactly the currently-filtered/visible crew ids, never the full project roster, so it only ever selects what the active filter is showing — [Crew]
 - `selectedEditTargets(crewId)` (Phase Bulk Edit) — **the selected-set bulk-edit pattern.** Every per-field editor on the Crew tab calls this first: if `crewId` is part of the current multi-select AND at least one other person is also selected, it returns every selected id; otherwise just `[crewId]`. The caller then loops its own field-specific mutation over the returned ids and does ONE `saveDB`/render at the end — this is the reusable "which ids does this edit apply to" decision, not a per-field bulk-edit implementation. Wired into `toggleCrewOnDay()` (Days on site), `toggleHotelNight()` / `toggleHotelPre()` (Hotel), `toggleMeal()` (Catering), `setTravelMethod()` (Travel), `saveQuickShowAs()` (Roles — Show as) and `setActiveRole()` (Roles — role/department; only on a direct user pick, i.e. `skipSave` falsy — the internal `skipSave:true` calls used to reactivate a replacement role after `removeRoleFromCrew()` do NOT fan out, since that's a single-person consistency fixup, not a user edit). `bulkActionBarHTML()` shows a one-line hint ("Editing a field for one selected person applies it to all N") whenever 2+ are selected. Deliberately NOT wired into `toggleAllForPerson()` / `toggleAllMealForPerson()` (the per-person "All" button) — that's a different axis (all days for one person), mixing it with cross-person propagation would be confusing — [Crew]
 - `bulkEditOpen` / `toggleBulkEdit()` / `bulkEditPanelHTML()` / `applyBulkLeadCompany()` — bulk-edit panel opened from the bulk-action bar; currently just Lead Company, the field Phase R moved off the main Roles row — [Crew]
@@ -284,21 +284,38 @@ Preview & Export is no longer the only export surface.
   a full re-render, so the field the user is typing in doesn't lose focus (same rule
   as `renderCateringSummaryGridSection()`/`renderTransportSummaryGridSection()`) —
   [Budget]
-- `budgetDayFilter` / `budgetFilterOpen` / `toggleBudgetFilterPanel()` /
-  `toggleBudgetFilterDay()` / `clearBudgetDayFilter()` / `budgetSelectedDays()` /
-  `budgetDayFilterCount()` / `budgetFilteredDays()` / `budgetFilterPanelHTML()`
-  (Phase Refinement) — **the Budget day filter.** A Set of shoot-day ids; empty
-  means every day, so the default is exactly the project-wide budget that was
-  there before. Deliberately a filter on the data rather than a fifth view —
-  "which days am I costing" scopes all four views at once, so it sits above the
-  view switcher, not inside it. `buildBudgetData()` reads `budgetFilteredDays()`
-  in place of `projectDays()`, which is the single line that scopes crew day
-  rates, `daysWorked`, the per-day rows and the hotel room-night count together.
-  Built in the Crew tab's Filter idiom (a `crewToolbarHTML()` row whose
-  `.filter-panel` renders BELOW it, never inside it) with the same day-chip
-  markup as `projectCrewFilter`'s Days sub-section. No OR/AND mode: days are
-  being *summed*, not matched against a person, so "or" is the only meaning the
+- `budgetDayFilter` / `budgetDeptFilter` / `budgetSort` / `budgetFilterOpen` /
+  `toggleBudgetFilterPanel()` / `toggleBudgetFilterDay()` /
+  `toggleBudgetFilterDept()` / `setBudgetSort()` / `clearBudgetFilter()` /
+  `budgetSelectedDays()` / `budgetDayFilterCount()` /
+  `budgetActiveFilterCount()` / `budgetFilteredDays()` /
+  `budgetFilterPanelHTML()` (Phase Refinement; department scope + sort added
+  R16/R4) — **the Budget filter.** ONE panel carrying two scopes and a sort:
+  a Set of shoot-day ids and a Set of department names (both empty = whole
+  project, so the default is exactly the project-wide budget that was there
+  before), plus `budgetSort` for Per Person. Deliberately a filter on the data
+  rather than a fifth view — "which days/departments am I costing" scopes all
+  four views at once, so it sits above the view switcher, not inside it.
+  `buildBudgetData()` reads `budgetFilteredDays()` in place of `projectDays()`,
+  which is the single line that scopes crew day rates, `daysWorked`, the per-day
+  rows and the hotel room-night count together; the department scope is applied
+  to the people list in that same function, so the summary bar and all four
+  views can't disagree about what's being costed. Built in the Crew tab's Filter
+  idiom (a `crewToolbarHTML()` row whose `.filter-panel` renders BELOW it, never
+  inside it) with the same day-chip markup as `projectCrewFilter`'s Days
+  sub-section, and it ends with the shared `filterPanelFootHTML()` row — see
+  **The filter-panel foot** below. No OR/AND mode on days: they're being
+  *summed*, not matched against a person, so "or" is the only meaning the
   selection can carry — [Budget]
+  - ⚠️ `clearBudgetFilter()` clears **both** scopes (days and departments). It
+    was called `clearBudgetDayFilter()` while it did only days; R16 grew it to
+    cover departments but left the name, and a second day-only definition of
+    that name sat above it as dead code (the later one silently won). Renamed
+    and the dead one deleted — do not look for `clearBudgetDayFilter` — [Budget]
+  - `budgetActiveFilterCount()` = live days + departments. Counts **filters
+    only** — `budgetSort` is not in it, because choosing a sort narrows nothing
+    and so must not make the panel look filtered. It's what gates the panel's
+    "Clear filters" link — [Budget]
   - Ticked ids are re-checked against the project's current days on every read
     (`budgetSelectedDays()`), so a deleted shoot day — or switching project,
     since this state is global like `crewGridView`/`budgetView` — can't leave the
@@ -439,7 +456,8 @@ Preview & Export is no longer the only export surface.
 - `addSubDeptAdmin()` / `renameSubDeptAdmin()` / `removeSubDeptAdmin()` — add, rename (updates any crew already on it) and remove (clears it off any crew) a sub-department from the admin panel — [Crew]
 - `toggleHoD()` — toggles a crew member's `isHoD` flag (Head of Department), used to pin them to the top of their department's roster in the admin panel and, via `crewRolesRowHTML`/roster sorts, elsewhere — [Crew]
 - `crewDbFilter` / `crewDbFilterOpen` / `crewSearchQuery` — Crew database's filter-panel state (same shape as `projectCrewFilter`, no group-by since there's no hotel context) and the free-text search, kept outside the DOM so re-renders don't clear the search box — [Crew]
-- `personMatchesCrewDbFilter()` / `sortCrewDbGroup()` / `toggleCrewDbFilterPanel()` / `toggleCrewDbFilterDept()` / `toggleCrewDbFilterRole()` / `setCrewDbFilterField()` / `toggleCrewDbFilterFlag()` / `clearCrewDbFilter()` / `crewDbActiveFilterCount()` / `crewDbFilterPanelHTML()` — Crew database's filter panel (multiselect departments, lead company, roles, exclude-Talent/exclude-other-companies, sort) — [Crew]
+- `personMatchesCrewDbFilter()` / `sortCrewDbGroup()` / `toggleCrewDbFilterPanel()` / `toggleCrewDbFilterDept()` / `toggleCrewDbFilterRole()` / `setCrewDbFilterField()` / `toggleCrewDbFilterFlag()` / `clearCrewDbFilter()` / `crewDbActiveFilterCount()` / `crewDbFilterPanelHTML()` — Crew database's filter panel (multiselect departments, lead company, roles, exclude-Talent/exclude-other-companies, sort). Its trailing row is the shared `filterPanelFootHTML()` — see **The filter-panel foot** — and `crewDbActiveFilterCount()` is what gates that row's "Clear filters" link — [Crew]
+- `filterPanelFootHTML()` — **the one trailing row every filter panel ends with**, shared by Crew database (D-1.2), Crew on this project (T-2.6) and Budget (T-6.0). Renders `.filter-panel-foot`: the panel's own exclusion checkboxes, a hint describing the current scope, and a "Clear filters" link **shown only when a filter is actually narrowing what you're looking at**. Only the markup and that visibility rule are shared — each panel passes its own active-filter signal and its own clear action. See **The filter-panel foot** for the full rule and why it isn't more shared than that — [Shared/utility functions, Crew, Budget]
 
 ## Server-side: Supabase Edge Functions (Phase AI Scan)
 
@@ -514,7 +532,7 @@ coarse information first, finest detail last.
 | T-2.3 | · Hotel | Person × night matrix, incl. the night before Day 1, with a collapsible hotel summary (room-booking table, per-night table — Phase O) below it | `hotelSummaryHTML()` / `toggleHotelNight()` / `toggleHotelPre()` |
 | T-2.4 | · Travel | One travel method per person per project, with a collapsible transport summary (cost fields + per-day method-count grid with a Daily cost row, derived by crossing travel method against days-on-site — Phase W) below it | `crewTravelRowHTML()` / `transportSummaryHTML()` |
 | T-2.5 | · Catering | Breakfast / Lunch / Dinner per person per day, with a collapsible catering summary (cost fields + Breakfast/Lunch/Dinner-by-day grid with a Daily cost row — Phase P2) below it | `crewCateringBlockHTML()` / `cateringSummaryHTML()` |
-| T-2.6 | · Filter panel | Departments, roles, lead company, days (OR/AND), exclusions, sort, group-by | `projectCrewFilterPanelHTML()` |
+| T-2.6 | · Filter panel | Departments, roles, lead company, days (OR/AND), exclusions, sort, group-by. Foot row shared with T-6.0/D-1.2 — see **The filter-panel foot** | `projectCrewFilterPanelHTML()` / `filterPanelFootHTML()` |
 | T-2.7 | · Bulk select & actions | Select all (filtered), bulk remove, bulk edit lead company | `bulkActionBarHTML()` / `bulkEditPanelHTML()` |
 | T-2.8 | · Add from crew database | Department-grouped picker | `addCrewToProject()` |
 | **T-3** | **Locations** | Where the project shoots | `renderProjectLocations()` |
@@ -534,7 +552,7 @@ coarse information first, finest detail last.
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
-| T-6.0 | · Filter & output | Phase Refinement/R16 — tick shoot days and/or departments to cost part of the shoot, plus the Per Person sort (R4) and the Copy/Export controls (R1). Scopes all four views at once, so it sits above the switcher, not in it. Nothing ticked = whole project | `budgetFilterPanelHTML()` / `copyBudget()` |
+| T-6.0 | · Filter & output | Phase Refinement/R16 — tick shoot days and/or departments to cost part of the shoot, plus the Per Person sort (R4) and the Copy/Export controls (R1). Scopes all four views at once, so it sits above the switcher, not in it. Nothing ticked = whole project. Foot row shared with T-2.6/D-1.2 — see **The filter-panel foot** | `budgetFilterPanelHTML()` / `filterPanelFootHTML()` / `copyBudget()` |
 | T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
 | T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
 | T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override) with its Save-to-database icon (Phase AG), VAT checkbox (Phase AH), Days worked, Subtotal | `budgetPersonViewHTML()` |
@@ -556,7 +574,7 @@ coarse information first, finest detail last.
 |---|---|---|---|
 | **D-1** | **Crew database** | Every crew member, searchable, grouped by department | `renderCrewDatabase()` |
 | D-1.1 | · Departments & sub-departments | Admin panel: structure + Heads of Department | `renderDeptAdminPanel()` |
-| D-1.2 | · Filter panel | Departments, roles, lead company, exclusions, sort | `crewDbFilterPanelHTML()` |
+| D-1.2 | · Filter panel | Departments, roles, lead company, exclusions, sort. Foot row shared with T-2.6/T-6.0 — see **The filter-panel foot** | `crewDbFilterPanelHTML()` / `filterPanelFootHTML()` |
 | D-1.3 | · Crew record form | Basics / Camera & equipment / Logistics & sizing / About & extras / Private | `crewFormHTML()` |
 | D-1.4 | · Crew read-only view | Everything on file, one table | `crewViewHTML()` |
 | D-1.5 | · Add saved role dialog | Pick or create a role for a person | `addRoleDialogHTML()` |
@@ -776,7 +794,9 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   (**R16**) — a department scope, living in the SAME panel as the day filter rather
   than becoming a per-view control. Applied to the people list inside
   `buildBudgetData()`, so the summary bar, Per Department, Per Day and Per Person
-  can't disagree about what's being costed. `clearBudgetDayFilter()` clears both.
+  can't disagree about what's being costed. `clearBudgetFilter()` clears both
+  (renamed from `clearBudgetDayFilter()` once it stopped being day-only — see the
+  Budget section).
   **Verified**: filtering to Cinematography produces £26,400, exactly the figure that
   department's row shows in the unfiltered Per Department view — [Budget]
 - `budgetSort` / `setBudgetSort()` / `budgetOrderedPeople()` (**R4**) — Per Person is
@@ -1017,9 +1037,12 @@ rendering in the browser's default serif — Budget's Costs tab (Catering / Trav
 (`.card h3` and `.subhead` are deliberately identical — see the Label family).
 ⚠️ If a new sub-heading is needed, use one of those two. Don't reach for `h4`.
 
-**`.filter-panel-foot`** — the trailing checkbox/"Clear filters" row at the
+**`.filter-panel-foot`** — the trailing checkbox/hint/"Clear filters" row at the
 bottom of a filter panel. Was inline on the Crew panel's closing `div`; Budget's
-day filter needed the same row, so it's a class.
+day filter needed the same row, so it's a class. All three panels now build it
+through `filterPanelFootHTML()` — see **The filter-panel foot** below.
+`.filter-clear` is the link itself (was the same inline
+`cursor:pointer;color:var(--tape)` repeated on each panel).
 
 **Vestigial ids removed.** Overview Tasks and AI Scan copied the
 `${prefix}c-`/`${prefix}b-` id convention from the `applyBlockState` blocks
@@ -1027,6 +1050,60 @@ without the mechanism that reads them — both toggles call `renderProjectBody()
 instead. `tasks-block`, `tasksb-block` and `aisc-block` were looked up by
 nothing and are gone. The summary blocks' `hsmc-`/`csmc-`/`tsmc-` ids are **not**
 vestigial — those really do go through `applyBlockState()`.
+
+## The filter-panel foot
+
+This app has three filter panels — Crew database (**D-1.2**), Crew on this
+project (**T-2.6**) and Budget (**T-6.0**) — and they are differently shaped:
+different filter fields, different state objects, different clear functions, one
+of them (Budget) with no exclusion checkboxes at all. What they share is the row
+at the bottom, and one rule about it.
+
+**The rule: a "Clear filters" link showing means a filter is currently narrowing
+what you're looking at.** If nothing is filtered there is nothing to clear, and
+a permanently-present link reads as a live control on a list nothing is doing
+anything to.
+
+Budget already worked this way (its link was gated on there being a live
+day/department scope). The two Crew panels showed it unconditionally. Rather
+than leave one panel right and two wrong — or write the gate a third time —
+`filterPanelFootHTML()` now builds the row for all three, and the gating is the
+shared behaviour rather than one panel's local detail.
+
+```
+filterPanelFootHTML({controls, hint, active, onClear})
+  controls — the panel's own checkbox <label>s, already-built HTML ('' if none)
+  hint     — one line of already-escaped text describing the current scope
+  active   — truthy when a filter is live; the ONLY thing gating the link
+  onClear  — the panel's own clear call, as an onclick string
+```
+
+⚠️ **What is deliberately NOT shared.** Only the markup and the visibility rule
+live in the shared function. Each panel keeps supplying:
+
+- **its own "is a filter active" signal** — `crewDbActiveFilterCount()`,
+  `projectCrewActiveFilterCount()`, `budgetActiveFilterCount()`. All three
+  already existed (they also drive the `Filter (N)` toggle label), so this
+  reuses them rather than adding a fourth idea of "active". They deliberately
+  count **filters only** — a Sort or Group by choice narrows nothing, so it must
+  never light the link up. Verified: setting Sort/Group by alone on any of the
+  three leaves the link hidden.
+- **its own clear action** — `clearCrewDbFilter()`, `clearProjectCrewFilter()`,
+  `clearBudgetFilter()`. Clearing means resetting *that panel's* state object,
+  and each also re-renders through a different path (`refreshCrewDatabase()` vs
+  `renderProjectBody()`). Folding these together would mean the shared component
+  knowing about all three screens. Don't.
+
+Styling: `.filter-panel-foot` for the row, `.filter-clear` for the link. Crew
+database used to hand-roll the row with an inline `display:flex;gap:14px…`
+instead of the class — that's gone; all three now sit on the same class and so
+can't drift apart again.
+
+**Behaviour change, intentional.** The two Crew panels' "Clear filters" links
+used to always show and now don't. Budget is unchanged (`budgetActiveFilterCount()>0`
+is exactly the `scope.length` it already gated on). If a future panel wants the
+link always present, it wants a different rule — argue for it rather than
+passing `active:true`.
 
 ## The design system, as decided (Phase Detail)
 
