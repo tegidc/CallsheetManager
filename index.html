@@ -562,12 +562,18 @@
   .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -2px;}
   .tablewrap table{min-width:520px;}
 
-  /* Budget summary bar (Phase Budget) — glanceable stat figures, same visual
-     language as the display headings (Fraunces headline number + Oswald label)
-     used everywhere else, without needing a .card wrapper. */
+  /* Budget summary bar (Phase Budget) — glanceable stat figures, without needing a
+     .card wrapper.
+     ⚠️ Phase AN: the figure itself is Oswald, not Fraunces — a deliberate exception
+     to Phase Fonts' "every Oswald label is 11px" rule. Fraunces' serif numerals read
+     badly at a glance; Oswald's are built for this. Sized up to 26px (from 22px) and
+     given light tracking (0.4px, well under the 1.2px label tracking — enough to
+     open the digits up at this weight without spacing them out like a caption) since
+     Oswald's condensed forms otherwise read lighter than Fraunces bold did at the
+     same pixel size. The .lbl caption below it is unchanged Oswald 11px/1.2px. */
   .budget-summary{display:flex; gap:28px; flex-wrap:wrap; align-items:flex-end;
     margin:14px 0 18px; padding-bottom:14px; border-bottom:1px solid var(--line);}
-  .budget-stat .num{font-family:var(--disp); font-weight:700; font-size:22px; color:var(--text);}
+  .budget-stat .num{font-family:var(--label); font-weight:700; font-size:26px; letter-spacing:.4px; color:var(--text);}
   .budget-stat .lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape); margin-top:2px;}
   .budget-vat-toggle{margin-left:auto; align-self:center;}
@@ -5344,6 +5350,13 @@ function toggleBudgetDayBlock(dayId){ toggleBlock(budgetDayBlocks, 'bd', dayId);
 function setAllBudgetDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(budgetDayBlocks, 'bd', collapsed); }
 function toggleAllBudgetDayBlocks(){ setAllBudgetDayBlocksCollapsed(!allBlocksCollapsed(budgetDayBlocks)); }
 
+/* AN — the one money formatter for every Budget figure: the summary bar, all
+   four views (Department/Person/Day/Costs) and the Copy/Excel export. Formatting
+   only — thousands-separated, still 2dp — never touches the number itself, so
+   nothing here can put a view, the export or a filtered subtotal out of step with
+   another; that arithmetic is buildBudgetData()/budgetPersonDisplay()'s job alone. */
+function budgetFmt(n){ return '£'+(n||0).toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
 /* A person's DISPLAYED cost, respecting the VAT toggle: the plain ex-VAT
    subtotal when itemized (VAT is shown as its own line in the summary bar
    instead), or subtotal+VAT baked silently in when not. Extras (catering/
@@ -5578,7 +5591,7 @@ function buildBudgetData(){
 }
 
 function budgetSummaryBarHTML(data){
-  const fmt = n => '£'+(n||0).toFixed(2);
+  const fmt = budgetFmt;
   const stats = budgetVatToggle
     ? [['Total (ex-VAT)', data.totalExVat], ['VAT', data.vatTotal], ['Total (inc-VAT)', data.totalIncVat]]
     : [['Total', data.totalIncVat]];
@@ -5594,7 +5607,7 @@ function budgetSummaryBarHTML(data){
    labelled block, never folded into a department — a catering or travel bill
    isn't any one department's cost. */
 function budgetDeptExtrasTableHTML(departments, catering, travel, hotel, total, extrasLabel, location){
-  const fmt = n => '£'+(n||0).toFixed(2);
+  const fmt = budgetFmt;
   if(!departments.length && !catering && !travel && !hotel && !location){
     return '<div class="empty-note">Nothing to cost yet.</div>';
   }
@@ -5620,7 +5633,7 @@ function budgetDepartmentViewHTML(data){
 
 function budgetPersonViewHTML(data){
   if(!data.hasCrew) return '<div class="empty-note">No crew assigned to this project yet.</div>';
-  const fmt = n => '£'+(n||0).toFixed(2);
+  const fmt = budgetFmt;
   // Same order as everywhere else crew is listed without an explicit sort
   // control: canonical department order, HoD-first within it (sortHoDFirst).
   // There's no existing sortable-table (click-a-column-header) pattern
@@ -5646,7 +5659,7 @@ function budgetPersonViewHTML(data){
 function budgetDayViewHTML(data){
   if(!data.hasDays) return '<div class="empty-note">Add shoot days first, then assign crew positions to cost them out here.</div>';
   syncBudgetDayBlocks(data.perDay.map(d=>d.dayId));
-  const fmt = n => '£'+(n||0).toFixed(2);
+  const fmt = budgetFmt;
   const toggleRow = data.perDay.length>1 ? expandCollapseAllHTML('toggleAllBudgetDayBlocks()', undefined, allBlocksCollapsed(budgetDayBlocks), 'bd') : '';
   const rows = data.perDay.map(d=>{
     const open = budgetDayBlocks[d.dayId];
@@ -5755,7 +5768,7 @@ function budgetOrderedPeople(data){
    filter, because a budget you send while filtered should say so rather than quietly
    exporting the whole project. Rows mirror the visible view, not a fixed shape. */
 function budgetExportRows(data){
-  const fmt = n => '£'+(n||0).toFixed(2);
+  const fmt = budgetFmt;
   const rows = [];
   const scope = [];
   const allDays = projectDays();

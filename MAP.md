@@ -367,7 +367,17 @@ Preview & Export is no longer the only export surface.
   shows as £0.00 rather than vanishing, which is the whole point of a cost-visibility
   screen — [Budget]
 - `budgetSummaryBarHTML()` — the three-line/one-line summary bar, driven by
-  `budgetVatToggle` — [Budget]
+  `budgetVatToggle`. Its `.num` figures are Oswald (Phase AN), not Fraunces — a
+  deliberate exception to Phase Fonts' "every Oswald label is 11px" rule; see
+  `.budget-stat .num` below — [Budget]
+- `budgetFmt()` (Phase AN) — the one money formatter for every Budget figure: the
+  summary bar, all four views and the Copy/Excel export (`budgetExportRows()`).
+  Adds thousands separators (`toLocaleString('en-GB', …)`), still 2dp — formatting
+  only, never the number itself, so it can't put a view, the export or a filtered
+  subtotal out of step with another. The five local `fmt` consts across
+  `budgetSummaryBarHTML()`/`budgetDeptExtrasTableHTML()`/`budgetPersonViewHTML()`/
+  `budgetDayViewHTML()`/`budgetExportRows()` now alias it rather than each
+  redefining `n => '£'+(n||0).toFixed(2)` — [Budget]
 - `budgetDeptExtrasTableHTML()` — the department-rows + Catering/Travel/Hotels
   extras + Total table, shared verbatim by the project-wide Per Department view and
   each Per Day row's own expanded breakdown ("same structure … just scoped to that
@@ -1207,6 +1217,15 @@ everything else. **Every Oswald label is 11px / 1.2px tracking** — one size, o
 tracking, no exceptions. Case is *not* forced: uppercasing field labels made them
 ~40% wider and wrapped them out of the label column, so `label`, `.pill` and
 `.posn-dept-badge` keep their natural case.
+
+⚠️ **Exception (Phase AN): `.budget-stat .num`, the Budget summary bar's three
+totals, is Oswald 700 26px/0.4px tracking**, not a label at 11px. It was Fraunces
+before Phase AN too — this isn't "every Oswald use is 11px" being broken, it's the
+figure moving font entirely: Fraunces' serif numerals read badly at a glance, and
+Oswald's are built for it. Sized up rather than kept at 22px because Oswald's
+condensed forms read lighter than Fraunces bold did at the same pixel size; tracking
+opened slightly (well under the 1.2px label tracking) for the same reason. The `.lbl`
+caption underneath each figure is unchanged Oswald 11px/1.2px.
 
 **Header controls are Jost, not Oswald.** Select all, Filter, Expand/Collapse all,
 Summary and the row-level All are things you click, not captions — `--fs-meta`,
