@@ -338,13 +338,68 @@ Preview & Export is no longer the only export surface.
   internal naming — [Budget]
 - `budgetVatToggle` / `toggleBudgetVat()` — itemized (every figure ex-VAT, VAT broken
   out as its own line in the summary bar) vs baked in (VAT folded silently into every
-  figure everywhere, one Total). Extras (catering/travel/hotel) never carry VAT in
-  either state — only a crew member's own rate does, gated on `c.vatRegistered` —
-  [Budget]
+  figure everywhere, one Total). VAT is a property of the PERSON, never of a cost
+  type: it attaches only where `c.vatRegistered` says so. Since **Phase AO** that
+  covers a person's day rate AND their travel — see **VAT follows the person** below,
+  which also records why Catering/Hotel/Locations are deliberately left out — [Budget]
 - `budgetPersonDisplay()` — the one function that applies the VAT toggle to a
   person's cost; every rollup (department, day, person-view Subtotal) is built by
   summing this, not the raw subtotal, so the toggle can never go stale in one view
-  and not another — [Budget]
+  and not another. The `vat` handed to it is whatever `buildBudgetData()` attributed
+  to that PERSON (day rate + travel since AO) — [Budget]
+
+### VAT follows the person (Phase AO)
+
+**The model, from the user — do not re-derive it.** VAT is a property of the PERSON,
+not of a cost type. If a crew member is VAT-registered, everything they invoice
+carries VAT. `c.vatRegistered` is the correct and only mechanism; there is no
+per-category or per-cost-field VAT flag anywhere and one must not be added.
+
+- **Travel inherits it.** Travel is charged back through the crew member, so a
+  VAT-registered person's travel attracts VAT too. `buildBudgetData()`'s
+  `travelRateFor(id)` resolves the existing per-person attribution
+  (`p.travelMethods[crewId]`, the same one `buildTransportSummary()` uses) down to a
+  per-person figure rather than inventing a second one: only `'Own car'` (the
+  mileage rate) and `'Public transport'` (the flat per-day rate) carry a cost, both
+  landing on each day the person is on site, so **per-person travel = that rate ×
+  `daysWorked`**. Summed over everyone this gives back exactly the `travelTotal` the
+  Travel extras row shows — verified on ROW 2026: £1,660 either way.
+  - The person's `vat` is therefore `(subtotal + travelCost) * VAT_RATE`. `travelCost`
+    is deliberately **not** added to their `subtotal`/`display` — it is already
+    counted once in the Travel extras row, and adding it here would double it. So
+    travel appears ex-VAT in the Travel row and its VAT in the person's (and hence
+    their department's) figures. That split is what keeps every view reconciling.
+- ⚠️ **Catering, Hotel and Locations are DELIBERATELY excluded — this is not an
+  oversight, do not "fix" it.** They are paid direct to a supplier (caterer, hotel,
+  location owner), never invoiced back through a crew member, so there is no person
+  whose `vatRegistered` status could attach to them. Travel is the sole exception
+  precisely because it *is* charged back through the crew member. Their rows show
+  £0.00 in the itemized VAT column on purpose.
+- **Per Department gained a real VAT breakdown.** With Itemize VAT on, every
+  department row shows ex-VAT / VAT / inc-VAT summed from the actual mix of
+  registered and unregistered people in it — explicitly **not** a flat 20% of the
+  department total. Verified on ROW 2026: Cinematography, 3 of 7 registered, shows
+  £26,400.00 / £2,965.00 / £29,365.00 — VAT is 11.2% of the department, not 20%; a
+  department with nobody registered (Grip, £3,900.00) shows £0.00 VAT. A department's
+  VAT is not 20% of its own ex-VAT column either, because it also covers its people's
+  travel, which is itemised ex-VAT in the Travel row — the table carries a `hint`
+  saying so rather than leaving it to be rediscovered.
+- **The reconciliation is the whole point** and is why all of this lives in
+  `buildBudgetData()` alone, never per view. Verified numerically on ROW 2026 (6 days,
+  66 crew, 5 registered): Per Department's VAT column, Per Person's VAT figures and
+  Per Day summed all equal the summary bar's £3,517.00, and still do under a day
+  filter (Day 1 alone: £432.00), a department filter (Cinematography: £2,965.00), both
+  together (£865.00), with VAT baked in, and with each of the six days costed alone
+  and re-summed (£51,290.00 / £3,517.00 / £54,807.00). The Copy/.xlsx export was
+  compared cell-for-cell against the rendered DOM in all three views — identical.
+- ⚠️ **Known, pre-existing, left alone:** the department filter narrows the *people*
+  but not the *extras* rows (they are the Catering/Travel tabs' own project-wide
+  summaries). So under a department filter the Travel row still reads project-wide
+  (£1,660.00) while the VAT attributed covers only the in-scope people's travel
+  (£700.00 of it). Every view still agrees with every other — the invariants above all
+  hold — but the Travel line and the VAT beside it are answering slightly different
+  questions. Scoping extras by department is a separate decision, not this phase's —
+  [Budget]
 - `budgetDayBlocks` / `syncBudgetDayBlocks()` / `toggleBudgetDayBlock()` /
   `setAllBudgetDayBlocksCollapsed()` / `toggleAllBudgetDayBlocks()` — Per Day's
   collapsible rows, same shared plumbing (`toggleBlock`/`setAllBlocksCollapsed`/
@@ -365,7 +420,10 @@ Preview & Export is no longer the only export surface.
   project-wide and per-day) are filtered by **presence** (someone's actually in that
   department), not by a truthy total — a department with people but no rate set
   shows as £0.00 rather than vanishing, which is the whole point of a cost-visibility
-  screen — [Budget]
+  screen. Phase AO added `travelRateFor()`/per-person `travelRate`/`travelCost`, the
+  per-department `exVat`/`vat`/`incVat` fields, and the same three on each `perDay`
+  row — all of it here, in the one aggregator, so no view computes VAT for itself; see
+  **VAT follows the person** above — [Budget]
 - `budgetSummaryBarHTML()` — the three-line/one-line summary bar, driven by
   `budgetVatToggle`. Its `.num` figures are Oswald (Phase AN), not Fraunces — a
   deliberate exception to Phase Fonts' "every Oswald label is 11px" rule; see
@@ -382,6 +440,15 @@ Preview & Export is no longer the only export surface.
   extras + Total table, shared verbatim by the project-wide Per Department view and
   each Per Day row's own expanded breakdown ("same structure … just scoped to that
   single day" per the brief) — [Budget]
+  - ⚠️ Phase AO changed it from **seven positional args to ONE options object**
+    (`{departments, catering, travel, hotel, location, extrasLabel, total, exVat, vat,
+    incVat}`) — the itemized breakdown needed three more figures and ten positional
+    args across two call sites is a bug waiting to happen. Do not look for the old
+    `(departments, catering, travel, hotel, total, extrasLabel, location)` signature;
+    both call sites (`budgetDepartmentViewHTML()`, `budgetDayViewHTML()`) were
+    converted. It now renders two shapes off `budgetVatToggle`: the original
+    Department/Cost pair when VAT is baked in, and Department/Ex-VAT/VAT/Inc-VAT when
+    itemized — [Budget]
 - `budgetDepartmentViewHTML()` / `budgetPersonViewHTML()` / `budgetDayViewHTML()` —
   the three rollup views (Costs, the fourth tab, is `budgetCostsViewHTML()` above —
   it's not a rollup, so it lives with the cost-input machinery instead). Per Person's
@@ -394,7 +461,12 @@ Preview & Export is no longer the only export surface.
   Rate column (Phase Z). Both Day rate fields now sit inside a `.rate-with-save` wrap
   next to their `crewRateSaveIconHTML()` Save icon (Phase AG); Per Person also gained
   a VAT checkbox column between Day rate and Days (Phase AH,
-  `toggleBudgetVatRegistered()`) — [Budget, Crew]
+  `toggleBudgetVatRegistered()`) — relabelled "VAT reg." in Phase AO, which added a
+  second, **amount** column headed "VAT" that appears only while Itemize VAT is on.
+  That column had to exist once travel started carrying VAT: a registered person's VAT
+  is no longer simply 20% of the Subtotal sitting beside it, and the cell's `title`
+  spells out how much of it is travel. Per Department is the view AO extended Itemize
+  VAT into (see **VAT follows the person** above) — [Budget, Crew]
 
 ## Preview & Export
 
@@ -821,7 +893,12 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   screen renders from, and honouring the active filter (a budget sent while filtered
   should say so — the export leads with a "Filtered to" line rather than quietly
   emitting the whole project). Rows mirror the visible view. Hidden on the Costs tab,
-  which is inputs rather than figures — [Budget]
+  which is inputs rather than figures. Since Phase AO each view has **two** row
+  shapes, switched on `budgetVatToggle` exactly as the screen does — Per Department
+  and Per Day gain Ex-VAT/VAT/Inc-VAT columns and Per Person a VAT amount when
+  itemized — so the export still mirrors what's on screen rather than a second
+  rendering of the same data; verified cell-for-cell against the rendered DOM in all
+  three views — [Budget]
 - `budgetCostBlocks` / `toggleBudgetCostBlock()` / `toggleAllBudgetCostBlocks()`
   (**R16**) — the Costs tab's three groups collapse, on the shared
   `toggleBlock`/`applyBlockState` plumbing (prefix `bc`) rather than a fourth

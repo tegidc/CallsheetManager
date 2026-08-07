@@ -5359,9 +5359,10 @@ function budgetFmt(n){ return '£'+(n||0).toLocaleString('en-GB', {minimumFracti
 
 /* A person's DISPLAYED cost, respecting the VAT toggle: the plain ex-VAT
    subtotal when itemized (VAT is shown as its own line in the summary bar
-   instead), or subtotal+VAT baked silently in when not. Extras (catering/
-   travel/hotel) never carry VAT in either state — only a crew member's own
-   rate does, per c.vatRegistered. */
+   instead), or subtotal+VAT baked silently in when not. The `vat` handed in is
+   whatever buildBudgetData attributed to that PERSON — since AO that's their day
+   rate AND their travel, per c.vatRegistered. Catering/hotel/location extras carry
+   no VAT in either state: they're supplier-paid, so no person's status attaches. */
 function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle ? 0 : vat); }
 
 /* AH: Budget Per Person's VAT checkbox — the editable front-end for the same
@@ -5473,6 +5474,26 @@ function buildBudgetData(){
   const crew = projectCrew(p);
   const hotelCosts = getHotelCosts(p);
 
+  /* AO — VAT follows the PERSON, so a VAT-registered crew member's TRAVEL carries
+     VAT too: travel is charged back through them, not paid direct to a supplier.
+     This resolves buildTransportSummary()'s per-day arithmetic down to the one
+     per-person figure it's already built from, rather than inventing a second
+     attribution: a method is stored once per person per project (p.travelMethods),
+     only 'Own car' (mileage) and 'Public transport' (flat day rate) carry a cost, and
+     that cost lands on each day the person is actually on site — the same
+     `daysWorked` signal below. So per-person travel = rate-for-their-method ×
+     daysWorked, and summing that over everyone gives back exactly the travelTotal
+     the Travel extras row shows.
+     ⚠️ Catering and Hotel are DELIBERATELY excluded — see the note on hotelTotal. */
+  const travelCosts = getTransportCosts(p);
+  const travelMethods = p.travelMethods || {};
+  const travelRateFor = id => {
+    const m = travelMethods[id];
+    if(m==='Own car') return travelCosts.mileage;
+    if(m==='Public transport') return travelCosts.publicPerDay;
+    return 0;   // Train / Flying / Production transport / custom: counted, never costed
+  };
+
   // R16 — department scope. Applied to the people list itself, so the summary bar,
   // Per Department, Per Day and Per Person can't disagree about what's being costed.
   const crewInScope = budgetDeptFilter.size
@@ -5482,11 +5503,16 @@ function buildBudgetData(){
     const {rate, hasRate, isOverride} = resolveCrewRate(c, p);
     const daysWorked = days.filter(d=>(d.positions||[]).some(pos=>pos[0]===c.id)).length;
     const subtotal = rate * daysWorked;
+    const travelRate = travelRateFor(c.id);
+    const travelCost = travelRate * daysWorked;
     const vatRegistered = c.vatRegistered==='Yes';
-    const vat = vatRegistered ? subtotal * VAT_RATE : 0;
+    // AO — the VAT base is day rate AND travel, both invoiced by this person.
+    // travelCost itself is NOT added to `subtotal`/`display`: it's already counted
+    // once in the Travel extras row, and counting it here too would double it.
+    const vat = vatRegistered ? (subtotal + travelCost) * VAT_RATE : 0;
     return {
       id:c.id, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
-      rate, hasRate, isOverride, daysWorked, subtotal, vatRegistered, vat,
+      rate, hasRate, isOverride, daysWorked, subtotal, travelRate, travelCost, vatRegistered, vat,
       display: budgetPersonDisplay(subtotal, vat)
     };
   });
@@ -5494,13 +5520,23 @@ function buildBudgetData(){
   // Filtered by PRESENCE (deptCounts), not by a truthy total — a department
   // with people assigned but no rate set should show as £0.00, not vanish, or
   // a whole department missing its rates would go unnoticed on a cost screen.
-  const deptTotals = {}, deptCounts = {};
+  /* AO — each department also carries a REAL VAT breakdown, summed from the actual
+     mix of registered and unregistered people in it, never a flat 20% of the
+     department total: a department with one registered person out of six shows only
+     that one person's VAT. exVat is the department's own crew cost; vat is all VAT
+     its people charge (day rate + their travel — see travelRateFor above), which is
+     why vat is NOT 20% of exVat for anyone with travel. Summed across departments
+     these give back exactly crewTotalExVat / vatTotal. */
+  const deptTotals = {}, deptCounts = {}, deptExVat = {}, deptVat = {};
   people.forEach(pp=>{
     deptTotals[pp.department] = (deptTotals[pp.department]||0) + pp.display;
     deptCounts[pp.department] = (deptCounts[pp.department]||0) + 1;
+    deptExVat[pp.department] = (deptExVat[pp.department]||0) + pp.subtotal;
+    deptVat[pp.department]   = (deptVat[pp.department]||0) + pp.vat;
   });
   const departments = DEPARTMENTS.filter(d=>deptCounts[d]).map(d=>
-    ({dept:d, code:DEPARTMENT_CODES[d]||'', total:deptTotals[d]||0}));
+    ({dept:d, code:DEPARTMENT_CODES[d]||'', total:deptTotals[d]||0,
+      exVat:deptExVat[d]||0, vat:deptVat[d]||0, incVat:(deptExVat[d]||0)+(deptVat[d]||0)}));
 
   /* R2 — location fees. A fee is entered once on the location record, then spread
      evenly across the shoot days that location is actually used on, so Per Day and
@@ -5548,6 +5584,12 @@ function buildBudgetData(){
   const dayHotelRooms = days.map(d=>(d.hotelNights||[]).length);
   const hotelTotal = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
 
+  /* ⚠️ AO — Catering, Hotel and Locations carry NO per-person VAT, and that is
+     DELIBERATE, not an oversight: they are paid direct to a supplier (caterer,
+     hotel, location owner), not invoiced back through a crew member, so there is no
+     person whose vatRegistered status could attach to them. Travel is the exception
+     precisely because it IS charged back through the crew member. Do not "fix" this
+     by adding VAT to them. */
   const crewTotalExVat = people.reduce((s,pp)=>s+pp.subtotal, 0);
   const vatTotal = people.reduce((s,pp)=>s+pp.vat, 0);
   const extrasTotal = cateringTotal + travelTotal + hotelTotal + locationTotal;
@@ -5557,14 +5599,20 @@ function buildBudgetData(){
   const perDay = days.map((d,i)=>{
     const onDayIds = new Set((d.positions||[]).map(pos=>pos[0]));
     const dayPeople = people.filter(pp=>onDayIds.has(pp.id));
-    const dayDeptTotals = {}, dayDeptCounts = {};
+    const dayDeptTotals = {}, dayDeptCounts = {}, dayDeptExVat = {}, dayDeptVat = {};
     dayPeople.forEach(pp=>{
-      const dayVat = pp.vatRegistered ? pp.rate*VAT_RATE : 0;
+      // AO — one day's share of this person's VAT base: their day rate plus that
+      // day's travel (travelRate is per on-site day by construction). Summed over
+      // every day they work this gives back pp.vat exactly.
+      const dayVat = pp.vatRegistered ? (pp.rate + pp.travelRate)*VAT_RATE : 0;
       dayDeptTotals[pp.department] = (dayDeptTotals[pp.department]||0) + budgetPersonDisplay(pp.rate, dayVat);
       dayDeptCounts[pp.department] = (dayDeptCounts[pp.department]||0) + 1;
+      dayDeptExVat[pp.department] = (dayDeptExVat[pp.department]||0) + pp.rate;
+      dayDeptVat[pp.department]   = (dayDeptVat[pp.department]||0) + dayVat;
     });
     const dayDepartments = DEPARTMENTS.filter(dd=>dayDeptCounts[dd]).map(dd=>
-      ({dept:dd, code:DEPARTMENT_CODES[dd]||'', total:dayDeptTotals[dd]||0}));
+      ({dept:dd, code:DEPARTMENT_CODES[dd]||'', total:dayDeptTotals[dd]||0,
+        exVat:dayDeptExVat[dd]||0, vat:dayDeptVat[dd]||0, incVat:(dayDeptExVat[dd]||0)+(dayDeptVat[dd]||0)}));
     const cateringCol = cateringGrid ? cateringGrid.cols.find(c=>c.dayNum===d.dayNum) : null;
     const travelCol = transportSummary ? transportSummary.cols.find(c=>c.dayNum===d.dayNum) : null;
     const dayCatering = cateringCol ? cateringCol.dailyCost : 0;
@@ -5575,10 +5623,16 @@ function buildBudgetData(){
     const dayLocation = locationFeeForDays([d]);
     const crewDisplay = dayDepartments.reduce((s,dd)=>s+dd.total, 0);
     const loc = d.locationId ? locById(d.locationId) : null;
+    // AO — the day's own ex-VAT / VAT / inc-VAT, same shape as the project-wide
+    // figures so Per Day's expanded table can use the identical itemized columns.
+    const dayExVat = dayDepartments.reduce((s,dd)=>s+dd.exVat, 0)
+                     + dayCatering + dayTravel + dayHotel + dayLocation;
+    const dayVatTotal = dayDepartments.reduce((s,dd)=>s+dd.vat, 0);
     return {
       dayId:d.id, dayNum:d.dayNum, locationLabel: loc ? loc.name : '',
       departments:dayDepartments, catering:dayCatering, travel:dayTravel, hotel:dayHotel,
       location:dayLocation,
+      exVat: dayExVat, vat: dayVatTotal, incVat: dayExVat + dayVatTotal,
       total: crewDisplay + dayCatering + dayTravel + dayHotel + dayLocation
     };
   });
@@ -5606,21 +5660,48 @@ function budgetSummaryBarHTML(data){
    scoped to that single day" per the brief. Extras rows are always their own
    labelled block, never folded into a department — a catering or travel bill
    isn't any one department's cost. */
-function budgetDeptExtrasTableHTML(departments, catering, travel, hotel, total, extrasLabel, location){
+/* AO — takes ONE options object rather than the seven positional args it had: the
+   itemized breakdown needs exVat/vat/incVat as well, and ten positional args at two
+   call sites is a bug waiting to happen. Shape is the same either way — the
+   project-wide caller passes the data's project totals, the Per Day caller passes
+   that day's, and both get the identical table.
+   With Itemize VAT on the department rows carry a real ex-VAT / VAT / inc-VAT
+   breakdown (see buildBudgetData) instead of one Cost column. The extras rows show
+   £0.00 VAT deliberately — catering/hotel/location are supplier-paid so no person's
+   vatRegistered attaches to them, and travel's VAT is charged by the crew member who
+   travelled, so it sits in THEIR department's row, not here. */
+function budgetDeptExtrasTableHTML(o){
   const fmt = budgetFmt;
+  const {departments, catering, travel, hotel, location, extrasLabel} = o;
   if(!departments.length && !catering && !travel && !hotel && !location){
     return '<div class="empty-note">Nothing to cost yet.</div>';
   }
+  const deptCell = d => `<td>${d.code?`<span class="dept-code">${esc(d.code)}</span> `:''}${esc(d.dept)}</td>`;
+  if(!budgetVatToggle){
+    return `<div class="tablewrap"><table>
+      <tr><th>Department</th><th>Cost</th></tr>
+      ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.total)}</td></tr>`).join('')}
+      <tr class="budget-extras-row"><td colspan="2"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
+      <tr><td>Catering</td><td>${fmt(catering)}</td></tr>
+      <tr><td>Travel</td><td>${fmt(travel)}</td></tr>
+      <tr><td>Hotels</td><td>${fmt(hotel)}</td></tr>
+      <tr><td>Locations</td><td>${fmt(location)}</td></tr>
+      <tr class="budget-total-row"><td>Total</td><td>${fmt(o.total)}</td></tr>
+    </table></div>`;
+  }
+  const extraRow = (lbl, v) => `<tr><td>${lbl}</td><td>${fmt(v)}</td><td>${fmt(0)}</td><td>${fmt(v)}</td></tr>`;
+  const anyTravelVat = departments.some(d=>d.vat>0) && travel>0;
   return `<div class="tablewrap"><table>
-    <tr><th>Department</th><th>Cost</th></tr>
-    ${departments.map(d=>`<tr><td>${d.code?`<span class="dept-code">${esc(d.code)}</span> `:''}${esc(d.dept)}</td><td>${fmt(d.total)}</td></tr>`).join('')}
-    <tr class="budget-extras-row"><td colspan="2"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
-    <tr><td>Catering</td><td>${fmt(catering)}</td></tr>
-    <tr><td>Travel</td><td>${fmt(travel)}</td></tr>
-    <tr><td>Hotels</td><td>${fmt(hotel)}</td></tr>
-    <tr><td>Locations</td><td>${fmt(location)}</td></tr>
-    <tr class="budget-total-row"><td>Total</td><td>${fmt(total)}</td></tr>
-  </table></div>`;
+    <tr><th>Department</th><th>Ex-VAT</th><th>VAT</th><th>Inc-VAT</th></tr>
+    ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.exVat)}</td><td>${fmt(d.vat)}</td><td>${fmt(d.incVat)}</td></tr>`).join('')}
+    <tr class="budget-extras-row"><td colspan="4"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
+    ${extraRow('Catering', catering)}
+    ${extraRow('Travel', travel)}
+    ${extraRow('Hotels', hotel)}
+    ${extraRow('Locations', location)}
+    <tr class="budget-total-row"><td>Total</td><td>${fmt(o.exVat)}</td><td>${fmt(o.vat)}</td><td>${fmt(o.incVat)}</td></tr>
+  </table></div>
+  <div class="hint" style="margin-top:8px;">A department's VAT is summed from the people in it who are actually VAT-registered — not 20% of its total.${anyTravelVat?' It includes VAT on their travel, which is itself shown ex-VAT in the Travel row above.':''} Catering, Hotels and Locations are paid direct to a supplier, so no crew member's VAT attaches to them.</div>`;
 }
 
 function budgetDepartmentViewHTML(data){
@@ -5628,7 +5709,11 @@ function budgetDepartmentViewHTML(data){
     return '<div class="empty-note">No crew assigned to this project yet.</div>';
   }
   const displayTotal = budgetVatToggle ? data.totalExVat : data.totalIncVat;
-  return budgetDeptExtrasTableHTML(data.departments, data.cateringTotal, data.travelTotal, data.hotelTotal, displayTotal, 'Project-wide extras', data.locationTotal);
+  return budgetDeptExtrasTableHTML({
+    departments: data.departments, catering: data.cateringTotal, travel: data.travelTotal,
+    hotel: data.hotelTotal, location: data.locationTotal, extrasLabel: 'Project-wide extras',
+    total: displayTotal, exVat: data.totalExVat, vat: data.vatTotal, incVat: data.totalIncVat
+  });
 }
 
 function budgetPersonViewHTML(data){
@@ -5641,18 +5726,30 @@ function budgetPersonViewHTML(data){
   // rather than inventing a new UI paradigm for one screen.
   const ordered = budgetOrderedPeople(data);
   const noRateCount = data.people.filter(pp=>!pp.hasRate).length;
+  // AO — with Itemize VAT on, the person's own VAT amount gets a column of its own.
+  // It has to be visible now that it is no longer simply 20% of the Subtotal beside
+  // it: for a VAT-registered person it also covers their travel (charged back
+  // through them), which is itemised ex-VAT in the Travel extras row instead.
+  const anyTravel = data.people.some(pp=>pp.travelCost>0);
+  const vatCell = pp => {
+    const travelNote = pp.vatRegistered && pp.travelCost
+      ? ` title="Includes ${budgetFmt(pp.travelCost*VAT_RATE)} VAT on ${budgetFmt(pp.travelCost)} of travel"` : '';
+    return `<td${travelNote}>${pp.vat ? fmt(pp.vat) : '<span class="budget-noRate">—</span>'}</td>`;
+  };
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT</th><th style="text-align:center;">Days</th><th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th><th style="text-align:center;">Days</th>${budgetVatToggle?'<th>VAT</th>':''}<th>Subtotal</th></tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
       <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveCrewRateOverride('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
       <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
       <td style="text-align:center;">${pp.daysWorked}</td>
+      ${budgetVatToggle?vatCell(pp):''}
       <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
     </tr>`).join('')}
   </table></div>
   ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}
+  ${anyTravel ? `<div class="hint" style="margin-top:8px;">A VAT-registered crew member's travel carries VAT too — it's charged back through them — so their VAT covers day rate ${budgetVatToggle?'and travel':'and travel, baked into the Subtotal'}. The travel cost itself is counted once, in the Travel line of Per Department.</div>` : ''}
   <div class="hint" style="margin-top:8px;">Ticking VAT here doesn't save on its own — it's saved to the crew database together with the day rate, the next time that row's Save icon is clicked.</div>`;
 }
 
@@ -5672,7 +5769,11 @@ function budgetDayViewHTML(data){
         <strong>${fmt(d.total)}</strong>
       </div>
       <div id="bdb-${d.dayId}" style="display:${open?'':'none'}; margin-top:10px;">
-        ${budgetDeptExtrasTableHTML(d.departments, d.catering, d.travel, d.hotel, d.total, 'Day extras', d.location)}
+        ${budgetDeptExtrasTableHTML({
+          departments: d.departments, catering: d.catering, travel: d.travel,
+          hotel: d.hotel, location: d.location, extrasLabel: 'Day extras',
+          total: d.total, exVat: d.exVat, vat: d.vat, incVat: d.incVat
+        })}
       </div>
     </div>`;
   }).join('');
@@ -5779,20 +5880,35 @@ function budgetExportRows(data){
     ? rows.push(['Total (ex-VAT)', fmt(data.totalExVat)], ['VAT', fmt(data.vatTotal)], ['Total (inc-VAT)', fmt(data.totalIncVat)])
     : rows.push(['Total', fmt(data.totalIncVat)]);
   rows.push([]);
+  // AO — the itemized shapes mirror the screen column-for-column: Per Person gains
+  // the VAT amount, Per Department/Per Day the ex-VAT/VAT/inc-VAT breakdown.
   if(budgetView==='person'){
-    rows.push(['Name','Role','Day rate','VAT','Days','Subtotal']);
+    rows.push(budgetVatToggle
+      ? ['Name','Role','Day rate','VAT reg.','Days','VAT','Subtotal']
+      : ['Name','Role','Day rate','VAT reg.','Days','Subtotal']);
     budgetOrderedPeople(data).forEach(pp=>rows.push([
       pp.name, pp.role||'', pp.hasRate?fmt(pp.rate):'no rate on file',
-      pp.vatRegistered?'Yes':'No', pp.daysWorked, pp.hasRate?fmt(pp.display):'—']));
+      pp.vatRegistered?'Yes':'No', pp.daysWorked,
+      ...(budgetVatToggle ? [pp.vat?fmt(pp.vat):'—'] : []),
+      pp.hasRate?fmt(pp.display):'—']));
   } else if(budgetView==='day'){
-    rows.push(['Day','Location','Total']);
-    data.perDay.forEach(d=>rows.push([`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.total)]));
+    rows.push(budgetVatToggle ? ['Day','Location','Ex-VAT','VAT','Inc-VAT'] : ['Day','Location','Total']);
+    data.perDay.forEach(d=>rows.push(budgetVatToggle
+      ? [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.exVat), fmt(d.vat), fmt(d.incVat)]
+      : [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.total)]));
+  } else if(budgetVatToggle){
+    rows.push(['Department','Ex-VAT','VAT','Inc-VAT']);
+    data.departments.forEach(d=>rows.push([d.dept, fmt(d.exVat), fmt(d.vat), fmt(d.incVat)]));
+    const extra = (lbl,v)=>[lbl, fmt(v), fmt(0), fmt(v)];
+    rows.push(extra('Catering', data.cateringTotal), extra('Travel', data.travelTotal),
+              extra('Hotels', data.hotelTotal), extra('Locations', data.locationTotal),
+              ['Total', fmt(data.totalExVat), fmt(data.vatTotal), fmt(data.totalIncVat)]);
   } else {
     rows.push(['Department','Cost']);
     data.departments.forEach(d=>rows.push([d.dept, fmt(d.total)]));
     rows.push(['Catering', fmt(data.cateringTotal)], ['Travel', fmt(data.travelTotal)],
               ['Hotels', fmt(data.hotelTotal)], ['Locations', fmt(data.locationTotal)],
-              ['Total', fmt(budgetVatToggle ? data.totalExVat : data.totalIncVat)]);
+              ['Total', fmt(data.totalIncVat)]);
   }
   return rows;
 }
