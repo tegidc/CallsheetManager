@@ -8364,6 +8364,12 @@ let bdmLoading  = {};               /* projectId -> true while a load is in flig
 let budgetDemoProjectId = null;
 let budgetDemoLens = 'dept';        /* 'dept' | 'bbc' */
 let budgetDemoCollapsed = new Set();/* group keys currently collapsed */
+/* Phase AW — which VAT basis this whole screen is showing: true = Inc. VAT (VAT
+   folded inside every total; the default, and the basis Little Film's sheets are
+   quoted in) — false = Ex. VAT (every total and float computed on the net figure
+   instead). Session state only, exactly like T-6's own budgetVatToggle — not
+   persisted across a reload. */
+let bdmVatToggle = true;
 /* Held OUTSIDE the DOM for the reason aiScanDraftText documents: renderMain()
    replaces the whole panel and would blank a half-typed section name. */
 let bdmNewSection = {name:'', expectedCode:'PROD', phaseSet:'shoot'};
@@ -8519,11 +8525,16 @@ function bdmGroupPhases(rec, lines){
 }
 
 /* ---- the calculated fields. Nothing below is ever stored. ----
-   daysTotal, total, vat, float, totalWithFloat and the resolved BBC category are all
-   derived on every read. ⚠️ Float is per LINE, not one bottom-line row — a section or
-   code total already includes it. ⚠️ The production fee is calculated on the
-   float-INCLUSIVE subtotal, deliberately. ⚠️ VAT is excluded from every percentage
-   and from the grand total, and shown in its own column. */
+   daysTotal, net, vat, total, float, totalWithFloat and the resolved BBC category
+   are all derived on every read. ⚠️ Phase AW correction: Little Film's budget
+   sheets carry VAT INSIDE the line total (the VAT column shows the VAT portion OF
+   that total), not as a figure sitting outside it — AU/AV had this backwards.
+   `bdmVatToggle` (default true = Inc. VAT) is which basis is currently on screen:
+   total = net + vat when true, total = net alone when false; `vat` itself is
+   always net × vatRate regardless, so the VAT column stays meaningful on either
+   basis. ⚠️ Float is per LINE, not one bottom-line row — a section or code total
+   already includes it. ⚠️ The production fee is calculated on the float-INCLUSIVE
+   subtotal, deliberately, on whichever basis is selected. */
 /* The line's own float % when it has one, the project's when it doesn't. ⚠️ 0 is a
    real per-line value (real lines carry zero float) and must not fall through to the
    project's, which is why this tests for null rather than falsiness. */
@@ -8533,10 +8544,11 @@ function bdmLineFloatPercent(rec, l){
 }
 function budgetDemoLineMath(rec, l){
   const daysTotal = Object.values(l.days||{}).reduce((a,b)=>a+bdmNum(b), 0);
-  const total = bdmNum(l.rate) * daysTotal;
-  const vat = total * bdmNum(l.vatRate);
+  const net = bdmNum(l.rate) * daysTotal;
+  const vat = net * bdmNum(l.vatRate);
+  const total = net + (bdmVatToggle ? vat : 0);
   const flt = total * (bdmLineFloatPercent(rec, l)/100);
-  return { daysTotal, total, vat, float: flt, totalWithFloat: total + flt };
+  return { daysTotal, net, vat, total, float: flt, totalWithFloat: total + flt };
 }
 function budgetDemoTotals(rec){
   let total=0, floatTotal=0, vat=0;
@@ -8668,17 +8680,19 @@ function budgetDemoTopSheetHTML(rec){
   const pct = v => t.subtotal ? (v/t.subtotal*100).toFixed(1)+'%' : '—';
   const bbc = budgetDemoLens==='bbc';
   const feeLabel = `${bbc?'<span class="bdm-cat-letter">Q</span>':''}Production fee (${bdmNum(rec.feePercent)}%)`;
+  const basisLabel = bdmVatToggle ? 'Inc. VAT' : 'Ex. VAT';
   return `
     <div class="budget-summary">
-      <div class="budget-stat"><div class="num">${budgetFmt(t.subtotal)}</div><div class="lbl">Subtotal</div></div>
+      <div class="budget-stat"><div class="num">${budgetFmt(t.subtotal)}</div><div class="lbl">Subtotal (${basisLabel})</div></div>
       <div class="budget-stat"><div class="num">${budgetFmt(t.fee)}</div><div class="lbl">Production fee</div></div>
-      <div class="budget-stat"><div class="num">${budgetFmt(t.grand)}</div><div class="lbl">Grand total</div></div>
-      <div class="budget-stat"><div class="num">${budgetFmt(t.vat)}</div><div class="lbl">VAT — separate</div></div>
+      <div class="budget-stat"><div class="num">${budgetFmt(t.grand)}</div><div class="lbl">Grand total (${basisLabel})</div></div>
+      <div class="budget-stat"><div class="num">${budgetFmt(t.vat)}</div><div class="lbl">VAT ${bdmVatToggle?'(included above)':'(excluded above)'}</div></div>
+      <div class="budget-vat-toggle"><label><input type="checkbox" ${bdmVatToggle?'checked':''} onchange="toggleBdmVat(this.checked)"> Inc. VAT</label></div>
     </div>
     <div class="tablewrap"><table>
       <tr>
         <th>${bbc?'BBC category':'Code'}</th>
-        <th class="bdm-num">Total</th>
+        <th class="bdm-num">Total (${basisLabel})</th>
         <th class="bdm-num">% of subtotal</th>
         <th class="bdm-num">VAT</th>
       </tr>
@@ -8711,7 +8725,9 @@ function budgetDemoTopSheetHTML(rec){
       : 'Rows total by the CODE each line carries, which is not always the section it displays under — a line marked ⚑ counts here under its own code.'}
       Float is carried on every line, not as one bottom-line row, so a total already includes it.
       The production fee is calculated on the float-inclusive subtotal.
-      VAT is shown alongside and is excluded from every percentage and from the grand total.</div>`;
+      ${bdmVatToggle
+        ? 'This sheet is on the Inc. VAT basis: every total, including the grand total, already has VAT folded in. The VAT column shows the VAT portion of each figure, for reference.'
+        : 'This sheet is on the Ex. VAT basis: every total, including the grand total, excludes VAT. The VAT column shows what VAT would add, for reference.'}</div>`;
 }
 
 /* ---- line detail ---- */
@@ -8743,7 +8759,7 @@ function budgetDemoLinesTableHTML(rec, g){
       <th>Section</th><th>Code</th><th>BBC</th><th>Item</th><th>Name</th>
       ${phases.map(ph=>`<th class="bdm-num">${esc(ph)}</th>`).join('')}
       <th class="bdm-num">Days</th><th class="bdm-num">Rate</th><th class="bdm-num">Float %</th><th>VAT</th>
-      <th class="bdm-num">Total</th><th class="bdm-num">Float</th><th class="bdm-num">Total + float</th>
+      <th class="bdm-num">Total (${bdmVatToggle?'inc.':'ex.'} VAT)</th><th class="bdm-num">Float</th><th class="bdm-num">Total + float</th>
       <th>Notes</th><th></th>
     </tr>
     ${g.lines.map(l=>{
@@ -8887,6 +8903,11 @@ function toggleAllBudgetDemoSections(){
 }
 function setBudgetDemoProject(id){ budgetDemoProjectId = id; budgetDemoCollapsed = new Set(); renderMain(); }
 function setBudgetDemoLens(lens){ budgetDemoLens = lens; budgetDemoCollapsed = new Set(); renderMain(); }
+/* Phase AW — same markup/styling/state-handling pattern as T-6's toggleBudgetVat():
+   a checkbox bound straight to the module-level flag, a full re-render since the
+   basis change reaches every derived figure on the screen (line totals, floats,
+   both lenses' groups and top sheets), not just the top sheet this checkbox sits in. */
+function toggleBdmVat(checked){ bdmVatToggle = checked; renderMain(); }
 
 function renderBudgetDemo(m){
   const id = bdmCurrentProjectId();
