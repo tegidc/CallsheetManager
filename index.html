@@ -138,7 +138,6 @@
   .sd-block-head-toggle:hover{color:var(--text);}
   .sd-block-head-toggle .dept-caret{color:inherit;}
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
-  .grid.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
 
   label{display:block; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--muted); margin-bottom:4px; font-weight:500;}
 
@@ -147,20 +146,20 @@
      full-width box — the label moves beside its control, in a fixed label column
      so rows line up down the page. Anything after the label (hint, second control)
      stacks inside the control column rather than wrapping under the label.
-     Deliberately NOT applied to .g3/.g4: those cells are already narrow, and a
+     Deliberately NOT applied to .g3: those cells are already narrow, and a
      104px label column there leaves ~55px for the control, which clips dates and
      times. Dense rows keep the label above, where the control gets the full cell.
      Bare labels outside a .grid — log line, notes, descriptions — stay full-width
      stacked, which is what long text wants. Below 900px everything reverts to
      stacked (see mobile block). */
-  .grid:not(.g3):not(.g4) > div:has(> label:first-child){display:grid;
+  .grid:not(.g3) > div:has(> label:first-child){display:grid;
     grid-template-columns:var(--field-label-w) minmax(0,1fr);
     align-items:center; column-gap:10px; row-gap:4px;}
-  .grid:not(.g3):not(.g4) > div:has(> label:first-child) > label{margin:0; line-height:1.25; align-self:center;}
-  .grid:not(.g3):not(.g4) > div:has(> label:first-child) > *:not(label){grid-column:2;}
+  .grid:not(.g3) > div:has(> label:first-child) > label{margin:0; line-height:1.25; align-self:center;}
+  .grid:not(.g3) > div:has(> label:first-child) > *:not(label){grid-column:2;}
   /* textareas are tall — pin the label to the first line instead of centring it */
-  .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea){align-items:start;}
-  .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea) > label{padding-top:9px;}
+  .grid:not(.g3) > div:has(> label:first-child):has(> textarea){align-items:start;}
+  .grid:not(.g3) > div:has(> label:first-child):has(> textarea) > label{padding-top:9px;}
 
   /* One inline-field pattern. .ts-field was a Tech-Specs-only duplicate of
      .field-inline; the Style Review merged them, so both names share these rules.
@@ -450,6 +449,7 @@
   .crew-header-selectall input{margin:0;}
   .filter-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   .filter-chips{display:flex; flex-wrap:wrap; gap:4px 10px;}
+  .dept-admin-block{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px;}
   /* The row of trailing checkboxes + hint + "Clear filters" at the bottom of a
      filter panel. Was inline on the Crew panel's closing div; a second filter
      panel (Budget's day filter) needed the same row, so it's a class now. All
@@ -724,9 +724,9 @@
     label{font-size:12px; margin-bottom:5px;}
     /* Inline label columns go back to stacked on narrow screens — a fixed 104px
        label column leaves too little room for the control on a phone. */
-    .grid:not(.g3):not(.g4) > div:has(> label:first-child){display:block;}
-    .grid:not(.g3):not(.g4) > div:has(> label:first-child) > label{margin-bottom:5px;}
-    .grid:not(.g3):not(.g4) > div:has(> label:first-child):has(> textarea) > label{padding-top:0;}
+    .grid:not(.g3) > div:has(> label:first-child){display:block;}
+    .grid:not(.g3) > div:has(> label:first-child) > label{margin-bottom:5px;}
+    .grid:not(.g3) > div:has(> label:first-child):has(> textarea) > label{padding-top:0;}
 
     /* --- buttons: 44px minimum touch target --- */
     button{font-size:15px; padding:12px 16px; min-height:46px;}
@@ -737,7 +737,7 @@
     .toolbar button{flex:1 1 auto;}
 
     /* --- everything in one column --- */
-    .grid.g2, .grid.g3, .grid.g4{grid-template-columns:1fr;}
+    .grid.g2, .grid.g3{grid-template-columns:1fr;}
     /* tech specs + camera rows stack on mobile */
     /* .ts-grid already flows and wraps; nothing to override on mobile */
     .cam-row{grid-template-columns:1fr; gap:8px;}
@@ -6551,7 +6551,7 @@ function renderDeptAdminPanel(){
     const subs = subDeptsFor(d);
     const roster = sortHoDFirst(crewDB.filter(c=>deptBucketKey(c.department)===d));
     const roles = rolesFor(d).slice().sort((a,b)=>roleSeniorityRank(d,a)-roleSeniorityRank(d,b));
-    return `<div class="dept-admin-block" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+    return `<div class="dept-admin-block">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
         <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span><strong>${esc(d)}</strong>
         <span class="hint">(${roster.length})</span>

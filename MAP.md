@@ -1165,8 +1165,9 @@ Stage 2 applies whatever the user accepts; the [B] and [C] items are explicitly 
 batchable.
 
 **Stage 2 progress.** All 21 findings were accepted. **Phase AR** landed G11, G13,
-G16 and G15 — see the Phase AR section. Phases **AS / AT / AU / AV / AW** carry the
-rest; **G14 must not be attempted before G11 is live**, which it now is.
+G16 and G15; **Phase AS** landed G12, G18, G19, G17 and G14 — see their sections.
+**Phase AT** (in progress) is landing G6, G1, G2, G7, G8, G9, G10 across three commits.
+Phases **AU / AV / AW** carry the rest.
 
 ⚠️ **R10 ("Remember the AI Scan conversation") was DECLINED and closed by the user on
 7 Aug 2026.** `gate1-review.html` still lists it as unanswered — that page is stale on
@@ -1458,6 +1459,39 @@ everything an earlier one did. Adding a per-key promise queue would have changed
 `saveDB()`'s concurrency semantics globally for a problem that isn't there.
 
 **Phases AT / AU / AV / AW remain.**
+
+## Phase AT — Gate 1 Stage 2, part 3 of 5: consolidation
+
+Seven Bucket A findings — **G6; G1, G2; G7, G8, G9, G10** — split across three commits so
+the two findings that are not actually behaviour-neutral (G7, G10) sit in their own
+gated commit, separate from the genuine no-ops. Verified against the live ROW 2026
+London project with `saveDB()`/`scheduleAutosave()` stubbed in a verification-only copy,
+confirmed clean against `app_data` afterwards. AU/AV/AW were not pulled forward.
+
+### Commit A — G6, dead code
+
+`.grid.g4` was never applied by anything in the file — confirmed by grepping every
+static `class="grid g…"` occurrence (20× `g2`, 11× `g3`, 0× `g4`) and confirming there is
+no dynamic construction of a `g…` class anywhere in the script, so removing it and
+simplifying the eight `:not(.g3):not(.g4)` guards to `:not(.g3)` cannot change which
+elements match — a mathematically guaranteed no-op, not just an untested one. Also
+removed the same dead `.g4` from the mobile `.grid.g2, .grid.g3, .grid.g4{grid-template-
+columns:1fr}` rule and the stale `.g3/.g4` mention in the comment above the guards.
+
+`.dept-admin-block` had no CSS rule and carried its box (border/radius/padding/margin)
+as a duplicated inline `style=`. Promoted to a real class with the identical values —
+checked with `getComputedStyle()` before and after, byte-identical.
+
+⚠️ **`.sritem:hover` deliberately left untouched.** The audit's own suggested fix — give
+it a real `--tint-3` fill, since it currently computes to a no-op against `.srlist`'s
+existing background — is a visible UX addition, not a removal, and the audit itself
+flagged it as "a small deliberate visual addition — flag it as such rather than slipping
+it in." Left for a deliberate decision outside a no-op commit rather than folded in here.
+
+Verified: `node --check` clean, `<style>` block brace-balanced (439/439), zero remaining
+`g4` references, page loads with no console errors at desktop and mobile widths, the
+Departments admin panel and a mobile add-crew form both render pixel-identical to
+before. `app_data` unchanged (newest write still the pre-session state) — nothing written.
 
 ## The design system, as decided (Phase Refinement)
 
