@@ -615,8 +615,11 @@
      above already use. Every other screen keeps 840px. */
   .main:has(#bdmTopSheet){max-width:1320px;}
   .bdm-num{text-align:right; white-space:nowrap;}
-  .bdm-lines table{min-width:1080px;}
-  .bdm-lines.bdm-lines-post table{min-width:1340px;}
+  /* Phase AV added a Section column (a line's display bucket is now stored
+     separately from the code it counts under), so both min-widths go up by one
+     select's worth. */
+  .bdm-lines table{min-width:1230px;}
+  .bdm-lines.bdm-lines-post table{min-width:1490px;}
   /* ⚠️ These MUST stay qualified with their element. `input[type=text]{width:100%}`
      above is an attribute selector — specificity (0,1,1) — so a bare `.bdm-rate-input`
      class (0,1,0) loses to it and every field silently collapses to its cell width
@@ -627,7 +630,22 @@
   input.bdm-rate-input{width:88px; text-align:right;}   /* wide enough for a four-figure buyout */
   input.bdm-text-input{width:100%; min-width:130px;}
   input.bdm-note-input{width:120px;}
-  select.bdm-code-select, select.bdm-vat-select, select.bdm-bbc-select{width:auto; padding:5px 4px 4px 2px;}
+  select.bdm-code-select, select.bdm-vat-select, select.bdm-bbc-select,
+  select.bdm-section-select{width:auto; padding:5px 4px 4px 2px;}
+  input.bdm-float-input{width:46px; text-align:center;}
+  /* Phase AV — the two information-only markers. Both say "look at this", neither
+     changes a value or excludes a line from any total: a miscode flag next to a
+     line's code when it differs from its section's expectedCode, and a rate-drift
+     flag next to the rate of a crew-linked line whose stored rate no longer matches
+     the crew record. Deliberately small, muted and title-only — no badge, no colour
+     alarm, no action. */
+  .bdm-flag{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);
+    cursor:help; margin-left:4px; user-select:none;}
+  .bdm-sec-code{font-family:var(--label); font-size:var(--fs-meta); color:var(--muted);
+    letter-spacing:0.8px;}
+  .bdm-settings-table table{min-width:auto;}
+  .bdm-add-section{margin:14px 0 4px; align-items:flex-end;}
+  input.bdm-newsec-name{width:190px;}
   /* the £ VAT that a line's rate produces, under its 0/20% picker — the calculated
      half of the same cell, so the two aren't in separate columns pretending to be
      unrelated */
@@ -1542,8 +1560,14 @@ function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
    mergeDB()'s tolerance of an array as base, and the fact that a null stamp routes
    to a plain upsert rather than the merge path), so no data was lost — but it was
    harmless by luck in the one function that IS the storage contract. */
-const DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings','db:roles'];
-const isObjDB = key => DB_OBJECT_KEYS.includes(key);
+/* Phase AV — `budget:<projectId>` is the first key family whose members are not
+   known ahead of time (one per project), so this can no longer be a flat list
+   alone. Both new keys are object-shaped: db:budget_settings is one shared record,
+   and each budget: record is {floatPercent, feePercent, sections[], lines[]}. */
+const DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings','db:roles','db:budget_settings'];
+const BUDGET_KEY_PREFIX = 'budget:';
+const isBudgetKey = key => String(key).indexOf(BUDGET_KEY_PREFIX)===0;
+const isObjDB = key => DB_OBJECT_KEYS.includes(key) || isBudgetKey(key);
 let dbStamp = {};   // key -> updated_at last seen
 let dbBase  = {};   // key -> deep snapshot matching that stamp
 const dbClone = v => JSON.parse(JSON.stringify(v ?? null));
@@ -1713,8 +1737,20 @@ const DB_KEY_LABELS = {
   'db:projects':'project details', 'db:shootdays':'shoot days',
   'db:settings':'settings', 'db:roles':'the roles list',
   'db:roleseniority':'role seniority', 'db:subdepartments':'sub-departments',
-  'db:travelmethods':'travel methods', 'db:coprocompanies':'production companies'
+  'db:travelmethods':'travel methods', 'db:coprocompanies':'production companies',
+  'db:budget_settings':'the budget codes and rules'
 };
+/* budget:<projectId> can't be listed above — there is one key per project — so the
+   banner names the project rather than printing a raw key at the user. */
+function dbKeyLabel(key){
+  if(DB_KEY_LABELS[key]) return DB_KEY_LABELS[key];
+  if(isBudgetKey(key)){
+    const id = key.slice(BUDGET_KEY_PREFIX.length);
+    const p = projById(id);
+    return 'the budget for ' + (p ? (p.title || p.client || id) : bdmProjectName(id));
+  }
+  return key;
+}
 let saveFailure = null;   // {key, kind:'unsaved'|'discarded', detail, value, retrying}
 
 function reportSaveFailure(key, kind, detail, value){
@@ -1746,7 +1782,7 @@ function renderSaveFailureBanner(){
   let el = document.getElementById('saveFailBanner');
   if(!saveFailure){ if(el) el.remove(); return; }
   if(!el){ el = document.createElement('div'); el.id='saveFailBanner'; document.body.appendChild(el); }
-  const f = saveFailure, what = DB_KEY_LABELS[f.key] || f.key, lost = f.kind==='discarded';
+  const f = saveFailure, what = dbKeyLabel(f.key), lost = f.kind==='discarded';
   el.className = 'save-banner' + (lost ? ' save-banner-lost' : '');
   const msg = lost
     ? `<strong>Your last change was not saved.</strong> Something else kept writing to ${esc(what)} while you were editing, so this change could not be stored. It is still on screen but it is <strong>not in the database</strong> — reload now and it is gone.`
@@ -1770,6 +1806,14 @@ function applyMergedDB(key, merged){
   } else if(key==='db:subdepartments' && merged) { SUBDEPARTMENTS_BY_DEPT = merged; }
   else if(key==='db:roleseniority' && merged)    { ROLE_SENIORITY = merged; }
   else if(key==='db:roles' && merged && !Array.isArray(merged)) { ROLES_BY_DEPT = merged; }
+  /* Phase AV — the budget keys are held in their own caches rather than one of the
+     four top-level arrays, so they need their own write-back or a merged result
+     would sit in the database while this tab kept rendering the pre-merge copy. */
+  else if(key==='db:budget_settings' && merged && typeof merged==='object'){ bdmSettings = bdmNormalizeSettings(merged); }
+  else if(isBudgetKey(key) && merged && typeof merged==='object'){
+    const id = key.slice(BUDGET_KEY_PREFIX.length);
+    bdmRecords[id] = bdmNormalizeRecord(merged);
+  }
   if(typeof renderSide==='function') renderSide();
   if(typeof renderMain==='function') renderMain();
 }
@@ -1793,6 +1837,19 @@ async function initApp(){
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
     await saveDB('db:travelmethods', travelMethodsList);
+  }
+  /* Phase AV — the shared budget codes/phase sets/BBC rules. One record for every
+     project, loaded once here because Settings renders it as well as the Budget
+     screen. Seeded on first run exactly the way travelMethodsList above is: the
+     defaults are the starting point, the stored record is the source of truth from
+     then on. The per-project budget: records are NOT loaded here — there is one per
+     project and the Budget screen loads the one it needs, on demand. */
+  const savedBudgetSettings = await loadDB('db:budget_settings');
+  if(savedBudgetSettings && !Array.isArray(savedBudgetSettings) && Object.keys(savedBudgetSettings).length){
+    bdmSettings = bdmNormalizeSettings(savedBudgetSettings);
+  } else {
+    bdmSettings = bdmNormalizeSettings(BDM_SETTINGS_DEFAULTS);
+    await saveDB('db:budget_settings', bdmSettings);
   }
   if(!crewDB.length && !locationsDB.length && !projectsDB.length){
     await seedSampleData();   // first-ever load — populate with the OFTV sample so there's something to work with
@@ -1908,7 +1965,7 @@ function renderSide(){
   const wrap = document.getElementById('sideProjects');
   if(!projectsDB.length){ wrap.innerHTML = '<div class="side-empty">No projects yet</div>'; return; }
   const sorted = [...projectsDB].sort((a,b)=> (b.startDate||'').localeCompare(a.startDate||''));
-  /* Budget (demo) keeps the open project highlighted: goBudgetDemo() deliberately
+  /* Budget (B-1) keeps the open project highlighted: goBudgetDemo() deliberately
      leaves currentProjectId alone, so "which project am I in" must not go blank
      just because the main panel switched view. */
   wrap.innerHTML = sorted.map(p=>`
@@ -1964,7 +2021,7 @@ window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer();
 function goDatabase(which){ route={screen:'db-'+which}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
 function goNewProject(){ route={screen:'new-project'}; closeDrawer(); renderSide(); renderMain(); }
 function goSettings(){ route={screen:'settings'}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
-/* Budget (demo), B-1. The ONE sidebar route that does NOT clear currentProjectId:
+/* Budget, B-1. The ONE sidebar route that does NOT clear currentProjectId:
    this is a different view OF a project, not a project-independent screen, so the
    project you were in stays open behind it and the sidebar keeps saying so. */
 function goBudgetDemo(){ route={screen:'budget'}; closeDrawer(); renderSide(); renderMain(); window.scrollTo(0,0); }
@@ -2002,7 +2059,7 @@ function renderMain(){
    every other collapsible block, rather than being the one screen that ignores the
    standing rule. Open by default: it's a short screen you come to in order to change
    something, so starting it collapsed would just add a click. */
-let settingsBlocks = { fonts:true, colours:true, preview:true, company:true };
+let settingsBlocks = { fonts:true, colours:true, preview:true, company:true, budgetrules:false, budgetseed:false };
 function toggleSettingsBlock(key){ toggleBlock(settingsBlocks, 'st', key); }
 function toggleAllSettingsBlocks(){ setAllBlocksCollapsed(settingsBlocks, 'st', !allBlocksCollapsed(settingsBlocks)); }
 function settingsBlockHTML(key, title, inner){
@@ -2068,7 +2125,18 @@ function renderSettings(m){
       <div class="grid g2">
         <div><label>Production company</label><input type="text" value="${esc(COMPANY)}" readonly></div>
       </div>
-      <p class="hint" style="margin-top:8px;">Single company for now. Per-company logos and details are deliberately not built — that waits until the app is used by anyone outside ${esc(COMPANY)}.</p>`)}`;
+      <p class="hint" style="margin-top:8px;">Single company for now. Per-company logos and details are deliberately not built — that waits until the app is used by anyone outside ${esc(COMPANY)}.</p>`)}
+    ${settingsBlockHTML('budgetrules', 'Budget codes & rules', bdmSettingsTablesHTML())}
+    ${settingsBlockHTML('budgetseed', 'Budget seed data', `
+      <p style="font-size:14px; line-height:1.6;">ROW 2026 London's budget is held as a data file in the repo
+        (<code>${esc(BDM_ROW_SEED_FILE)}</code>). This reads that file once and writes it to that project's budget.
+        After seeding, the file is never read again — the budget is edited in the app and storage is the source of truth.</p>
+      <div class="toolbar" style="margin-top:12px;">
+        <button onclick="seedRowBudget()">Seed ROW 2026 budget</button>
+        <span class="status" id="bdmSeedStatus"></span>
+      </div>
+      <p class="hint" style="margin-top:8px;">If that project already has budget lines, this warns and asks first —
+        seeding replaces the whole budget, it does not merge into it.</p>`)}`;
 }
 /* apply without persisting — the colour picker fires oninput continuously while
    dragging, and one Supabase write per pixel of hue is not a good trade */
@@ -8106,281 +8174,500 @@ function downloadExcel(){
   XLSX.writeFile(wb,`callsheet-${data.shootDate||'draft'}${data.dayNum?('-day'+data.dayNum):''}.xlsx`);
 }
 
-/* ============================================================ BUDGET (DEMO) — B-1
+/* ============================================================ BUDGET — B-1
 
-   A real line-item budget, as a DEMO. Reached from the side panel ("Budget"), which
-   is why goBudgetDemo() is the one sidebar route that leaves currentProjectId alone:
-   this is a different view of a project, not a project-independent screen.
+   A real line-item budget. Reached from the side panel ("Budget"), which is why
+   goBudgetDemo() is the one sidebar route that leaves currentProjectId alone: this
+   is a different view of a project, not a project-independent screen.
 
    ⚠️ NOT the Budget TAB (T-6). That one is cost visibility only, rolled up from the
    Crew/Catering/Travel/Hotel tabs, and is untouched by any of this. Every name here
-   is `budgetDemo*` / `bdm*` so nothing can collide with T-6's `budget*` family.
+   is `budgetDemo*` / `bdm*` so nothing can collide with T-6's `budget*` family. The
+   "Demo" in those names is HISTORICAL — Phase AU built this as a demo and Phase AV
+   gave it real storage. The names were kept rather than churned through forty call
+   sites; the thing they protect against (a collision with T-6) is unchanged.
 
-   ⚠️ TOUCHES NO DATABASE. There is no saveDB/loadDB call anywhere in this section
-   and no Supabase read or write. The two projects live in BUDGET_DEMO_DATA below, a
-   plain constant; budgetDemoInit() takes ONE deep copy of it into budgetDemoProjects
-   and every edit mutates that copy. Edits therefore survive lens switches, project
-   switches and navigation away and back — and are gone on reload. Persistence is a
-   separate decision; do not wire this to `db:*` without one.
+   ⚠️ Phase AV — THIS SCREEN NOW WRITES TO STORAGE. The AU note that said it touches
+   no database is superseded. Three keys, all through the app's existing
+   loadDB/saveDB choke point and the same `app_data` key/value table db:crew uses:
+
+     db:budget_settings   ONE shared record — the codes list, the named phase sets
+                          and the ordered BBC rules table. Not per project.
+     budget:<projectId>   ONE record per project — {floatPercent, feePercent,
+                          sections[], lines[]}. A budget edit writes ONLY this one
+                          key; it never rewrites every project's budget.
+
+   db:crew is READ-ONLY from here, and read for exactly one thing — see COPY NOT
+   LOOKUP below. Nothing in this section writes to it.
 
    Styling is entirely the app's own: Pattern A .section h2, deptHeaderHTML() for the
    collapsible sections, .section table for every table, the ruled-line inputs, the
    .tabs view switcher for the lens toggle, .budget-summary/.budget-stat for the
    headline figures and .budget-total-row for ruled total rows. */
 
-/* Phase buckets are per SECTION, not global — a shoot section and POST count
-   different things. Stored per project (p.phaseSets) keyed by code, with a
-   `default` fallback, so a third set can be added by editing data alone. */
-const BUDGET_DEMO_SHOOT_PHASES = ['PreProd','Shoot','Strike','Buyout'];
-const BUDGET_DEMO_POST_PHASES  = ['PreProd','Assembly','PreV1','V1 Feedback','PreV2','V2 Feedback','Delivery','Buyout'];
+/* ---- SECTIONS vs CODES (Phase AV) --------------------------------------------
+   AU had one axis: a line's code was both where it displayed and what it counted
+   under. AV splits them, because on a real budget they routinely disagree.
 
-const BUDGET_DEMO_CODE_LABELS = {
-  'PROD':'Production', 'CIN':'Cinematography', 'AUD':'Audio', 'GRIP':'Grip & Lighting',
-  'EQUIP':'Equipment', 'SET':'Set, art & locations', 'HMU':'Hair & make-up',
-  'CAT/TRA':'Catering & travel', 'POST':'Post-production', 'TAL':'Talent'
-};
-const BUDGET_DEMO_CODES = Object.keys(BUDGET_DEMO_CODE_LABELS);
+     section  — WHERE THE LINE DISPLAYS. A named bucket on the project, carrying an
+                expectedCode and a phaseSet ("shoot" or "post").
+     code     — WHAT THE LINE COUNTS UNDER on the top sheet. Frequently differs from
+                its section's expectedCode, and that is intentional, not an error.
 
-/* The BBC top sheet, all 17 categories in order. P and Q are derived (float and
-   fee) and never hold lines — see budgetDemoTopSheetRows(). */
-const BUDGET_DEMO_BBC_CATEGORIES = [
-  ['A','Development'],
-  ['B','Story/script/rights'],
-  ['C','Producer, director, exec'],
-  ['D','Artists, presenters, contributors'],
-  ['E','Production unit salaries'],
-  ['F','Crew'],
-  ['G','Art dept, costume, make-up'],
-  ['H','Production equipment & facilities'],
-  ['I','Studio/OB'],
-  ['J','Travel, transport, accommodation, subsistence'],
-  ['K','Archive & library'],
-  ['L','Post-production'],
-  ['M','Music & copyright clearances'],
-  ['N','Insurance, legal, finance'],
-  ['O','Production overheads / general expenses'],
-  ['P','Contingency'],
-  ['Q','Production fee']
-];
-const BUDGET_DEMO_BBC_LABELS = Object.fromEntries(BUDGET_DEMO_BBC_CATEGORIES);
+   So in the Departments lens the LINE DETAIL is grouped by section while the TOP
+   SHEET totals by code, and the two deliberately need not match section-for-row. A
+   camera operator carried in the Travel section still counts as Cinematography.
+   Where they differ the line wears a small marker (see MISCODE FLAGGING) — which is
+   information only: it never changes the value and never excludes the line from any
+   total. Both lenses still reach the same subtotal, because every line is counted
+   exactly once whichever axis you read it on. */
 
-/* ---- the demo data itself ----
-   Real figures from the OFTV master and the Proper Corn job, so it reads like work
-   rather than lorem. The thing this data exists to prove is at the top of each
-   project: Matt Wells and Sabrina Goreeba each appear TWICE, on two codes at two
-   rates, and George/Karim/Charlie each carry a crew fee and a kit fee as separate
-   lines. Same person, different jobs, different money — no merging. */
-const BUDGET_DEMO_DATA = [
-  {
-    id: 'bdm-irl-london-2026',
-    name: 'IRL London 2026',
-    floatPercent: 5,
-    feePercent: 10,
-    phaseSets: { default: BUDGET_DEMO_SHOOT_PHASES, 'POST': BUDGET_DEMO_POST_PHASES },
-    lines: [
-      /* PROD */
-      {id:'bl01', code:'PROD', item:'Producer',              name:'Matt Wells',           days:{PreProd:20},        rate:500,  vatRate:0.2, bbcOverride:'', notes:'Prep + shoot supervision'},
-      {id:'bl02', code:'PROD', item:'Line Producer',         name:'Sabrina Goreeba',      days:{PreProd:12},        rate:450,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl03', code:'PROD', item:'Insurance',             name:'Allianz Media',        days:{Buyout:1},          rate:1500, vatRate:0.2, bbcOverride:'', notes:'Production policy — BBC cat N'},
-      {id:'bl04', code:'PROD', item:'Risk Assessment',       name:'First Option Safety',  days:{Buyout:1},          rate:450,  vatRate:0,   bbcOverride:'', notes:''},
-      /* CIN */
-      {id:'bl05', code:'CIN',  item:'DOP',                   name:'Matt Wells',           days:{Shoot:5},           rate:700,  vatRate:0.2, bbcOverride:'', notes:'Same person as bl01, different rate'},
-      {id:'bl06', code:'CIN',  item:'Camera B',              name:'Sabrina Goreeba',      days:{Shoot:5},           rate:700,  vatRate:0,   bbcOverride:'', notes:'Same person as bl02, different rate'},
-      {id:'bl07', code:'CIN',  item:'Camera C',              name:'George Pearton',       days:{Shoot:5},           rate:600,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl08', code:'CIN',  item:'Camera D',              name:'Karim D Clarke',       days:{Shoot:5},           rate:600,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl09', code:'CIN',  item:'Camera E',              name:'Charlie De La Hunt',   days:{Shoot:5},           rate:600,  vatRate:0.2, bbcOverride:'', notes:''},
-      /* EQUIP — kit fees, separate from the crew fee above */
-      {id:'bl10', code:'EQUIP',item:'Camera C Kit',          name:'George Pearton',       days:{Shoot:5},           rate:200,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl11', code:'EQUIP',item:'Camera D Kit',          name:'Karim D Clarke',       days:{Shoot:5},           rate:250,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl12', code:'EQUIP',item:'Camera E Kit',          name:'Charlie De La Hunt',   days:{Shoot:5},           rate:300,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl13', code:'EQUIP',item:'Camera Package Rental', name:'Greenkit',             days:{Buyout:1},          rate:5000, vatRate:0.2, bbcOverride:'', notes:'Buyout for the run'},
-      /* AUD */
-      {id:'bl14', code:'AUD',  item:'Soundie',               name:'Hear More Audio',      days:{Shoot:5},           rate:475,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl15', code:'AUD',  item:'Soundie Kit',           name:'Hear More Audio',      days:{Shoot:5},           rate:475,  vatRate:0.2, bbcOverride:'', notes:'"Kit" routes this to BBC H, not F'},
-      {id:'bl16', code:'AUD',  item:'Soundie Assist',        name:'Hear More Audio',      days:{Shoot:5},           rate:470,  vatRate:0.2, bbcOverride:'', notes:''},
-      /* GRIP */
-      {id:'bl17', code:'GRIP', item:'Key Grip',              name:'Alex McGill',          days:{Shoot:5},           rate:650,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl18', code:'GRIP', item:'Grip',                  name:'Scott Buxton',         days:{Shoot:5},           rate:444,  vatRate:0,   bbcOverride:'', notes:''},
-      /* SET */
-      {id:'bl19', code:'SET',  item:'Researcher',            name:'Stella Moss',          days:{PreProd:10},        rate:250,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl20', code:'SET',  item:'Location — Hackney Warehouse',  name:'Hackney Wick Studios', days:{Buyout:1},  rate:2500, vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl21', code:'SET',  item:'Location — Shoreditch Rooftop', name:'Rooftop London',       days:{Buyout:1},  rate:2500, vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl22', code:'SET',  item:'Location — Peckham Flat',       name:'Peckham Lofts',        days:{Buyout:1},  rate:2500, vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl23', code:'SET',  item:'Location — Soho Bar',           name:'The Ivy House',        days:{Buyout:1},  rate:2500, vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'bl24', code:'SET',  item:'Location — Thames Riverside',   name:'Port of London',       days:{Buyout:1},  rate:2500, vatRate:0.2, bbcOverride:'', notes:''},
-      /* CAT/TRA */
-      {id:'bl25', code:'CAT/TRA', item:'Road Runner',        name:'Sid',                  days:{Shoot:5},           rate:350,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl26', code:'CAT/TRA', item:'Road Runner',        name:'Sam',                  days:{Shoot:5},           rate:350,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl27', code:'CAT/TRA', item:'IRL Catering',       name:'Bread & Butter',       days:{Shoot:5},           rate:850,  vatRate:0.2, bbcOverride:'', notes:'Per shoot day, whole unit'},
-      {id:'bl28', code:'CAT/TRA', item:'Per Diems',          name:'Crew',                 days:{Shoot:5},           rate:250,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'bl29', code:'CAT/TRA', item:'Hotels',             name:'Premier Inn Old Street', days:{PreProd:1, Shoot:4}, rate:1200, vatRate:0.2, bbcOverride:'', notes:'Room nights, whole unit'},
-      {id:'bl30', code:'CAT/TRA', item:'Travel & Transport', name:'Splitscreen',          days:{PreProd:1, Shoot:5}, rate:400, vatRate:0.2, bbcOverride:'', notes:''},
-      /* TAL */
-      {id:'bl31', code:'TAL',  item:'Contributor Fees',      name:'IRL Talent',           days:{Shoot:5},           rate:250,  vatRate:0,   bbcOverride:'', notes:''}
-    ]
+/* ---- COPY NOT LOOKUP (Phase AV) ----------------------------------------------
+   A line may carry `crewId`, a pointer at a crew record. Most lines are suppliers or
+   locations and carry null.
+
+   ⚠️ The rate and VAT status on a line are COPIED at the moment of linking. They are
+   NEVER re-read from the crew database into an existing line, automatically or
+   otherwise — a crew member putting their day rate up must not silently rewrite a
+   budget that was signed off six months ago. Where a linked line's stored rate no
+   longer matches the crew record's current rate, the line shows a small marker
+   whose tooltip says what the crew rate is now, and nothing else happens: no
+   auto-update, no prompt, no bulk action. That comparison is the ONLY read of
+   crewDB anywhere in this section. */
+
+const BDM_PROPER_CORN_ID = 'bdm-proper-corn-hot-sauce';
+
+/* ---- the shared settings record's defaults ----
+   Seeded into db:budget_settings on first run (initApp), exactly the way
+   travelMethodsList is. From then on the STORED record is the source of truth and
+   these defaults are never consulted again — which is what makes editing them a
+   later phase's job rather than a code change. Settings (S-1) displays all three
+   tables read-only so the rules can be seen rather than being buried here. */
+const BDM_SETTINGS_DEFAULTS = {
+  codes: [
+    {code:'PROD',    label:'Production'},
+    {code:'CIN',     label:'Cinematography'},
+    {code:'AUD',     label:'Audio'},
+    {code:'GRIP',    label:'Grip & Lighting'},
+    {code:'EQUIP',   label:'Equipment'},
+    {code:'SET',     label:'Set, art & locations'},
+    {code:'HMU',     label:'Vanities'},
+    {code:'CAT/TRA', label:'Catering & travel'},
+    {code:'POST',    label:'Post-production'},
+    {code:'TAL',     label:'Talent'}
+  ],
+  /* Named sets of phase columns. A SECTION picks one by name, so a third set is a
+     data edit rather than a code change. */
+  phaseSets: {
+    shoot: ['PreProd','Shoot','Strike','Buyout'],
+    post:  ['PreProd','Assembly','PreV1','V1 Feedback','PreV2','V2 Feedback','Delivery','Buyout']
   },
-  {
-    id: 'bdm-proper-corn-hot-sauce',
-    name: 'Proper Corn Hot Sauce',
-    floatPercent: 5,
-    feePercent: 0,          /* deliberately 0 — the fee row and the grand total must both stay right */
-    phaseSets: { default: BUDGET_DEMO_SHOOT_PHASES, 'POST': BUDGET_DEMO_POST_PHASES },
-    lines: [
-      {id:'pc01', code:'PROD', item:'Producer',        name:'Sabrina Goreeba',  days:{PreProd:8},  rate:500,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc02', code:'CIN',  item:'Director / DOP',  name:'Matt Wells',       days:{Shoot:4},    rate:700,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc03', code:'CIN',  item:'Camera Op',       name:'George Pearton',   days:{Shoot:1},    rate:750,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'pc04', code:'GRIP', item:'Grip',            name:'Alex McGill',      days:{Shoot:1},    rate:668,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'pc05', code:'HMU',  item:'Hair & Make-up',  name:'Jojo Ferreira',    days:{Shoot:1},    rate:500,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc06', code:'SET',  item:'Location — Studio Kitchen', name:'Hoxton Kitchen Studios', days:{Buyout:1}, rate:2500, vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'pc07', code:'SET',  item:'Props',           name:'Prop House London',days:{PreProd:1},  rate:600,  vatRate:0.2, bbcOverride:'', notes:''},
-      {id:'pc08', code:'SET',  item:'Set Designer',    name:'Elle Bramwell',    days:{PreProd:2},  rate:550,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc09', code:'CAT/TRA', item:'Catering',     name:'Local Deli',       days:{Shoot:10},   rate:20,   vatRate:0.2, bbcOverride:'', notes:'10 covers'},
-      /* POST — its own phase columns, per phaseSets above */
-      {id:'pc10', code:'POST', item:'Editor',          name:'Tom Rowlands',     days:{Assembly:3, PreV1:2, Delivery:1},                 rate:350, vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc11', code:'POST', item:'Editor',          name:'Nina Patel',       days:{Assembly:2, PreV1:2, PreV2:2},                    rate:350, vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc12', code:'POST', item:'Editor',          name:'Joe Adeyemi',      days:{PreV1:2, 'V1 Feedback':1, PreV2:2, 'V2 Feedback':1}, rate:350, vatRate:0, bbcOverride:'', notes:''},
-      {id:'pc13', code:'POST', item:'Grade',           name:'Cheat Colour',     days:{Delivery:1}, rate:400,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc14', code:'POST', item:'Audio Mix',       name:'Wave Studios',     days:{Delivery:1}, rate:500,  vatRate:0,   bbcOverride:'', notes:''},
-      {id:'pc15', code:'POST', item:'Drives',          name:'LaCie',            days:{PreProd:3},  rate:120,  vatRate:0.2, bbcOverride:'', notes:'3 × 4TB'}
-    ]
-  }
-];
+  /* ORDERED — first match wins. A rule matches when:
+       code   equals the line's code (always set here, but '' would mean "any code")
+       phase  is 'any', or equals the phaseSet of the section the line sits in
+       match  is '' (matches everything), or ANY of its comma-separated terms appears
+              in the line's ITEM text, case-insensitively
+     ⚠️ `match` is tested against the line's ITEM only, not its name. Every term in
+     this table is a job or a thing ("Producer", "Kit", "Crypt"), never a supplier,
+     and matching the name field too would route "Hear More Audio Kit Ltd" on the
+     strength of its company name rather than what it is being paid for.
+     ⚠️ Insurance/Risk is a PROD rule sitting BELOW the Producer/Exec/Director rule,
+     per the table as specified. AU had it as a cross-cutting rule tested before
+     everything; it is not that any more. First match wins, top to bottom. */
+  bbcRules: [
+    {code:'PROD',    phase:'any',  match:'Producer,Exec,Director',            cat:'C'},
+    {code:'PROD',    phase:'any',  match:'Insurance,Risk',                    cat:'N'},
+    {code:'PROD',    phase:'any',  match:'',                                  cat:'E'},
+    {code:'CIN',     phase:'post', match:'',                                  cat:'L'},
+    {code:'CIN',     phase:'any',  match:'',                                  cat:'F'},
+    {code:'AUD',     phase:'any',  match:'Kit',                               cat:'H'},
+    {code:'AUD',     phase:'any',  match:'',                                  cat:'F'},
+    {code:'GRIP',    phase:'any',  match:'',                                  cat:'F'},
+    {code:'EQUIP',   phase:'any',  match:'',                                  cat:'H'},
+    {code:'SET',     phase:'any',  match:'Location,Venue,Crypt,Factory,Organ', cat:'I'},
+    {code:'SET',     phase:'any',  match:'',                                  cat:'G'},
+    {code:'HMU',     phase:'any',  match:'',                                  cat:'G'},
+    {code:'CAT/TRA', phase:'any',  match:'',                                  cat:'J'},
+    {code:'POST',    phase:'any',  match:'',                                  cat:'L'},
+    {code:'TAL',     phase:'any',  match:'',                                  cat:'D'}
+  ],
+  /* All 17, in order, for display. P and Q are derived (float and fee) and never
+     hold a line — see bdmTopSheetRows(). */
+  bbcCats: [
+    ['A','Development'],
+    ['B','Story/script/rights'],
+    ['C','Producer, director, exec'],
+    ['D','Artists, presenters, contributors'],
+    ['E','Production unit salaries'],
+    ['F','Crew'],
+    ['G','Art dept, costume, make-up'],
+    ['H','Production equipment & facilities'],
+    ['I','Studio/OB'],
+    ['J','Travel, transport, accommodation, subsistence'],
+    ['K','Archive & library'],
+    ['L','Post-production'],
+    ['M','Music & copyright clearances'],
+    ['N','Insurance, legal, finance'],
+    ['O','Production overheads / general expenses'],
+    ['P','Contingency'],
+    ['Q','Production fee']
+  ]
+};
 
-/* ---- live, in-memory state (session only) ---- */
-let budgetDemoProjects = null;              /* the working copy — see budgetDemoInit() */
+/* ---- Proper Corn ----
+   Kept from AU deliberately: ROW has no post work, so this is the only project on
+   which the "post" phaseSet is visible at all. Its lines live inline here purely as
+   the STARTING CONTENT for its budget record — bdmEnsureLoaded() writes them to
+   budget:bdm-proper-corn-hot-sauce the first time the record is found absent, the
+   same seed-if-empty idiom initApp() uses for travelMethodsList, and from then on
+   storage is the source of truth and this constant is never read again.
+   Proper Corn is not a project in projectsDB; it appears in the Budget screen's
+   project selector alongside the real ones and nowhere else in the app.
+   ⚠️ AU's other dataset, "IRL London 2026", is GONE — dropped entirely in AV. Do not
+   look for BUDGET_DEMO_DATA. */
+const BDM_PROPER_CORN_SEED = {
+  floatPercent: 5,
+  feePercent: 0,          /* deliberately 0 — the fee row and the grand total must both stay right */
+  sections: [
+    {id:'pcs-prod', name:'Production',            expectedCode:'PROD',    phaseSet:'shoot'},
+    {id:'pcs-cin',  name:'Camera',                expectedCode:'CIN',     phaseSet:'shoot'},
+    {id:'pcs-grip', name:'Grip & Lighting',       expectedCode:'GRIP',    phaseSet:'shoot'},
+    {id:'pcs-hmu',  name:'Vanities',              expectedCode:'HMU',     phaseSet:'shoot'},
+    {id:'pcs-set',  name:'Set, art & locations',  expectedCode:'SET',     phaseSet:'shoot'},
+    {id:'pcs-cat',  name:'Catering & travel',     expectedCode:'CAT/TRA', phaseSet:'shoot'},
+    {id:'pcs-post', name:'Post-production',       expectedCode:'POST',    phaseSet:'post'}
+  ],
+  lines: [
+    {id:'pc01', crewId:null, section:'pcs-prod', code:'PROD',    item:'Producer',        name:'Sabrina Goreeba',   days:{PreProd:8},  rate:500,  vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc02', crewId:null, section:'pcs-cin',  code:'CIN',     item:'Director / DOP',  name:'Matt Wells',        days:{Shoot:4},    rate:700,  vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc03', crewId:null, section:'pcs-cin',  code:'CIN',     item:'Camera Op',       name:'George Pearton',    days:{Shoot:1},    rate:750,  vatRate:0.2, floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc04', crewId:null, section:'pcs-grip', code:'GRIP',    item:'Grip',            name:'Alex McGill',       days:{Shoot:1},    rate:668,  vatRate:0.2, floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc05', crewId:null, section:'pcs-hmu',  code:'HMU',     item:'Hair & Make-up',  name:'Jojo Ferreira',     days:{Shoot:1},    rate:500,  vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc06', crewId:null, section:'pcs-set',  code:'SET',     item:'Location — Studio Kitchen', name:'Hoxton Kitchen Studios', days:{Buyout:1}, rate:2500, vatRate:0.2, floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc07', crewId:null, section:'pcs-set',  code:'SET',     item:'Props',           name:'Prop House London', days:{PreProd:1},  rate:600,  vatRate:0.2, floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc08', crewId:null, section:'pcs-set',  code:'SET',     item:'Set Designer',    name:'Elle Bramwell',     days:{PreProd:2},  rate:550,  vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc09', crewId:null, section:'pcs-cat',  code:'CAT/TRA', item:'Catering',        name:'Local Deli',        days:{Shoot:10},   rate:20,   vatRate:0.2, floatPercent:null, bbcOverride:'', notes:'10 covers'},
+    /* POST — its own phase columns, per its section's phaseSet above */
+    {id:'pc10', crewId:null, section:'pcs-post', code:'POST', item:'Editor',    name:'Tom Rowlands', days:{Assembly:3, PreV1:2, Delivery:1},                     rate:350, vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc11', crewId:null, section:'pcs-post', code:'POST', item:'Editor',    name:'Nina Patel',   days:{Assembly:2, PreV1:2, PreV2:2},                        rate:350, vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc12', crewId:null, section:'pcs-post', code:'POST', item:'Editor',    name:'Joe Adeyemi',  days:{PreV1:2, 'V1 Feedback':1, PreV2:2, 'V2 Feedback':1},  rate:350, vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc13', crewId:null, section:'pcs-post', code:'POST', item:'Grade',     name:'Cheat Colour', days:{Delivery:1}, rate:400, vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc14', crewId:null, section:'pcs-post', code:'POST', item:'Audio Mix', name:'Wave Studios', days:{Delivery:1}, rate:500, vatRate:0,   floatPercent:null, bbcOverride:'', notes:''},
+    {id:'pc15', crewId:null, section:'pcs-post', code:'POST', item:'Drives',    name:'LaCie',        days:{PreProd:3},  rate:120, vatRate:0.2, floatPercent:null, bbcOverride:'', notes:'3 × 4TB'}
+  ]
+};
+
+/* ---- live state ---- */
+let bdmSettings = null;             /* the db:budget_settings record, once loaded */
+let bdmRecords  = {};               /* projectId -> the budget:<id> record, once loaded */
+let bdmLoading  = {};               /* projectId -> true while a load is in flight */
 let budgetDemoProjectId = null;
-let budgetDemoLens = 'dept';                /* 'dept' | 'bbc' */
-let budgetDemoCollapsed = new Set();        /* group keys currently collapsed */
+let budgetDemoLens = 'dept';        /* 'dept' | 'bbc' */
+let budgetDemoCollapsed = new Set();/* group keys currently collapsed */
+/* Held OUTSIDE the DOM for the reason aiScanDraftText documents: renderMain()
+   replaces the whole panel and would blank a half-typed section name. */
+let bdmNewSection = {name:'', expectedCode:'PROD', phaseSet:'shoot'};
 
-function budgetDemoInit(){
-  if(!budgetDemoProjects) budgetDemoProjects = JSON.parse(JSON.stringify(BUDGET_DEMO_DATA));
-  if(!budgetDemoProjectId || !budgetDemoProjects.some(p=>p.id===budgetDemoProjectId))
-    budgetDemoProjectId = budgetDemoProjects[0].id;
+/* ---- normalisation ----
+   Everything below reads these shapes without defending itself, so a record coming
+   off the wire — or out of budget-seed-row.json — is put into shape once, here. */
+function bdmNormalizeSettings(s){
+  const d = BDM_SETTINGS_DEFAULTS;
+  s = (s && typeof s==='object') ? s : {};
+  return {
+    codes:     Array.isArray(s.codes)     && s.codes.length     ? s.codes     : d.codes,
+    phaseSets: (s.phaseSets && typeof s.phaseSets==='object' && Object.keys(s.phaseSets).length) ? s.phaseSets : d.phaseSets,
+    bbcRules:  Array.isArray(s.bbcRules)  && s.bbcRules.length  ? s.bbcRules  : d.bbcRules,
+    bbcCats:   Array.isArray(s.bbcCats)   && s.bbcCats.length   ? s.bbcCats   : d.bbcCats
+  };
 }
-function currentBudgetDemoProject(){
-  budgetDemoInit();
-  return budgetDemoProjects.find(p=>p.id===budgetDemoProjectId) || budgetDemoProjects[0];
+/* What a budget that has never been touched starts at. ⚠️ These are a fallback for
+   ABSENT, not for zero: a project deliberately carrying no float or no fee (Proper
+   Corn's fee is 0%) stores that 0 and must get it back, so this tests for
+   null/undefined/'' rather than falsiness — same rule as a line's own floatPercent. */
+const BDM_DEFAULT_FLOAT_PERCENT = 5;
+const BDM_DEFAULT_FEE_PERCENT = 10;
+const bdmPercentOr = (v, dflt) => (v===null || v===undefined || v==='') ? dflt : bdmNum(v);
+function bdmNormalizeRecord(r){
+  r = (r && typeof r==='object' && !Array.isArray(r)) ? r : {};
+  const secs = Array.isArray(r.sections) ? r.sections : [];
+  return {
+    floatPercent: bdmPercentOr(r.floatPercent, BDM_DEFAULT_FLOAT_PERCENT),
+    feePercent:   bdmPercentOr(r.feePercent,   BDM_DEFAULT_FEE_PERCENT),
+    sections: secs.map((s,i)=>({
+      id:           s.id || ('sec'+i),
+      name:         s.name || 'Section',
+      expectedCode: s.expectedCode || '',
+      phaseSet:     s.phaseSet || 'shoot'
+    })),
+    lines: (Array.isArray(r.lines) ? r.lines : []).map((l,i)=>({
+      id:      l.id || ('bdm'+i+'_'+Math.random().toString(36).slice(2,7)),
+      crewId:  l.crewId || null,
+      section: l.section || '',
+      code:    l.code || '',
+      item:    l.item || '',
+      name:    l.name || '',
+      days:    (l.days && typeof l.days==='object') ? l.days : {},
+      rate:    bdmNum(l.rate),
+      vatRate: bdmNum(l.vatRate),
+      /* null/'' means "follow the project" — 0 is a real, stored value and must
+         survive the round trip, so this cannot be `bdmNum(l.floatPercent) || null` */
+      floatPercent: bdmPercentOr(l.floatPercent, null),
+      bbcOverride: l.bbcOverride || '',
+      notes:   l.notes || ''
+    }))
+  };
 }
-function setBudgetDemoProject(id){ budgetDemoProjectId = id; budgetDemoCollapsed = new Set(); renderMain(); }
-function setBudgetDemoLens(lens){ budgetDemoLens = lens; budgetDemoCollapsed = new Set(); renderMain(); }
 
-/* ---- small shared helpers ---- */
-/* Every editable figure is a plain text field (the app has no styled number input —
+/* ---- which projects the selector offers ----
+   The real projects, plus Proper Corn, which is not in projectsDB and exists only
+   here (see BDM_PROPER_CORN_SEED). */
+function bdmProjectList(){
+  return projectsDB.map(p=>({ id:p.id, name:p.title || p.client || p.id }))
+    .concat([{ id:BDM_PROPER_CORN_ID, name:'Proper Corn Hot Sauce' }]);
+}
+function bdmProjectName(id){
+  const hit = bdmProjectList().find(x=>x.id===id);
+  return hit ? hit.name : id;
+}
+/* Defaults to the project you already have open — goBudgetDemo() is the one sidebar
+   route that keeps it — and falls back to the first in the list. */
+function bdmCurrentProjectId(){
+  const list = bdmProjectList();
+  if(budgetDemoProjectId && list.some(x=>x.id===budgetDemoProjectId)) return budgetDemoProjectId;
+  if(currentProjectId && list.some(x=>x.id===currentProjectId)) return currentProjectId;
+  return list.length ? list[0].id : BDM_PROPER_CORN_ID;
+}
+function currentBudgetDemoProject(){ return bdmRecords[bdmCurrentProjectId()] || null; }
+
+/* ---- load ----
+   One key, on demand. Deliberately NOT loaded in initApp(): there is one record per
+   project and startup already makes ten sequential round trips. Always populates the
+   cache, including on a failed read (loadDB returns {} and this becomes an empty
+   budget), so the render below can never loop waiting for it.
+
+   ⚠️ A second call while the first is still in flight gets THE SAME PROMISE, never a
+   null. renderBudgetDemo() paints a loading shell and re-renders when this resolves,
+   so returning an already-settled null to the second caller made it re-render
+   immediately, re-enter with the record still absent, and spin — a hard hang of the
+   whole tab, on nothing more exotic than a slow read plus any re-render landing in
+   the same window (which applyMergedDB() does on its own after a merge). Handing back
+   the in-flight promise means every caller waits for the one read and re-renders once,
+   after it. */
+function bdmEnsureLoaded(projectId){
+  if(bdmRecords[projectId]) return Promise.resolve(bdmRecords[projectId]);
+  if(bdmLoading[projectId]) return bdmLoading[projectId];
+  const inFlight = (async()=>{
+    const raw = await loadDB(BUDGET_KEY_PREFIX + projectId);
+    let rec = bdmNormalizeRecord(raw);
+    /* Proper Corn's one-time seed — see BDM_PROPER_CORN_SEED. The cache is populated
+       BEFORE the write, so the render that saveDB may trigger finds a record. */
+    if(projectId===BDM_PROPER_CORN_ID && !rec.lines.length && !rec.sections.length){
+      rec = bdmNormalizeRecord(BDM_PROPER_CORN_SEED);
+      bdmRecords[projectId] = rec;
+      await saveDB(BUDGET_KEY_PREFIX + projectId, rec);
+    }
+    bdmRecords[projectId] = rec;
+    return rec;
+  })().finally(()=>{ delete bdmLoading[projectId]; });
+  bdmLoading[projectId] = inFlight;
+  return inFlight;
+}
+
+/* ---- save ----
+   Autosave on edit, debounced, through the app's existing scheduleAutosave +
+   flashSaveResult pair — the same save indicator every other autosaving field in the
+   app already uses. ⚠️ Keyed per project, and it writes ONE key: a budget edit must
+   never rewrite every project's budget. */
+function bdmTouch(projectId){
+  const id = projectId || bdmCurrentProjectId();
+  scheduleAutosave(BUDGET_KEY_PREFIX + id, ()=>bdmSaveNow(id));
+}
+async function bdmSaveNow(id){
+  const rec = bdmRecords[id];
+  if(!rec) return;
+  flashSaveResult('bdmStatus', await saveDB(BUDGET_KEY_PREFIX + id, rec));
+}
+
+/* ---- small shared helpers ----
+   Every editable figure is a plain text field (the app has no styled number input —
    fields are ruled lines), so everything gets parsed on the way in. */
 function bdmNum(v){ const n = parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isFinite(n) ? n : 0; }
 /* Group keys become DOM ids, and 'CAT/TRA' carries a slash. */
 function bdmSlug(s){ return String(s).replace(/[^A-Za-z0-9]+/g,'_'); }
-
-/* The bucket set for one section, per project. */
-function budgetDemoPhases(p, code){
-  const sets = p.phaseSets || {};
-  return sets[code] || sets.default || BUDGET_DEMO_SHOOT_PHASES;
+function bdmCodes(){ return (bdmSettings ? bdmSettings.codes : BDM_SETTINGS_DEFAULTS.codes); }
+function bdmCodeLabel(code){ const hit = bdmCodes().find(c=>c.code===code); return hit ? hit.label : (code||'—'); }
+function bdmBbcCats(){ return (bdmSettings ? bdmSettings.bbcCats : BDM_SETTINGS_DEFAULTS.bbcCats); }
+function bdmBbcLabel(cat){ const hit = bdmBbcCats().find(c=>c[0]===cat); return hit ? hit[1] : cat; }
+/* A named phase set, by name. Unknown names fall back to shoot rather than to no
+   columns at all. */
+function bdmPhaseSet(name){
+  const sets = (bdmSettings ? bdmSettings.phaseSets : BDM_SETTINGS_DEFAULTS.phaseSets) || {};
+  return sets[name] || sets.shoot || BDM_SETTINGS_DEFAULTS.phaseSets.shoot;
 }
-/* The columns to show for a rendered GROUP. In the Departments lens a group is one
-   code, so this is just that code's set. In the BBC lens a category can in principle
-   collect lines from codes with different sets, so it unions them — first set wins on
-   order, anything new is appended. In practice L only ever holds POST lines and the
-   rest only ever hold shoot-phase lines, so this returns a single set either way. */
-function budgetDemoGroupPhases(p, lines){
+function bdmSection(rec, id){ return rec.sections.find(s=>s.id===id) || null; }
+/* The phase columns for a GROUP. In the Departments lens a group is one section, so
+   this is that section's set. In the BBC lens a category can collect lines from
+   sections with different sets, so it unions them — first set wins on order. */
+function bdmGroupPhases(rec, lines){
   const out = [];
-  const codes = [...new Set(lines.map(l=>l.code))];
-  (codes.length ? codes : ['__none__']).forEach(code=>{
-    budgetDemoPhases(p, code).forEach(ph=>{ if(!out.includes(ph)) out.push(ph); });
+  const setNames = [...new Set(lines.map(l=>{ const s = bdmSection(rec, l.section); return s ? s.phaseSet : 'shoot'; }))];
+  (setNames.length ? setNames : ['shoot']).forEach(n=>{
+    bdmPhaseSet(n).forEach(ph=>{ if(!out.includes(ph)) out.push(ph); });
   });
   return out;
 }
 
-/* ---- the calculated fields. Nothing below is ever stored. ---- */
-function budgetDemoLineMath(p, l){
+/* ---- the calculated fields. Nothing below is ever stored. ----
+   daysTotal, total, vat, float, totalWithFloat and the resolved BBC category are all
+   derived on every read. ⚠️ Float is per LINE, not one bottom-line row — a section or
+   code total already includes it. ⚠️ The production fee is calculated on the
+   float-INCLUSIVE subtotal, deliberately. ⚠️ VAT is excluded from every percentage
+   and from the grand total, and shown in its own column. */
+/* The line's own float % when it has one, the project's when it doesn't. ⚠️ 0 is a
+   real per-line value (real lines carry zero float) and must not fall through to the
+   project's, which is why this tests for null rather than falsiness. */
+function bdmLineFloatPercent(rec, l){
+  return (l.floatPercent===null || l.floatPercent===undefined || l.floatPercent==='')
+    ? bdmNum(rec.floatPercent) : bdmNum(l.floatPercent);
+}
+function budgetDemoLineMath(rec, l){
   const daysTotal = Object.values(l.days||{}).reduce((a,b)=>a+bdmNum(b), 0);
   const total = bdmNum(l.rate) * daysTotal;
   const vat = total * bdmNum(l.vatRate);
-  const flt = total * (bdmNum(p.floatPercent)/100);
+  const flt = total * (bdmLineFloatPercent(rec, l)/100);
   return { daysTotal, total, vat, float: flt, totalWithFloat: total + flt };
 }
-function budgetDemoTotals(p){
+function budgetDemoTotals(rec){
   let total=0, floatTotal=0, vat=0;
-  p.lines.forEach(l=>{ const m = budgetDemoLineMath(p,l); total+=m.total; floatTotal+=m.float; vat+=m.vat; });
+  rec.lines.forEach(l=>{ const m = budgetDemoLineMath(rec,l); total+=m.total; floatTotal+=m.float; vat+=m.vat; });
   const subtotal = total + floatTotal;
-  const fee = subtotal * (bdmNum(p.feePercent)/100);   /* deliberately on the float-INCLUSIVE subtotal */
+  const fee = subtotal * (bdmNum(rec.feePercent)/100);   /* deliberately on the float-INCLUSIVE subtotal */
   return { total, floatTotal, vat, subtotal, fee, grand: subtotal + fee };
 }
 
 /* ---- the BBC lens's one piece of real logic ----
-   A line's bbcOverride wins over everything. Insurance / Risk Assessment is a
-   cross-cutting rule (it applies whatever the code says), so it is tested before the
-   per-code rules rather than inside them. */
-function budgetDemoBbcCategory(l){
+   bbcOverride wins over everything. Otherwise the ordered rules table in
+   db:budget_settings is walked top to bottom and the FIRST match wins — see
+   BDM_SETTINGS_DEFAULTS.bbcRules for what each field means and why `match` is tested
+   against the item text alone. */
+function budgetDemoBbcCategory(rec, l){
   if(l.bbcOverride) return l.bbcOverride;
-  const item = String(l.item||''), name = String(l.name||'');
-  if(/insurance|risk assessment/i.test(item)) return 'N';
-  switch(l.code){
-    case 'PROD':    return /executive producer|line producer|producer|director/i.test(item+' '+name) ? 'C' : 'E';
-    case 'CIN':     return 'F';
-    case 'AUD':     return /kit/i.test(item) ? 'H' : 'F';
-    case 'GRIP':    return 'F';
-    case 'EQUIP':   return 'H';
-    case 'SET':     return /location|venue/i.test(item) ? 'I' : 'G';
-    case 'HMU':     return 'G';
-    case 'CAT/TRA': return 'J';
-    case 'POST':    return 'L';
-    case 'TAL':     return 'D';
-    default:        return 'O';
+  const sec = bdmSection(rec, l.section);
+  const phaseSet = (sec && sec.phaseSet) || 'shoot';
+  const item = String(l.item||'').toLowerCase();
+  const rules = (bdmSettings ? bdmSettings.bbcRules : BDM_SETTINGS_DEFAULTS.bbcRules) || [];
+  for(let i=0; i<rules.length; i++){
+    const r = rules[i];
+    if(r.code && r.code!==l.code) continue;
+    if(r.phase && r.phase!=='any' && r.phase!==phaseSet) continue;
+    if(r.match){
+      const terms = String(r.match).split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      if(!terms.some(t=>item.indexOf(t)!==-1)) continue;
+    }
+    return r.cat;
   }
+  return 'O';
 }
 
-/* ---- grouping: the lines never change, only which bucket they're read in ---- */
-function budgetDemoGroups(p){
+/* ---- the two information-only markers ----
+   Neither changes a value, and neither excludes a line from any total. */
+/* A line whose code differs from its section's expectedCode. */
+function bdmMiscodeFlag(rec, l){
+  const sec = bdmSection(rec, l.section);
+  if(!sec || !sec.expectedCode || !l.code || sec.expectedCode===l.code) return '';
+  return `<span class="bdm-flag" title="Coded ${esc(l.code)}, sits in ${esc(sec.name)}">⚑</span>`;
+}
+/* A crew-linked line whose stored rate no longer matches the crew record's current
+   rate. ⚠️ This is the ONLY read of crewDB in this section, and it is a comparison —
+   it never writes the crew value back into the line. See COPY NOT LOOKUP above. */
+function bdmRateDriftFlag(l){
+  if(!l.crewId) return '';
+  const c = crewById(l.crewId);
+  if(!c) return '';
+  const now = parseRateNumber(c.rate);
+  if(now==null || now===bdmNum(l.rate)) return '';
+  return `<span class="bdm-flag" title="Crew rate is now ${budgetFmt(now)}">≠</span>`;
+}
+
+/* ---- grouping: the lines never change, only the bucket they are read in ----
+   Departments lens → one group per SECTION, totalling totalWithFloat.
+   BBC lens         → one group per derived category, totalling total EX-float,
+                      because in that lens the float is pooled into P and must not
+                      also be spread through the categories.
+   Both give the same subtotal — every line is counted exactly once either way. */
+function budgetDemoGroups(rec){
   if(budgetDemoLens==='bbc'){
     const byCat = {};
-    p.lines.forEach(l=>{ const c = budgetDemoBbcCategory(l); (byCat[c] = byCat[c] || []).push(l); });
-    return BUDGET_DEMO_BBC_CATEGORIES
-      .filter(([c])=> c!=='P' && c!=='Q' && byCat[c])
-      .map(([c,label])=>{
-        const lines = byCat[c];
-        /* ex-float here: in this lens float is pooled into category P, not spread
-           through the categories, so a category row and P must not both carry it */
-        const total = lines.reduce((a,l)=>a+budgetDemoLineMath(p,l).total, 0);
-        const vat   = lines.reduce((a,l)=>a+budgetDemoLineMath(p,l).vat, 0);
-        return { key:c, code:c, label, lines, total, vat,
+    rec.lines.forEach(l=>{ const c = budgetDemoBbcCategory(rec,l); (byCat[c] = byCat[c] || []).push(l); });
+    return bdmBbcCats()
+      .filter(c=> c[0]!=='P' && c[0]!=='Q' && byCat[c[0]])
+      .map(c=>{
+        const lines = byCat[c[0]];
+        const total = lines.reduce((a,l)=>a+budgetDemoLineMath(rec,l).total, 0);
+        const vat   = lines.reduce((a,l)=>a+budgetDemoLineMath(rec,l).vat, 0);
+        return { key:c[0], code:c[0], label:c[1], lines, total, vat,
                  totalLabel:'Category total (ex-float — float is category P)',
-                 addCode: lines[0].code };
+                 addSection: lines[0].section };
       });
   }
-  return BUDGET_DEMO_CODES
-    .map(code=>{
-      const lines = p.lines.filter(l=>l.code===code);
-      if(!lines.length) return null;
-      const total = lines.reduce((a,l)=>a+budgetDemoLineMath(p,l).totalWithFloat, 0);
-      const vat   = lines.reduce((a,l)=>a+budgetDemoLineMath(p,l).vat, 0);
-      return { key:bdmSlug(code), code, label:BUDGET_DEMO_CODE_LABELS[code], lines, total, vat,
-               totalLabel:'Department total (inc. float)', addCode: code };
-    })
-    .filter(Boolean);
+  const groups = rec.sections.map(s=>{
+    const lines = rec.lines.filter(l=>l.section===s.id);
+    const total = lines.reduce((a,l)=>a+budgetDemoLineMath(rec,l).totalWithFloat, 0);
+    const vat   = lines.reduce((a,l)=>a+budgetDemoLineMath(rec,l).vat, 0);
+    return { key:bdmSlug(s.id), code:s.expectedCode, label:s.name, lines, total, vat,
+             totalLabel:'Section total (inc. float)', addSection:s.id, sectionId:s.id };
+  });
+  /* A line whose section id doesn't resolve would otherwise be invisible in the line
+     detail while still counting on the top sheet. It gets a bucket of its own so it
+     can be seen and re-sectioned. */
+  const orphans = rec.lines.filter(l=>!bdmSection(rec, l.section));
+  if(orphans.length){
+    const total = orphans.reduce((a,l)=>a+budgetDemoLineMath(rec,l).totalWithFloat, 0);
+    const vat   = orphans.reduce((a,l)=>a+budgetDemoLineMath(rec,l).vat, 0);
+    groups.push({ key:'__unsectioned', code:'', label:'Not in a section', lines:orphans, total, vat,
+                  totalLabel:'Section total (inc. float)', addSection:'', sectionId:'' });
+  }
+  return groups;
 }
-function budgetDemoGroupByKey(p, key){ return budgetDemoGroups(p).find(g=>g.key===key) || null; }
+function budgetDemoGroupByKey(rec, key){ return budgetDemoGroups(rec).find(g=>g.key===key) || null; }
 
-/* ---- top sheet ---- */
-/* Departments: one row per code in use. BBC: all of A–P whether they hold lines or
-   not — an empty category at £0 is information (nothing was spent on archive), so it
-   gets a labelled row rather than being dropped. Q is the fee and renders below the
-   subtotal, which is both its ordered position and where it actually applies. */
-function budgetDemoTopSheetRows(p, t){
-  const groups = budgetDemoGroups(p);
-  if(budgetDemoLens!=='bbc') return groups.map(g=>({code:g.code, label:g.label, total:g.total, vat:g.vat, empty:false}));
+/* ---- top sheet ----
+   ⚠️ The Departments lens totals by CODE, not by section — a line counts under the
+   code it carries wherever it happens to display. See SECTIONS vs CODES above.
+   BBC: all of A–P whether they hold lines or not — an empty category at £0 is
+   information (nothing was spent on archive), so it gets a labelled row rather than
+   being dropped. Q is the fee and renders below the subtotal, which is both its
+   ordered position and where it actually applies. */
+function budgetDemoTopSheetRows(rec, t){
+  if(budgetDemoLens!=='bbc'){
+    const byCode = {};
+    rec.lines.forEach(l=>{ (byCode[l.code] = byCode[l.code] || []).push(l); });
+    const ordered = bdmCodes().map(c=>c.code).filter(c=>byCode[c]);
+    /* a line carrying a code that isn't in the settings list still has to appear */
+    Object.keys(byCode).forEach(c=>{ if(!ordered.includes(c)) ordered.push(c); });
+    return ordered.map(code=>({
+      code,
+      label: bdmCodeLabel(code),
+      total: byCode[code].reduce((a,l)=>a+budgetDemoLineMath(rec,l).totalWithFloat, 0),
+      vat:   byCode[code].reduce((a,l)=>a+budgetDemoLineMath(rec,l).vat, 0),
+      empty: false
+    }));
+  }
+  const groups = budgetDemoGroups(rec);
   const byKey = Object.fromEntries(groups.map(g=>[g.key, g]));
-  return BUDGET_DEMO_BBC_CATEGORIES.filter(([c])=>c!=='Q').map(([c,label])=>{
-    if(c==='P') return {code:'P', label:'Contingency (float @ '+bdmNum(p.floatPercent)+'%)', total:t.floatTotal, vat:0, empty:!t.floatTotal};
-    const g = byKey[c];
-    return {code:c, label, total:g?g.total:0, vat:g?g.vat:0, empty:!g};
+  return bdmBbcCats().filter(c=>c[0]!=='Q').map(c=>{
+    if(c[0]==='P') return {code:'P', label:'Contingency (float)', total:t.floatTotal, vat:0, empty:!t.floatTotal};
+    const g = byKey[c[0]];
+    return {code:c[0], label:c[1], total:g?g.total:0, vat:g?g.vat:0, empty:!g};
   });
 }
-function budgetDemoTopSheetHTML(p){
-  const t = budgetDemoTotals(p);
-  const rows = budgetDemoTopSheetRows(p, t);
+function budgetDemoTopSheetHTML(rec){
+  const t = budgetDemoTotals(rec);
+  const rows = budgetDemoTopSheetRows(rec, t);
   const pct = v => t.subtotal ? (v/t.subtotal*100).toFixed(1)+'%' : '—';
   const bbc = budgetDemoLens==='bbc';
-  const feeLabel = `${bbc?'<span class="bdm-cat-letter">Q</span>':''}Production fee (${bdmNum(p.feePercent)}%)`;
+  const feeLabel = `${bbc?'<span class="bdm-cat-letter">Q</span>':''}Production fee (${bdmNum(rec.feePercent)}%)`;
   return `
     <div class="budget-summary">
       <div class="budget-stat"><div class="num">${budgetFmt(t.subtotal)}</div><div class="lbl">Subtotal</div></div>
@@ -8390,7 +8677,7 @@ function budgetDemoTopSheetHTML(p){
     </div>
     <div class="tablewrap"><table>
       <tr>
-        <th>${bbc?'BBC category':'Department'}</th>
+        <th>${bbc?'BBC category':'Code'}</th>
         <th class="bdm-num">Total</th>
         <th class="bdm-num">% of subtotal</th>
         <th class="bdm-num">VAT</th>
@@ -8419,49 +8706,59 @@ function budgetDemoTopSheetHTML(p){
         <td class="bdm-num">${budgetFmt(t.vat)}</td>
       </tr>
     </table></div>
-    <div class="hint">Float is carried on every line, not as one bottom-line row, so a department
-      total already includes it. The production fee is calculated on the float-inclusive subtotal.
+    <div class="hint">${bbc
+      ? 'Categories total ex-float; the float is pooled into P.'
+      : 'Rows total by the CODE each line carries, which is not always the section it displays under — a line marked ⚑ counts here under its own code.'}
+      Float is carried on every line, not as one bottom-line row, so a total already includes it.
+      The production fee is calculated on the float-inclusive subtotal.
       VAT is shown alongside and is excluded from every percentage and from the grand total.</div>`;
 }
 
 /* ---- line detail ---- */
-function budgetDemoSectionHTML(p, g){
+function budgetDemoSectionHTML(rec, g){
   const collapsed = budgetDemoCollapsed.has(g.key);
   const head = deptHeaderHTML(g.label, g.lines.length, collapsed, `toggleBudgetDemoSection('${g.key}')`, g.code);
   if(collapsed) return `<div class="bdm-section">${head}</div>`;
+  const canDelete = budgetDemoLens!=='bbc' && g.sectionId && !g.lines.length;
   return `<div class="bdm-section">${head}
-    ${budgetDemoLinesTableHTML(p, g)}
+    ${g.lines.length ? budgetDemoLinesTableHTML(rec, g) : '<div class="empty-note">No lines in this section yet.</div>'}
     <div class="bdm-sec-foot toolbar">
       <button class="small" onclick="addBudgetDemoLine('${g.key}')">+ Add line</button>
+      ${canDelete?`<button class="small" onclick="deleteBudgetDemoSection('${esc(g.sectionId)}')">Remove section</button>`:''}
       <span class="status">${esc(g.totalLabel)} <strong id="bdm-secttl-${g.key}">${budgetFmt(g.total)}</strong></span>
     </div>
   </div>`;
 }
-function budgetDemoLinesTableHTML(p, g){
-  const phases = budgetDemoGroupPhases(p, g.lines);
-  const post = phases.length > BUDGET_DEMO_SHOOT_PHASES.length;
-  const codeOpts = l => BUDGET_DEMO_CODES.map(c=>`<option value="${esc(c)}" ${l.code===c?'selected':''}>${esc(c)}</option>`).join('');
-  const bbcOpts = l => `<option value="">auto</option>` + BUDGET_DEMO_BBC_CATEGORIES.map(([c])=>
-    `<option value="${c}" ${l.bbcOverride===c?'selected':''}>${c}</option>`).join('');
-  return `<div class="tablewrap bdm-lines ${post?'bdm-lines-post':''}"><table>
+function budgetDemoLinesTableHTML(rec, g){
+  const phases = bdmGroupPhases(rec, g.lines);
+  const wide = phases.length > bdmPhaseSet('shoot').length;
+  const sectionOpts = l => rec.sections.map(s=>
+    `<option value="${esc(s.id)}" ${l.section===s.id?'selected':''}>${esc(s.name)}</option>`).join('')
+    + (bdmSection(rec, l.section) ? '' : `<option value="${esc(l.section||'')}" selected>— none —</option>`);
+  const codeOpts = l => bdmCodes().map(c=>`<option value="${esc(c.code)}" ${l.code===c.code?'selected':''}>${esc(c.code)}</option>`).join('');
+  const bbcOpts = l => `<option value="">auto</option>` + bdmBbcCats().map(c=>
+    `<option value="${c[0]}" ${l.bbcOverride===c[0]?'selected':''}>${c[0]}</option>`).join('');
+  return `<div class="tablewrap bdm-lines ${wide?'bdm-lines-post':''}"><table>
     <tr>
-      <th>Code</th><th>BBC</th><th>Item</th><th>Name</th>
+      <th>Section</th><th>Code</th><th>BBC</th><th>Item</th><th>Name</th>
       ${phases.map(ph=>`<th class="bdm-num">${esc(ph)}</th>`).join('')}
-      <th class="bdm-num">Days</th><th class="bdm-num">Rate</th><th>VAT</th>
+      <th class="bdm-num">Days</th><th class="bdm-num">Rate</th><th class="bdm-num">Float %</th><th>VAT</th>
       <th class="bdm-num">Total</th><th class="bdm-num">Float</th><th class="bdm-num">Total + float</th>
       <th>Notes</th><th></th>
     </tr>
     ${g.lines.map(l=>{
-      const m = budgetDemoLineMath(p, l);
+      const m = budgetDemoLineMath(rec, l);
       return `<tr>
-        <td><select class="pill-select bdm-code-select" onchange="setBudgetDemoLineField('${l.id}','code',this.value)">${codeOpts(l)}</select></td>
-        <td><select class="pill-select bdm-bbc-select" title="Blank derives the category from the code and the item text" onchange="setBudgetDemoLineField('${l.id}','bbcOverride',this.value)">${bbcOpts(l)}</select>
-            <span class="empty-note">${esc(budgetDemoBbcCategory(l))}</span></td>
+        <td><select class="pill-select bdm-section-select" onchange="setBudgetDemoLineField('${l.id}','section',this.value)">${sectionOpts(l)}</select></td>
+        <td><select class="pill-select bdm-code-select" onchange="setBudgetDemoLineField('${l.id}','code',this.value)">${codeOpts(l)}</select>${bdmMiscodeFlag(rec, l)}</td>
+        <td><select class="pill-select bdm-bbc-select" title="Blank derives the category from the rules table in Settings" onchange="setBudgetDemoLineField('${l.id}','bbcOverride',this.value)">${bbcOpts(l)}</select>
+            <span class="empty-note">${esc(budgetDemoBbcCategory(rec, l))}</span></td>
         <td><input type="text" class="bdm-text-input" value="${esc(l.item||'')}" oninput="setBudgetDemoLineText('${l.id}','item',this.value)" onchange="renderMain()"></td>
         <td><input type="text" class="bdm-text-input" value="${esc(l.name||'')}" oninput="setBudgetDemoLineText('${l.id}','name',this.value)" onchange="renderMain()"></td>
         ${phases.map(ph=>`<td class="bdm-num"><input type="text" class="bdm-day-input" inputmode="decimal" value="${esc(String((l.days&&l.days[ph])||''))}" oninput="setBudgetDemoDay('${l.id}','${esc(ph)}',this.value)"></td>`).join('')}
         <td class="bdm-num" id="bdm-${l.id}-days">${m.daysTotal}</td>
-        <td class="bdm-num"><input type="text" class="bdm-rate-input" inputmode="decimal" value="${esc(String(l.rate||0))}" oninput="setBudgetDemoRate('${l.id}',this.value)"></td>
+        <td class="bdm-num"><input type="text" class="bdm-rate-input" inputmode="decimal" value="${esc(String(l.rate||0))}" oninput="setBudgetDemoRate('${l.id}',this.value)">${bdmRateDriftFlag(l)}</td>
+        <td class="bdm-num"><input type="text" class="bdm-float-input" inputmode="decimal" title="Blank follows the project's float. 0 is a real value — a line can carry no float." placeholder="${esc(String(bdmNum(rec.floatPercent)))}" value="${l.floatPercent===null?'':esc(String(l.floatPercent))}" oninput="setBudgetDemoLineFloat('${l.id}',this.value)"></td>
         <td><select class="pill-select bdm-vat-select" onchange="setBudgetDemoLineField('${l.id}','vatRate',this.value)">
               <option value="0" ${bdmNum(l.vatRate)?'':'selected'}>0%</option>
               <option value="0.2" ${bdmNum(l.vatRate)?'selected':''}>20%</option>
@@ -8480,55 +8777,100 @@ function budgetDemoLinesTableHTML(p, g){
    Two speeds, for the reason aiScanDraftText documents: a render replaces the whole
    panel and would blank whatever is half-typed. So the figures update through a
    TARGETED refresh that only rewrites derived text (the renderCateringSummaryGridSection
-   pattern), and only an edit that can MOVE a line between groups — its code, its BBC
-   override, or the item/name text the BBC rules read — re-renders, and then only once
-   focus has left the field (onchange). */
-function budgetDemoLine(id){ const p = currentBudgetDemoProject(); return p.lines.find(l=>l.id===id) || null; }
-function setBudgetDemoLineText(id, field, v){ const l = budgetDemoLine(id); if(l) l[field] = v; }
+   pattern), and only an edit that can MOVE a line between groups — its section, its
+   code, its BBC override, or the item text the BBC rules read — re-renders, and then
+   only once focus has left the field (onchange).
+   Every one of them ends in bdmTouch(), the debounced save. */
+function budgetDemoLine(id){ const rec = currentBudgetDemoProject(); return rec ? (rec.lines.find(l=>l.id===id) || null) : null; }
+function setBudgetDemoLineText(id, field, v){ const l = budgetDemoLine(id); if(l){ l[field] = v; bdmTouch(); } }
 function setBudgetDemoLineField(id, field, v){
   const l = budgetDemoLine(id); if(!l) return;
   l[field] = (field==='vatRate') ? bdmNum(v) : v;
+  bdmTouch();
   renderMain();
 }
-function setBudgetDemoRate(id, v){ const l = budgetDemoLine(id); if(!l) return; l.rate = bdmNum(v); refreshBudgetDemoNumbers(); }
+function setBudgetDemoRate(id, v){ const l = budgetDemoLine(id); if(!l) return; l.rate = bdmNum(v); bdmTouch(); refreshBudgetDemoNumbers(); }
+/* ⚠️ An empty field means "follow the project"; a typed 0 means "no float on this
+   line" and is stored as 0. Those are different and both are legitimate. */
+function setBudgetDemoLineFloat(id, v){
+  const l = budgetDemoLine(id); if(!l) return;
+  l.floatPercent = (String(v).trim()==='') ? null : bdmNum(v);
+  bdmTouch(); refreshBudgetDemoNumbers();
+}
 function setBudgetDemoDay(id, phase, v){
   const l = budgetDemoLine(id); if(!l) return;
   l.days = l.days || {};
   const n = bdmNum(v);
   if(n) l.days[phase] = n; else delete l.days[phase];
-  refreshBudgetDemoNumbers();
+  bdmTouch(); refreshBudgetDemoNumbers();
 }
-function setBudgetDemoPercent(field, v){ const p = currentBudgetDemoProject(); p[field] = bdmNum(v); refreshBudgetDemoNumbers(); }
+function setBudgetDemoPercent(field, v){
+  const rec = currentBudgetDemoProject(); if(!rec) return;
+  rec[field] = bdmNum(v); bdmTouch(); refreshBudgetDemoNumbers();
+}
 
 function addBudgetDemoLine(key){
-  const p = currentBudgetDemoProject();
-  const g = budgetDemoGroupByKey(p, key);
-  p.lines.push({ id:'bdm'+uid(), code:(g?g.addCode:'PROD'), item:'New line', name:'',
-                 days:{}, rate:0, vatRate:0, bbcOverride:(budgetDemoLens==='bbc'&&g)?g.code:'', notes:'' });
+  const rec = currentBudgetDemoProject(); if(!rec) return;
+  const g = budgetDemoGroupByKey(rec, key);
+  const sectionId = (g && g.addSection) || (rec.sections[0] && rec.sections[0].id) || '';
+  const sec = bdmSection(rec, sectionId);
+  rec.lines.push({ id:'bdm'+uid(), crewId:null, section:sectionId,
+                   code:(sec && sec.expectedCode) || (bdmCodes()[0]||{}).code || '',
+                   item:'New line', name:'', days:{}, rate:0, vatRate:0, floatPercent:null,
+                   /* in the BBC lens the section it was added from says nothing about
+                      the category, so pin it to the one it was pressed in */
+                   bbcOverride:(budgetDemoLens==='bbc'&&g)?g.code:'', notes:'' });
+  bdmTouch();
   renderMain();
 }
 function deleteBudgetDemoLine(id){
-  const p = currentBudgetDemoProject();
-  const i = p.lines.findIndex(l=>l.id===id);
-  if(i>-1) p.lines.splice(i,1);
+  const rec = currentBudgetDemoProject(); if(!rec) return;
+  const i = rec.lines.findIndex(l=>l.id===id);
+  if(i>-1) rec.lines.splice(i,1);
+  bdmTouch();
+  renderMain();
+}
+
+/* ---- sections ----
+   The minimum needed for a budget record that starts empty to be usable at all: with
+   no sections there is no "+ Add line" anywhere, so LMAOF and Fashion Files would
+   have a budget that could never be started. Add and remove-when-empty only —
+   renaming and re-coding a section is a later phase's job, same as editing the
+   settings tables. */
+function setBudgetDemoNewSection(field, v){ bdmNewSection[field] = v; }
+function addBudgetDemoSection(){
+  const rec = currentBudgetDemoProject(); if(!rec) return;
+  const name = (bdmNewSection.name||'').trim();
+  if(!name){ alert('Give the section a name.'); return; }
+  rec.sections.push({ id:'sec'+uid(), name, expectedCode:bdmNewSection.expectedCode, phaseSet:bdmNewSection.phaseSet });
+  bdmNewSection = {name:'', expectedCode:bdmNewSection.expectedCode, phaseSet:bdmNewSection.phaseSet};
+  bdmTouch();
+  renderMain();
+}
+function deleteBudgetDemoSection(sectionId){
+  const rec = currentBudgetDemoProject(); if(!rec) return;
+  if(rec.lines.some(l=>l.section===sectionId)) return;   /* only ever offered when empty */
+  const i = rec.sections.findIndex(s=>s.id===sectionId);
+  if(i>-1) rec.sections.splice(i,1);
+  bdmTouch();
   renderMain();
 }
 
 /* Rewrites every derived figure in place, touching no input. */
 function refreshBudgetDemoNumbers(){
-  const p = currentBudgetDemoProject();
+  const rec = currentBudgetDemoProject(); if(!rec) return;
   const set = (elId, txt) => { const el = document.getElementById(elId); if(el) el.textContent = txt; };
   const ts = document.getElementById('bdmTopSheet');
-  if(ts) ts.innerHTML = budgetDemoTopSheetHTML(p);
-  p.lines.forEach(l=>{
-    const m = budgetDemoLineMath(p, l);
+  if(ts) ts.innerHTML = budgetDemoTopSheetHTML(rec);
+  rec.lines.forEach(l=>{
+    const m = budgetDemoLineMath(rec, l);
     set('bdm-'+l.id+'-days',  String(m.daysTotal));
     set('bdm-'+l.id+'-vat',   budgetFmt(m.vat));
     set('bdm-'+l.id+'-total', budgetFmt(m.total));
     set('bdm-'+l.id+'-float', budgetFmt(m.float));
     set('bdm-'+l.id+'-twf',   budgetFmt(m.totalWithFloat));
   });
-  budgetDemoGroups(p).forEach(g=> set('bdm-secttl-'+g.key, budgetFmt(g.total)));
+  budgetDemoGroups(rec).forEach(g=> set('bdm-secttl-'+g.key, budgetFmt(g.total)));
 }
 
 /* ---- collapse, the app's group pattern (deptHeaderHTML + a re-render) ---- */
@@ -8537,36 +8879,50 @@ function toggleBudgetDemoSection(key){
   renderMain();
 }
 function toggleAllBudgetDemoSections(){
-  const p = currentBudgetDemoProject();
-  const groups = budgetDemoGroups(p);
+  const rec = currentBudgetDemoProject(); if(!rec) return;
+  const groups = budgetDemoGroups(rec);
   const allCollapsed = groups.length>0 && groups.every(g=>budgetDemoCollapsed.has(g.key));
   budgetDemoCollapsed = allCollapsed ? new Set() : new Set(groups.map(g=>g.key));
   renderMain();
 }
+function setBudgetDemoProject(id){ budgetDemoProjectId = id; budgetDemoCollapsed = new Set(); renderMain(); }
+function setBudgetDemoLens(lens){ budgetDemoLens = lens; budgetDemoCollapsed = new Set(); renderMain(); }
 
 function renderBudgetDemo(m){
-  const p = currentBudgetDemoProject();
-  setTopbarTitle('Budget — ' + (p.name||''));
-  const groups = budgetDemoGroups(p);
-  const allCollapsed = groups.length>0 && groups.every(g=>budgetDemoCollapsed.has(g.key));
-  m.innerHTML = `
+  const id = bdmCurrentProjectId();
+  const name = bdmProjectName(id);
+  setTopbarTitle('Budget — ' + name);
+  const rec = bdmRecords[id];
+  const head = `
     <div class="page-head">
-      <h1>${esc(p.name)}</h1>
+      <h1>${esc(name)}</h1>
       <div class="eyebrow">${esc(COMPANY)} · Budget</div>
-      <div class="code">DEMO · EDITS LAST FOR THIS SESSION ONLY</div>
-    </div>
+    </div>`;
+  /* The record is loaded on demand, so the first paint for a project may have
+     nothing to draw. bdmEnsureLoaded() always populates the cache — including on a
+     failed read — so this can be entered at most once per project. */
+  if(!rec){
+    m.innerHTML = head + '<div class="empty-note">Loading budget…</div>';
+    bdmEnsureLoaded(id).then(()=>{ if(route.screen==='budget') renderMain(); });
+    return;
+  }
+  const groups = budgetDemoGroups(rec);
+  const allCollapsed = groups.length>0 && groups.every(g=>budgetDemoCollapsed.has(g.key));
+  m.innerHTML = head + `
     <div class="ts-grid bdm-proj-row">
       <div class="ts-field"><label for="bdmProject">Project</label>
         <select id="bdmProject" onchange="setBudgetDemoProject(this.value)">
-          ${budgetDemoProjects.map(x=>`<option value="${esc(x.id)}" ${x.id===p.id?'selected':''}>${esc(x.name)}</option>`).join('')}
+          ${bdmProjectList().map(x=>`<option value="${esc(x.id)}" ${x.id===id?'selected':''}>${esc(x.name)}</option>`).join('')}
         </select></div>
       <div class="ts-field"><label for="bdmFloat">Float %</label>
-        <input type="text" id="bdmFloat" class="fld-xs" inputmode="decimal" value="${esc(String(p.floatPercent))}"
+        <input type="text" id="bdmFloat" class="fld-xs" inputmode="decimal" value="${esc(String(rec.floatPercent))}"
           oninput="setBudgetDemoPercent('floatPercent', this.value)"></div>
       <div class="ts-field"><label for="bdmFee">Fee %</label>
-        <input type="text" id="bdmFee" class="fld-xs" inputmode="decimal" value="${esc(String(p.feePercent))}"
+        <input type="text" id="bdmFee" class="fld-xs" inputmode="decimal" value="${esc(String(rec.feePercent))}"
           oninput="setBudgetDemoPercent('feePercent', this.value)"></div>
-      <div class="hint">Placeholder selector — it switches between the two demo projects and nothing else.</div>
+      <span class="status" id="bdmStatus"></span>
+      <div class="hint">Every edit on this screen saves itself. The project float applies to any line
+        that hasn't been given a float of its own.</div>
     </div>
     <div class="tabs">
       <div class="tab ${budgetDemoLens==='dept'?'active':''}" onclick="setBudgetDemoLens('dept')">DEPARTMENTS</div>
@@ -8574,14 +8930,107 @@ function renderBudgetDemo(m){
     </div>
     <div class="section">
       <h2>Top sheet</h2>
-      <div id="bdmTopSheet">${budgetDemoTopSheetHTML(p)}</div>
+      <div id="bdmTopSheet">${budgetDemoTopSheetHTML(rec)}</div>
     </div>
     <div class="section">
       <h2>Line detail</h2>
       ${groups.length ? expandCollapseAllHTML('toggleAllBudgetDemoSections()', undefined, allCollapsed, 'bdm') : ''}
-      ${groups.length ? groups.map(g=>budgetDemoSectionHTML(p,g)).join('')
-                      : '<div class="empty-note">No lines on this project yet.</div>'}
+      ${groups.length ? groups.map(g=>budgetDemoSectionHTML(rec,g)).join('')
+                      : `<div class="empty-note">No budget on this project yet — add a section below to start one.</div>`}
+      ${budgetDemoLens==='bbc' ? '' : `
+      <div class="toolbar bdm-add-section">
+        <div class="ts-field"><label for="bdmNewSecName">New section</label>
+          <input type="text" id="bdmNewSecName" class="bdm-newsec-name" placeholder="e.g. Camera" value="${esc(bdmNewSection.name)}"
+            oninput="setBudgetDemoNewSection('name', this.value)"></div>
+        <div class="ts-field"><label for="bdmNewSecCode">Expected code</label>
+          <select id="bdmNewSecCode" onchange="setBudgetDemoNewSection('expectedCode', this.value)">
+            ${bdmCodes().map(c=>`<option value="${esc(c.code)}" ${bdmNewSection.expectedCode===c.code?'selected':''}>${esc(c.code)} — ${esc(c.label)}</option>`).join('')}
+          </select></div>
+        <div class="ts-field"><label for="bdmNewSecPhase">Phase set</label>
+          <select id="bdmNewSecPhase" onchange="setBudgetDemoNewSection('phaseSet', this.value)">
+            ${Object.keys((bdmSettings||BDM_SETTINGS_DEFAULTS).phaseSets).map(k=>
+              `<option value="${esc(k)}" ${bdmNewSection.phaseSet===k?'selected':''}>${esc(k)}</option>`).join('')}
+          </select></div>
+        <button class="small" onclick="addBudgetDemoSection()">+ Add section</button>
+      </div>`}
     </div>`;
+}
+
+/* ---- the ROW 2026 seed action (Settings) ----
+   ROW's budget lives in budget-seed-row.json in the repo, NOT inline in this file:
+   it is data, it is long, and once it has been seeded the app is where it is edited.
+   This action reads that file exactly once, writes it to budget:<ROW's id>, and from
+   then on storage is the source of truth and the file is never read again. */
+const BDM_ROW_SEED_FILE = 'budget-seed-row.json';
+async function seedRowBudget(){
+  let file;
+  try{
+    const res = await fetch(BDM_ROW_SEED_FILE, {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    file = await res.json();
+  }catch(e){
+    alert('Couldn’t read ' + BDM_ROW_SEED_FILE + ' — ' + ((e && e.message) || e));
+    return;
+  }
+  /* Resolve the target project by id, falling back to title — the id is the real
+     signal, the title is there so the file still lands if the record is rebuilt. */
+  const target = (file.projectId && projById(file.projectId))
+              || projectsDB.find(p=>(p.title||'')===(file.projectTitle||' '));
+  if(!target){
+    alert('Couldn’t find the project this file is for (' + esc(file.projectTitle || file.projectId || 'unnamed') + ').');
+    return;
+  }
+  const seeded = bdmNormalizeRecord(file);
+  if(!seeded.lines.length){
+    alert(BDM_ROW_SEED_FILE + ' has no budget lines in it, so there is nothing to seed.');
+    return;
+  }
+  const existing = await bdmEnsureLoaded(target.id);
+  if(existing && existing.lines.length){
+    const ok = confirm('“' + (target.title||target.id) + '” already has a budget with ' + existing.lines.length +
+      ' line' + (existing.lines.length===1?'':'s') + '.\n\nSeeding will REPLACE it entirely. Any edits made in the app will be lost.\n\nContinue?');
+    if(!ok) return;
+  }
+  bdmRecords[target.id] = seeded;
+  const res = await saveDB(BUDGET_KEY_PREFIX + target.id, seeded);
+  flashSaveResult('bdmSeedStatus', res, 'Seeded');
+  if(res && res.ok){
+    budgetDemoProjectId = target.id;
+    budgetDemoCollapsed = new Set();
+  }
+}
+
+/* ---- Settings (S-1.5) — the rules, read only ----
+   The point is that the codes, phase sets and BBC rules can be SEEN rather than
+   being buried in code. Editing them is a later phase. */
+function bdmSettingsTablesHTML(){
+  const s = bdmSettings || BDM_SETTINGS_DEFAULTS;
+  const phaseSetNames = Object.keys(s.phaseSets||{});
+  return `
+    <div class="subhead">Codes</div>
+    <div class="tablewrap bdm-settings-table"><table>
+      <tr><th>Code</th><th>Label</th></tr>
+      ${(s.codes||[]).map(c=>`<tr><td><span class="bdm-cat-letter">${esc(c.code)}</span></td><td>${esc(c.label)}</td></tr>`).join('')}
+    </table></div>
+    <div class="subhead" style="margin-top:16px;">Phase sets</div>
+    <div class="tablewrap bdm-settings-table"><table>
+      <tr><th>Set</th><th>Columns</th></tr>
+      ${phaseSetNames.map(k=>`<tr><td><span class="bdm-sec-code">${esc(k)}</span></td><td>${esc((s.phaseSets[k]||[]).join(' · '))}</td></tr>`).join('')}
+    </table></div>
+    <div class="subhead" style="margin-top:16px;">BBC rules</div>
+    <div class="tablewrap bdm-settings-table"><table>
+      <tr><th>Code</th><th>Phase</th><th>Item contains</th><th>Category</th></tr>
+      ${(s.bbcRules||[]).map(r=>`<tr>
+        <td><span class="bdm-sec-code">${esc(r.code||'any')}</span></td>
+        <td>${esc(r.phase||'any')}</td>
+        <td>${r.match?esc(String(r.match).split(',').map(s=>s.trim()).filter(Boolean).join(', ')):'<span class="empty-note">anything</span>'}</td>
+        <td><span class="bdm-cat-letter">${esc(r.cat)}</span>${esc(bdmBbcLabel(r.cat))}</td></tr>`).join('')}
+    </table></div>
+    <p class="hint" style="margin-top:8px;">Read only for now — editing these is a later phase.
+      The rules are walked top to bottom and the <strong>first match wins</strong>. A phase of
+      “any” matches every section; a blank “Item contains” matches every line. “Item contains” is
+      tested against a line’s item text only, not the supplier or person name. A line’s own BBC
+      override, where one is set, beats the whole table.</p>`;
 }
 </script>
 </body>
