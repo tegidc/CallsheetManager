@@ -1493,6 +1493,67 @@ Verified: `node --check` clean, `<style>` block brace-balanced (439/439), zero r
 Departments admin panel and a mobile add-crew form both render pixel-identical to
 before. `app_data` unchanged (newest write still the pre-session state) — nothing written.
 
+### Commit B — G1, G2: shared UI components
+
+**G1 — `filterToggleHTML({open, count, onToggle, inverted})`**, next to
+`filterPanelFootHTML()`, same split: markup and the "(N)" rule shared, each of the
+three panels (Crew-on-project, Budget, Crew database) keeps its own open flag, its
+own count and its own toggle function. `.crew-header-filter` (matched by zero CSS
+rules — it only looked right because `.crew-header-row span` happened to reach it)
+is gone; all three now render one real class, `.filter-toggle`.
+
+The two properties that actually differed, picked deliberately rather than
+defaulted:
+- **display** — not a real choice. `.filter-toggle` declares `inline-flex`
+  throughout; Crew-on-project's and Budget's instances compute to `flex` because
+  they're flex items inside `.crew-header-row` and get blockified — an automatic
+  consequence of where they sit, not something the class controls. Confirmed with
+  `getComputedStyle()`.
+- **margin-bottom** — a real choice. Kept out of `.filter-toggle` itself and added
+  as `.section > .filter-toggle{margin-bottom:8px}`, which only ever matches Crew
+  database's standalone trigger (the other two sit inside `.crew-header-row`,
+  which already supplies its own bottom margin — giving the trigger its own too
+  would have doubled up and added uneven space when the row wraps). Verified with
+  `getComputedStyle()` on all three: Crew-on-project/Budget both `0px` (unchanged),
+  Crew database `8px` (unchanged).
+
+**G2 — `collapsibleSectionHTML({state, prefix, key, title, inner, actions, id,
+wrapClass, onToggle})`**, next to `applyBlockState()`/`toggleBlock()`. Converted
+five of the eight builders (seven call sites): `settingsBlockHTML`,
+`techBlockHTML`, `renderTasksSection`, `pvBlockHTML`, and the three summary blocks
+(`hotelSummaryHTML`/`cateringSummaryHTML`/`transportSummaryHTML`). `onToggle` was
+added to the audit's proposed param list — every caller needs its own toggle call
+and the audit's shorthand didn't spell it out, but "each caller keeps its own
+toggle function" requires it.
+
+⚠️ **Three left out deliberately — eight builders were not eight instances of one
+thing:**
+- `sdBlock()` — the whole `.sd-block-head` is the click target, not a caret+title
+  span, and its body carries `.sd-block-body` (the only one of the eight that
+  does). A real structural difference, exactly as the audit flagged.
+- `budgetDayViewHTML()`'s row — trailing `<strong>total</strong>` plus a bespoke
+  inline margin (`margin:14px 0 0`), also flagged by the audit.
+- **`budgetCostsViewHTML()`'s `group()` — not flagged by the audit, but found to
+  have a real reason of its own.** Its inline margin-top
+  (`key==='catering'?'0':'18px'`) stands in for the `.sd-block:first-child`
+  auto-zero rule that already exists elsewhere in this file, using 18px instead of
+  the default 26px for non-first blocks. Routing it through the shared component
+  would have meant either a param only this one caller ever uses, or silently
+  changing its spacing. Left for a second pass rather than guessed at — reported
+  here since the audit's own "six near-identical" count implied this one should
+  convert.
+
+Verified: `node --check` clean, `<style>` brace-balanced, `renderPreviewCard()`'s
+call-sheet header (a ninth, genuinely different builder — full two-line header,
+no `.sd-block-head` at all, not in the audit's G2 list) confirmed untouched. Every
+converted section exercised in the live app (Overview Tasks, Tech's two blocks,
+all four Settings blocks, all four Preview & Export blocks, Hotel/Catering/
+Transport summaries on both Crew and Preview & Export) — correct title, correct
+caret state, toggles independently, collapses/expands correctly. The three left-out
+builders (Shoot Days' `sdBlock`, Budget's Day view, Budget's Costs view) re-checked
+after the change and confirmed byte-identical to before. `app_data` unchanged —
+nothing written.
+
 ## The design system, as decided (Phase Refinement)
 
 A consistency pass over everything built since Phase U (Budget, AI Scan, Overview

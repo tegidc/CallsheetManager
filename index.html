@@ -407,10 +407,17 @@
     color:var(--muted); text-align:right; margin-bottom:8px;}
   .dept-toggle-all span{cursor:pointer;}
   .dept-toggle-all span:hover{color:var(--tape);}
-  /* filter panel — shared look for the Crew database and Crew-on-project filters */
+  /* filter panel — the shared Filter trigger for all three filter panels (Crew
+     database, Crew-on-project, Budget), built by filterToggleHTML() (G1). No
+     margin-bottom here: Crew-on-project and Budget render it as a flex item inside
+     .crew-header-row, which already supplies the row's own bottom margin — giving
+     the trigger its own would double up and add uneven space only when the row
+     wraps. Crew database renders it standalone, straight in a .section, so it
+     still needs one; see the .section > .filter-toggle rule below. */
   .filter-toggle{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px;
-    font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none; color:var(--muted); margin-bottom:8px;}
+    font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none; color:var(--muted);}
   .filter-toggle:hover{color:var(--tape);}
+  .section > .filter-toggle{margin-bottom:8px;}
   /* Crew tab header row (Phase V) — Select all + Filter left-aligned, Expand/Collapse
      all + Summary right-aligned, all sharing one font/size so nothing reads as bolder
      or bigger than its neighbours. The Filter panel itself renders below this row,
@@ -1950,15 +1957,10 @@ let settingsBlocks = { fonts:true, colours:true, preview:true, company:true };
 function toggleSettingsBlock(key){ toggleBlock(settingsBlocks, 'st', key); }
 function toggleAllSettingsBlocks(){ setAllBlocksCollapsed(settingsBlocks, 'st', !allBlocksCollapsed(settingsBlocks)); }
 function settingsBlockHTML(key, title, inner){
-  const open = settingsBlocks[key];
-  return `<div class="sd-block section">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleSettingsBlock('${key}')">
-        <span class="dept-caret" id="stc-${key}">${open?'▾':'▸'}</span> ${esc(title)}
-      </span>
-    </div>
-    <div id="stb-${key}" style="display:${open?'':'none'};">${inner}</div>
-  </div>`;
+  return collapsibleSectionHTML({
+    state: settingsBlocks[key], prefix: 'st', key, title: esc(title), inner,
+    wrapClass: 'sd-block section', onToggle: `toggleSettingsBlock('${key}')`
+  });
 }
 
 function renderSettings(m){
@@ -2769,14 +2771,10 @@ function toggleTechBlock(key){ toggleBlock(techBlocks, 'tt', key); }
 function setAllTechBlocksCollapsed(collapsed){ setAllBlocksCollapsed(techBlocks, 'tt', collapsed); }
 function toggleAllTechBlocks(){ setAllTechBlocksCollapsed(!allBlocksCollapsed(techBlocks)); }
 function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
-  const open = techBlocks[key];
-  return `<div class="section" id="techBlock-${key}">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleTechBlock('${key}')"><span class="dept-caret" id="ttc-${key}">${open?'▾':'▸'}</span> ${title}</span>
-      ${headerActionsHTML||''}
-    </div>
-    <div id="ttb-${key}" style="display:${open?'':'none'}">${bodyInnerHTML}</div>
-  </div>`;
+  return collapsibleSectionHTML({
+    state: techBlocks[key], prefix: 'tt', key, title, inner: bodyInnerHTML,
+    actions: headerActionsHTML, id: `techBlock-${key}`, onToggle: `toggleTechBlock('${key}')`
+  });
 }
 function jumpToTechRoundup(){
   if(!techBlocks.roundup) toggleTechBlock('roundup');
@@ -3158,13 +3156,8 @@ function tasksListHTML(p){
 
 function renderTasksSection(p, days){
   const flagItems = buildTaskFlags(p, days);
-  const open = tasksSectionOpen;
   const openTaskCount = (p.tasks||[]).filter(t=>!t.completed).length;
-  return `<div class="section" id="tasksSection">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleTasksSection()"><span class="dept-caret">${open?'▾':'▸'}</span> Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}</span>
-    </div>
-    <div style="display:${open?'':'none'}">
+  const inner = `
       ${taskFlagPillsHTML(flagItems)}
       <div class="subhead" style="margin-top:18px;">Add a task</div>
       <div class="grid g2" style="margin-bottom:8px;">
@@ -3173,8 +3166,12 @@ function renderTasksSection(p, days){
       </div>
       <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
       ${tasksListHTML(p)}
-    </div>
-  </div>`;
+    `;
+  return collapsibleSectionHTML({
+    state: tasksSectionOpen, id: 'tasksSection',
+    title: `Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}`,
+    inner, onToggle: 'toggleTasksSection()'
+  });
 }
 /* ============================================================================
    AI SCAN (Phase AI Scan) — a chat box on Overview backed by a Supabase Edge
@@ -3714,6 +3711,30 @@ function filterPanelFootHTML({controls='', hint='', active=false, onClear=''} = 
   </div>`;
 }
 
+/* ============ filterToggleHTML() — the shared Filter trigger, same split as
+   filterPanelFootHTML() above ============
+   filterPanelFootHTML() unified the FOOT of all three filter panels; the trigger
+   that opens each one was never unified and had quietly diverged into two
+   constructions under two class names, one of which (.crew-header-filter) turned
+   out to be matched by zero CSS rules — it only looked right because
+   .crew-header-row span happened to reach it. Gate 1 / G1.
+
+   Only the markup and the "(N)" rule are shared here. Each caller keeps its own
+   open-state flag, its own toggle function and its own active-filter count —
+   exactly like filterPanelFootHTML()'s split. Don't fold those in here.
+
+     open     — that panel's own open flag
+     count    — that panel's own active-filter count (0 renders no "(N)")
+     onToggle — that panel's own toggle call, as an onclick string
+     inverted — Crew-on-project only: true when the filter is showing everyone
+                who does NOT match it                                        */
+function filterToggleHTML({open=false, count=0, onToggle='', inverted=false} = {}){
+  return `<span class="filter-toggle" onclick="${onToggle}">
+    <span class="dept-caret">${open?'▾':'▸'}</span> Filter${count?` (${count})`:''}${
+      inverted ? ` <span class="filter-inverted" title="Showing everyone who does NOT match the filter">inverted</span>` : ''}
+  </span>`;
+}
+
 /* ---- Crew-on-project filter/group/sort + bulk select ----
    One shared filter state across every view-switcher tab (Roles/Days on
    site/Hotel/Travel/Catering) — it's a module-level global, so switching
@@ -4131,10 +4152,10 @@ function renderProjectCrew(body){
   // opened, renders as its own block below the row rather than inside it — the panel
   // is a full-width block (chips, selects, day checkboxes) and letting it live inside
   // the flex row would distort the row's left/right alignment every time it opens.
-  const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleProjectCrewFilterPanel()">
-    <span class="dept-caret">${projectCrewFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}${
-      projectCrewFilter.inverse ? ` <span class="filter-inverted" title="Showing everyone who does NOT match the filter">inverted</span>` : ''}
-  </span>`;
+  const filterToggleSpan = filterToggleHTML({
+    open: projectCrewFilterOpen, count: filterCount,
+    onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse
+  });
   const filterPanelHTML = projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned, days) : '';
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
@@ -4476,12 +4497,10 @@ function hotelSummaryHTML(){
     ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`);
-  return `<div class="section" id="hotelSummarySection">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleHotelSummaryBlock()"><span class="dept-caret" id="hsmc-summary">${open?'▾':'▸'}</span> Hotel summary</span>
-    </div>
-    <div id="hsmb-summary" style="display:${open?'':'none'}">${inner}</div>
-  </div>`;
+  return collapsibleSectionHTML({
+    state: open, prefix: 'hsm', key: 'summary', title: 'Hotel summary', inner,
+    id: 'hotelSummarySection', onToggle: 'toggleHotelSummaryBlock()'
+  });
 }
 function jumpToHotelSummary(){
   if(!hotelSummaryOpen) toggleHotelSummaryBlock();
@@ -4674,12 +4693,10 @@ function cateringSummaryHTML(){
     </div>`;
   const inner = `${fieldsHTML}<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyCateringSummaryGrid()">${icon('copy')} Copy catering summary</button></div>`;
-  return `<div class="section" id="cateringSummarySection">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleCateringSummaryBlock()"><span class="dept-caret" id="csmc-summary">${open?'▾':'▸'}</span> Catering summary</span>
-    </div>
-    <div id="csmb-summary" style="display:${open?'':'none'}">${inner}</div>
-  </div>`;
+  return collapsibleSectionHTML({
+    state: open, prefix: 'csm', key: 'summary', title: 'Catering summary', inner,
+    id: 'cateringSummarySection', onToggle: 'toggleCateringSummaryBlock()'
+  });
 }
 function jumpToCateringSummary(){
   if(!cateringSummaryOpen) toggleCateringSummaryBlock();
@@ -4814,12 +4831,10 @@ function transportSummaryHTML(){
     </div>`;
   const inner = `${fieldsHTML}<div id="tsmGridWrap">${transportSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyTransportSummary()">${icon('copy')} Copy transport summary</button></div>`;
-  return `<div class="section" id="transportSummarySection">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="toggleTransportSummaryBlock()"><span class="dept-caret" id="tsmc-summary">${open?'▾':'▸'}</span> Transport summary</span>
-    </div>
-    <div id="tsmb-summary" style="display:${open?'':'none'}">${inner}</div>
-  </div>`;
+  return collapsibleSectionHTML({
+    state: open, prefix: 'tsm', key: 'summary', title: 'Transport summary', inner,
+    id: 'transportSummarySection', onToggle: 'toggleTransportSummaryBlock()'
+  });
 }
 function jumpToTransportSummary(){
   if(!transportSummaryOpen) toggleTransportSummaryBlock();
@@ -5389,18 +5404,65 @@ function setAllBlocksCollapsed(state, prefix, collapsed){
   Object.keys(state).forEach(key=>{ state[key] = !collapsed; applyBlockState(state, prefix, key); });
   refreshExpandCollapseAll(prefix, allBlocksCollapsed(state));
 }
+/* ============ collapsibleSectionHTML() — the shared collapsible-section header
+   (Gate 1 / G2) ============
+   Every collapsible section in the app is a .sd-block-head with a caret, an id pair
+   (<prefix>c-<key> / <prefix>b-<key>) and a display:${state?'':'none'} body — that
+   shape was written out by hand in six near-identical places. Same split as
+   filterPanelFootHTML()/filterToggleHTML(): only the markup is shared; each caller
+   keeps its own open-state flag and its own toggle function (state lives in
+   settingsBlocks/techBlocks/previewBlocks/etc. above, or a bare boolean for a
+   singleton section) and calls into applyBlockState()/toggleBlock() exactly as
+   before. No state moves here.
+
+   Left OUT deliberately, not overlooked — eight builders were not eight instances
+   of one thing:
+     sdBlock()      — the whole head is the click target, not a caret+title span,
+                       and its body carries .sd-block-body (the only one of the
+                       eight that does). A real structural difference.
+     budgetDayViewHTML()'s row — trailing <strong>total</strong> AND a bespoke
+                       inline margin (`margin:14px 0 0`) neither shared by anything
+                       else nor expressible as a boolean flag.
+     budgetCostsViewHTML()'s group() — its inline margin-top is conditional on
+                       which group renders first (`key==='catering'?'0':'18px'`),
+                       standing in for the .sd-block:first-child rule that already
+                       exists elsewhere in this file. Routing it through this shared
+                       shape would mean either a param only one caller ever uses, or
+                       silently changing its spacing (18px → the default 26px).
+                       Left for a second pass rather than guessed at.
+
+     state    — that section's own open flag
+     prefix   — id prefix; '' omits the id attributes entirely, for a singleton
+                section with nothing else to key off (e.g. Tasks)
+     key      — that instance's key; '' for a singleton
+     title    — already-formatted title HTML, inserted verbatim — callers that need
+                escaping still call esc() themselves before passing it in, exactly
+                as settingsBlockHTML() already did
+     inner    — the body's inner HTML
+     actions  — optional header-trailing HTML (e.g. a Copy button); stays outside
+                the toggle span so it's clickable while the body is collapsed
+     id       — optional id on the wrapper div
+     wrapClass— the wrapper's class(es); defaults to 'section'
+     onToggle — that caller's own toggle call, as an onclick string             */
+function collapsibleSectionHTML({state=false, prefix='', key='', title='', inner='', actions='', id='', wrapClass='section', onToggle=''} = {}){
+  const caretId = prefix ? ` id="${prefix}c-${key}"` : '';
+  const bodyId  = prefix ? ` id="${prefix}b-${key}"` : '';
+  return `<div class="${wrapClass}"${id?` id="${id}"`:''}>
+    <div class="sd-block-head flush">
+      <span class="sd-block-head-toggle" onclick="${onToggle}"><span class="dept-caret"${caretId}>${state?'▾':'▸'}</span> ${title}</span>
+      ${actions||''}
+    </div>
+    <div${bodyId} style="display:${state?'':'none'}">${inner}</div>
+  </div>`;
+}
 function togglePreviewBlock(key){ toggleBlock(previewBlocks, 'pv', key); }
 function setAllPreviewBlocksCollapsed(collapsed){ setAllBlocksCollapsed(previewBlocks, 'pv', collapsed); }
 function toggleAllPreviewBlocks(){ setAllPreviewBlocksCollapsed(!allBlocksCollapsed(previewBlocks)); }
 function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
-  const open = previewBlocks[key];
-  return `<div class="section">
-    <div class="sd-block-head flush">
-      <span class="sd-block-head-toggle" onclick="togglePreviewBlock('${key}')"><span class="dept-caret" id="pvc-${key}">${open?'▾':'▸'}</span> ${title}</span>
-      ${headerActionsHTML||''}
-    </div>
-    <div id="pvb-${key}" style="display:${open?'':'none'}">${bodyInnerHTML}</div>
-  </div>`;
+  return collapsibleSectionHTML({
+    state: previewBlocks[key], prefix: 'pv', key, title, inner: bodyInnerHTML,
+    actions: headerActionsHTML, onToggle: `togglePreviewBlock('${key}')`
+  });
 }
 /* ---- Phase Q: what the export actually contains ----
    TWO independent choices, deliberately not one list:
@@ -6282,9 +6344,9 @@ function renderProjectBudget(body){
   // Same construction as the Crew tab's Filter and Preview & Export's Format panel:
   // one toggle in a crewToolbarHTML() row, panel rendered below the row, not in it.
   const activeFilters = budgetActiveFilterCount();
-  const filterToggleSpan = `<span class="crew-header-filter" onclick="toggleBudgetFilterPanel()">
-    <span class="dept-caret">${budgetFilterOpen?'▾':'▸'}</span> Filter${activeFilters?` (${activeFilters})`:''}
-  </span>`;
+  const filterToggleSpan = filterToggleHTML({
+    open: budgetFilterOpen, count: activeFilters, onToggle: 'toggleBudgetFilterPanel()'
+  });
   /* AP — Copy/Export no longer fire from the toolbar. They keep their place in the
      right slot and their icons, but now open the shared output menu (see
      outputMenuRowHTML()). No longer hidden on the Costs tab: the menu can export any
@@ -6532,9 +6594,7 @@ function renderCrewDatabase(m){
     <div class="section">
       <h2>All crew</h2>
       <input type="text" id="crewSearch" value="${esc(crewSearchQuery)}" style="margin-bottom:10px;" placeholder="Search name, role, skills, camera gear…" oninput="crewSearchQuery=this.value;renderCrewList()">
-      <div class="filter-toggle" onclick="toggleCrewDbFilterPanel()">
-        <span class="dept-caret">${crewDbFilterOpen?'▾':'▸'}</span> Filter${filterCount?` (${filterCount})`:''}
-      </div>
+      ${filterToggleHTML({open: crewDbFilterOpen, count: filterCount, onToggle: 'toggleCrewDbFilterPanel()'})}
       ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
       <div id="crewList"></div>
       <button class="small" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
