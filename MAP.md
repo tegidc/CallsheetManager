@@ -495,6 +495,52 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   spells out how much of it is travel. Per Department is the view AO extended Itemize
   VAT into (see **VAT follows the person** above) — [Budget, Crew]
 
+## Sidebar & navigation — VIEWS (Phase AX)
+
+Phase AX made **project** and **view** independent axes. Before this phase the Budget
+screen (B-1) carried its own project `<select>`, entirely separate from the sidebar's
+project list — two competing ideas of "what project am I looking at" on one screen at
+once. After AX the project is chosen exactly once, in the sidebar, and the view
+(Production or Budget) is chosen separately; neither resets the other.
+
+- **The sidebar's top section is now called VIEWS**, moved above Databases (previously
+  a "Project" section sat between Projects and App, holding Budget alone). It holds
+  two entries: **Production** — the project workspace and its tabs (T-1…T-7), and
+  **Budget** — B-1, unchanged in every other respect. Order below VIEWS is unchanged:
+  Databases, Projects, App.
+- `goProduction()` / `goBudgetDemo()` — the two VIEW routes. **Neither touches
+  `currentProjectId`** (Budget already worked this way — see below; AX made Production
+  match it). Clicking a VIEW changes `route.screen` and re-renders; the project stays
+  whatever it already was.
+- `openProject(id)` — the PROJECT axis, the sidebar's project list. **Since AX it no
+  longer unconditionally forces you into Production.** If a VIEW is already on screen
+  (`route.screen==='project'` or `'budget'`), only `currentProjectId` changes — the open
+  view keeps rendering, now for the newly-picked project. From a project-independent
+  screen (a database, Settings, Welcome, New project) picking a project still lands in
+  Production with the tab reset to Overview, exactly as before AX — that half of
+  `openProject()`'s old behaviour wasn't part of what this phase was asked to change.
+- **No empty state.** `initApp()` used to leave `route` at its `{screen:'welcome'}`
+  default and require a click ("Recent" or "+ New") to get anywhere. Phase AX has it
+  call `goProduction()` once loading finishes (when any project exists), which falls
+  back through the existing `mostRecentProject()` (highest `lastOpenedAt`, ties keeping
+  `projectsDB`'s own order — i.e. "the first project in the list" on a true first load)
+  to reopen whichever project was last viewed. **No new persistence layer and nothing
+  new written to Supabase**: `lastOpenedAt` already lived on the project record before
+  this phase (Phase Y), already written by `openProject()` every time a project is
+  actually picked; `goProduction()`'s fallback only *reads* it, and deliberately never
+  stamps it itself, so viewing on load isn't treated as "opening" a project the way a
+  sidebar click is.
+- **Consequence, not a bug: Proper Corn is no longer reachable through the UI.**
+  Removing B-1's own project dropdown (see **Budget (B-1)** below) means the screen now
+  always renders `currentProjectId`, and Proper Corn was never a real project you could
+  select from the sidebar — it only ever existed as an extra option in the dropdown
+  that's now gone. Its stored budget (`budget:bdm-proper-corn-hot-sauce`) is untouched
+  and still loads correctly if `bdmCurrentProjectId()` ever falls back to it (only
+  possible if `projectsDB` itself is empty), but there is no click path to it any more.
+  Not fixed here — the brief was to delete the dropdown, and building a new way to reach
+  a project that was only ever a demo fixture would be a feature this phase didn't ask
+  for.
+
 ## Budget (B-1) — the line-item budget
 
 ⚠️ **This is NOT the Budget tab (T-6).** T-6 is cost visibility only, rolled up from
@@ -578,15 +624,18 @@ scope); the rule above is what a future linking action must obey.
 
 ### Functions
 
-- `goBudgetDemo()` — **the one sidebar route that does not clear `currentProjectId`.**
-  `goDatabase()`/`goSettings()` both null it because they go to project-independent
-  screens; this is a different view *of* a project, so the project you were in stays
-  open behind it. `renderSide()` was widened to keep the open project highlighted on
-  `route.screen==='budget'` for the same reason — [Shared/utility functions, Budget (B-1)]
-- `renderBudgetDemo()` — the screen: `.page-head`, the project selector + Float %/Fee %
-  row + save-status flash, the lens `.tabs`, the Top sheet section, then the Line detail
-  sections and the add-section row. ⚠️ Paints a **loading shell** and re-renders when
-  `bdmEnsureLoaded()` resolves, because the record arrives on demand — [Budget (B-1)]
+- `goBudgetDemo()` — **one of the two sidebar VIEWS routes that do not clear
+  `currentProjectId`** (Phase AX added `goProduction()` as its sibling — see
+  **Sidebar & navigation — VIEWS**). `goDatabase()`/`goSettings()` still null it because
+  they go to project-independent screens; this is a different view *of* a project, so
+  the project you were in stays open behind it. `renderSide()` keeps the open project
+  highlighted on `route.screen==='budget'` (and, since AX, `'project'`) for the same
+  reason — [Shared/utility functions, Budget (B-1)]
+- `renderBudgetDemo()` — the screen: `.page-head`, then (Phase AX) the Float %/Fee %
+  settings strip + save-status flash — no project selector any more, see below — then
+  the lens `.tabs`, the Top sheet section, then the Line detail sections and the
+  add-section row. ⚠️ Paints a **loading shell** and re-renders when `bdmEnsureLoaded()`
+  resolves, because the record arrives on demand — [Budget (B-1)]
 - `BDM_SETTINGS_DEFAULTS` — the shared record's starting content: the ten codes, the
   two named phase sets, the ordered BBC rules table, the 17 A–Q categories. ⚠️ Seeded
   ONCE into `db:budget_settings`; from then on the **stored** record is the source of
@@ -600,10 +649,17 @@ scope); the rule above is what a future linking action must obey.
   zero**: Proper Corn's fee genuinely is 0% and must come back as 0%, so this tests
   `null`/`undefined`/`''` rather than falsiness. The same helper is what lets a LINE
   store a float of 0 without falling through to the project's — [Budget (B-1)]
-- `bdmProjectList()` / `bdmProjectName()` / `bdmCurrentProjectId()` — the selector now
-  offers the **real projects** from `projectsDB`, plus Proper Corn. Defaults to the
-  project you already have open, since `goBudgetDemo()` is the one sidebar route that
-  keeps `currentProjectId` — [Budget (B-1)]
+- `bdmProjectList()` / `bdmProjectName()` / `bdmCurrentProjectId()` — ⚠️ **Phase AX
+  removed this screen's own project selector; these no longer back one.**
+  `bdmProjectList()` still offers the real projects from `projectsDB` plus Proper Corn
+  (name lookups, plus the last-resort fallback below), but nothing calls it to build a
+  `<select>` any more. `bdmCurrentProjectId()` now simply returns `currentProjectId`
+  when it resolves to something in that list, falling back to the first entry only if
+  it doesn't (e.g. every project was deleted while this screen was open) — the earlier
+  `budgetDemoProjectId` override variable and its setter (`setBudgetDemoProject()`) are
+  gone. The one caller that used to jump the screen to a specific project after an
+  action — `seedRowBudget()`, after seeding — now sets `currentProjectId` directly
+  instead, the same axis the sidebar uses — [Budget (B-1)]
 - `bdmEnsureLoaded(projectId)` — the on-demand load, one key. ⚠️ **A second call while
   the first is in flight gets THE SAME PROMISE, never a null.** `renderBudgetDemo()`
   paints a loading shell and re-renders when this resolves, so returning an
@@ -612,6 +668,21 @@ scope); the rule above is what a future linking action must obey.
   more exotic than a slow read plus any re-render landing in the same window (which
   `applyMergedDB()` does on its own after a merge). Caught in AV testing; do not
   "simplify" the in-flight promise back into a boolean — [Budget (B-1)]
+  - ⚠️ **Phase AX audit.** This phase added several new ways to trigger a re-render on
+    this exact path — switching VIEW (`goProduction()`/`goBudgetDemo()`), switching
+    PROJECT (`openProject()` while already on Budget), and the no-empty-state boot
+    sequence (`initApp()` → `goProduction()`). None of them call `bdmEnsureLoaded()`
+    directly or bypass `renderBudgetDemo()` — every one of them only ever changes
+    `route`/`currentProjectId` and calls `renderMain()`, so `renderBudgetDemo()` stays
+    the single call site and the promise-dedup fix above still holds. Verified live:
+    repeated rapid project/view switching, and switching project mid-read (cache
+    cleared, ~30 rapid `openProject()`/`goBudgetDemo()`/`goProduction()` calls fired
+    back-to-back against the real Supabase project) — the tab always settled on the
+    correct final project/view with no stuck "Loading budget…" and no leaked
+    `bdmLoading` entries. **Do not add a second `bdmEnsureLoaded()` call site** (e.g. to
+    "prefetch" a budget when switching project while on Production) — the on-demand,
+    Budget-screen-only load is deliberate (see the three-keys note above: startup
+    already makes ten round trips) and a second call site would need its own dedup.
 - `bdmTouch()` / `bdmSaveNow()` — autosave on edit, debounced through the app's
   existing `scheduleAutosave()` and reported through `flashSaveResult('bdmStatus', …)`,
   the same indicator every other autosaving field uses. ⚠️ **Keyed per project and it
@@ -810,6 +881,26 @@ Inc./Ex. VAT toggle so both bases are still reachable.
 | every existing screen still loads | ✓ Welcome, Crew db, Locations db, Settings, T-1…T-7 (T-6's four views + its own VAT toggle + filter, unchanged), T-2's five grids, B-1 × 5 projects (4 real + Proper Corn) × 2 lenses × 2 VAT bases — no console errors |
 | dead references to the removed VAT-outside handling | ✓ none — `grep` for "VAT is excluded"/"VAT sits outside"/"outside the arithmetic" in `index.html` returns nothing |
 
+### Verified (Phase AX), driven through the live page against the real Supabase
+
+| check | result |
+|---|---|
+| inline script extracts and parses | ✓ `node --check` clean |
+| CSS brace balance | ✓ 463 open / 463 close |
+| dead references to the removed B-1 project `<select>` / renamed sidebar handlers | ✓ none — `grep` for `bdmProject`/`setBudgetDemoProject`/`budgetDemoProjectId`/`bdm-proj-row`/the old `side-label">Project<` returns nothing |
+| `db:crew` untouched | ✓ 88 records, md5 `8e1989859a1a5153ff03ba137e11be28` (matches AV/AW exactly), `updated_at` unmoved since before this session |
+| ROW 2026, Inc. VAT basis, unchanged | ✓ Subtotal £318,668.31 / Production fee £31,866.83 / Grand total £350,535.14 / VAT £26,354.20 — 82 lines / 10 sections, exact match to AW |
+| switch project with Budget open | ✓ project changes, `route.screen` stays `'budget'` (verified ROW → Fashion Files London: figures switch to Fashion Files' empty budget, VIEW does not reset) |
+| switch view with a project open | ✓ Production → Budget → Production: `currentProjectId`/`currentProjectTab` unchanged throughout |
+| rapid + concurrent stress (the `bdmEnsureLoaded()` risk, §4) | ✓ two rounds against the live Supabase project: (1) cache cleared for 3 projects, 9 back-to-back `goBudgetDemo()`/`openProject()`/`goProduction()` calls with no waits between them; (2) cache cleared, 30 rapid alternating view/project switches. Both rounds: tab settled on the correct final project + view, no stuck "Loading budget…", `bdmLoading` empty afterwards, zero thrown errors |
+| no empty state on load | ✓ fresh page load opens straight into Production on the last-viewed project (ROW 2026 London), no Welcome screen |
+| refresh — remembered project reopens | ✓ confirmed after the stress tests above, which changed which project was most-recently-opened; a subsequent fresh load followed it |
+| empty-budget state, Fashion Files and LMAOF | ✓ both show £0.00 throughout, 5%/10% defaults, "+ Add section" reachable |
+| every existing screen still loads | ✓ Welcome (via `goDatabase`), Crew db, Locations db, Settings, T-1…T-7 (T-6's four views + filter + VAT toggle unchanged), B-1 — no console errors from any of this phase's code |
+| sidebar at 375px | ✓ VIEWS (Production, Budget) at top, then Databases/Projects/App, no layout breakage; page-level `scrollWidth===clientWidth` on the Budget screen (no horizontal overflow) |
+| stray writes from testing | ✓ `budget:*` keys in storage still exactly the pre-existing two (`id_msc4nv2c0g178`, `bdm-proper-corn-hot-sauce`) — rapid switching never auto-created a budget record for LMAOF/Fashion Files |
+| unrelated console noise seen during the heaviest stress round | "Supabase save gave up after repeated conflicts (db:projects)" — the app's pre-existing optimistic-concurrency retry/merge path (see `saveDB()`), exhausted by ~30 same-key writes fired faster than any real click stream plus a second live session on the same Supabase project; not a hang, not data loss (`db:projects` count and content verified intact after), and not code this phase touched |
+
 ## Preview & Export
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
@@ -870,10 +961,13 @@ Inc./Ex. VAT toggle so both bases are still reachable.
 - `crewIdentityHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab) — [Shared/utility functions]
 - `appSettings` / `SETTINGS_DEFAULTS` / `FONT_CHOICES` (**renamed from `HEADER_FONTS` in Phase R/R15** — it now feeds all three font roles, not just headings) / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, plus (Phase Tasks) the three Overview auto-flag rule toggles (`flagNoLocation`/`flagNoCrew`/`flagNoDayRate`) — same object, same persistence, just not all of it is styling. Persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
 - `renderSettings()` / `goSettings()` (Phase Q) — the Settings screen (S-1), reached from the sidebar. A full screen, not a floating cog panel: the app's one existing pattern for a project-independent thing you go and look at is the sidebar screen (Crew database, Locations database), and a modal would have been a second pattern for no gain — [Shared/utility functions]
-- `renderSide()` — renders the left sidebar (project list, nav) — [Shared/utility functions]
+- `renderSide()` — renders the left sidebar (VIEWS/Databases/Projects/App nav, project list) — [Shared/utility functions]
+  - ⚠️ **Phase AX widened the active-item check to `route.screen==='project'&&el.dataset.side==='production'`**, alongside the existing `budget` check — Production and Budget are siblings now (see **Sidebar & navigation — VIEWS**), so both light up their own nav item while leaving the project list's own highlight (`route.screen==='project'||route.screen==='budget'`) exactly as it already was.
+- `initApp()` (Phase AX addition) — after loading and any first-run seed, calls `goProduction()` instead of leaving `route` at its `{screen:'welcome'}` default, whenever `projectsDB.length` — see **No empty state** below — [Shared/utility functions]
 - `toggleDrawer()` / `closeDrawer()` — open/close the mobile navigation drawer — [Shared/utility functions]
 - `setTopbarTitle()` — updates the mobile top bar's title text — [Shared/utility functions]
-- `goDatabase()` / `goNewProject()` / `openProject()` / `goProjectTab()` — top-level router functions that change `route`/`currentProjectId`/`currentProjectTab` and re-render. `openProject()` also stamps that project's `lastOpenedAt` (Phase Y, `Date.now()`) and saves it — the signal `mostRecentProject()` reads for the Welcome screen's "Recent" button — [Shared/utility functions, Overview]
+- `goDatabase()` / `goNewProject()` / `openProject()` / `goProjectTab()` — top-level router functions that change `route`/`currentProjectId`/`currentProjectTab` and re-render. `openProject()` also stamps that project's `lastOpenedAt` (Phase Y, `Date.now()`) and saves it — the signal `mostRecentProject()` reads for the Welcome screen's "Recent" button and (Phase AX) the no-empty-state boot sequence. ⚠️ **Since Phase AX, `openProject()` no longer unconditionally forces `route={screen:'project'}`**: project and view are independent axes now, so if `route.screen==='budget'` when a project is picked from the sidebar list, the route (and `currentProjectTab`) are left alone — only `currentProjectId` changes, and the open Budget screen just starts rendering the newly-picked project. From anywhere else (a database, Settings, Welcome, New project) it still lands in Production with the tab reset to Overview, same as before — [Shared/utility functions, Overview, Budget (B-1)]
+- `goProduction()` (Phase AX) — the sidebar's other VIEW, alongside `goBudgetDemo()`: switches to the project workspace (`route={screen:'project'}`) **without touching `currentProjectId`/`currentProjectTab`** when a valid project is already open — the direct counterpart to `openProject()` leaving `route` alone when already on Budget. Only touches `currentProjectId` as a fallback (via `mostRecentProject()`) when nothing valid is open yet, and even then never stamps `lastOpenedAt` — viewing isn't the same action as picking a project. See **Sidebar & navigation — VIEWS** above — [Shared/utility functions, Overview, Budget (B-1)]
 - `renderMain()` — dispatches the main panel render based on the current route — [Shared/utility functions]
 - `projCode()` — derives a project's short display code — [Shared/utility functions]
 - `fmtDate()` — formats an ISO date string as a human-readable date — [Shared/utility functions]
@@ -1017,16 +1111,18 @@ coarse information first, finest detail last.
 
 ## B — Budget
 
-A different thing from **T-6**. Reached from the side panel, not the project tab
-strip, and it keeps the open project open behind it. **Phase AV gave it real
-storage** — it is no longer a demo, despite the `budgetDemo*` function names. See the
-**Budget (B-1)** section above for the three keys and for SECTIONS vs CODES.
+A different thing from **T-6**. Reached from the sidebar's VIEWS section (Phase AX),
+not the project tab strip, and it keeps the open project open behind it. **Phase AV
+gave it real storage** — it is no longer a demo, despite the `budgetDemo*` function
+names. **Phase AX removed its own project selector** — it now renders whichever
+project the sidebar has selected. See the **Budget (B-1)** section above for the three
+keys and for SECTIONS vs CODES, and **Sidebar & navigation — VIEWS** for the axis split.
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
 | **B-1** | **Budget** | Line-item budget: you type the lines, every figure is derived, every edit is saved | `renderBudgetDemo()` |
-| B-1.1 | · Project selector | The real projects from `projectsDB`, plus Proper Corn (which lives only here). Defaults to the project you have open | `bdmProjectList()` / `setBudgetDemoProject()` |
-| B-1.2 | · Float % / Fee % | Project-level, editable, live, autosaved. A line may carry its own float, including 0 | `setBudgetDemoPercent()` |
+| ~~B-1.1~~ | ~~· Project selector~~ | **Removed in Phase AX.** The screen reads `currentProjectId` directly — see B-1.2 below, which now sits first, right under the header | — |
+| B-1.2 | · Project settings strip | Float % / Fee %, project-level, editable, live, autosaved — a line may carry its own float, including 0. Moved out of the content area in Phase AX so the Top sheet is the first thing under the header; VAT (B-1.4) stays a view control, not a project setting, and stays in the top sheet | `setBudgetDemoPercent()` |
 | B-1.3 | · Lens toggle | Departments ↔ BBC. Same lines, different grouping and totalling | `setBudgetDemoLens()` |
 | B-1.4 | · Top sheet | Rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total, plus the Inc./Ex. VAT toggle (Phase AW, `bdmVatToggle`) — same markup/pattern as T-6's own VAT toggle. ⚠️ Departments totals by CODE, while the line detail below groups by SECTION | `budgetDemoTopSheetHTML()` |
 | B-1.5 | · Line detail | Collapsible section per group, one editable row per line, carrying the ⚑ miscode and ≠ rate-drift markers | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
@@ -1048,9 +1144,11 @@ storage** — it is no longer a demo, despite the `budgetDemo*` function names. 
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
-| **G-1** | Sidebar | Databases, project list, + New project, **Project → Budget (B-1)**, Settings | `renderSide()` |
+| **G-1** | Sidebar | **VIEWS** (Production → T-1…T-7, Budget → B-1) at the top since Phase AX, then Databases, Projects (project list + New project), App (Settings) — see **Sidebar & navigation — VIEWS** | `renderSide()` |
+| G-1.1 | · VIEWS — Production | The project workspace and its tabs — the VIEW counterpart to Budget, added in Phase AX so a project could be opened without a route already forcing it | `goProduction()` |
+| G-1.2 | · VIEWS — Budget | B-1, unchanged; sat alone in a "Project" section before Phase AX moved it up alongside Production | `goBudgetDemo()` |
 | **G-2** | Mobile top bar & drawer | Burger, title, slide-out nav | `toggleDrawer()` / `setTopbarTitle()` |
-| **G-3** | Welcome screen | Landing state when no project is open | `renderWelcome()` |
+| **G-3** | Welcome screen | Landing state when no project is open — since Phase AX, only reachable with zero projects in `projectsDB` (no empty state otherwise skips straight to Production) | `renderWelcome()` |
 | ~~**G-4**~~ | ~~Sample data reset~~ | **Removed in Phase AS (G12)** — the section and its button are gone; first-load auto-seeding survives in `initApp()` | — |
 | **G-5** | New project form | Create a project (auto-creates its first shoot day) | `renderNewProject()` |
 | **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
@@ -2250,9 +2348,50 @@ remove-when-empty is the minimum that fixes that. Renaming sections, and editing
 codes/phase sets/BBC rules, are a later phase.
 
 **Explicitly not built, and not to be added without a decision:** per-person breakdown,
-cost reporting, invoiced/paid tracking, markup, bank reconciliation, a sidebar
-restructure, linking a line to a crew record from the UI, and adding crew from within
-the budget view. The only read of the crew database is the rate-drift comparison.
+cost reporting, invoiced/paid tracking, markup, bank reconciliation, linking a line to
+a crew record from the UI, and adding crew from within the budget view. The only read
+of the crew database is the rate-drift comparison.
+
+## Budget (B-1) — the decisions (Phase AX addendum)
+
+**The sidebar restructure listed above as "not to be added without a decision" is that
+decision.** AV deliberately left it alone; AX is the phase that did it, once both B-1
+and the sidebar's own project list existed and had started disagreeing about "what
+project is open." Nothing else in the "explicitly not built" list above changed — this
+addendum is scoped to navigation only, same as the phase brief.
+
+**Project chosen once; view chosen separately.** Before AX, B-1 carried its own
+project `<select>`, defaulting to whatever the sidebar had open but able to diverge
+from it the moment it was touched — two sources of truth for one piece of state, on
+screen at the same time. AX deleted the dropdown. B-1 now reads `currentProjectId`
+directly, the same variable the sidebar's project list and Production both read —
+there is exactly one place "which project" lives, and B-1 stopped being an exception
+to that.
+
+**Float %/Fee % are project settings; VAT is a view control — and that's not a
+distinction without a difference.** Float %/Fee % are stored per-project (`budget:
+<projectId>`) and travel with the DATA; the VAT basis (`bdmVatToggle`) is session state
+that changes how the same data is DISPLAYED and was never persisted (Phase AW). Moving
+Float %/Fee % into a settings strip under the header — and deliberately leaving VAT
+exactly where AW put it, inside the top sheet — keeps that line visible rather than
+blurring "a property of this budget" and "a lens on this budget" into one strip because
+they happen to both be a checkbox/input near the top of the screen.
+
+**Proper Corn becomes unreachable, and that's accepted, not overlooked.** It was never
+a real project — only ever an extra option in the dropdown this phase deleted. Its
+stored budget is untouched and would still render correctly if something pointed
+`currentProjectId` at it, but nothing in the app does or should: building a new way to
+reach a fixture that only ever existed to give AU/AV/AW something with post-phaseSet
+lines to test against would be a feature, not navigation. See **Sidebar & navigation —
+VIEWS** for the exact fallback path.
+
+**No new persistence layer for "remembered project," and nothing new in Supabase.**
+The no-empty-state boot sequence reuses `lastOpenedAt` — already on every project
+record since Phase Y, already stamped by `openProject()` every time a project is
+actually picked. `goProduction()`'s own fallback to `mostRecentProject()` only reads
+it. The alternative — a new `localStorage`/`sessionStorage` key for "last view/project"
+— was avoided on purpose: the app has never used browser storage for anything, and
+the existing Supabase-backed signal already says exactly what was needed.
 
 ## The design system, as decided (Phase Detail)
 
