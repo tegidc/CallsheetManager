@@ -3821,11 +3821,41 @@ function buildProjectCrewGroups(list, p, days){
     list.forEach(c=>{ const key = keyFn(c); (buckets[key]=buckets[key]||[]).push(c); });
     return buckets;
   };
+  /* Gate 1 / G9 — nine of the thirteen group-by options were two pieces of data
+     (a key function and a label order) wearing eight lines of bucket/sort/map
+     boilerplate each. Two table-driven helpers now cover them:
+       groupAlpha(rawKeyFn, blankLabel) — bucket by rawKeyFn(c), falling back to
+         blankLabel for anyone with no value, sorted alphabetically with the
+         blank forced last (company, role, subDept, travel, catering).
+       groupFixed(keyFn, orderedKeys)   — bucket by keyFn(c), rendered in a fixed
+         order with empty buckets dropped (hotel, personType, vat, seniority).
+     deptCompany (composite key), daysOnSite (multi-bucket, a crew member can be
+     in several) and dept (canonical DEPARTMENTS order + codes, the default) stay
+     as their own branches below — genuinely different shapes, not copy-paste. */
+  const groupAlpha = (rawKeyFn, blankLabel) => {
+    const buckets = bucketOf(c => rawKeyFn(c) || blankLabel);
+    const keys = Object.keys(buckets).sort((a,b)=> a===blankLabel?1 : b===blankLabel?-1 : a.localeCompare(b));
+    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
+  };
+  const groupFixed = (keyFn, orderedKeys) => {
+    const buckets = bucketOf(keyFn);
+    return orderedKeys.filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
+  };
+  const SIMPLE_GROUPERS = {
+    company:  () => groupAlpha(c => c.coProductionCompany, 'No lead company'),
+    role:     () => groupAlpha(c => c.role, 'No role set'),
+    subDept:  () => groupAlpha(c => c.subDepartment, 'No sub-department'),
+    travel:   () => groupAlpha(c => ((p&&p.travelMethods)||{})[c.id], 'Not set'),
+    catering: () => groupAlpha(c => c.dietaryGeneral, 'Standard / not set'),
+    hotel:      () => groupFixed(c => personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel', ['Has hotel','No hotel']),
+    personType: () => groupFixed(c => deptBucketKey(c.department)==='Talent' ? 'Talent' : deptBucketKey(c.department)==='Client' ? 'Client' : 'Crew', ['Crew','Talent','Client']),
+    // c.vatRegistered is strictly '' / 'Yes' / 'No' — the same yn('ncVat',…) field
+    // Budget's VAT calc already reads (buildBudgetData()), not a second source
+    vat:        () => groupFixed(c => c.vatRegistered==='Yes' ? 'VAT registered' : c.vatRegistered==='No' ? 'Not VAT registered' : 'Not set', ['VAT registered','Not VAT registered','Not set']),
+    seniority:  () => groupFixed(crewSeniorityBand, ['Department leads','Mid-level','Support / entry level']),
+  };
+  if(SIMPLE_GROUPERS[gb]) return SIMPLE_GROUPERS[gb]();
 
-  if(gb==='hotel'){
-    const buckets = bucketOf(c => personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel');
-    return ['Has hotel','No hotel'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
-  }
   if(gb==='deptCompany'){
     const meta = {};
     list.forEach(c=>{
@@ -3836,48 +3866,6 @@ function buildProjectCrewGroups(list, p, days){
     return Object.keys(meta)
       .sort((a,b)=> (DEPARTMENTS.indexOf(meta[a].dept)-DEPARTMENTS.indexOf(meta[b].dept)) || meta[a].co.localeCompare(meta[b].co))
       .map(key=>({key, label:key, code:DEPARTMENT_CODES[meta[key].dept]||'', items:bySort(meta[key].items)}));
-  }
-  if(gb==='company'){
-    const buckets = bucketOf(c => c.coProductionCompany || 'No lead company');
-    const keys = Object.keys(buckets).sort((a,b)=> a==='No lead company'?1 : b==='No lead company'?-1 : a.localeCompare(b));
-    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
-  }
-  if(gb==='role'){
-    const buckets = bucketOf(c => c.role || 'No role set');
-    const keys = Object.keys(buckets).sort((a,b)=> a==='No role set'?1 : b==='No role set'?-1 : a.localeCompare(b));
-    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
-  }
-  if(gb==='subDept'){
-    const buckets = bucketOf(c => c.subDepartment || 'No sub-department');
-    const keys = Object.keys(buckets).sort((a,b)=> a==='No sub-department'?1 : b==='No sub-department'?-1 : a.localeCompare(b));
-    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
-  }
-  if(gb==='personType'){
-    const typeOf = c => deptBucketKey(c.department)==='Talent' ? 'Talent' : deptBucketKey(c.department)==='Client' ? 'Client' : 'Crew';
-    const buckets = bucketOf(typeOf);
-    return ['Crew','Talent','Client'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
-  }
-  if(gb==='travel'){
-    const methods = (p&&p.travelMethods)||{};
-    const buckets = bucketOf(c => methods[c.id] || 'Not set');
-    const keys = Object.keys(buckets).sort((a,b)=> a==='Not set'?1 : b==='Not set'?-1 : a.localeCompare(b));
-    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
-  }
-  if(gb==='vat'){
-    // c.vatRegistered is strictly '' / 'Yes' / 'No' — the same yn('ncVat',…) field
-    // Budget's VAT calc already reads (buildBudgetData()), not a second source
-    const label = v => v==='Yes' ? 'VAT registered' : v==='No' ? 'Not VAT registered' : 'Not set';
-    const buckets = bucketOf(c => label(c.vatRegistered));
-    return ['VAT registered','Not VAT registered','Not set'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
-  }
-  if(gb==='catering'){
-    const buckets = bucketOf(c => c.dietaryGeneral || 'Standard / not set');
-    const keys = Object.keys(buckets).sort((a,b)=> a==='Standard / not set'?1 : b==='Standard / not set'?-1 : a.localeCompare(b));
-    return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
-  }
-  if(gb==='seniority'){
-    const buckets = bucketOf(crewSeniorityBand);
-    return ['Department leads','Mid-level','Support / entry level'].filter(k=>buckets[k]&&buckets[k].length).map(k=>({key:k, label:k, code:'', items:bySort(buckets[k])}));
   }
   if(gb==='daysOnSite'){
     const buckets = {};
@@ -4170,9 +4158,8 @@ function renderProjectCrew(body){
     const filteredIdsCSV = filtered.map(c=>c.id).join(',');
     const allFilteredSelected = filtered.every(c=>projectCrewSelected.has(c.id));
     selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
-    const summaryLinkHTML = crewGridView==='hotel' ? `<span onclick="jumpToHotelSummary()">Summary</span>`
-      : crewGridView==='catering' ? `<span onclick="jumpToCateringSummary()">Summary</span>`
-      : crewGridView==='travel' ? `<span onclick="jumpToTransportSummary()">Summary</span>` : '';
+    const summaryLinkHTML = ['hotel','catering'].includes(crewGridView) ? `<span onclick="jumpToSummary('${crewGridView}')">Summary</span>`
+      : crewGridView==='travel' ? `<span onclick="jumpToSummary('transport')">Summary</span>` : '';
     // Expand/Collapse all: one toggle, not two separate links. The Style Review
     // dropped the rotating chevron in favour of plain text that swaps between
     // "Expand all" and "Collapse all" so only the available action is shown.
@@ -4472,21 +4459,51 @@ function buildHotelSummary(){
   const summary = `${maxRooms} room${maxRooms>1?'s':''} max, ${active.length} night${active.length>1?'s':''}, ${dateRange}`;
   return { summary, perNight, roomBooking };
 }
-let hotelSummaryOpen = false; // collapsible state for the T-2.3 hotel summary block (Phase O) — collapsed by default
-function toggleHotelSummaryBlock(){
-  hotelSummaryOpen = !hotelSummaryOpen;
-  applyBlockState({summary:hotelSummaryOpen}, 'hsm', 'summary');
+/* ============ Hotel/Catering/Transport summary blocks — shared plumbing
+   (Gate 1 / G8) ============
+   Three tabs each had their own toggleXSummaryBlock(), jumpToXSummary() and
+   XSummaryHTML() wrapper, differing only in a three-letter id prefix, a title
+   string and which global boolean held the open state. One table plus the
+   existing collapsibleSectionHTML()/applyBlockState() plumbing now covers all
+   three; each caller still builds its own `inner` HTML exactly as before.
+   costFieldHTML — label + a 90px decimal input — was defined four times
+   (character-identical in three; Hotel's was inline since it has only one
+   field) and is now this one module-level helper. */
+function costFieldHTML(id, label, value){
+  return `<div class="field-inline">
+      <label for="${id}">${label}</label>
+      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
+    </div>`;
+}
+const SUMMARY_BLOCKS = {
+  hotel:     { prefix:'hsm', title:'Hotel summary',     sectionId:'hotelSummarySection' },
+  catering:  { prefix:'csm', title:'Catering summary',  sectionId:'cateringSummarySection' },
+  transport: { prefix:'tsm', title:'Transport summary', sectionId:'transportSummarySection' },
+};
+let summaryBlocksOpen = { hotel:false, catering:false, transport:false }; // collapsed by default, all three
+function toggleSummaryBlock(key){
+  summaryBlocksOpen[key] = !summaryBlocksOpen[key];
+  applyBlockState({summary:summaryBlocksOpen[key]}, SUMMARY_BLOCKS[key].prefix, 'summary');
+}
+function jumpToSummary(key){
+  if(!summaryBlocksOpen[key]) toggleSummaryBlock(key);
+  document.getElementById(SUMMARY_BLOCKS[key].sectionId)?.scrollIntoView({block:'start'});
+}
+function summaryBlockHTML(key, inner){
+  const {prefix, title, sectionId} = SUMMARY_BLOCKS[key];
+  return collapsibleSectionHTML({
+    state: summaryBlocksOpen[key], prefix, key:'summary', title, inner,
+    id: sectionId, onToggle: `toggleSummaryBlock('${key}')`
+  });
 }
 function hotelSummaryHTML(){
   const p = currentProject();
   const hotelCosts = getHotelCosts(p);
   const data = buildHotelSummary();
-  const open = hotelSummaryOpen;
-  const costFieldHTML = `<div class="field-inline" style="margin-bottom:14px;">
-      <label for="hcRoomNight">Est. cost per room/night</label>
-      <input type="text" inputmode="decimal" id="hcRoomNight" value="${hotelCosts.perRoomNight||''}" placeholder="0.00" style="width:90px;">
+  const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
+      ${costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight)}
     </div>`;
-  const inner = costFieldHTML + (!data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
+  const inner = fieldsHTML + (!data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
     <div class="hint" style="margin:0 0 12px;">${esc(data.summary)}</div>
     <div class="subhead">Room-booking table</div>
     <table><tr><th>Room No.</th><th>Name</th><th>Date from</th><th>Date to</th><th>Total nights</th></tr>
@@ -4497,14 +4514,7 @@ function hotelSummaryHTML(){
     ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`);
-  return collapsibleSectionHTML({
-    state: open, prefix: 'hsm', key: 'summary', title: 'Hotel summary', inner,
-    id: 'hotelSummarySection', onToggle: 'toggleHotelSummaryBlock()'
-  });
-}
-function jumpToHotelSummary(){
-  if(!hotelSummaryOpen) toggleHotelSummaryBlock();
-  document.getElementById('hotelSummarySection')?.scrollIntoView({block:'start'});
+  return summaryBlockHTML('hotel', inner);
 }
 /* the text form of the hotel summary, as an array of lines — shared by the Copy
    button here and the WhatsApp export's Hotels section (Phase Q). `null` when there
@@ -4656,7 +4666,7 @@ function buildCateringSummaryGrid(){
 function cateringSummaryGridBodyHTML(){
   const data = buildCateringSummaryGrid();
   if(!data) return '<div class="empty-note">Add shoot days first, then fill in catering on the grid above.</div>';
-  const fmt = n => (n||0).toFixed(2);
+  const fmt = budgetFmt; // Gate 1 / G7 — was a local (n||0).toFixed(2), no £, no thousands separator
   return `<div class="tablewrap">
     <table>
       <tr><th></th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
@@ -4672,19 +4682,9 @@ function renderCateringSummaryGridSection(){
   const el = document.getElementById('csmGridWrap'); if(!el) return;
   el.innerHTML = cateringSummaryGridBodyHTML();
 }
-let cateringSummaryOpen = false; // collapsible state for the T-2.5 catering summary block — collapsed by default, same as Hotel's
-function toggleCateringSummaryBlock(){
-  cateringSummaryOpen = !cateringSummaryOpen;
-  applyBlockState({summary:cateringSummaryOpen}, 'csm', 'summary');
-}
 function cateringSummaryHTML(){
   const p = currentProject();
   const costs = getCateringCosts(p);
-  const open = cateringSummaryOpen;
-  const costFieldHTML = (id, label, value) => `<div class="field-inline">
-      <label for="${id}">${label}</label>
-      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
-    </div>`;
   const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
       ${costFieldHTML('ccCostB', 'Est. cost per Breakfast', costs.b)}
       ${costFieldHTML('ccCostL', 'Est. cost per Lunch', costs.l)}
@@ -4693,18 +4693,11 @@ function cateringSummaryHTML(){
     </div>`;
   const inner = `${fieldsHTML}<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyCateringSummaryGrid()">${icon('copy')} Copy catering summary</button></div>`;
-  return collapsibleSectionHTML({
-    state: open, prefix: 'csm', key: 'summary', title: 'Catering summary', inner,
-    id: 'cateringSummarySection', onToggle: 'toggleCateringSummaryBlock()'
-  });
-}
-function jumpToCateringSummary(){
-  if(!cateringSummaryOpen) toggleCateringSummaryBlock();
-  document.getElementById('cateringSummarySection')?.scrollIntoView({block:'start'});
+  return summaryBlockHTML('catering', inner);
 }
 function copyCateringSummaryGrid(){
   const data = buildCateringSummaryGrid(); if(!data) return;
-  const fmt = n => (n||0).toFixed(2);
+  const fmt = budgetFmt; // Gate 1 / G7 — was a local (n||0).toFixed(2), no £, no thousands separator
   const lines = ['CATERING SUMMARY', ''];
   data.cols.forEach(c=>lines.push(`${c.label}: Breakfast ${c.b}, Lunch ${c.l}, Dinner ${c.d} — Daily cost ${fmt(c.dailyCost)}`));
   lines.push('', `Total catering cost: ${fmt(data.totalCost)}`);
@@ -4798,7 +4791,7 @@ function buildTransportSummary(){
 function transportSummaryGridBodyHTML(){
   const data = buildTransportSummary();
   if(!data) return '<div class="empty-note">Add shoot days and set travel methods first, then fill in Travel on the grid above.</div>';
-  const fmt = n => (n||0).toFixed(2);
+  const fmt = budgetFmt; // Gate 1 / G7 — was a local (n||0).toFixed(2), no £, no thousands separator
   return `<div class="tablewrap">
     <table>
       <tr><th></th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
@@ -4812,39 +4805,22 @@ function renderTransportSummaryGridSection(){
   const el = document.getElementById('tsmGridWrap'); if(!el) return;
   el.innerHTML = transportSummaryGridBodyHTML();
 }
-let transportSummaryOpen = false; // collapsible state for the T-2.4 transport summary block (Phase W) — collapsed by default, same as Hotel/Catering's
-function toggleTransportSummaryBlock(){
-  transportSummaryOpen = !transportSummaryOpen;
-  applyBlockState({summary:transportSummaryOpen}, 'tsm', 'summary');
-}
 function transportSummaryHTML(){
   const p = currentProject();
   const costs = getTransportCosts(p);
-  const open = transportSummaryOpen;
-  const costFieldHTML = (id, label, value) => `<div class="field-inline">
-      <label for="${id}">${label}</label>
-      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
-    </div>`;
   const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
       ${costFieldHTML('tsCostPublic', 'Est. public transport cost/day', costs.publicPerDay)}
       ${costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', costs.mileage)}
     </div>`;
   const inner = `${fieldsHTML}<div id="tsmGridWrap">${transportSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyTransportSummary()">${icon('copy')} Copy transport summary</button></div>`;
-  return collapsibleSectionHTML({
-    state: open, prefix: 'tsm', key: 'summary', title: 'Transport summary', inner,
-    id: 'transportSummarySection', onToggle: 'toggleTransportSummaryBlock()'
-  });
-}
-function jumpToTransportSummary(){
-  if(!transportSummaryOpen) toggleTransportSummaryBlock();
-  document.getElementById('transportSummarySection')?.scrollIntoView({block:'start'});
+  return summaryBlockHTML('transport', inner);
 }
 /* text form of the transport summary — shared by the Copy button and the WhatsApp
    export's Travel section (Phase Q); `null` when no travel methods are in use */
 function transportSummaryLines(){
   const data = buildTransportSummary(); if(!data) return null;
-  const fmt = n => (n||0).toFixed(2);
+  const fmt = budgetFmt; // Gate 1 / G7 — was a local (n||0).toFixed(2), no £, no thousands separator
   const lines = ['TRANSPORT SUMMARY', ''];
   data.cols.forEach(c=>{
     const parts = data.usedMethods.map(m=>`${m} ${c.counts[m]}`).join(', ');
@@ -5747,6 +5723,23 @@ function setBudgetSort(v){ budgetSort = v; renderProjectBody(); }
    silently won). Both are gone; this is the only one. */
 function clearBudgetFilter(){ budgetDayFilter.clear(); budgetDeptFilter.clear(); renderProjectBody(); }
 function budgetActiveFilterCount(){ return budgetDayFilterCount() + budgetDeptFilter.size; }
+/* budgetScopeParts() — the "N of M day(s)" segment of "describe the active
+   budget scope", written three times (filter panel hint, export header,
+   output-menu hint) and unified here (Gate 1 / G10). This is the part that was
+   genuinely duplicated, pluralisation bug included: two callers always said
+   "days", one correctly said "day" for a single day. Fixed once, to the
+   correct form.
+   The department segment is deliberately NOT folded in here — it's a real
+   content difference, not a copy-paste one. The filter panel shows a count
+   ("2 departments") next to checkboxes that already show the names; the
+   export and output panels show the actual department names, because that's
+   what the exported text needs to say to be read on its own. Each caller
+   still builds that part itself, exactly as before. */
+function budgetScopeParts(){
+  const allDays = projectDays();
+  const n = budgetDayFilterCount();
+  return n ? [`${n} of ${allDays.length} day${allDays.length===1?'':'s'}`] : [];
+}
 
 function budgetFilterPanelHTML(){
   const all = projectDays();
@@ -5759,9 +5752,8 @@ function budgetFilterPanelHTML(){
   const deptChips = present.length ? present.map(d=>
       `<label><input type="checkbox" ${budgetDeptFilter.has(d)?'checked':''} onchange="toggleBudgetFilterDept('${d}', this.checked)"> ${esc(d)}</label>`
     ).join('') : '<span class="hint">No crew on this project yet.</span>';
-  const n = budgetDayFilterCount(), dn = budgetDeptFilter.size;
-  const scope = [];
-  if(n)  scope.push(`${n} of ${all.length} day${all.length===1?'':'s'}`);
+  const dn = budgetDeptFilter.size;
+  const scope = budgetScopeParts();
   if(dn) scope.push(`${dn} department${dn>1?'s':''}`);
   return `<div class="filter-panel">
     <div><div class="hint" style="margin-bottom:4px;">Shoot days</div><div class="filter-chips">${chips}</div></div>
@@ -6122,10 +6114,6 @@ function budgetCostsViewHTML(){
   const cateringCosts = getCateringCosts(p);
   const transportCosts = getTransportCosts(p);
   const hotelCosts = getHotelCosts(p);
-  const costFieldHTML = (id, label, value) => `<div class="field-inline">
-      <label for="${id}">${label}</label>
-      <input type="text" inputmode="decimal" id="${id}" value="${value||''}" placeholder="0.00" style="width:90px;">
-    </div>`;
   // R16 — the three cost groups collapse, via the same shared applyBlockState
   // plumbing (prefix 'bc') as every other collapsible block, rather than a
   // hand-rolled toggle. Open by default: this tab exists to be typed into.
@@ -6201,9 +6189,7 @@ function budgetOrderedPeople(data){
 function budgetExportRows(data, view){
   const fmt = budgetFmt;
   const rows = [];
-  const scope = [];
-  const allDays = projectDays();
-  if(budgetDayFilterCount()) scope.push(`${budgetDayFilterCount()} of ${allDays.length} days`);
+  const scope = budgetScopeParts();
   if(budgetDeptFilter.size)  scope.push([...budgetDeptFilter].join(', '));
   if(scope.length) rows.push(['Filtered to', scope.join(' · ')], []);
   budgetVatToggle
@@ -6316,9 +6302,7 @@ function budgetOutputPanelHTML(){
   const view = budgetExportViewEff();
   const viewTab = (key,label)=>`<div class="tab ${view===key?'active':''}" onclick="setBudgetExportView('${key}')">${label}</div>`;
   const vatTab = (on,label)=>`<div class="tab ${budgetVatToggle===on?'active':''}" onclick="toggleBudgetVat(${on})">${label}</div>`;
-  const scope = [];
-  const allDays = projectDays();
-  if(budgetDayFilterCount()) scope.push(`${budgetDayFilterCount()} of ${allDays.length} days`);
+  const scope = budgetScopeParts();
   if(budgetDeptFilter.size)  scope.push([...budgetDeptFilter].join(', '));
   return `
     <div><div class="hint" style="margin-bottom:4px;">View</div>

@@ -1165,8 +1165,8 @@ Stage 2 applies whatever the user accepts; the [B] and [C] items are explicitly 
 batchable.
 
 **Stage 2 progress.** All 21 findings were accepted. **Phase AR** landed G11, G13,
-G16 and G15; **Phase AS** landed G12, G18, G19, G17 and G14 — see their sections.
-**Phase AT** (in progress) is landing G6, G1, G2, G7, G8, G9, G10 across three commits.
+G16 and G15; **Phase AS** landed G12, G18, G19, G17 and G14; **Phase AT** landed
+G6, G1, G2, G7, G8, G9 and G10 across three commits — see their sections.
 Phases **AU / AV / AW** carry the rest.
 
 ⚠️ **R10 ("Remember the AI Scan conversation") was DECLINED and closed by the user on
@@ -1553,6 +1553,112 @@ caret state, toggles independently, collapses/expands correctly. The three left-
 builders (Shoot Days' `sdBlock`, Budget's Day view, Budget's Costs view) re-checked
 after the change and confirmed byte-identical to before. `app_data` unchanged —
 nothing written.
+
+### Commit C — G7, G8, G9, G10: logic consolidation
+
+The two findings that are not behaviour-neutral, isolated in their own commit as
+planned. Both output changes are cosmetic (formatting/wording), not calculation —
+demonstrated below with real numbers, temporarily set in memory only (same
+technique as G15's verification), never saved.
+
+**G7 — the four stray formatters now point at `budgetFmt()`**
+(`const fmt = budgetFmt;` at each of the four sites — declaration hoisting makes
+`budgetFmt` being defined later in the file a non-issue). Every underlying number
+is unchanged; only the string representation changes.
+
+⚠️ **The audit's own blast note over-stated the surface — corrected here.** It said
+"the Hotels/Catering/Travel sections of the WhatsApp export" all pick up the
+change. Traced each: the WhatsApp *TRAVEL* section calls `transportSummaryLines()`
+(affected), but the WhatsApp *CATERING* section calls a **different, unaffected
+function** — `cateringOrderLines()` (Breakfast/Lunch/Dinner counts and dietary
+notes, no cost figures at all) — and the WhatsApp *HOTELS* section's
+`hotelSummaryLines()` was never in G7's scope and also carries no cost figures.
+Only Travel's WhatsApp section actually changes.
+
+Demonstrated on ROW 2026 with a lunch rate of £12.50 and a dinner rate of £18 set
+temporarily in memory (ROW 2026's real catering rates are all £0.00, per the AR
+verification note — inert on this project):
+
+| Surface | Before | After |
+|---|---|---|
+| Catering summary grid, Daily cost row (per day) | `662.50` / `685.50` / `680.50` ×2 / `662.50` ×2 | `£662.50` / `£685.50` / `£680.50` ×2 / `£662.50` ×2 |
+| Catering summary grid, Total | `Total catering cost: 4034.00` | `Total catering cost: £4,034.00` |
+| Catering Copy button | `— Daily cost 662.50` … `Total catering cost: 4034.00` | `— Daily cost £662.50` … `Total catering cost: £4,034.00` |
+| Travel summary grid, Daily cost row | `115.00` / `305.00` ×4 / `325.00` | `£115.00` / `£305.00` ×4 / `£325.00` |
+| Travel summary grid, Total | `Total transport cost: 1660.00` | `Total transport cost: £1,660.00` |
+| Travel Copy button + WhatsApp *TRAVEL* section (`transportSummaryLines()`) | `— Daily cost 115.00` … `Total transport cost: 1660.00` | `— Daily cost £115.00` … `Total transport cost: £1,660.00` |
+| WhatsApp *CATERING* section (`cateringOrderLines()`) | unaffected — no cost figures | unaffected |
+| WhatsApp *HOTELS* section (`hotelSummaryLines()`) | unaffected — no cost figures | unaffected |
+
+**Budget itself re-verified unmoved**, as it should be — G7 only touches
+formatters *outside* Budget: `£59,890.00` ex-VAT / `£3,517.00` VAT / `£63,407.00`
+inc-VAT, identical to the Phase AR baseline.
+
+**G8 — `summaryBlockHTML(key, inner)` + `SUMMARY_BLOCKS` table + module-level
+`costFieldHTML(id, label, value)`.** Hotel/Catering/Transport's nine
+toggle/jump/wrapper functions collapsed to one `toggleSummaryBlock(key)` and one
+`jumpToSummary(key)`, built on G2's `collapsibleSectionHTML()`. The three separate
+open-state booleans became one `summaryBlocksOpen = {hotel, catering, transport}`
+object — each was only ever read inside its own block, confirmed by grepping every
+reference before merging them, so nothing outside these three blocks could have
+been reading them individually. All four `costFieldHTML` copies (three
+character-identical, Hotel's inline) are now the one module-level function; Hotel's
+caller wraps it in the same `flex/gap:18px/margin-bottom:14px` container the other
+two already used, replacing the margin that used to sit on the field itself —
+`getComputedStyle()` confirmed the rendered gap is unchanged.
+
+Verified: all three blocks open/close independently via `jumpToSummary()`, all
+seven field ids (`hcRoomNight`, `ccCost{B,L,D,Delivery}`, `tsCost{Public,Mileage}`)
+byte-identical and confirmed present in Budget's Costs tab output, which reuses
+the shared `costFieldHTML` but was otherwise untouched.
+
+**G9 — `groupAlpha(rawKeyFn, blankLabel)` / `groupFixed(keyFn, orderedKeys)` +
+a `SIMPLE_GROUPERS` lookup**, covering 5 alpha-sorted options (company, role,
+subDept, travel, catering) and 4 fixed-order options (hotel, personType, vat,
+seniority) — nine of the thirteen `groupBy` branches. `deptCompany` (composite
+key), `daysOnSite` (multi-bucket) and `dept` (canonical order + codes, the
+default) stay as their own branches exactly as the audit specified.
+
+**Verified by direct comparison, not spot-checked:** ran `buildProjectCrewGroups()`
+for all 13 `groupBy` values against the live ROW 2026 crew list (66 assigned) in
+both the pre-Commit-C code and the new code, serialised each result (group keys,
+labels, codes, and item-id order) and compared — **byte-for-byte identical**
+(same length, same hash). Repeated for a cross-section of all 7 `sort` options ×
+4 of the newly table-driven `groupBy` values — also byte-for-byte identical.
+
+**G10 — `budgetScopeParts()`**, covering only the "N of M day(s)" segment — the
+part that was genuinely duplicated three times, pluralisation bug included. The
+department segment was deliberately **not** folded in: `budgetFilterPanelHTML()`
+shows a count ("2 departments") next to checkboxes that already show the names,
+while the export/output panels show the actual department names, because that's
+what the exported text needs to say on its own. That's a real content difference,
+not a copy-paste one, so each caller still builds it itself.
+
+Demonstrated by simulating a one-shoot-day project in memory (ROW 2026's `Day 1`
+kept, the other five temporarily removed from `shootDaysDB`, day filter set to
+that one day):
+
+| Surface | Before | After |
+|---|---|---|
+| Filter panel hint (`budgetFilterPanelHTML`, already correct) | "Costing 1 of 1 day" | "Costing 1 of 1 day" (unchanged) |
+| Export header (`budgetExportRows`) | "Filtered to: 1 of 1 **days**" | "Filtered to: 1 of 1 **day**" |
+| Output-menu hint (`budgetOutputPanelHTML`) | "…scoped to your filter (1 of 1 **days**)" | "…scoped to your filter (1 of 1 **day**)" |
+
+Multi-day case re-verified unchanged: ROW 2026's real 6-day project, filtered to
+1 day, still reads "1 of 6 days" in all three places, before and after.
+
+### Verification (Commit C)
+- `node --check` clean, `<style>` block untouched (no CSS in this commit).
+- Orphan sweep: zero remaining references to any of the nine old summary-block
+  function/variable names; `budgetScopeParts()` and the G9 helpers used only
+  where intended.
+- All in-browser checks run against live ROW 2026 London data with
+  `saveDB()`/`scheduleAutosave()` stubbed in a verification-only copy; confirmed
+  clean against `app_data` afterwards — nothing written, including through the
+  in-memory `shootDaysDB`/cost-rate simulations used to demonstrate G7 and G10.
+
+**Phase AT complete. Phases AU / AV / AW remain — seedSampleData() (G20) and the
+shoot-day location structures (G21) were not touched, as instructed.**
 
 ## The design system, as decided (Phase Refinement)
 
