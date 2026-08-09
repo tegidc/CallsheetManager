@@ -349,6 +349,21 @@
   .pill{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; padding:2px 8px; border-radius:20px;
     background:var(--panel-2); color:var(--muted); letter-spacing:1.2px; vertical-align:middle;}
   .pill.dept{background:var(--tint-3); color:var(--tape);}
+  /* Phase BE — role chips only (roleBannerHTML()'s single banner chip and
+     rolesTagListHTML()'s tag-list editor). Was a .pill.dept capsule: tinted green
+     fill, no border — a label shape from a different design language than the rest
+     of the app, which is rounded-rectangle-with-a-border throughout. Given a
+     dedicated class rather than restyling .pill.dept itself, since that class is
+     shared with deptLabelHTML()'s department badge and the department-admin
+     sub-department tags — neither of which this phase touches. Reuses the
+     checkbox's own border/radius literals verbatim (Phase Fonts: 1.5px solid,
+     3px radius, no fill) rather than a new nearby-but-different number, and
+     var(--text) for "primary text colour" — the same variable the checkbox
+     itself switches to on :checked. */
+  .role-chip{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
+    letter-spacing:1.2px; padding:2px 8px; border-radius:3px; vertical-align:middle;
+    background:transparent; border:1.5px solid var(--muted); color:var(--muted);}
+  .role-chip.active{border-color:var(--text); color:var(--text);}
   /* Inline pickers (department, company) are just fields (Fonts Review): same Jost,
      same size, same ruled underline as a typed input — to the person filling the form
      it's another thing to fill in, so it shouldn't look like a coloured tag. Keeps the
@@ -1155,7 +1170,7 @@ function rolesTagListHTML(c){
   return `<span class="taglist" style="display:inline-flex;">${roles.map(rp=>{
     const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
     const active = !!c.role && c.role===name;
-    return `<span class="pill dept" style="cursor:pointer;${active?'background:var(--tint-6);':''}" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
+    return `<span class="role-chip${active?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
   }).join('')}</span>`;
 }
 /* Phase AZ — the Roles-view row banner. Used to render rolesTagListHTML() directly
@@ -1168,7 +1183,7 @@ function rolesTagListHTML(c){
    The "+" marker is inert (no handler) until Phase BA wires it to a menu; its weight
    just signals whether this person has other saved roles to offer. */
 function roleBannerHTML(c){
-  const chip = c.role ? `<span class="pill dept" title="${esc(c.role)}">${esc(c.role)}</span>` : '';
+  const chip = c.role ? `<span class="role-chip active" title="${esc(c.role)}">${esc(c.role)}</span>` : '';
   const hasOtherRoles = (c.roles||[]).length > 1;
   const marker = `<span class="role-add-marker${hasOtherRoles?' has-roles':''}" aria-hidden="true">+</span>`;
   return `${chip}${marker}`;
