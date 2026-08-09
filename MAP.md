@@ -495,123 +495,6 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   spells out how much of it is travel. Per Department is the view AO extended Itemize
   VAT into (see **VAT follows the person** above) — [Budget, Crew]
 
-## Budget (demo) — the line-item budget
-
-⚠️ **This is NOT the Budget tab (T-6).** T-6 is cost visibility only, rolled up from
-data entered on other tabs. This is **B-1**, a separate screen reached from the side
-panel, and it is a real line-item budget: you type the lines, and every figure on it
-is derived from them. The two do not share a single function, constant or DOM id —
-everything here is named `budgetDemo*` / `bdm*` precisely so it cannot collide with
-T-6's `budget*` family. The one thing it *does* reuse is `budgetFmt()`, the app's one
-money formatter.
-
-⚠️ **It touches no database.** There is no `saveDB`/`loadDB` call and no Supabase
-read or write anywhere in this section. The data is `BUDGET_DEMO_DATA`, a plain
-constant; `budgetDemoInit()` takes ONE deep copy into `budgetDemoProjects` and every
-edit mutates that copy. Edits therefore survive lens switches, project switches and
-navigating away and back — and are gone on reload. **Persistence is a separate
-decision.** Do not wire this to a `db:*` key without one.
-
-- `goBudgetDemo()` — **the one sidebar route that does not clear `currentProjectId`.**
-  `goDatabase()`/`goSettings()` both null it because they go to project-independent
-  screens; this is a different view *of* a project, so the project you were in stays
-  open behind it. `renderSide()` was widened to keep the open project highlighted on
-  `route.screen==='budget'` for the same reason — [Shared/utility functions, Budget (demo)]
-- `renderBudgetDemo()` — the screen: `.page-head`, the project selector + Float %/Fee %
-  row, the lens `.tabs`, the Top sheet section, then the Line detail sections — [Budget (demo)]
-- `BUDGET_DEMO_DATA` / `budgetDemoProjects` / `budgetDemoInit()` /
-  `currentBudgetDemoProject()` / `budgetDemoProjectId` / `setBudgetDemoProject()` —
-  the two demo projects and the in-memory working copy. The project selector is a
-  **placeholder**: it switches between those two and does nothing else — [Budget (demo)]
-- `BUDGET_DEMO_SHOOT_PHASES` / `BUDGET_DEMO_POST_PHASES` / `budgetDemoPhases()` /
-  `budgetDemoGroupPhases()` — **phase buckets are per section, not global.** A project
-  carries `phaseSets` keyed by code with a `default` fallback, so a third set is a data
-  edit rather than a code change. Shoot sections get PreProd/Shoot/Strike/Buyout; POST
-  gets PreProd/Assembly/PreV1/V1 Feedback/PreV2/V2 Feedback/Delivery/Buyout.
-  `budgetDemoGroupPhases()` exists for the BBC lens, where a category could in
-  principle collect codes with different sets — it unions them, first set wins on
-  order. On the real data it always returns exactly one set — [Budget (demo)]
-- `budgetDemoLineMath()` / `budgetDemoTotals()` — **every calculated field, in one
-  place, never stored.** `daysTotal` = sum of the phase buckets, `total` = rate ×
-  daysTotal, `vat` = total × vatRate, `float` = total × floatPercent, `totalWithFloat`
-  = total + float. ⚠️ **Float is per LINE, not one bottom-line row** — a department
-  total already includes it. ⚠️ **The production fee is calculated on the
-  float-INCLUSIVE subtotal**, deliberately. ⚠️ **VAT is excluded from every percentage
-  and from the grand total** and shown in its own column — [Budget (demo)]
-- `budgetDemoBbcCategory()` — the BBC lens's only real logic. Order matters:
-  `bbcOverride` wins over everything; then the cross-cutting Insurance / Risk
-  Assessment rule (→ N), which applies whatever the code says, which is why it is
-  tested *before* the per-code rules rather than inside PROD's; then the per-code
-  rules. Float shows as P and the fee as Q — neither ever holds a line — [Budget (demo)]
-- `BUDGET_DEMO_BBC_CATEGORIES` / `budgetDemoTopSheetRows()` — the BBC lens shows **all
-  17 categories A–Q in order, including the empty ones at £0**, labelled "— no lines"
-  rather than hidden. On the demo data that is A, B, E, K, M and O for IRL London.
-  Q renders below the subtotal because that is both its ordered position and where the
-  fee actually applies — [Budget (demo)]
-- `budgetDemoGroups()` — **the lines never change, only the bucket they are read in.**
-  Departments lens groups by `code` and totals `totalWithFloat`; BBC lens groups by
-  derived category and totals `total` **ex-float**, because in that lens the float is
-  pooled into P and must not also be spread through the categories. Both give the same
-  subtotal — verified below — [Budget (demo)]
-- `budgetDemoTopSheetHTML()` / `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()`
-  — top sheet and line detail. Sections collapse through `deptHeaderHTML()` +
-  a re-render, the same idiom as the Crew list's department groups (not
-  `applyBlockState`, whose keys are a fixed set and these are not), with the shared
-  `expandCollapseAllHTML()` above them — [Budget (demo), Shared/utility functions]
-- `setBudgetDemoRate()` / `setBudgetDemoDay()` / `setBudgetDemoPercent()` /
-  `refreshBudgetDemoNumbers()` — **the live-recalculation path.** These update the model
-  on `oninput` and then rewrite only the *derived* text through
-  `refreshBudgetDemoNumbers()`, touching no input — the same targeted-refresh rule as
-  `renderCateringSummaryGridSection()`, for the reason `aiScanDraftText` documents: a
-  re-render replaces the panel and blanks whatever is half-typed. Verified: editing a
-  rate updates the line, the section total and the top sheet with focus retained —
-  [Budget (demo)]
-- `setBudgetDemoLineText()` / `setBudgetDemoLineField()` — the other speed. Only an edit
-  that can MOVE a line between groups re-renders: its code, its BBC override, or the
-  item/name text the BBC rules read. Text fields re-render on `onchange` (focus has
-  left), never on `oninput` — [Budget (demo)]
-- `addBudgetDemoLine()` / `deleteBudgetDemoLine()` — add takes its code from the section
-  it was pressed in (in the BBC lens it also sets `bbcOverride` to that category, so the
-  new line stays where you added it). Delete has **no `confirm()`** — unlike the app's
-  record deletes this is one row of a demo, in memory, with no undo to integrate — [Budget (demo)]
-- `bdmNum()` / `bdmSlug()` — parse a free-text figure; make a group key safe as a DOM id
-  (`CAT/TRA` carries a slash) — [Budget (demo)]
-- `.main:has(#bdmTopSheet){max-width:1320px}` — ⚠️ **the one screen that opts out of the
-  app's 840px reading column.** At 840px the Total / Float / Total+float columns sat off
-  the right edge, which are the three you actually read. Scoped by `:has()` on this
-  screen's own top sheet — the same selector idiom the field-layout rules already use —
-  so every other screen is untouched (verified: 840px everywhere else, 1320px here).
-  At 1680px the whole line row fits with no scroll; at 1440px it needs ~70px inside its
-  own `.tablewrap`, and on mobile the table scrolls in its own box with no page-level
-  horizontal overflow — [Budget (demo)]
-- ⚠️ **The field-width rules are qualified with their element on purpose** —
-  `input.bdm-rate-input`, not `.bdm-rate-input`. `input[type=text]{width:100%}` is an
-  attribute selector at specificity (0,1,1) and beats a bare class (0,1,0), so the
-  unqualified version silently collapsed every field to its cell (measured: a £5,000
-  rate rendering in 39px, clipped). Same reason `.ts-field input.fld-xs` is written the
-  way it is. Don't "tidy" the element off the front — [Budget (demo)]
-
-**Verified on both demo projects**, driven through the live page with `saveDB()`
-stubbed and the write log empty apart from `openProject()`'s own pre-existing
-`lastOpenedAt` stamp:
-
-| check | IRL London 2026 | Proper Corn Hot Sauce |
-|---|---|---|
-| subtotal == Σ line total + Σ line float | ✓ £92,736.00 | ✓ £21,711.90 |
-| Σ department totals == subtotal | ✓ | ✓ |
-| Σ BBC (A–O) + float == subtotal | ✓ | ✓ |
-| every line in exactly one group, both lenses | ✓ 31 | ✓ 15 |
-| fee == subtotal × fee% | ✓ £9,273.60 (10%) | ✓ £0.00 (**0%**) |
-| grand == subtotal + fee | ✓ £102,009.60 | ✓ £21,711.90 |
-| VAT total == Σ line vat, excluded from grand | ✓ £12,200.00 | ✓ £1,015.60 |
-
-Also exercised live: rate edit (20 × £600 → £12,000 / float £600 / VAT £2,400, focus
-retained), day-bucket edit and clear, VAT 0↔20%, Float % 5→10 (subtotal £97,152),
-Fee % →0 (grand == subtotal), item text moving a line C→E in the BBC lens, a `bbcOverride`
-beating the derived category, add + delete line, per-section and Expand/Collapse-all,
-project switch (POST renders its own 8 phase columns), and mobile at 375px (no page-level
-horizontal overflow — the wide table scrolls inside its own `.tablewrap`).
-
 ## Preview & Export
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
@@ -812,21 +695,6 @@ coarse information first, finest detail last.
 | D-2.1 | · Location form | Address search, map preview, access/recce/parking notes | `locFormHTML()` |
 | D-2.2 | · Nearest hospital / parking | OpenStreetMap Overpass lookup, saved onto the location | `lookupAmenityForForm()` |
 
-## B — Budget (demo)
-
-A DEMO, and a different thing from **T-6**. Reached from the side panel, not the
-project tab strip, and it keeps the open project open behind it. See the
-**Budget (demo)** section above for why, and for the no-database rule.
-
-| Code | Section | What it is | Entry point |
-|---|---|---|---|
-| **B-1** | **Budget (demo)** | Line-item budget: you type the lines, every figure is derived | `renderBudgetDemo()` |
-| B-1.1 | · Project selector | Placeholder — switches between the two demo projects, nothing else | `setBudgetDemoProject()` |
-| B-1.2 | · Float % / Fee % | Project-level, editable, live | `setBudgetDemoPercent()` |
-| B-1.3 | · Lens toggle | Departments ↔ BBC. Same lines, different grouping and totalling | `setBudgetDemoLens()` |
-| B-1.4 | · Top sheet | Category rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total | `budgetDemoTopSheetHTML()` |
-| B-1.5 | · Line detail | Collapsible section per group, one editable row per line | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
-
 ## S — Settings
 
 | Code | Section | What it is | Entry point |
@@ -841,7 +709,7 @@ project tab strip, and it keeps the open project open behind it. See the
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
-| **G-1** | Sidebar | Databases, project list, + New project, **Project → Budget (B-1)**, Settings | `renderSide()` |
+| **G-1** | Sidebar | Databases, project list, + New project, Settings | `renderSide()` |
 | **G-2** | Mobile top bar & drawer | Burger, title, slide-out nav | `toggleDrawer()` / `setTopbarTitle()` |
 | **G-3** | Welcome screen | Landing state when no project is open | `renderWelcome()` |
 | ~~**G-4**~~ | ~~Sample data reset~~ | **Removed in Phase AS (G12)** — the section and its button are gone; first-load auto-seeding survives in `initApp()` | — |
@@ -1963,50 +1831,6 @@ Note the asymmetry with `budgetExportView`, which is deliberate and not an
 inconsistency: the VIEW is export-only state (you can export Per Person while
 looking at Per Day) because nothing on screen claims otherwise, whereas VAT is a
 footing the screen is actively displaying, so a second one would be a lie.
-
-## Budget (demo) — the decisions
-
-**It is a demo, and the file says so.** The screen's own `.page-head` code line reads
-"DEMO · EDITS LAST FOR THIS SESSION ONLY". That is not decoration — it is the honest
-statement of what `budgetDemoProjects` is. Anyone reviewing this should be able to type
-into it freely knowing nothing survives a reload and nothing reaches the database.
-
-**Two Budgets, on purpose, for now.** T-6 rolls up costs the app already holds; B-1 is
-a budget you build. They answer different questions and share no code. If B-1 is
-adopted, that is the point at which somebody decides what happens to T-6 — this phase
-deliberately does not decide it, and deliberately did not rename or touch T-6.
-
-**Side panel, not a project tab.** The brief put it in the side panel, and the side
-panel is also where it belongs: adding a second tab labelled BUDGET next to T-6's would
-have been unreadable. The cost of a sidebar entry is that sidebar routes null
-`currentProjectId`, so `goBudgetDemo()` is the one that doesn't, and `renderSide()`
-keeps the open project lit while you're on it. Leave from Budget and you land back on
-the tab you left.
-
-**Float per line, fee on the float-inclusive subtotal.** Both were specified and both
-are unusual enough to be "fixed" by a well-meaning future session. They are not
-mistakes. A department total already contains its float; the fee is a percentage of a
-number that already contains float.
-
-**VAT sits outside the arithmetic.** It has its own column on every table and it is in
-none of the percentages and not in the grand total. Note this is a *different* model
-from T-6's, where VAT follows the PERSON (`c.vatRegistered`). Here VAT is a property of
-the LINE (`vatRate`, 0 or 0.2), because a line is what gets invoiced. Don't unify them
-without deciding which model wins.
-
-**The BBC lens shows its empty categories.** A, B, E, K, M, O at £0 with "— no lines"
-is information — it says what wasn't spent — and a top sheet with categories missing
-is a top sheet somebody has to cross-check by hand.
-
-**The one styling deviation is `max-width`.** The app's 840px reading column is right
-for a call sheet form and wrong for a budget: it pushed Total / Float / Total+float off
-the right edge. `.main:has(#bdmTopSheet)` widens this screen alone to 1320px. Everything
-else — headings, labels, greens, fields, tables, collapsibles, the tab switcher, the
-money figures — is the app's existing rules, unmodified.
-
-**Explicitly not built, and not to be added without a decision:** per-person breakdown,
-cost reporting, invoiced/paid tracking, markup, bank reconciliation, and any read from
-the crew database or the call sheet.
 
 ## The design system, as decided (Phase Detail)
 
