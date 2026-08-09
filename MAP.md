@@ -118,12 +118,100 @@ Every screen needs the same handful of records. These are the single place that 
 - `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: a cost field ("Est. cost per room/night", id `hcRoomNight`, Phase AD — moved here from Budget, same `getHotelCosts()`/`saveHotelCosts()` pair, same `field-inline` markup as Catering's cost fields) above room-booking table (Room No./Name/Date from–to/Total nights), then per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-7.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once, which is also why the cost field shows up on both (same precedent as Travel's cost fields at T-7.4). Autosave for `hcRoomNight` is wired per-screen: `renderProjectCrew()`'s `body.oninput` when `crewGridView==='hotel'`, and `renderProjectPreview()`'s scoped `e.target.id==='hcRoomNight'` check (alongside the Travel fields, Phase AD) — [Crew, Budget, Preview & Export]
 - `jumpToHotelSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Hotel sub-tab: expands `hotelSummaryOpen` if collapsed, then scrolls `#hotelSummarySection` into view — [Crew]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
-- `addCrewEntry()` / `removeCrewEntries()` (Phase BF) — the one place an entry is created, and the one place entries + their positions + their day overrides are removed together. ⚠️ `removeCrewEntries()` deliberately does NOT clear travel/hotel/catering: removing someone from a project never did, and BF has no behaviour changes. It also happens to be right for the entry model — two roles is one bed — [Crew]
+- `addCrewEntry()` / `removeCrewEntries()` (Phase BF) — the one place an entry is created, and the one place entries + their positions + their day overrides are removed together. ⚠️ `removeCrewEntries()` deliberately does NOT clear travel/hotel/catering: removing someone from a project never did, and BF has no behaviour changes. It also happens to be right for the entry model — two roles is one bed. **Phase BD added one more thing it clears: `prunePrepSchedule()`**, because `p.prepSchedule` is a parallel structure keyed by entry id and so — unlike `entry.rate` — does not vanish when the entry does. This is where the single and bulk removals meet, so hooking it here covers both; `deleteCrew()` is the third entry-dropping path and does not come through here, so it prunes for itself — [Crew, Pre-production]
 - `addCrewToProject()` / `removeCrewFromProject(entryId)` — add a crew member to / remove an ENTRY from the current project's roster. `addCrewToProject()` has **three** callers now: this tab's picker, AI Scan's `propose_crew` matched-accept, and Overview Quick Add's crew search — it also calls `resetQuickAdd()` so that box settles back after the third — [Crew, Overview]
 - `crewInfo()` — looks up a crew member's basic display info by id, with a fallback for removed crew — [Crew]
 - `resolveCrewForDay(entryId, day)` / `hasOverride(entryId, day)` — resolve an ENTRY's effective role/dept for a specific day (Phase BF — was keyed by crew id). The base is the entry view, so a person holding two entries resolves to their AC role on one position and their operator role on the other. An id that no longer resolves still falls back to `(removed crew)` — [Crew, Shoot Days]
 - `dayOverrideFormHTML()` / `saveDayOverride()` / `clearDayOverride()` — render/save/clear a per-day override of an ENTRY's role/department/company. ⚠️ `d.crewOverrides` is keyed by ENTRY id since Phase BF (it overrides role, which is entry-level). It was empty on all ten live shoot days at migration time, so this rekey moved no data — [Crew, Shoot Days]
 - `OVERRIDABLE_FIELDS` — list of crew fields that can be overridden per shoot day — [Crew, Shoot Days]
+
+## Pre-production
+
+Phase BD. A sibling project tab (**T-8**), between Crew and Locations — **not** a sixth
+view inside Crew, and **not** the parked "Preproduction" view from the Views sidebar
+restructure, which is a separate and deliberately-parked idea. It exists because
+pre-production has a different scheduling model to a shoot-day roster: prep work is a
+number of days, optionally spread over a non-contiguous set of dates, rather than a
+person × shoot-day grid.
+
+⚠️ **THERE ARE NO TOTALS ON THIS SCREEN, AND NONE MAY BE ADDED.** No rate × days, no
+aggregation, no rollup, no section total, no totals column. Rate and days are data on
+rows and nothing here adds anything up. The only number on the screen that isn't a
+row's own is the department heading's roster count, which `deptHeaderHTML()` renders on
+every crew screen in the app and which counts rows, not prep data.
+
+- `renderProjectPreproduction()` — the tab body. Renders **every** entry on the project
+  with **no filtering** — a filter is wanted later and was explicitly out of scope, which
+  is why this deliberately does NOT reach for `projectCrewFilter` or
+  `buildProjectCrewGroups()`; grouping is the canonical `DEPARTMENTS` order plus
+  `sortHoDFirst()` and nothing more. Entries with no days and no marks are a normal state
+  and render cleanly as empty — [Pre-production]
+- `prepRowHTML()` — one ENTRY's row: Name | Role | the two bare number fields | the marks
+  indicator. Same entry grain as the Roles view (`projectEntryViews()`), so a person doing
+  two roles is two rows with independent days, marks and rate. Reuses `roleBannerHTML()`
+  exactly as `crewRolesRowHTML()` has it, **AZ's inert `.role-add-marker` included** — BD
+  did not build the roles menu and did not wire that marker. ⚠️ It deliberately does NOT
+  render `crewRateSaveIconHTML()`: that icon is the app's one project→database write, and
+  this tab makes no write to `db:crew` — [Pre-production, Crew]
+- ⚠️ **FIELD LABELLING: rate and days are two bare number fields with NO column headers
+  and NO inline labels** — the decision was that magnitude alone distinguishes them. There
+  is no header row on this grid at all. Do not add them back — [Pre-production]
+- `p.prepSchedule` — the storage. A **PARALLEL** per-project structure **keyed by ENTRY
+  id**: `{ [entryId]: {days, dates[]} }`. ⚠️ Deliberately NOT a field on `p.crewEntries` —
+  Phase BF settled that shape and this is a parallel, not an extension. The cost of that
+  choice is pruning; see `prunePrepSchedule()`. An emptied record, and an emptied
+  `prepSchedule`, are **deleted** rather than left as husks, so a project nobody has used
+  this tab on carries no key at all — [Pre-production]
+- `prepScheduleOf()` / `prepRecordOf()` / `prepDaysOf()` / `prepDatesOf()` — read-only
+  accessors. None of them creates a record — [Pre-production]
+- `prepWrite(p, entryId, mutate)` — the ONE write path into `p.prepSchedule`. Normalises on
+  the way out (dates deduplicated and sorted) and does the delete-rather-than-husk cleanup —
+  [Pre-production]
+- `prunePrepSchedule(p, entryIds)` — **the pruning hook.** Called from
+  `removeCrewEntries()` (which both `removeCrewFromProject()` and
+  `bulkRemoveSelectedFromProject()` route through) and from `deleteCrew()` (which does
+  not). Without it, prep data outlives the entry it belongs to — invisibly, since nothing
+  renders an orphan — [Pre-production, Crew]
+- `setPrepDays()` — **DAYS is a plain editable number and the AUTHORITATIVE figure**: not
+  derived, not computed from anything, not reconciled against the date marks or against
+  shoot days. Writes on `onchange`; garbage reverts by re-rendering without saving, the
+  same idiom as `saveEntryRate()`; empty clears it — [Pre-production]
+- ⚠️ **RATE IS NOT STORED HERE.** The Rate field is the entry's existing `rate`, read
+  through `resolveEntryRate()` and written through `saveEntryRate()` — the same field the
+  Roles view (`crewRolesRowHTML()`) and Budget's Per Person view read. **There is
+  deliberately ONE rate**: editing it on this tab changes the same value everywhere.
+  Verified in both directions with no divergence. Do not create, shadow or copy a
+  prep-specific rate; if something seems to need one, that is a separate decision and a
+  later phase — [Pre-production, Crew, Budget]
+- `prepCalendarHTML()` / `togglePrepCalendar()` / `prepCalAnchorMonth()` /
+  `shiftPrepCalMonth()` / `commitPrepDates()` / `clearPrepDates()` — the per-entry
+  calendar, one open at a time (`prepCalendarFor` / `prepCalMonth`). **DATE MARKS are
+  stored as a FLAT ARRAY of `'YYYY-MM-DD'`** — not range objects, not start/end pairs.
+  Their purpose is showing NON-CONTIGUOUS patterns (one day, gap, three days, gap, two).
+  It opens on the project's first shoot day, else `p.startDate`, else this month — a
+  read-only glance; this tab never touches shoot day selection — [Pre-production]
+- `prepDrag` / `prepDayDown()` / `prepDayEnter()` / `prepDragApply()` — click-and-drag
+  selection. ⚠️ **The drag is a UI affordance for picking several dates quickly and is NOT
+  a storage format** — what lands is still the flat array. It works off a local Set and
+  direct `classList` updates rather than re-rendering per cell, because a re-render
+  mid-drag would destroy the element the pointer is over; ONE save and ONE render happen on
+  a document-level `mouseup`. The first cell decides direction (from an unmarked day it
+  marks, from a marked day it unmarks), so a drag can clear a run as easily as make one. A
+  plain click is a one-cell drag — [Pre-production]
+- `prepCounterText()` — the soft counter under the fields: "5 days booked · 6 dates
+  marked". ⚠️ **Muted only.** Marks are INDICATIVE and NOT bound to the days number —
+  "booked 5, marked 7" is a VALID state (someone spreading five days' work across seven).
+  There is deliberately **no warning, no validation, no reconciliation, no colour change
+  and no badge** for a mismatch, in either direction. Do not add one. Renders empty rather
+  than "0 days booked" when there is nothing to say — [Pre-production]
+- `.prep-cal-btn` / `.prep-cal-btn.has-marks` — the calendar icon doubles as the marks
+  indicator, carrying its state as **weight**: `--muted` when nothing is marked, `--text`
+  when something is. This is AZ's `.role-add-marker` convention reused rather than a second
+  visual language for the same idea — [Pre-production]
+- `collapsedPrepDepts` / `toggleProjectPrepDeptCollapse()` / `toggleAllPrepDeptsCollapsed()`
+  — group collapse state. Deliberately its OWN Set rather than the Crew tab's
+  `collapsedProjectDepts`: collapsing a department here is not a statement about the Crew
+  tab — [Pre-production]
 
 ## Locations
 
@@ -588,7 +676,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `saveCrew()` — persist a crew record. Refuses to create a brand-new crew member without `pendingNewCrewRole` set ("every crew member needs at least one saved role"); for a new record, role/department/`roles` are derived entirely from that pick. For an existing record, role/department/`roles` are left untouched (they're managed live by `addRoleToCrew`/`setActiveRole` elsewhere, not by this form) — [Crew]
   - **Duplicate-name warning (Phase BG)** — a `confirm()` between the role check and the first mutation, so cancelling returns cleanly with nothing written and nothing renamed. Matches on the **name alone**, normalised (`trim()` + `toLowerCase()`), against every other record in `crewDB`. ⚠️ **Never name + role**: under BF one record holds several saved roles, so one person with two roles is one CORRECT record and two records sharing a name are wrong whatever roles they carry — building role into the comparison breaks the moment BF lands. It is a **warning, not a block** (two different people genuinely can share a name), and it only fires when the name is new or actually changed, so re-saving an unchanged record never nags. Covers the hand-entry paths — "+ Add crew member" and renaming in the Edit expansion — which are the ones that pass through this function; the template flow doesn't reach here at all and carries its own guard in `useCrewAsTemplate()` — [Crew]
   - ⚠️ **Not a duplicate finder, and it must not be sold as one.** Exact-string matching is weak against years of hand entry: normalising catches trailing spaces and casing, and nothing else — "M. Marshall" vs "Marshall, M" vs "Mike Marshall" all slip through. It also says nothing about pairs **already** in the database; it only guards new entry. Reconciling the existing ~88 records is BF's job — [Crew]
-- `deleteCrew()` — delete a crew record, and drop every roster ENTRY that points at them on every project. ⚠️ **Deliberately leaves their shoot-day positions behind**, because that is exactly what it did before Phase BF (it filtered `p.crewIds` and touched nothing else); an unresolvable position has always rendered as `(removed crew)` via `crewInfo()`, and still does. Cleaning those up is a real improvement and a real behaviour change, so it was not BF's to make — [Crew]
+- `deleteCrew()` — delete a crew record, and drop every roster ENTRY that points at them on every project. ⚠️ **Deliberately leaves their shoot-day positions behind**, because that is exactly what it did before Phase BF (it filtered `p.crewIds` and touched nothing else); an unresolvable position has always rendered as `(removed crew)` via `crewInfo()`, and still does. Cleaning those up is a real improvement and a real behaviour change, so it was not BF's to make. ⚠️ **It is the THIRD path that drops entries from a project and the one that does NOT route through `removeCrewEntries()`** — so Phase BD calls `prunePrepSchedule()` here too, per project. That is not the same decision as the dangling positions above: a dangling position is visible as "(removed crew)" and always has been, whereas an orphaned prep record is invisible and would simply accumulate in the project row forever. Undo is unaffected — prep data lives in `db:projects`, which `beginUndo()` already snapshots on this path — [Crew, Pre-production]
 - `renderDeptAdminPanel()` / `toggleDeptAdminPanel()` — collapsible "Departments & sub-departments" panel on the Crew database screen: one block per department showing its sub-departments (add/rename/remove), its "Role seniority order" reorder list (Phase N item 2 — up/down via `moveRoleSeniority()`), and its roster, Heads of Department pinned to the top — [Crew]
 - `addSubDeptAdmin()` / `renameSubDeptAdmin()` / `removeSubDeptAdmin()` — add, rename (updates any crew already on it) and remove (clears it off any crew) a sub-department from the admin panel — [Crew]
 - `toggleHoD()` — toggles a crew member's `isHoD` flag (Head of Department), used to pin them to the top of their department's roster in the admin panel and, via `crewRolesRowHTML`/roster sorts, elsewhere — [Crew]
@@ -705,6 +793,10 @@ coarse information first, finest detail last.
 | T-7.4 | · Transport summary | Same cost fields + per-day method-count grid as T-2.4, shown here too when Travel is ticked (Phase Q) | `transportSummaryHTML()` |
 | T-7.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
 | T-7.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-7.1. No longer a block of its own: it's the Download .xlsx button in T-7.0 | `downloadExcel()` |
+| **T-8** | **Pre-production** | Phase BD — prep days and optional date marks per crew ENTRY, plus the entry's shared rate. Sits **between Crew and Locations** on screen but numbered .8, per the existing rule that codes are stable handles allocated when a section is built. A parallel to Crew and Shoot Days, not a view inside either, and not the parked Views-sidebar "Preproduction". ⚠️ No totals of any kind | `renderProjectPreproduction()` |
+| T-8.1 | · Entry row | Name / Role (`roleBannerHTML()`, AZ marker still inert) / two bare number fields — rate and days, no column headers, no inline labels / the marks indicator | `prepRowHTML()` |
+| T-8.2 | · Date marks calendar | Per-entry, one open at a time; click or drag to mark. Stored as a flat array of dates — the drag is selection only, never a stored range | `prepCalendarHTML()` |
+| T-8.3 | · Soft counter | "5 days booked · 6 dates marked", muted, no emphasis when the two differ — a mismatch is valid and is never flagged | `prepCounterText()` |
 
 ## D — Databases (project-independent, the source of truth)
 
@@ -2140,6 +2232,138 @@ than the font being added.
 **Open for the next round:** a fonts-only review. One thing to fold in — Fraunces is
 loaded at weights 500 and 700 only (see the Google Fonts `<link>`), but every display
 rule asks for 600 or 700; the 600s are being synthesised rather than using a real cut.
+
+## Phase BD — Pre-production tab (9 Aug 2026)
+
+Ships onto BF (`9ca9fdf`), alone. BC was deferred and is unrelated — shoot day selection
+is untouched. Two commits: behaviour, then appearance.
+
+See the **Pre-production** section above for the functions. What belongs here is the
+reasoning that isn't obvious from them.
+
+### The three things that are not negotiable
+
+1. **No totals, in any form.** Not a gap to fill in later — a constraint. If a figure is
+   ever wanted on this screen it is a deliberate decision, taken then.
+2. **One rate.** The Rate field is `entry.rate` via `resolveEntryRate()`/`saveEntryRate()`,
+   the same field the Roles view and Budget read and write. There is no prep-specific rate,
+   no shadow copy and no second field. Verified in both directions: writing 425 here showed
+   425 in the Roles view and Budget's Per Person; writing 515 in the Roles view showed 515
+   here. Nothing diverges because there is only one value.
+3. **Marks are indicative.** "Booked 5, marked 7" is valid and gets no warning, validation,
+   reconciliation, colour change or badge — in either direction.
+
+### Storage, and the bill that comes with it
+
+`p.prepSchedule = { [entryId]: {days, dates[]} }` — parallel to `p.crewEntries`, not part
+of it, because BF settled that shape deliberately.
+
+⚠️ **The stated reason for pruning needs one correction, recorded so the next session
+doesn't rely on the wrong mechanism.** The brief described the risk as "a
+deleted-and-recreated entry for the same person inherits stale days". That specific failure
+**cannot happen**: entry ids come from `uid()`, so a recreated entry gets a fresh id and can
+never collide with a pruned record's key. The real consequence of not pruning is **silent
+unbounded accumulation** — orphaned records nothing renders, growing the `db:projects` row
+forever. Pruning is still exactly right; it is just fixing a different problem than the one
+named.
+
+**There are THREE paths that drop entries from a project, not two.** The brief warned the
+removal paths were plural; they are, and one more than expected:
+
+| Path | Routes through `removeCrewEntries()`? | Where pruning is hooked |
+|---|---|---|
+| `removeCrewFromProject(entryId)` — single | Yes | `removeCrewEntries()` |
+| `bulkRemoveSelectedFromProject()` — bulk | Yes | `removeCrewEntries()` |
+| `deleteCrew(crewId)` — database delete, every project | **No** — filters `p.crewEntries` itself | `deleteCrew()` directly |
+
+The third is deliberate in BF (it leaves shoot-day positions dangling on purpose, so it
+cannot share the function that clears them). Pruning there is **not** the same call as
+leaving those positions: a dangling position renders visibly as "(removed crew)" and always
+has; an orphaned prep record is invisible. Undo is unaffected — prep data lives in
+`db:projects`, already in `beginUndo()`'s snapshot on that path.
+
+All three verified: single removal pruned the removed entry and left its neighbour's record
+byte-identical; bulk removal of two pruned both; `deleteCrew()` pruned that person's record
+on ROW **and** their entry's record on LMAOF, cross-project.
+
+### Judgement calls, flagged rather than buried
+
+- **Placement**: between Crew and Locations. The brief named the siblings but not the
+  order; it is a crew-roster-shaped screen and prep precedes the shoot.
+- **Department grouping** with `deptHeaderHTML()`, which renders a roster count `(13)` in
+  each heading. That is the only aggregate-shaped number on the screen. It counts rows, not
+  prep data, and is what every crew screen in the app already shows — but it is the one
+  thing worth a second look given constraint 1, so it is called out rather than assumed. A
+  flat 66-row list with no headings was the alternative.
+- **No `body.oninput` autosave.** Both fields commit on `onchange` through their own
+  `saveDB('db:projects', …)`, exactly as the Roles view's Rate field does. The debounced
+  `scheduleAutosave()` path is for fields that stream input (Overview, the cost fields);
+  two discrete number fields are not that.
+
+### Verification
+
+- Inline `<script>` extracted (2 blocks) — `node --check` clean on both. `<style>`
+  brace-balanced, **478/478**.
+- Orphan sweep: all 27 new symbols referenced beyond their definition; no dead helpers.
+- **Whole-output fingerprint, pre vs post.** The BF harness was an in-session artefact and
+  is not on disk, so an equivalent was rebuilt: a 933,203-character / 686-line capture of
+  every budget total under both VAT footings, all four export views' rows and titles, the
+  WhatsApp call sheet and resolved `buildFullData()` for all 10 shoot days, both
+  `exportOutputText()` formats, every summary and `*Lines()` builder, task flags,
+  cinematography crew, and all 13 group-bys × 7 sorts on **both** list grains — across all
+  3 projects. Captured from **pre-BD code** (`git show HEAD:index.html`) and from the final
+  post-BD build, both reading the same live data. **Identical: `896c24c8-1a973800`.**
+- Tab renders: 3 projects × 8 tabs including every Crew and Budget sub-view — 45 renders,
+  **zero console errors**.
+- Rendering cases all confirmed: an entry with no days and no marks (66 of 66 rows, empty
+  counters, `prepSchedule` absent entirely); days but no marks ("5 days booked"); marks but
+  no days ("1 date marked"); marks exceeding days ("5 days booked · 7 dates marked", in
+  `rgb(111,106,99)` = `--muted`, the same colour as any other muted text — no warning
+  treatment); and one person holding two entries rendering as two rows with independent
+  role, rate, days and marks.
+- Marks indicator weight confirmed by computed colour across all 66 rows: `--text` where
+  marked, `--muted` where not.
+- Drag verified with real `MouseEvent`s: a 3-day drag marked 3, a second drag made the set
+  deliberately non-contiguous, and a drag starting on a marked day unmarked its run. Stored
+  every time as a flat sorted array.
+- **Zero writes to `db:crew`.** Across the whole session the only key any write path touched
+  was `db:projects`.
+
+### The test fixture — how "am I driving production?" was actually checked
+
+The brief flagged a previous session where a local server dropped the path, served the real
+`index.html`, and a migration ran against production. Guarded structurally rather than by
+care:
+
+- The fixture is a **separate file, `bd-fixture.html`, in a directory containing no
+  `index.html` at all** — a dropped path there serves a directory listing, so it cannot fall
+  through to the real file. Confirmed by `curl`ing `/`.
+- `saveDB()` and `scheduleAutosave()` are replaced at build time; the real `saveDB` body
+  survives only under `__fixture_unreachable_saveDB` and is never called.
+- The page carries a **random per-session token** (`window.__BD_FIXTURE__`), and the token,
+  the stubs and `location.href` were asserted **before any interaction** and re-asserted
+  after every reload.
+- ⚠️ Mid-session the fixture rebuild silently no-opped — `node -e` shifts `process.argv`
+  differently from a script file, so a destructuring rebuild wrote to a junk path while
+  reporting success, and two rounds of styling verification ran against a stale page. Caught
+  by diffing the served CSS against the source. The rebuild is now a real script file
+  (`build-fixture.js`) that refuses an already-stubbed source, requires each anchor to match
+  exactly once, and prints the bytes it wrote.
+- **Confirmed clean against `app_data` afterwards**: newest write `db:projects`
+  `2026-08-09 15:30:36+00`, over an hour before this session began; `db:crew` untouched
+  since 10:13; and `db:projects` contains **no `prepSchedule` string** — nothing this phase
+  did reached the database.
+
+### Left alone, as instructed
+- BA's roles menu is not built and AZ's `.role-add-marker` is still inert and unwired.
+- BC / shoot day selection — untouched.
+- The AZ Edit-pencil chip-`×` database-wide role deletion — still open.
+- `deleteCrew()` leaving positions dangling as "(removed crew)" — untouched (only its prep
+  pruning was added).
+- "+ Add crew member" form visibility, and `dayTotal` not resyncing — untouched.
+- No filter, and no hook for one.
+- Hotel/catering/travel do not derive from prep days.
+- No code from `budget-v1-fail` was read or reused.
 
 ## Phase BG — crew database duplicate guard (9 Aug 2026)
 
