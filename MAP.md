@@ -549,7 +549,8 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `rolesTagListHTML()` / `roleAddPickerHTML()` / `addRoleToCrew()` / `removeRoleFromCrew()` / `setActiveRole()` — render and manage a crew member's multiple assignable roles. `setActiveRole()` is the sole place a crew member's `department`/`subDepartment` are ever set — always derived from whichever saved role just became active, never typed directly. `removeRoleFromCrew()` refuses to remove a person's last remaining role, and re-activates a replacement if the removed one was active — [Shared/utility functions]
 - `pendingNewCrewRole` / `newCrewRolePickerHTML()` / `onNewCrewRolePick()` — single-role picker for a brand-new, not-yet-saved crew member (no id yet to attach a saved role to) — stashed here until `saveCrew()` creates the record with it — [Shared/utility functions]
 - `addRoleDialogFor` / `openAddRoleDialog()` / `closeAddRoleDialog()` / `addRoleDialogHTML()` / `confirmAddRoleDialog()` / `renderGlobalOverlay()` — the "Add new role" dialog (Phase R item 5): one in-page dialog (Department select + Role name) rendered into the persistent `#globalOverlay` div outside `#main`, replacing the old two-`prompt()` flow. Adds straight onto a crew id, or (when opened as `'__new__'`) feeds `pendingNewCrewRole` for the not-yet-saved crew form — [Shared/utility functions]
-- `duplicateCrew()` — clones a crew record as a starting point for a new one — [Shared/utility functions]
+- `useCrewAsTemplate()` / `duplicateCrew()` (Phase BG renamed the control and added the first of these) — **"Use as template"**, the D-1 crew-card action that clones a record as the starting point for a DIFFERENT PERSON (same company, agent and rate; new name). Never a second role for the same person — that's BA's "Add again as" once it ships. `useCrewAsTemplate()` is a confirm step and nothing else; `duplicateCrew()` below it is unchanged and still does the actual clone (new `uid()`, `_copyOriginalRole` stamp, `saveDB('db:crew')`). ⚠️ **The guard sits BEFORE the write, not at save**: `duplicateCrew()` writes to `db:crew` on click, so there is no pending record and no save step to gate — cancelling has to mean "don't create it", which only exists as a choice up front. Cancel writes nothing at all. Uses native `confirm()`, matching `deleteCrew()`/`removeSubDeptAdmin()` on this same screen; D-1.5's `addRoleDialogHTML()` is a picker, not a confirmation, so it isn't the pattern to copy — [Crew, Shared/utility functions]
+  - The control was labelled **"Duplicate"** before Phase BG (never "Duplicate crew member", despite how it gets referred to). Its `title` and both `copy`-badge tooltips were reworded off "duplicate" at the same time; the badges themselves and `_copyOriginalRole` keep their existing purpose, since the copy really does exist and they still describe something true — [Crew]
 - `coProPillSelect()` / `quickSetCoPro()` / `coProCompaniesList` — render and update a crew member's co-production company assignment — [Shared/utility functions]
 - `crewIdentityHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab) — [Shared/utility functions]
 - `appSettings` / `SETTINGS_DEFAULTS` / `FONT_CHOICES` (**renamed from `HEADER_FONTS` in Phase R/R15** — it now feeds all three font roles, not just headings) / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, plus (Phase Tasks) the three Overview auto-flag rule toggles (`flagNoLocation`/`flagNoCrew`/`flagNoDayRate`) — same object, same persistence, just not all of it is styling. Persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
@@ -561,12 +562,14 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `renderMain()` — dispatches the main panel render based on the current route — [Shared/utility functions]
 - `projCode()` — derives a project's short display code — [Shared/utility functions]
 - `fmtDate()` — formats an ISO date string as a human-readable date — [Shared/utility functions]
-- `renderCrewDatabase()` / `renderCrewList()` / `crewSearchBlob()` / `crewCardHTML()` — render the standalone crew database screen, its filtered list, and its search index/card markup. `crewSearchBlob()` includes `c.showAs` so the cosmetic override is searchable too — [Crew, Shared/utility functions]
+- `renderCrewDatabase()` / `renderCrewList()` / `crewSearchBlob()` / `crewCardHTML()` — render the standalone crew database screen, its filtered list, and its search index/card markup. `crewSearchBlob()` includes `c.showAs` so the cosmetic override is searchable too. `crewCardHTML()` is the **only** render site for the "Use as template" and Delete actions — [Crew, Shared/utility functions]
 - `toggleDeptCollapse()` / `setAllDeptsCollapsed()` — collapse/expand department groups in the crew database list — [Crew]
 - `toggleProjectDeptCollapse()` / `setAllProjectDeptsCollapsed()` — the same, for the project Crew tab's groups — [Crew]
 - `crewFormHTML()` / `toggleCarFields()` — render the add/edit crew form and react to "has car" toggling. No more free-text Role or manual Department field (Phase R item 1/follow-up): existing crew (`c.id` set) get the live saved-roles tag-list editor; a brand-new crew member gets `newCrewRolePickerHTML()` instead, required to save. Also has the new "Show as" text field. Since Phase AG, the Private section's Fee/rate row also carries a "Day rate (this project)" field next to it, when-and-only-when this form is opened from within a project for an existing crew member (`c.id` set AND `currentProject()` resolves — false on the standalone Crew database screen, which shares this same function but has no project) — same `p.crewRateOverrides`/`resolveCrewRate()`/`saveCrewRateOverride()` field as the Roles row and Budget's Per Person view, with its own `crewRateSaveIconHTML()` Save icon (context `'e'`), not a second copy of the override — [Crew]
 - `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view. `toggleCrewForm()`/`closeCrewForm()` reset `pendingNewCrewRole` when the new-crew form opens/closes. Since Phase AS (**G18**) `toggleCrewForm()` also scrolls `#crewFormWrap` into view on open — the form was never missing, it opened ~600px below the fold because the button is the last element on a 12,400px page. `#crewFormWrap` is shared by both render sites (crew database and the project Crew tab); only one is in the DOM at a time, same precedent as `#locFormWrap`. ⚠️ It picks `behavior` rather than hard-coding `'smooth'` like `editLocation()`/`startNewLocationFromSearch()` do: **under `prefers-reduced-motion: reduce` this browser does not scroll at all with `behavior:'smooth'`** (measured — scrollY never moved over 3.6s, while `'auto'` landed the form correctly). The two Locations call sites still hard-code `'smooth'` and carry the same latent hole — logged, not fixed here — [Crew]
 - `saveCrew()` — persist a crew record. Refuses to create a brand-new crew member without `pendingNewCrewRole` set ("every crew member needs at least one saved role"); for a new record, role/department/`roles` are derived entirely from that pick. For an existing record, role/department/`roles` are left untouched (they're managed live by `addRoleToCrew`/`setActiveRole` elsewhere, not by this form) — [Crew]
+  - **Duplicate-name warning (Phase BG)** — a `confirm()` between the role check and the first mutation, so cancelling returns cleanly with nothing written and nothing renamed. Matches on the **name alone**, normalised (`trim()` + `toLowerCase()`), against every other record in `crewDB`. ⚠️ **Never name + role**: under BF one record holds several saved roles, so one person with two roles is one CORRECT record and two records sharing a name are wrong whatever roles they carry — building role into the comparison breaks the moment BF lands. It is a **warning, not a block** (two different people genuinely can share a name), and it only fires when the name is new or actually changed, so re-saving an unchanged record never nags. Covers the hand-entry paths — "+ Add crew member" and renaming in the Edit expansion — which are the ones that pass through this function; the template flow doesn't reach here at all and carries its own guard in `useCrewAsTemplate()` — [Crew]
+  - ⚠️ **Not a duplicate finder, and it must not be sold as one.** Exact-string matching is weak against years of hand entry: normalising catches trailing spaces and casing, and nothing else — "M. Marshall" vs "Marshall, M" vs "Mike Marshall" all slip through. It also says nothing about pairs **already** in the database; it only guards new entry. Reconciling the existing ~88 records is BF's job — [Crew]
 - `deleteCrew()` — delete a crew record — [Crew]
 - `renderDeptAdminPanel()` / `toggleDeptAdminPanel()` — collapsible "Departments & sub-departments" panel on the Crew database screen: one block per department showing its sub-departments (add/rename/remove), its "Role seniority order" reorder list (Phase N item 2 — up/down via `moveRoleSeniority()`), and its roster, Heads of Department pinned to the top — [Crew]
 - `addSubDeptAdmin()` / `renameSubDeptAdmin()` / `removeSubDeptAdmin()` — add, rename (updates any crew already on it) and remove (clears it off any crew) a sub-department from the admin panel — [Crew]
@@ -2119,6 +2122,96 @@ than the font being added.
 **Open for the next round:** a fonts-only review. One thing to fold in — Fraunces is
 loaded at weights 500 and 700 only (see the Google Fonts `<link>`), but every display
 rule asks for 600 or 700; the 600s are being synthesised rather than using a real cut.
+
+## Phase BG — crew database duplicate guard (9 Aug 2026)
+
+Interface only. **No schema change, no data rewrite, no migration** — this phase stops
+new duplicates being created; it does not touch the pairs already among the ~88 records.
+That is BF's job, and BG deliberately runs **first**: reconciling the pile while the tap
+is still running would let a fresh pair appear in the gap between the two phases.
+
+Kept out of BF on purpose — BF is the one phase where a revert has to be clean, and
+bundling a button rename with a data migration means backing out the rename drags the
+migration with it.
+
+### Two entry points, two guards — and why they're different shapes
+
+The two ways a duplicate gets made do not share a code path, so they don't share a guard:
+
+| Path | Reaches `saveCrew()`? | Guard | Shape |
+|---|---|---|---|
+| "Use as template" (D-1 crew card) | **No** — `duplicateCrew()` writes to `db:crew` on click | `useCrewAsTemplate()` confirm, before the write | Confirm-to-create |
+| "+ Add crew member" / rename in the Edit expansion | Yes | duplicate-name `confirm()` inside `saveCrew()` | Warn-and-continue |
+
+⚠️ **The original brief for this phase specified a hard block at save for the template
+flow. That was impossible against the real code and was dropped** — `duplicateCrew()`
+persists the clone on click, so there is no pending record to block and no moment at
+which "proceed" is a choice. Blocking a later save would also have left the exact-name
+pair sitting in `db:crew` in the meantime, which is precisely the artefact the phase
+exists to prevent. The confirm moved in front of the write instead.
+
+### Deferred, not rejected: the prefilled-form design ("solution B")
+
+The correct end state is that **"Use as template" opens a prefilled crew form and writes
+nothing until the name has been changed** — no clone exists until it has its own name, so
+the failure mode ("click, walk away, leave a same-name pair") cannot happen at all rather
+than being confirmed away.
+
+It was considered in full and deferred until after the schema work, deliberately. Do not
+re-derive it from scratch, and do not build toward it now. What it costs, so the next
+session doesn't have to rediscover it:
+
+- `saveCrew()` refuses to create a brand-new record without `pendingNewCrewRole` set, and
+  `crewFormHTML()` branches on `c.id` to choose between the live tag-list editor and
+  `newCrewRolePickerHTML()`. A template copy arrives already carrying the source's `roles`
+  array, so it fits neither branch — that invariant has to be reworked first.
+- `_copyOriginalRole` and its two `copy` badges (`crewIdentityHTML()`,
+  `crewRolesRowHTML()`) describe a record that exists. Under the prefilled-form design
+  nothing exists until it's named, so they need revisiting at the same time.
+
+### Also considered and rejected: auto-suffixing the copy's name ("Alex Marshall (2)")
+
+Raised during the phase, and it is worse than it looks. `c.name` is not display-only —
+`buildFullData()` reads it straight into every position, so it reaches the call sheet
+card, the WhatsApp text, the .xlsx, and two helpers that parse it on whitespace:
+`abbreviateName()` renders `Alex Marshall (2)` as **`A. (2)`** in the hotel rooming list
+(surname dropped), and `nameInitials()` → `cameraFileTag()` bakes it into a media
+file-naming tag as **`A_FX9_AM(_`**. It would also defeat the normalised matcher above —
+`alex marshall` and `alex marshall (2)` don't match — so the template flow would stop
+producing the one duplicate shape the warning catches and start producing one it's blind
+to, making BF's job harder rather than easier. Don't re-propose it.
+
+### Verification
+
+- Inline `<script>` extracted (2 blocks, 7,178 lines in the main one) — `node --check`
+  clean on both. `<style>` brace-balanced, 444/444 (no CSS changed).
+- Orphan sweep: `duplicateCrew()` has exactly one caller (`useCrewAsTemplate()`), which
+  has exactly one caller (`crewCardHTML()`'s button). **Zero user-facing occurrences of
+  "duplicate" remain** — every survivor is a code comment or the internal function name.
+- **No new `db:crew` write path**: 16 `saveDB('db:crew')` call sites before and after,
+  and the diff adds no `saveDB`/`crewDB.push`/`crewDB =` line. Both guards are early
+  returns ahead of any mutation.
+- Exercised in-browser against the live 88-record database with `saveDB()` and
+  `scheduleAutosave()` stubbed. Ten cases, all correct: template cancel (88→88, **zero**
+  writes) / template proceed (88→89, clone identical to before, `_copyOriginalRole`
+  stamped); new record clashing exactly → warns, cancel creates nothing, proceed creates;
+  padding + uppercase (`"   JUSTIN SCHOENROCK  "`) still matches, confirming trim +
+  case-insensitivity; unique name → no prompt at all; existing record re-saved unchanged →
+  **no prompt** (no self-match); rename into a clash → warns, and **cancelling leaves the
+  record's old name intact**; rename to a unique name → no prompt. No console errors.
+- Confirmed clean against `app_data` afterwards: `db:crew` still 88 records, last written
+  4h before the session — nothing this phase did reached the database.
+
+### Left alone, as instructed
+- The AZ Edit-pencil deletion gap (see the ⚠️ under `roleBannerHTML()`) is still open.
+- `dayTotal` not resyncing when a day is added — unrelated, untouched.
+- "+ Add crew member" not visually showing its form: **could not reproduce as described**
+  — MAP.md records this as fixed in Phase AS (G18), and `toggleCrewForm()`'s
+  `scrollIntoView` is present and working. It did not block testing.
+- Ordinary "+ Add crew member" creation **is** covered by the duplicate-name warning here,
+  unlike the original brief's section 5, which scoped the warning to the template flow
+  only. The spec correction moved it deliberately: hand entry is the path that actually
+  passes through `saveCrew()`.
 
 ---
 

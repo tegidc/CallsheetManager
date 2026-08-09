@@ -1296,9 +1296,33 @@ function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
   if(el) el.innerHTML = addRoleDialogHTML();
 }
+/* "Use as template" (Phase BG) — the confirm step in front of duplicateCrew().
+   The control is for making a DIFFERENT PERSON off an existing record (same company,
+   agent and rate; new name), never a second role for the same person.
+
+   ⚠️ Why the guard lives HERE and not in saveCrew(): duplicateCrew() writes to db:crew
+   on click. There is no pending record and no save step to gate, so the only moment at
+   which "don't create this" is still a choice is before the write. Cancel writes
+   nothing at all; proceed runs duplicateCrew() unchanged.
+
+   Native confirm() deliberately — it is what deleteCrew() and removeSubDeptAdmin()
+   already use on this screen (D-1). The one in-page dialog here (addRoleDialogHTML,
+   D-1.5) is a picker, not a confirmation, so it is not the pattern to copy.
+
+   Deferred, not rejected: opening a prefilled form and writing nothing until the name
+   is changed is the correct end state. It needs saveCrew()'s pendingNewCrewRole
+   invariant reworked, so it waits until after the schema work — see MAP.md's Phase BG
+   section. Do not build toward it here. */
+async function useCrewAsTemplate(crewId){
+  const src = crewById(crewId); if(!src) return;
+  const who = src.name || 'this crew member';
+  if(!confirm(`This creates a second record named "${who}". It's a new person, so you'll need to give it a different name.`)) return;
+  await duplicateCrew(crewId);
+}
 /* clone a crew member — independent record, keeps everything, meant to be
    reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
-   until the role is actually changed away from the original's. */
+   until the role is actually changed away from the original's.
+   ⚠️ Reached only through useCrewAsTemplate() above, which owns the confirm. */
 async function duplicateCrew(crewId){
   const src = crewById(crewId); if(!src) return;
   const copy = Object.assign({}, src, { id: uid(), _copyOriginalRole: src.role||'' });
@@ -1350,7 +1374,7 @@ function crewIdentityHTML(c, opts){
   const roleText = opts.showRole===false ? null : (opts.showAsOrRole ? (c.showAs||c.role) : c.role);
   const bits = [roleText, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
   // quiet "copy" badge: shows only until the duplicate's role is actually changed
-  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
+  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
   const deptBadge = opts.hideDept ? '' : deptLabelHTML(c);
   const leadPill = opts.hideLeadPill ? '' : coProPillSelect(c);
   if(opts.oneLine){
@@ -4304,7 +4328,7 @@ function crewRolesRowHTML(c){
   const isEditing = editingCrewId===c.id;
   const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
   const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
-  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Duplicated from another crew record — still has the original's role">copy</span>` : '';
+  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
   const rate = resolveCrewRate(c, currentProject());
   return `<div class="roles-grid roles-grid-row ${isEditing?'roles-grid-row-editing':''}">
     <div class="roles-grid-controls">${selectCb}${editBtn}</div>
@@ -6728,7 +6752,7 @@ function crewCardHTML(c){
     <div class="list-card ${isEditing?'list-card-editing':''}">
       <div class="meta">${crewIdentityHTML(c, {extraLine})}</div>
       <div class="actions">
-        <button class="small" onclick="duplicateCrew('${c.id}')" title="Clone this person as an independent record, e.g. to reassign a different role">Duplicate</button>
+        <button class="small" onclick="useCrewAsTemplate('${c.id}')" title="Create a new person from this record's details — same company and rate, different name">Use as template</button>
         <button class="small danger" onclick="deleteCrew('${c.id}')">Delete</button>
       </div>
     </div>
@@ -7000,6 +7024,45 @@ async function saveCrew(){
   const id = val('crewEditId');
   const existing = crewById(id);
   if(!existing && !pendingNewCrewRole){ alert('Pick a role — every crew member needs at least one saved role.'); return; }
+  /* Duplicate-name warning (Phase BG) — a WARNING, not a block. Two different people
+     genuinely can share a name, so this asks rather than forbids.
+
+     Covers records created or renamed BY HAND, which is the path that actually passes
+     through this function. The "Use as template" flow does not reach here at all —
+     duplicateCrew() writes straight to db:crew — so it carries its own confirm step in
+     useCrewAsTemplate(). Two entry points, two guards, on purpose.
+
+     Match is on the NAME ALONE, normalised (trimmed, case-insensitive) — never name +
+     role. Under BF one record will hold several saved roles, so one person with two
+     roles is one CORRECT record; two records sharing a name are wrong whatever roles
+     they carry. Building role into the comparison would break the moment BF lands.
+
+     ⚠️ Exact-string matching is weak against years of hand entry. Normalising catches
+     trailing spaces and casing; it will NOT catch "M. Marshall" vs "Marshall, M" vs
+     "Mike Marshall". This is a guard on new entry, not a duplicate finder — it makes no
+     claim to be exhaustive, and it says nothing about the pairs already in the database.
+     Reconciling those is BF's job.
+
+     Only fires when the name is actually new or changed, so re-saving an unchanged
+     record never nags. Nothing has been mutated at this point — returning is clean. */
+  const normName = s => (s||'').trim().toLowerCase();
+  if(!existing || normName(existing.name)!==normName(name)){
+    const clashes = crewDB.filter(x => x.id!==id && normName(x.name)===normName(name));
+    if(clashes.length){
+      const detail = clashes.map(x=>[x.role, x.department].filter(Boolean).join(', ')).filter(Boolean);
+      const msg = [
+        clashes.length>1
+          ? `There are already ${clashes.length} crew records called "${name}".`
+          : `There's already a crew record called "${name}".`,
+        detail.length ? `Existing: ${detail.join(' · ')}` : null,
+        '',
+        "Two different people can share a name — if that's the case here, carry on. If it's the same person, cancel and edit the existing record instead.",
+        '',
+        'Save anyway?'
+      ].filter(x=>x!==null).join('\n');
+      if(!confirm(msg)) return;
+    }
+  }
   const rec = { id: id||uid(), name,
     subDepartment: val('ncSubDept'), showAs: val('ncShowAs'), coProductionCompany: val('ncCoPro'),
     phone: val('ncPhone'), email: val('ncEmail'),
