@@ -502,19 +502,60 @@
   /* Phase BD — the Pre-production row (T-8). Same grid idiom as .roles-grid, one
      column fewer: Name | Role | the two bare number fields | the calendar marker.
      There is deliberately NO header row — rate and days carry no column headers and
-     no inline labels, magnitude alone distinguishes them. */
-  .prep-grid{display:grid; grid-template-columns:minmax(140px,1fr) minmax(160px,1.3fr) 150px 40px; align-items:start; column-gap:10px;}
+     no inline labels, magnitude alone distinguishes them. The name column is capped
+     the same way .crewgrid's is (Phase Detail), with a trailing minmax(0,1fr) so
+     spare width lands after the row rather than stranding the marker at the edge. */
+  /* the fields column is sized to the COUNTER, not to the two 60px inputs — at 150px
+     "5 days booked · 7 dates marked" wrapped onto a second line and made rows with
+     both figures taller than rows with one. */
+  .prep-grid{display:grid; align-items:start; column-gap:10px;
+    grid-template-columns:minmax(160px,280px) minmax(175px,1.2fr) 200px 32px minmax(0,1fr);}
+  /* the chip and AZ's inert "+" marker are one unit — scoped to this grid rather than
+     changing the shared .roles-inline, which the Roles view also uses. Without it a
+     long role ("Executive Producer") wrapped the marker onto its own line and made
+     that row taller than its neighbours. */
+  .prep-cell .roles-inline{flex-wrap:nowrap;}
+  .prep-cell .role-chip{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .prep-grid-row{padding:8px 0;}
   .prep-cell{min-width:0;}
-  .prep-name{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .prep-fields-row{display:flex; align-items:center; gap:8px;}
-  .prep-fields .budget-rate-input{width:64px;}
-  .prep-calcell{display:flex; justify-content:flex-end;}
-  .prep-calwrap{grid-column:1/-1;}
+  /* names match every other list in the app: Jost 600 14px (Phase Style Review) */
+  .prep-name{font-family:var(--body); font-weight:600; font-size:var(--fs-name);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .prep-fields-row{display:flex; align-items:center; gap:10px;}
+  .prep-fields .budget-rate-input{width:60px;}
+  /* the soft counter. Muted, --fs-meta, NEVER emphasised or recoloured when the two
+     figures differ — a mismatch is a valid state, not a warning. It sits under the
+     fields and reserves its line so a row does not jump height as it is filled in. */
+  .prep-counter{font-size:var(--fs-meta); color:var(--muted); margin-top:3px; min-height:15px; line-height:15px;}
+  /* the marks indicator. WEIGHT is the whole signal, matching AZ's .role-add-marker
+     convention exactly (muted = nothing marked, ink = marked) rather than inventing
+     a second visual language for the same idea. */
+  .prep-cal-btn{color:var(--muted);}
+  .prep-cal-btn.has-marks{color:var(--text);}
+  .prep-calcell{display:flex; justify-content:flex-start;}
+  /* the calendar is a transient editing panel, so it takes the app's panel treatment
+     (.filter-panel / .bulk-edit-panel), not a bare block — Phase Fonts keeps boxes
+     only where one means something, and "this row is open for editing" is one. */
+  .prep-calwrap{grid-column:1/-1; margin-top:8px;}
+  .prep-cal{border:1px solid var(--line); border-radius:var(--box-radius);
+    padding:var(--box-pad); background:var(--tint-1); max-width:330px;}
+  .prep-cal-head{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+  .prep-cal-title{font-family:var(--body); font-weight:600; font-size:var(--fs-field); flex:1;}
+  .prep-cal-nav{cursor:pointer; color:var(--muted); font-size:15px; line-height:1; padding:0 3px; user-select:none;}
+  .prep-cal-nav:hover{color:var(--tape);}
+  .prep-cal-clear{cursor:pointer; color:var(--tape); font-size:var(--fs-meta);}
   .prep-cal-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;}
-  .prep-cal-day{display:flex; align-items:center; justify-content:center; user-select:none;}
-  .prep-cal-day.empty{visibility:hidden;}
-  .prep-cal-head{display:flex; align-items:center; gap:8px;}
+  .prep-cal-wd{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+    color:var(--tape); text-align:center; padding-bottom:4px;}
+  /* a marked day is the same filled-dark chip the mobile day-chips use (Phase Bulk
+     Edit) — one signal for one state, no outline-plus-mark doubling up. */
+  .prep-cal-day{display:flex; align-items:center; justify-content:center; user-select:none;
+    height:28px; border-radius:3px; cursor:pointer; font-size:var(--fs-field);
+    border:1.5px solid transparent;}
+  .prep-cal-day:not(.empty):hover{border-color:var(--field-line);}
+  .prep-cal-day.marked{background:var(--text); color:#fff; font-weight:600; border-color:var(--text);}
+  .prep-cal-day.empty{visibility:hidden; cursor:default;}
+  .prep-cal .hint{margin-top:8px;}
   .modal-overlay{position:fixed; inset:0; background:rgba(17,10,8,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
   .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
   .modal-box h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;
@@ -922,6 +963,25 @@
     .roles-grid-showas{white-space:normal;}
     .roles-grid-editform{margin-top:10px;}
     .tablewrap:has(.roles-grid){overflow-x:visible;}
+    /* Phase BD — the Pre-production row stacks into a card the same way, and for the
+       same reason: four columns do not survive a phone width. The fields keep their
+       side-by-side pairing inside the card, since "two bare numbers" only reads
+       correctly next to each other. Still no labels on them (the data-label ::before
+       trick the Roles grid uses is deliberately NOT applied to .prep-fields). */
+    .prep-grid{
+      display:block; border:1px solid var(--line); border-radius:10px;
+      padding:12px; margin-bottom:10px; background:var(--panel);
+    }
+    .prep-cell{margin-bottom:8px;}
+    .prep-cell:last-child{margin-bottom:0;}
+    /* the counter reserves a line on desktop so rows in a shared grid keep a common
+       height. Stacked into a card there is no neighbouring row to stay level with,
+       so an empty one is just dead space. */
+    .prep-counter:empty{min-height:0; margin-top:0;}
+    .prep-calcell{justify-content:flex-start;}
+    .prep-cal{max-width:100%;}
+    .prep-cal-day{height:34px;}
+    .tablewrap:has(.prep-grid){overflow-x:visible;}
     /* the crew grid no longer needs to scroll sideways once it's stacked */
     .tablewrap:has(.crewgrid){overflow-x:visible;}
 
