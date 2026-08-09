@@ -499,6 +499,22 @@
   .roles-grid-cell{min-width:0;}
   .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
+  /* Phase BD — the Pre-production row (T-8). Same grid idiom as .roles-grid, one
+     column fewer: Name | Role | the two bare number fields | the calendar marker.
+     There is deliberately NO header row — rate and days carry no column headers and
+     no inline labels, magnitude alone distinguishes them. */
+  .prep-grid{display:grid; grid-template-columns:minmax(140px,1fr) minmax(160px,1.3fr) 150px 40px; align-items:start; column-gap:10px;}
+  .prep-grid-row{padding:8px 0;}
+  .prep-cell{min-width:0;}
+  .prep-name{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .prep-fields-row{display:flex; align-items:center; gap:8px;}
+  .prep-fields .budget-rate-input{width:64px;}
+  .prep-calcell{display:flex; justify-content:flex-end;}
+  .prep-calwrap{grid-column:1/-1;}
+  .prep-cal-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;}
+  .prep-cal-day{display:flex; align-items:center; justify-content:center; user-select:none;}
+  .prep-cal-day.empty{visibility:hidden;}
+  .prep-cal-head{display:flex; align-items:center; gap:8px;}
   .modal-overlay{position:fixed; inset:0; background:rgba(17,10,8,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
   .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
   .modal-box h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;
@@ -1615,6 +1631,12 @@ function removeCrewEntries(p, entryIds){
     if(d.positions) d.positions = d.positions.filter(pos=>!kill.has(pos[0]));
     if(d.crewOverrides) kill.forEach(id=>{ delete d.crewOverrides[id]; });
   });
+  // Phase BD — p.prepSchedule is a PARALLEL structure keyed by entry id, so unlike
+  // entry.rate it does not disappear when the entry does. Prune it here, at the one
+  // place both the single (removeCrewFromProject) and bulk
+  // (bulkRemoveSelectedFromProject) removals already meet. deleteCrew() does NOT come
+  // through here — it prunes for itself, see its own note.
+  prunePrepSchedule(p, kill);
 }
 /* ---- the migration ----
    Runs once from initApp(), before the first render, and is IDEMPOTENT: a project that
@@ -1749,6 +1771,9 @@ const ICONS = {
   send:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l17-7-6.5 17-2.5-8-8-2z"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M4 12h4M16 12h4M6.5 6.5l2 2M15.5 15.5l2 2M17.5 6.5l-2 2M8.5 15.5l-2 2"/></svg>',
   doc:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>',
+  // Phase BD — the Pre-production row's date-marks indicator. Its WEIGHT is the signal
+  // (solid = dates marked, faint = none), same convention as AZ's .role-add-marker.
+  calendar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="1.8"/><path d="M3.5 9.5h17M8 3.5V6.5M16 3.5V6.5"/></svg>',
 };
 function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
 
@@ -2993,6 +3018,7 @@ function renderProject(m){
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
+      <div class="tab ${currentProjectTab==='preprod'?'active':''}" onclick="goProjectTab('preprod')">PRE-PRODUCTION</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS</div>
       <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
@@ -3007,6 +3033,7 @@ function renderProjectBody(){
   setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
+  if(currentProjectTab==='preprod') return renderProjectPreproduction(body);
   if(currentProjectTab==='locations') return renderProjectLocations(body);
   if(currentProjectTab==='tech') return renderProjectTech(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
@@ -5555,6 +5582,292 @@ async function removeCrewFromProject(id){
   saveInBackground('db:shootdays', shootDaysDB);
 }
 
+/* ============================================================ PRE-PRODUCTION (T-8)
+
+   Phase BD. A sibling tab to Crew / Locations / Tech / Shoot Days / Budget /
+   Preview & Export, NOT a sixth view inside Crew — it exists because pre-production
+   has a different scheduling model to a shoot-day roster. It shows the same crew
+   ENTRY rows as the Roles view, so a person doing two roles is two rows.
+
+   ⚠️ THE ONE RULE THIS SCREEN IS BUILT AROUND: there are NO TOTALS. No rate × days,
+   no aggregation, no rollup, no section total, no totals column. Rate and days are
+   data on rows and nothing on this screen adds anything up. If a later phase wants a
+   figure here, that is a decision to be taken deliberately, not a gap to fill in.
+   (The only number on the screen that is not a row's own is the department heading's
+   roster count, which deptHeaderHTML() renders on every crew screen in the app and
+   which counts rows, not prep data.)
+
+   ---- what lives where ----
+   DAYS       — p.prepSchedule[entryId].days. A plain editable number and the
+                AUTHORITATIVE figure: not derived, not computed, not reconciled
+                against the date marks or against shoot days.
+   DATE MARKS — p.prepSchedule[entryId].dates, a FLAT ARRAY of 'YYYY-MM-DD'. Their
+                purpose is showing NON-CONTIGUOUS patterns (one day, gap, three days,
+                gap, two). Click-and-drag is a selection affordance only — it is never
+                stored as a range, a start/end pair, or anything but the flat list.
+   RATE       — NOT here. It is the entry's own existing `rate`, read through
+                resolveEntryRate() and written through saveEntryRate(), the exact same
+                field the Roles view and Budget read. There is deliberately ONE rate:
+                editing it here changes it everywhere. Do not add a prep-specific rate.
+
+   ⚠️ MARKS ARE INDICATIVE AND NOT BOUND TO THE DAYS NUMBER. "Booked 5, marked 7" is a
+   VALID state — someone spreading five days' work across seven. There is deliberately
+   NO warning, NO validation, NO reconciliation, NO colour change and NO badge for a
+   mismatch, in either direction. Do not add one.
+
+   ---- why a parallel structure and not a field on the entry ----
+   p.crewEntries' shape was settled deliberately by Phase BF; this is a parallel, not
+   an extension of it. The cost of that choice is that prep data outlives the entry it
+   belongs to unless something removes it, which is why prunePrepSchedule() exists and
+   is called from both entry-removal paths — see removeCrewEntries() and deleteCrew().
+*/
+
+/* the open/closed state of the department groups on this tab. Deliberately its OWN
+   Set rather than the Crew tab's collapsedProjectDepts: collapsing a department here
+   is not a statement about the Crew tab, and sharing it would make two screens move
+   together for no reason the user asked for. */
+let collapsedPrepDepts = new Set();
+let prepCalendarFor = null;   // entry id whose calendar is open, or null — one at a time
+let prepCalMonth = null;      // 'YYYY-MM' the open calendar is currently showing
+
+/* ---- storage accessors ----
+   Read-only helpers never create a record: an entry with no prep data must stay
+   absent from p.prepSchedule entirely, so a project nobody has used this tab on
+   carries no key at all. */
+const prepScheduleOf = (p) => ((p||currentProject()||{}).prepSchedule)||{};
+const prepRecordOf   = (entryId, p) => prepScheduleOf(p)[entryId] || null;
+const prepDaysOf     = (entryId, p) => { const r = prepRecordOf(entryId, p); return r && r.days!=null ? r.days : null; };
+const prepDatesOf    = (entryId, p) => { const r = prepRecordOf(entryId, p); return Array.isArray(r&&r.dates) ? r.dates : []; };
+
+/* the ONE write path into p.prepSchedule. Normalises on the way out (dates sorted and
+   deduplicated) and deletes rather than storing an empty husk — the same idiom as
+   saveEntryRate()'s "clearing the field deletes the key". */
+function prepWrite(p, entryId, mutate){
+  if(!p || !entryId) return;
+  p.prepSchedule = p.prepSchedule || {};
+  const existing = p.prepSchedule[entryId];
+  const rec = { days: existing && existing.days!=null ? existing.days : null,
+                dates: Array.isArray(existing&&existing.dates) ? existing.dates.slice() : [] };
+  mutate(rec);
+  const dates = [...new Set(rec.dates||[])].sort();
+  if(rec.days==null && !dates.length) delete p.prepSchedule[entryId];
+  else p.prepSchedule[entryId] = { days: rec.days, dates };
+  if(!Object.keys(p.prepSchedule).length) delete p.prepSchedule;
+}
+
+/* Pruning. Called from removeCrewEntries() (single + bulk removal) and from
+   deleteCrew() (which does not route through it). Takes a Set of entry ids. */
+function prunePrepSchedule(p, entryIds){
+  if(!p || !p.prepSchedule) return;
+  const kill = entryIds instanceof Set ? entryIds : new Set(entryIds||[]);
+  kill.forEach(id=>{ delete p.prepSchedule[id]; });
+  if(!Object.keys(p.prepSchedule).length) delete p.prepSchedule;
+}
+
+/* Days. Written on `onchange`, so it only fires when the value actually changed and
+   focus has left. Garbage reverts by re-rendering without saving, exactly as
+   saveEntryRate() does — the field visibly returns to the last valid value rather
+   than sitting there holding text that was never stored. Empty clears it. */
+async function setPrepDays(entryId, rawValue){
+  const p = currentProject(); if(!p) return;
+  if(!entryById(entryId, p)) return;
+  const trimmed = (rawValue||'').trim();
+  let next = null;
+  if(trimmed!==''){
+    const n = Number(trimmed);
+    if(isNaN(n) || n < 0){ renderProjectBody(); return; }
+    next = n;
+  }
+  prepWrite(p, entryId, rec=>{ rec.days = next; });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+
+/* ---- the per-entry calendar ---- */
+function prepCalAnchorMonth(entryId){
+  const marks = prepDatesOf(entryId);
+  if(marks.length) return marks[0].slice(0,7);
+  // otherwise open on something meaningful: the project's first shoot day, else its
+  // start date, else this month. Read-only — this tab never touches shoot days.
+  const p = currentProject();
+  const first = projectDays(p&&p.id)[0];
+  const iso = (first && first.date) || (p && p.startDate) || '';
+  return /^\d{4}-\d{2}/.test(iso) ? iso.slice(0,7) : new Date().toISOString().slice(0,7);
+}
+function togglePrepCalendar(entryId){
+  if(prepCalendarFor===entryId){ prepCalendarFor = null; prepCalMonth = null; }
+  else { prepCalendarFor = entryId; prepCalMonth = prepCalAnchorMonth(entryId); }
+  renderProjectBody();
+}
+function shiftPrepCalMonth(delta){
+  if(!prepCalMonth) return;
+  const [y,m] = prepCalMonth.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m-1+delta, 1));
+  prepCalMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  renderProjectBody();
+}
+async function commitPrepDates(entryId, isoList){
+  const p = currentProject(); if(!p) return;
+  if(!entryById(entryId, p)) return;
+  prepWrite(p, entryId, rec=>{ rec.dates = isoList||[]; });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function clearPrepDates(entryId){ await commitPrepDates(entryId, []); }
+
+/* Click-and-drag selection. The drag is a UI affordance for picking several dates
+   quickly and nothing more — what gets stored is still the flat array.
+   It works off a local Set and direct classList updates rather than re-rendering per
+   cell, because a re-render mid-drag would destroy the element the pointer is over.
+   ONE save and ONE render happen on mouseup. The first cell decides the direction
+   (dragging from an unmarked day marks; from a marked day unmarks), so a drag can
+   clear a run as easily as it makes one. A plain click is a one-cell drag. */
+let prepDrag = null;   // {entryId, mode:'add'|'remove', set:Set}
+function prepDayDown(entryId, iso, ev){
+  if(ev) ev.preventDefault();
+  const cur = new Set(prepDatesOf(entryId));
+  prepDrag = { entryId, mode: cur.has(iso) ? 'remove' : 'add', set: cur };
+  prepDragApply(iso);
+}
+function prepDayEnter(iso){ if(prepDrag) prepDragApply(iso); }
+function prepDragApply(iso){
+  if(!prepDrag) return;
+  if(prepDrag.mode==='add') prepDrag.set.add(iso); else prepDrag.set.delete(iso);
+  const el = document.querySelector(`.prep-cal-day[data-iso="${iso}"]`);
+  if(el) el.classList.toggle('marked', prepDrag.set.has(iso));
+}
+document.addEventListener('mouseup', ()=>{
+  if(!prepDrag) return;
+  const d = prepDrag; prepDrag = null;
+  commitPrepDates(d.entryId, [...d.set]);
+});
+
+const PREP_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const PREP_WEEKDAYS = ['M','T','W','T','F','S','S'];
+function prepCalendarHTML(entryId){
+  const ym = prepCalMonth || prepCalAnchorMonth(entryId);
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m-1, 1)).getUTCDay() + 6) % 7;   // Monday-first
+  const marked = new Set(prepDatesOf(entryId));
+  const cells = [];
+  for(let i=0;i<lead;i++) cells.push('<span class="prep-cal-day empty"></span>');
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells.push(`<span class="prep-cal-day${marked.has(iso)?' marked':''}" data-iso="${iso}"
+      onmousedown="prepDayDown('${entryId}','${iso}',event)" onmouseenter="prepDayEnter('${iso}')">${d}</span>`);
+  }
+  return `<div class="prep-cal">
+      <div class="prep-cal-head">
+        <span class="prep-cal-nav" onclick="shiftPrepCalMonth(-1)" title="Previous month">‹</span>
+        <span class="prep-cal-title">${PREP_MONTH_NAMES[m-1]} ${y}</span>
+        <span class="prep-cal-nav" onclick="shiftPrepCalMonth(1)" title="Next month">›</span>
+        ${marked.size ? `<span class="prep-cal-clear" onclick="clearPrepDates('${entryId}')">Clear marks</span>` : ''}
+      </div>
+      <div class="prep-cal-grid">
+        ${PREP_WEEKDAYS.map(w=>`<span class="prep-cal-wd">${w}</span>`).join('')}
+        ${cells.join('')}
+      </div>
+      <div class="hint">Click or drag to mark the days this person is needed in prep. Marks are indicative — they don't have to match the booked number.</div>
+    </div>`;
+}
+
+/* The soft counter. Muted, no emphasis and no colour change when the two differ —
+   a mismatch is a valid state, not a warning. Renders empty (not "0 days booked")
+   when there is nothing to say, so an untouched row reads as genuinely empty. */
+function prepCounterText(days, markCount){
+  const parts = [];
+  if(days!=null) parts.push(`${days} day${days===1?'':'s'} booked`);
+  if(markCount) parts.push(`${markCount} date${markCount===1?'':'s'} marked`);
+  return parts.join(' · ');
+}
+
+/* One ENTRY's row. Rate and days sit as two bare number fields with NO column headers
+   and NO inline labels — the decision was that magnitude alone distinguishes them.
+   Do not add labels back. The role cell reuses roleBannerHTML() exactly as the Roles
+   view has it, inert AZ "+" marker and all; this phase does not build the roles menu
+   and does not wire that marker. */
+function prepRowHTML(c){
+  const p = currentProject();
+  const rate = resolveEntryRate(c.id, p);
+  const days = prepDaysOf(c.id, p);
+  const marks = prepDatesOf(c.id, p);
+  const open = prepCalendarFor===c.id;
+  return `<div class="prep-grid prep-grid-row${open?' prep-grid-row-open':''}">
+    <div class="prep-cell prep-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}</div>
+    <div class="prep-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(c)}</span></div>
+    <div class="prep-cell prep-fields">
+      <div class="prep-fields-row">
+        <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
+          title="Day rate — the same rate as the Roles view and Budget"
+          onclick="event.stopPropagation()" onchange="saveEntryRate('${c.id}', this.value)">
+        <input type="text" inputmode="numeric" class="budget-rate-input prep-days-input" value="${days!=null?days:''}" placeholder="—"
+          title="Pre-production days"
+          onclick="event.stopPropagation()" onchange="setPrepDays('${c.id}', this.value)">
+      </div>
+      <div class="prep-counter">${esc(prepCounterText(days, marks.length))}</div>
+    </div>
+    <div class="prep-cell prep-calcell">
+      <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
+        onclick="togglePrepCalendar('${c.id}')"
+        title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
+        aria-label="Date marks">${icon('calendar')}</button>
+    </div>
+    ${open ? `<div class="prep-calwrap">${prepCalendarHTML(c.id)}</div>` : ''}
+  </div>`;
+}
+
+function toggleProjectPrepDeptCollapse(dept){
+  if(collapsedPrepDepts.has(dept)) collapsedPrepDepts.delete(dept); else collapsedPrepDepts.add(dept);
+  renderProjectBody();
+}
+function toggleAllPrepDeptsCollapsed(csv){
+  const present = (csv||'').split(',').filter(Boolean);
+  const allCollapsed = present.length>0 && present.every(d=>collapsedPrepDepts.has(d));
+  collapsedPrepDepts = allCollapsed ? new Set() : new Set(present);
+  renderProjectBody();
+}
+
+function renderProjectPreproduction(body){
+  const p = currentProject();
+  /* EVERY entry on the project, with NO filtering. A filter is wanted later and is
+     explicitly not part of this phase — there is deliberately no filter here and no
+     hook for one, which is also why this does not reach for projectCrewFilter or
+     buildProjectCrewGroups(). Grouping is the canonical department order and nothing
+     more. */
+  const entries = projectEntryViews(p);
+  const buckets = {};
+  entries.forEach(c=>{ const k = deptBucketKey(c.department); (buckets[k]=buckets[k]||[]).push(c); });
+  const groups = DEPARTMENTS.filter(d=>buckets[d] && buckets[d].length)
+    .map(d=>({ key:d, label:d, code:DEPARTMENT_CODES[d]||'', items:sortHoDFirst(buckets[d]) }));
+
+  let listHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
+  let rightHeaderHTML = '';
+  if(groups.length){
+    const groupsCSV = groups.map(g=>g.key).join(',');
+    if(groups.length>1){
+      const allCollapsed = groups.every(g=>collapsedPrepDepts.has(g.key));
+      rightHeaderHTML = `<span class="crew-header-expandall" onclick="toggleAllPrepDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
+    }
+    listHTML = `<div class="tablewrap">${groups.map(g=>{
+      const collapsed = collapsedPrepDepts.has(g.key);
+      return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectPrepDeptCollapse('${g.key}')`, g.code)
+        + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(prepRowHTML).join('')}</div>`;
+    }).join('')}</div>`;
+  }
+
+  body.innerHTML = `
+    <div class="section">
+      <h2>Pre-production</h2>
+      <div class="hint" style="margin-bottom:10px;">Prep days are not shoot days — nothing here reaches a call sheet or an export. The rate is the same one the Roles view and Budget use.</div>
+      ${crewToolbarHTML('', '', rightHeaderHTML)}
+      ${listHTML}
+    </div>`;
+  // No body.oninput autosave here: both fields commit on `onchange` through their own
+  // save (saveEntryRate / setPrepDays), the same way the Roles view's Rate field does.
+  body.oninput = null;
+}
+
 /* ---------- Project Locations ---------- */
 function renderProjectLocations(body){
   const p = currentProject();
@@ -7434,7 +7747,17 @@ async function deleteCrew(id){
      which have always cleared positions and so go through removeCrewEntries(). */
   projectsDB.forEach(p=>{
     const gone = new Set(entriesForCrew(id, p).map(e=>e.id));
-    if(gone.size) p.crewEntries = (p.crewEntries||[]).filter(e=>!gone.has(e.id));
+    if(!gone.size) return;
+    p.crewEntries = (p.crewEntries||[]).filter(e=>!gone.has(e.id));
+    /* Phase BD — this is the THIRD path that drops entries from a project, and the one
+       that does not go through removeCrewEntries(). Its pre-production records are
+       pruned here for the same reason theirs are: p.prepSchedule is keyed by entry id
+       and nothing else would ever clear it. This is not the same decision as the
+       shoot-day positions left dangling above — those render as "(removed crew)" and
+       have always been visible; an orphaned prep record is invisible and would simply
+       accumulate in the project row forever. Undo is unaffected: prep data lives in
+       db:projects, which beginUndo() already snapshots on this path. */
+    prunePrepSchedule(p, gone);
   });
   await saveDB('db:crew', crewDB); await saveDB('db:projects', projectsDB);
   renderCrewList();
