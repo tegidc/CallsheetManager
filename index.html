@@ -703,34 +703,6 @@
      already uses for a live-but-quiet signal. Still no colour alarm, still no action. */
   .bdm-flag-warn{color:var(--text);}
 
-  /* Phase AY-b — bulk generation and the candidate review screen. Same rule as
-     everything above: widths, spacing and muted captions only. No new colours, no new
-     fonts, no new control types — the tables are .section table, the buttons the
-     shared .small, the collapsed group deptHeaderHTML, the chips the same shape the
-     Crew filter's already wear. */
-  .bdm-crew-tools{margin:0 0 14px;}
-  /* the preview: a review list is a TABLE, not a dialog full of prose, so the box has
-     to be able to hold one. Everything else about it is the shared .modal-box. */
-  .modal-box-wide{max-width:900px;}
-  .bdm-gen-wrap{margin:6px 0 4px; max-height:46vh; overflow-y:auto;}
-  .bdm-gen-wrap table{min-width:640px;}
-  .bdm-gen-tools{margin:4px 0 2px;}
-  .bdm-gen-tick{width:28px;}
-  /* "no rate on file" and "⚠ n unmapped" — the two rows the brief says must be shown
-     rather than silently zeroed or dropped. Muted and title-only, like the four line
-     markers: they say "decide about this", not "this is broken". */
-  .bdm-gen-flag{color:var(--muted); cursor:help; font-size:var(--fs-meta);}
-  .bdm-cand-panel .subhead{margin-top:16px;}
-  .bdm-cand-wrap{margin:6px 0 4px;}
-  .bdm-cand-wrap table{min-width:900px;}
-  .bdm-cand-known{display:block; margin-top:2px;}
-  .bdm-cand-sig{max-width:280px;}
-  .bdm-cand-chip{display:inline-block; font-family:var(--label); font-size:var(--fs-meta);
-    letter-spacing:0.6px; color:var(--muted); border:1px solid var(--line);
-    border-radius:999px; padding:1px 8px; margin:2px 4px 2px 0;}
-  .bdm-cand-acts{white-space:nowrap;}
-  .bdm-cand-foot{margin-top:10px;}
-
   /* the two-option "remove from a project" dialog (Phase AY-a). Two stacked choice
      buttons, each with its consequence written under it, rather than a confirm()
      that can only say yes or no to a question it hasn't fully asked. */
