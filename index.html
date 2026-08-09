@@ -4008,14 +4008,21 @@ function selectedEditTargets(crewId){
   if(projectCrewSelected.size>1 && projectCrewSelected.has(crewId)) return [...projectCrewSelected];
   return [crewId];
 }
+/* ⚠️ This clears BOTH p.crewIds and every shoot day's `positions`, the same two
+   places removeCrewFromProject() has always cleared. Removing only crewIds left a
+   bulk-removed person sitting on the call sheet — they were off the roster but still
+   holding a position on the days they'd been assigned to. The undo snapshot has to
+   cover db:shootdays for the same reason. */
 async function bulkRemoveSelectedFromProject(){
   const p = currentProject(); if(!p) return;
   const n = projectCrewSelected.size;
   if(!n || !confirm(`Remove ${n} crew member(s) from this project?`)) return;
-  const snaps = beginUndo(['db:projects']);
+  const snaps = beginUndo(['db:projects','db:shootdays']);
   p.crewIds = (p.crewIds||[]).filter(id=>!projectCrewSelected.has(id));
+  shootDaysDB.forEach(d=>{ if(d.projectId===p.id && d.positions) d.positions = d.positions.filter(pos=>!projectCrewSelected.has(pos[0])); });
   projectCrewSelected.clear();
   await saveDB('db:projects', projectsDB);
+  await saveDB('db:shootdays', shootDaysDB);
   renderProjectBody();
   finishUndo(`Removed ${n} crew member${n>1?'s':''} from this project.`, snaps);
 }
