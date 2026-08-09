@@ -490,6 +490,13 @@
     display:flex; align-items:center; gap:8px;}
   .modal-box h3::after{content:''; flex:1; height:1px; background:var(--line);}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
+  /* Phase AZ — the roles-view banner's inert "+" marker (wired to a menu in Phase BA).
+     Weight signals whether the person has other saved roles to switch to; the mark
+     itself does nothing yet. */
+  .role-add-marker{display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; font-family:var(--body); font-size:13px; line-height:1;
+    color:var(--muted); vertical-align:middle; user-select:none;}
+  .role-add-marker.has-roles{color:var(--text);}
   .formgroup{border:none; border-radius:0; padding:0; margin-bottom:16px; background:none;}
   .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;
     display:flex; align-items:center; gap:8px;}
@@ -1150,6 +1157,21 @@ function rolesTagListHTML(c){
     const active = !!c.role && c.role===name;
     return `<span class="pill dept" style="cursor:pointer;${active?'background:var(--tint-6);':''}" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
   }).join('')}</span>`;
+}
+/* Phase AZ — the Roles-view row banner. Used to render rolesTagListHTML() directly
+   (every saved role as a clickable, deletable chip) — a live accidental-data-loss
+   path, since that chip's × is removeRoleFromCrew() against the shared crew
+   database, not a project-scoped action. Now shows exactly one chip: the role this
+   row is currently using (c.role), no click-to-switch, no ×. Saved-role management
+   (add/switch/remove) still lives in the Edit-pencil expansion's tag-list editor
+   (rolesTagListHTML() + roleAddPickerHTML(), inside crewFormHTML()) — untouched here.
+   The "+" marker is inert (no handler) until Phase BA wires it to a menu; its weight
+   just signals whether this person has other saved roles to offer. */
+function roleBannerHTML(c){
+  const chip = c.role ? `<span class="pill dept" title="${esc(c.role)}">${esc(c.role)}</span>` : '';
+  const hasOtherRoles = (c.roles||[]).length > 1;
+  const marker = `<span class="role-add-marker${hasOtherRoles?' has-roles':''}" aria-hidden="true">+</span>`;
+  return `${chip}${marker}`;
 }
 function roleAddPickerHTML(c){
   const has = new Set(c.roles||[]);
@@ -4272,7 +4294,7 @@ function crewRolesRowHTML(c){
   return `<div class="roles-grid roles-grid-row ${isEditing?'roles-grid-row-editing':''}">
     <div class="roles-grid-controls">${selectCb}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}${copyBadge}</div>
-    <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${rolesTagListHTML(c)}</span></div>
+    <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(c)}</span></div>
     <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveCrewRateOverride('${c.id}', this.value)">${crewRateSaveIconHTML(c.id, 'r')}</span></div>
     <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(c)}</div>
     ${crewExpansionHTML(c, 'roles-grid-editform')}
