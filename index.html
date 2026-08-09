@@ -1506,7 +1506,7 @@ async function confirmRemovePerson(scope){
    that knows what lives in the overlay. */
 function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
-  if(el) el.innerHTML = addRoleDialogHTML() + removePersonDialogHTML() + bdmAddPersonDialogHTML() + bdmGenerateDialogHTML();
+  if(el) el.innerHTML = addRoleDialogHTML() + removePersonDialogHTML() + bdmAddPersonDialogHTML();
 }
 /* clone a crew member — independent record, keeps everything, meant to be
    reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
@@ -3644,14 +3644,7 @@ async function addNewLocationFromProposal(name, addressOrNotes){
    its project through bdmCurrentProjectId(), which can differ from currentProjectId
    in one edge case (currentProjectId unset/invalid), so it passes the record it is
    actually rendering rather than trusting the default. */
-/* ⚠️ Phase AY-b added the optional 5th argument, `extra` — fields seeded onto the new
-   record before it is saved, so the whole creation is still ONE write through this one
-   path. Its only caller is the Budget's candidate-accept flow, where the copy runs the
-   opposite way round: a line that says "Gaffer, £668, 20% VAT" and has nobody behind
-   it becomes a crew record carrying that rate and VAT status, rather than a blank
-   record that would then make the line look like it had drifted. The other three
-   callers pass nothing and are unchanged. */
-async function addNewCrewFromProposal(name, department, role, proj, extra){
+async function addNewCrewFromProposal(name, department, role, proj){
   const p = proj || currentProject(); if(!p || !name) return null;
   const rolePath = `${department}/${role}`;
   const rec = { id:uid(), name, roles:[rolePath], role, department,
@@ -3661,7 +3654,6 @@ async function addNewCrewFromProposal(name, department, role, proj, extra){
     vatRegistered:'', drives:'', carMakeModel:'', carReg:'', homeAddress:'',
     generalNotes:'', previousProjects:'', instagram:'', youtube:'', linkedin:'', coffeeOrder:'',
     rate:'', notes:'' };
-  if(extra) Object.assign(rec, extra);
   crewDB.push(rec);
   await saveDB('db:crew', crewDB);
   p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(rec.id)) p.crewIds.push(rec.id);
@@ -8782,14 +8774,7 @@ function bdmNormalizeRecord(r){
       floatPercent: bdmPercentOr(l.floatPercent, null),
       bbcOverride: l.bbcOverride || '',
       notes:   l.notes || ''
-    })),
-    /* Phase AY-b — line ids the candidate review screen has been told are not people.
-       ⚠️ Stored on the BUDGET record, not in session state: a suggestion that has been
-       considered and rejected must stay rejected across reloads, or the screen asks
-       the same 30 questions every time it is opened. Absent on every pre-AY-b record,
-       so it normalises to [] and lands on that budget's next save — the same
-       "normalise on read, write on next save" idiom lineType and dayTotal use. */
-    dismissedCandidates: Array.isArray(r.dismissedCandidates) ? r.dismissedCandidates.slice() : []
+    }))
   };
 }
 
@@ -9088,54 +9073,24 @@ function bdmUnmappedDaysFlag(rec, l){
   return `<span class="bdm-flag bdm-flag-warn" title="This person has ${prod} shoot day${prod===1?'':'s'} in Production, but this line's section has no Shoot column to put them in — days left at zero rather than guessed">⚠</span>`;
 }
 
-/* ---- ATTACH vs COPY (Phase AY-b split the AY-a function in two) ---------------
-   AY-a had one function: point the line at a person AND copy their figures onto it.
-   AY-b needs both halves separately, so the one implementation is split rather than
-   duplicated. Three callers, two primitives, no third version of either:
-
-     bdmAttachCrewToLine()  the POINTER only. No figure is read or written.
-     bdmCopyCrewToLine()    attach, then THE COPY: item, rate, VAT, days.
-
-   | caller                       | attach | copy | why                            |
-   |------------------------------|--------|------|--------------------------------|
-   | bdmLinkLineToCrew() (picker) |   ✓    |  ✓   | AY-a's behaviour, unchanged    |
-   | bdmGenerateLines()  (AY-b P1)|   ✓    |  ✓   | a generated line IS a fresh copy|
-   | bdmAcceptCandidate() (AY-b P2)|  ✓    |  ✗   | the copy runs the OTHER way —
-                                                    the LINE's rate becomes the new
-                                                    crew record's, and the line must
-                                                    not move by a penny             |
-   ⚠️ The accept path is why the attach half has to exist on its own. Running the
-   copy there would re-read the brand-new record's rate (a no-op), its VAT (a no-op,
-   because the record is created FROM the line's VAT) — and then fill days from
-   Production, where a person created five seconds ago has none, silently zeroing a
-   line budgeted at six days. Figures must not change; so nothing that touches a
-   figure runs. -------------------------------------------------------------------- */
-/* The pointer, and the name mirror that backs it up. Touches no figure. */
-function bdmAttachCrewToLine(l, c){
-  l.crewId = c.id;
-  l.name = c.name || '';
-  /* a linked person is a person: a service line being pointed at one becomes crew */
-  l.lineType = 'crew';
-}
-/* THE COPY, at the moment of linking, never re-read afterwards. Returns whether the
-   days mapped, so a caller that wants to report the ⚠ case can. */
-function bdmCopyCrewToLine(rec, l, c, p){
-  bdmAttachCrewToLine(l, c);
-  /* seed the item from the position only when the line hasn't been given one —
-     never overwrite what somebody has already typed */
-  if(!l.item || l.item==='New line') l.item = c.showAs || c.role || '';
-  const r = resolveCrewRate(c, p);
-  if(r.hasRate) l.rate = r.rate;                 /* THE COPY. Never re-read. */
-  l.vatRate = (c.vatRegistered==='Yes') ? 0.2 : 0;
-  return bdmFillDaysFromProduction(rec, l);
-}
 /* Link a line to a crew record: copy name, position→item, rate and VAT across, then
    fill the days from Production. Everything after this moment is the line's own. */
 function bdmLinkLineToCrew(lineId, crewId){
   const rec = currentBudgetDemoProject(); if(!rec) return;
   const l = budgetDemoLine(lineId); if(!l) return;
   const c = crewById(crewId); if(!c) return;
-  bdmCopyCrewToLine(rec, l, c, projById(bdmCurrentProjectId()));
+  const p = projById(bdmCurrentProjectId());
+  l.crewId = c.id;
+  l.name = c.name || '';
+  /* seed the item from the position only when the line hasn't been given one —
+     never overwrite what somebody has already typed */
+  if(!l.item || l.item==='New line') l.item = c.showAs || c.role || '';
+  const r = resolveCrewRate(c, p);
+  if(r.hasRate) l.rate = r.rate;                 /* THE COPY. Never re-read. */
+  l.vatRate = (c.vatRegistered==='Yes') ? 0.2 : 0;
+  /* a linked person is a person: a service line being pointed at one becomes crew */
+  l.lineType = 'crew';
+  bdmFillDaysFromProduction(rec, l);
   bdmTouch();
   renderMain();
 }
@@ -9168,226 +9123,6 @@ function bdmResyncLineDays(lineId){
   const l = budgetDemoLine(lineId); if(!l) return;
   if(!bdmFillDaysFromProduction(rec, l)) return;
   bdmTouch();
-  renderMain();
-}
-
-/* ---- defaulting a line's SECTION and CODE from a person's department (AY-b) -----
-   ⚠️ There is NO department→code table in this app and AY-b does not add one. Both
-   answers are derived by matching the person's DEPARTMENT against text that already
-   exists and is already user-editable:
-
-     code    ← the label of a code in db:budget_settings ("Cinematography", "Vanities",
-               "Catering & travel", …), which is what DEPARTMENTS reads like already
-     section ← the name of a section on THIS budget ("Grip", "Set / Venue", "Travel")
-
-   ⚠️ SECTION AND CODE ARE INDEPENDENT and are resolved independently. They routinely
-   disagree on a real sheet — ROW carries a Production Coordinator in the Production
-   section coded SET — and AY-b makes no attempt to reconcile them, hide the
-   difference, or be clever about it. Both are DEFAULTS on a generated line and the
-   whole point of the preview is that they are visible before anything is written;
-   recoding afterwards is the normal way this screen is used, not a correction.
-
-   The one place the two do meet is the section FALLBACK: a budget whose sections
-   aren't named after departments (a section called "Crew", say) still has an
-   expectedCode, so a department that resolved to a code can find its section through
-   it. That is reading a section's own declared code, not inventing a mapping. */
-function bdmMatchKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
-/* 3 = the same words ("Post Production" / "Post-production"), 2 = one STARTS WITH the
-   other's whole words ("DOP / Director" / "DOP"), 1 = one's words are a subset of the
-   other's ("Camera Assistant" / "Assistant Camera (AC)"), 0 = unrelated. Highest wins,
-   first wins on a tie — so "Production" takes the Production section rather than
-   Post-production, which only scores 1.
-   ⚠️ The prefix test is on WHOLE WORDS, and that is not fussiness: measured against
-   ROW's real items, a character-prefix test read "Painters Ladder" as the role "PA"
-   and offered a stepladder as a production assistant. Punctuation is already gone by
-   here, so "DOP / Director" is "dop director" and still matches "DOP" on the space. */
-function bdmMatchScore(a, b){
-  const A = bdmMatchKey(a), B = bdmMatchKey(b);
-  if(!A || !B) return 0;
-  if(A===B) return 3;
-  if(A.replace(/ /g,'')===B.replace(/ /g,'')) return 3;
-  const wordPrefix = (x,y)=> x.startsWith(y) && (x.length===y.length || x[y.length]===' ');
-  if(wordPrefix(A,B) || wordPrefix(B,A)) return 2;
-  const wa = A.split(' '), wb = B.split(' ');
-  if(wa.every(w=>wb.includes(w)) || wb.every(w=>wa.includes(w))) return 1;
-  return 0;
-}
-function bdmBestMatch(needle, list, textOf){
-  let best = null, bestScore = 0;
-  list.forEach(x=>{ const s = bdmMatchScore(needle, textOf(x)); if(s>bestScore){ bestScore = s; best = x; } });
-  return best;
-}
-/* '' when the department matches no code — a real answer, not a failure. The
-   preview shows the blank and the code picker on the line is one click away. */
-function bdmCodeForDepartment(dept){
-  const c = bdmBestMatch(dept, bdmCodes(), x=>x.label);
-  return c ? c.code : '';
-}
-/* Section by name; failing that, the first section that declares the code this
-   department resolved to; failing that, the budget's first section. */
-function bdmSectionForDepartment(rec, dept){
-  const byName = bdmBestMatch(dept, rec.sections, s=>s.name);
-  if(byName) return byName.id;
-  const code = bdmCodeForDepartment(dept);
-  const byCode = code ? rec.sections.find(s=>s.expectedCode===code) : null;
-  if(byCode) return byCode.id;
-  return (rec.sections[0] && rec.sections[0].id) || '';
-}
-
-/* ---- PART 1: generate budget lines from the project's crew (Phase AY-b) ---------
-   Linking one line at a time is right for a budget that already exists. Starting one
-   from a crew list that is already sixty-six people long is not — hence one pass.
-
-   ⚠️ NOTHING IS WRITTEN UNTIL THE PREVIEW IS CONFIRMED. The plan is built, shown as
-   one tick-able row per person with every figure the line would take, and only then
-   turned into lines. This is not a confirm() over a number: a confirm() cannot say
-   "these four have no rate on file and this one's days can't be mapped".
-
-   ⚠️ NO DUPLICATES, EVER. Anyone already carried by a line on this budget is not in
-   the plan at all — not unticked, absent — because "already linked" is not a choice
-   the user should have to make sixty-six times.
-
-   ⚠️ The rate, VAT, item and days come through bdmCopyCrewToLine(), the SAME copy the
-   picker uses. Generation adds no second idea of what linking means; it creates an
-   empty line and links it. */
-let bdmGen = null;   /* {projectId, rows:[…]} — held outside the DOM, same reason as
-                        bdmAddPerson: ticking a row must not be lost to a re-render */
-
-/* One row per person who could get a line, with every figure the line would take.
-   Read-only — it writes nothing, so it is safe to build for a preview that is then
-   cancelled. */
-function bdmGeneratePlanRows(rec, p){
-  const linked = new Set(rec.lines.map(l=>l.crewId).filter(Boolean));
-  return (p.crewIds||[])
-    .map(id=>crewById(id))
-    .filter(c=>c && !linked.has(c.id))          /* ⚠️ already on a line: not offered */
-    .map(c=>{
-      const sectionId = bdmSectionForDepartment(rec, c.department);
-      const sec = bdmSection(rec, sectionId);
-      /* the same question bdmFillDaysFromProduction() asks, asked before the line
-         exists: does this section have a column that means "a day on set"? */
-      const phases = bdmPhaseSet((sec && sec.phaseSet) || 'shoot');
-      const mappable = phases.includes('Shoot');
-      const prodDays = bdmProductionDayCount(c.id, p.id);
-      const r = resolveCrewRate(c, p);
-      return { on:true, crewId:c.id, name:c.name||'(no name)',
-               role: c.showAs || c.role || '', dept: c.department || '',
-               rate:r.rate, hasRate:r.hasRate, isOverride:r.isOverride,
-               sectionId, sectionName:(sec&&sec.name)||'—',
-               /* ⚠️ A department that matches no code (Client, Other) falls back to
-                  the code the SECTION itself declares — the same fallback
-                  addBudgetDemoLine() uses for a hand-added line, and the same reason:
-                  a line with no code at all would open its own nameless row on the
-                  top sheet. It is still a default and still recodable. */
-               code: bdmCodeForDepartment(c.department) || (sec && sec.expectedCode) || '',
-               prodDays, mappable };
-    });
-}
-function openBdmGenerateDialog(){
-  const rec = currentBudgetDemoProject(); if(!rec) return;
-  const p = projById(bdmCurrentProjectId());
-  if(!p){ alert('No project is open.'); return; }
-  if(!rec.sections.length){ alert('This budget has no sections yet — add one first, so generated lines have somewhere to go.'); return; }
-  bdmGen = { projectId:p.id, rows: bdmGeneratePlanRows(rec, p) };
-  renderGlobalOverlay();
-}
-function closeBdmGenerateDialog(){ bdmGen = null; renderGlobalOverlay(); }
-/* The tick is the checkbox itself, so the state moves without a re-render — the
-   count in the footer is the only derived text and it is rewritten in place. */
-function toggleBdmGenRow(crewId, on){
-  if(!bdmGen) return;
-  const r = bdmGen.rows.find(x=>x.crewId===crewId); if(!r) return;
-  r.on = !!on;
-  bdmGenRefreshCount();
-}
-function setBdmGenAll(on){
-  if(!bdmGen) return;
-  bdmGen.rows.forEach(r=>r.on = !!on);
-  renderGlobalOverlay();
-}
-function bdmGenRefreshCount(){
-  const el = document.getElementById('bdmGenCount');
-  if(el && bdmGen){
-    const n = bdmGen.rows.filter(r=>r.on).length;
-    el.textContent = n + ' of ' + bdmGen.rows.length + ' selected';
-  }
-}
-function bdmGenerateDialogHTML(){
-  if(!bdmGen) return '';
-  const rows = bdmGen.rows;
-  const sel = rows.filter(r=>r.on).length;
-  const body = rows.length ? `
-    <div class="tablewrap bdm-gen-wrap"><table>
-      <tr><th class="bdm-gen-tick"></th><th>Name</th><th>Role</th><th>Department</th>
-        <th>Section</th><th>Code</th><th class="bdm-num">Rate</th><th class="bdm-num">Days</th></tr>
-      ${rows.map(r=>`<tr>
-        <td class="bdm-gen-tick"><input type="checkbox" ${r.on?'checked':''}
-          onchange="toggleBdmGenRow('${esc(r.crewId)}', this.checked)"></td>
-        <td>${esc(r.name)}</td>
-        <td>${r.role?esc(r.role):'<span class="empty-note">no role on file</span>'}</td>
-        <td>${r.dept?esc(r.dept):'<span class="empty-note">—</span>'}</td>
-        <td>${esc(r.sectionName)}</td>
-        <td>${r.code?esc(r.code):'<span class="empty-note">—</span>'}</td>
-        <td class="bdm-num">${r.hasRate ? budgetFmt(r.rate)
-          : `<span class="bdm-gen-flag" title="No day rate on this person's crew record and no rate override on this project — the line is created at £0 and you set the rate on it. It is not excluded and nothing is guessed.">no rate on file</span>`}</td>
-        <td class="bdm-num">${r.mappable ? r.prodDays
-          : `<span class="bdm-gen-flag" title="This person has ${r.prodDays} shoot day${r.prodDays===1?'':'s'} in Production, but the ${esc(r.sectionName)} section has no Shoot column to put them in. The line is created with its days at zero and wears the ⚠ marker — nothing is guessed.">⚠ ${r.prodDays} unmapped</span>`}</td>
-      </tr>`).join('')}
-    </table></div>`
-    : `<div class="empty-note">Everyone on this project's crew is already carried by a line on this budget — there is nothing to generate.</div>`;
-  return `<div class="modal-overlay" onclick="if(event.target===this) closeBdmGenerateDialog()">
-    <div class="modal-box modal-box-wide">
-      <h3>Generate lines from crew</h3>
-      <div class="hint">One line per person on this project's Production crew. Anyone already carried by a
-        line on this budget is left out entirely. Rate, VAT, item and days are copied exactly the way
-        linking a line by hand copies them; section and code are defaults taken from each person's
-        department and are yours to recode afterwards.</div>
-      ${rows.length ? `<div class="toolbar bdm-gen-tools">
-        <button class="small" onclick="setBdmGenAll(true)">Select all</button>
-        <button class="small" onclick="setBdmGenAll(false)">Select none</button>
-        <span class="status" id="bdmGenCount">${sel} of ${rows.length} selected</span>
-      </div>` : ''}
-      ${body}
-      <div class="toolbar">
-        <button class="primary" onclick="confirmBdmGenerate()" ${rows.length?'':'disabled'}>Create the ticked lines</button>
-        <button onclick="closeBdmGenerateDialog()">Cancel</button>
-      </div>
-    </div>
-  </div>`;
-}
-/* THE ONLY WRITE IN PART 1. Everything above this point is a preview.
-   ⚠️ Appends to the end of the person's SECTION, not the end of the record: the
-   section groups render rec.lines in array order, so a bare push would still look
-   right today but would put a Camera line after the Travel ones the moment sections
-   are reordered or re-read. */
-function confirmBdmGenerate(){
-  const state = bdmGen; if(!state) return;
-  const rec = currentBudgetDemoProject(); if(!rec) return;
-  const p = projById(state.projectId);
-  const picked = state.rows.filter(r=>r.on);
-  if(!p || !picked.length){ closeBdmGenerateDialog(); return; }
-  /* re-check the guard against the record as it stands NOW, not as the plan saw it:
-     the picker on a line could have linked somebody while this dialog was open */
-  const linked = new Set(rec.lines.map(l=>l.crewId).filter(Boolean));
-  let made = 0;
-  picked.forEach(r=>{
-    const c = crewById(r.crewId);
-    if(!c || linked.has(c.id)) return;
-    linked.add(c.id);
-    const l = { id:'bdm'+uid(), crewId:null, section:r.sectionId, code:r.code,
-                lineType:'crew', overtime:0,
-                /* item deliberately EMPTY so the copy seeds it from the position —
-                   the same branch the picker takes on an untouched line */
-                item:'', name:'', days:{}, rate:0, vatRate:0, floatPercent:null,
-                bbcOverride:'', notes:'' };
-    bdmCopyCrewToLine(rec, l, c, p);          /* THE SHARED COPY, not a second one */
-    const last = rec.lines.map(x=>x.section).lastIndexOf(r.sectionId);
-    if(last>-1) rec.lines.splice(last+1, 0, l); else rec.lines.push(l);
-    made++;
-  });
-  bdmGen = null;
-  renderGlobalOverlay();
-  if(made){ bdmTouch(); }
   renderMain();
 }
 
@@ -9476,24 +9211,12 @@ function bdmOnCrewPick(lineId, value){
    dialog and not an inline "type a name and we'll make one".
    Department + role are required for the same reason saveCrew() requires them:
    since Phase R every crew member has at least one saved role, and role IS
-   department. Same two fields, same shape, as the existing Add-new-role dialog.
-
-   ⚠️ Phase AY-b gave this dialog a second MODE rather than a second dialog, because
-   the two flows ask the user for exactly the same three things:
-     mode 'link'   — the picker's "+ Add new person…". Creates the record, then LINKS
-                     the line to it, which copies the person's rate/VAT/days onto the
-                     line. AY-a's behaviour, unchanged.
-     mode 'accept' — the candidate review screen's Accept. Creates the record FROM the
-                     line (its rate becomes the person's rate, its VAT becomes their
-                     VAT status), then attaches the pointer and stops. ⚠️ NO COPY RUNS
-                     BACK: the line's rate, days, VAT and total must be identical
-                     before and after. See bdmAcceptCandidate().
-   Only the hint text, the button label and the last three lines of confirm differ. */
-let bdmAddPerson = null;   /* {lineId, name, dept, role, mode, seed} — outside the DOM */
+   department. Same two fields, same shape, as the existing Add-new-role dialog. */
+let bdmAddPerson = null;   /* {lineId, name, dept, role} — held outside the DOM */
 function openBdmAddPersonDialog(lineId){
   const rec = currentBudgetDemoProject();
   const l = rec ? budgetDemoLine(lineId) : null;
-  bdmAddPerson = { lineId, name:(l && !l.crewId ? (l.name||'') : ''), dept:'', role:'', mode:'link', seed:null };
+  bdmAddPerson = { lineId, name:(l && !l.crewId ? (l.name||'') : ''), dept:'', role:'' };
   renderGlobalOverlay();
 }
 function closeBdmAddPersonDialog(){ bdmAddPerson = null; renderGlobalOverlay(); renderMain(); }
@@ -9507,13 +9230,12 @@ function setBdmAddPersonField(field, v){
 function bdmAddPersonDialogHTML(){
   if(!bdmAddPerson) return '';
   const d = bdmAddPerson;
-  const accept = d.mode==='accept';
   const deptOpts = ['<option value="">— Department —</option>']
     .concat(DEPARTMENTS.map(x=>`<option value="${esc(x)}"${d.dept===x?' selected':''}>${esc(x)}</option>`)).join('');
   const roles = d.dept ? rolesFor(d.dept) : [];
   return `<div class="modal-overlay" onclick="if(event.target===this) closeBdmAddPersonDialog()">
     <div class="modal-box">
-      <h3>${accept?'Add this person to the crew database':'Add a person'}</h3>
+      <h3>Add a person</h3>
       <div class="grid g2" style="margin-bottom:12px;">
         <div><label>Name</label><input type="text" id="bdmApName" placeholder="e.g. Alishia Shaw"
           value="${esc(d.name)}" oninput="setBdmAddPersonField('name', this.value)"></div>
@@ -9526,15 +9248,10 @@ function bdmAddPersonDialogHTML(){
           : `<input type="text" id="bdmApRoleText" placeholder="${d.dept?'e.g. Steadicam Operator':'pick a department first'}"
                value="${esc(d.role)}" oninput="setBdmAddPersonField('role', this.value)" ${d.dept?'':'disabled'}>`}</div>
       </div>
-      ${accept
-        ? `<div class="hint">${d.role?'The role below came from this line’s item text, which matches a saved role exactly. ':'This line’s item text isn’t one of the saved roles, so pick the role this person actually does. '}Roles are a fixed list — a budget line’s wording never becomes one.</div>
-           <div class="hint">Creates the crew record from the line: <strong>${esc(budgetFmt(bdmNum(d.seed&&d.seed.rate)))}</strong> becomes their day rate and VAT is recorded as
-           <strong>${(d.seed&&d.seed.vat)?'registered':'not registered'}</strong>, then the line is linked to them.
-           <strong>The line’s rate, days, VAT and total do not change.</strong></div>`
-        : `<div class="hint">Adds them to the crew database and to this project's Production crew, then links this line to them.
-        Their day rate and VAT status copy onto the line; nothing schedules them onto a shoot day — that's Production's to decide.</div>`}
+      <div class="hint">Adds them to the crew database and to this project's Production crew, then links this line to them.
+        Their day rate and VAT status copy onto the line; nothing schedules them onto a shoot day — that's Production's to decide.</div>
       <div class="toolbar">
-        <button class="primary" onclick="confirmBdmAddPerson()">${accept?'Create and link':'Add person'}</button>
+        <button class="primary" onclick="confirmBdmAddPerson()">Add person</button>
         <button onclick="closeBdmAddPersonDialog()">Cancel</button>
       </div>
     </div>
@@ -9555,258 +9272,12 @@ async function confirmBdmAddPerson(){
     ROLES_BY_DEPT[dept].push(role);
     await saveDB('db:roles', ROLES_BY_DEPT);
   }
-  const lineId = d.lineId, mode = d.mode, seed = d.seed;
+  const lineId = d.lineId;
   bdmAddPerson = null;
   renderGlobalOverlay();
-  /* ⚠️ In accept mode the record is seeded FROM the line, in ONE write through the
-     same path — so the rate the new person carries is the rate the line already
-     holds, and the ≠ drift marker has nothing to report the moment it is created. */
-  const extra = (mode==='accept' && seed)
-    ? { rate: String(bdmNum(seed.rate)), vatRegistered: seed.vat ? 'Yes' : 'No' }
-    : null;
-  const c = await addNewCrewFromProposal(name, dept, role, p, extra);
+  const c = await addNewCrewFromProposal(name, dept, role, p);
   if(!c){ renderMain(); return; }
-  if(mode==='accept'){ bdmFinishAcceptCandidate(lineId, c); return; }
   bdmLinkLineToCrew(lineId, c.id);   /* renders */
-}
-
-/* ================= PART 2: the candidate review screen (Phase AY-b) ==============
-   A budget written before anybody thought about a crew database is full of people:
-   82 ROW lines, 50 of them typed crew, and not one pointing at a record. This screen
-   finds the ones that look like a person and offers them — as SUGGESTIONS, per row,
-   accepted or dismissed one at a time. Nothing here creates anything on its own.
-
-   ⚠️ IT SCANS ALL 82 LINES, NOT THE 50 TYPED crew. A freelancer invoicing through
-   their own company sits on a service line, and that is exactly the person most
-   likely to be missing from the database. Service-typed hits are real but much
-   likelier to be a supplier, so they are shown apart and collapsed — separated by
-   confidence, not filtered out.
-
-   ⚠️ ALREADY-LINKED LINES ARE NOT CANDIDATES. There is nothing to suggest.
-
-   THE SIGNALS, combined, and each one reported on the row that fired it:
-     ROLE    the item text is, or is close to, a saved canonical role
-     NAME    the name reads as a person rather than a company
-     DAYS    the line has days AND a rate, rather than a bare quantity
-   ⚠️ NAME is a GATE, not a third vote. The brief calls Ltd/Limited/LLP/&/Hire/
-   Rentals/Services "strong negatives", and on real data they are decisive rather than
-   suggestive: "Prevent Security" against the item "Security" scores a role match and
-   has a rate, and is obviously a company. So anything the name test rejects is out,
-   whatever else it scored, and the other two signals then rank what's left. The four
-   rejections are documented on bdmNameLooksPersonal(). */
-
-/* Every canonical role, flattened, with the department it belongs to. Built per scan
-   rather than cached: ROLES_BY_DEPT gains entries at runtime (confirmAddRoleDialog,
-   confirmBdmAddPerson) and a stale list would quietly stop matching new roles. ~50
-   entries — it is a flatten, not a computation. */
-function bdmCanonicalRoles(){
-  const out = [];
-  Object.keys(ROLES_BY_DEPT||{}).forEach(dept=>
-    (ROLES_BY_DEPT[dept]||[]).forEach(role=> out.push({dept, role})));
-  return out;
-}
-/* The best canonical role for a line's item text, or null. score 3 is an EXACT match
-   and is the only score allowed to pre-select a role on the accept dialog — see
-   bdmAcceptCandidate(). Anything less is a hint for the eye, not an answer. */
-function bdmRoleMatchFor(item, roles){
-  let best = null;
-  (roles||bdmCanonicalRoles()).forEach(r=>{
-    const s = bdmMatchScore(item, r.role);
-    if(s > (best?best.score:0)) best = { dept:r.dept, role:r.role, score:s };
-  });
-  return best;
-}
-/* ⚠️ THE STRONG NEGATIVES, in the order they are cheapest to test. Returns null when
-   the text reads as a person, or the reason it doesn't — which is shown on the row,
-   because "why isn't X in this list" is the question this screen gets asked.
-     1. a company token: Ltd, Limited, LLP, & … the brief's list, plus the siblings
-        that appear on these sheets (Hire, Rentals, Services, Storage, Studios)
-     2. the name IS the item — "ORGAN FACTORY" against the item "ORGAN FACTORY",
-        "Catering" against "Catering". A person's name never restates the thing bought
-     3. the name overlaps the item — "Travel Buyouts" against "Travel Buyout",
-        "Prevent Security" against "Security", "Greenkit" against "Greenkit Rental"
-     4. the name is a section or a code on this very budget — "SET", "Travel",
-        "Production Cost". That is a bucket being used as a payee, not a person
-   ⚠️ Deliberately NOT tested: how many words it has. Sid, Sam, Jojo, Amrita, Hana,
-   Isha and Brian are all one word and all real people on ROW; Beazley and Greenkit
-   are one word and neither is. A word count cannot tell them apart and pretending it
-   can would drop seven real people to spare a couple of dismissal clicks. */
-const BDM_COMPANY_TOKENS = ['ltd','limited','llp','plc','inc','gmbh','and','hire','hires',
-  'rental','rentals','service','services','storage','studios','studio','supplies'];
-function bdmNameLooksPersonal(rec, name, item){
-  const n = bdmMatchKey(name);
-  if(!n) return 'no name on this line';
-  if(/&/.test(String(name))) return 'reads as a company (&)';
-  const tok = n.split(' ');
-  const hit = tok.find(w=>BDM_COMPANY_TOKENS.includes(w));
-  if(hit) return 'reads as a company (“'+hit+'”)';
-  if(bdmMatchScore(name, item)>0) return 'the name restates the item';
-  const bucket = rec.sections.map(s=>s.name).concat(bdmCodes().map(c=>c.code), bdmCodes().map(c=>c.label));
-  if(bucket.some(b=>bdmMatchScore(name, b)>0)) return 'the name is a section or code, not a payee';
-  return null;
-}
-/* An unlinked line whose name is EXACTLY an existing crew record's is not a person
-   missing from the database — it is a person the line has simply never been pointed
-   at. Accepting it links; it must not create a second Matt Wells. Exact, trimmed,
-   case-insensitive: anything looser would merge two real people who share a surname.
-   ⚠️ Where two records share a name this deliberately returns nothing and the row
-   falls back to the create flow, rather than guessing which of them the line meant. */
-function bdmExistingCrewByName(name){
-  const n = String(name||'').trim().toLowerCase();
-  if(!n) return null;
-  const hits = crewDB.filter(c=>String(c.name||'').trim().toLowerCase()===n);
-  return hits.length===1 ? hits[0] : null;
-}
-/* The scan. Read-only, and it never touches crewDB beyond the name lookup above. */
-function bdmCandidates(rec){
-  const dismissed = new Set(rec.dismissedCandidates||[]);
-  const roles = bdmCanonicalRoles();
-  const out = { crew:[], service:[] };
-  rec.lines.forEach(l=>{
-    if(l.crewId || dismissed.has(l.id)) return;
-    const reject = bdmNameLooksPersonal(rec, l.name, l.item);
-    if(reject) return;                                   /* ⚠️ the gate */
-    const service = bdmIsService(l);
-    const rm = bdmRoleMatchFor(l.item, roles);
-    const m = budgetDemoLineMath(rec, l);
-    const daysAndRate = !service && m.scheduled>0 && bdmNum(l.rate)>0;
-    const signals = [];
-    if(rm && rm.score>=1) signals.push(rm.score>=3 ? 'Item is the saved role “'+rm.role+'”'
-                                                   : 'Item is close to the saved role “'+rm.role+'”');
-    signals.push('Name reads as a person');
-    if(daysAndRate) signals.push('Has days and a rate, not a bare quantity');
-    /* On a CREW line the name gate alone is not enough — one of the other two has to
-       have fired as well.
-       ⚠️ On a SERVICE line it is, and that asymmetry is the point of Part 2. A service
-       line carries a bare quantity by definition, so the DAYS signal can NEVER fire on
-       one; requiring two signals there would systematically exclude exactly the person
-       the brief is asking about — the freelancer invoicing through their own company.
-       Measured on ROW it is the difference between finding one such person and finding
-       three (Paul Collins and Brian are both bare-quantity lines with no role match).
-       The price is a handful of suppliers in the list, which is why that group is
-       separate, collapsed, and labelled less likely rather than filtered harder. */
-    if(signals.length < (service ? 1 : 2)) return;
-    const score = (rm?rm.score:0) + (daysAndRate?2:0);
-    const row = { line:l, id:l.id, name:l.name, item:l.item, rate:bdmNum(l.rate),
-                  days:m.scheduled, vatRate:bdmNum(l.vatRate), total:m.total,
-                  roleMatch:rm, exactRole:!!(rm&&rm.score>=3), signals, score,
-                  existing: bdmExistingCrewByName(l.name) };
-    (service ? out.service : out.crew).push(row);
-  });
-  out.crew.sort((a,b)=>b.score-a.score);
-  out.service.sort((a,b)=>b.score-a.score);
-  return out;
-}
-
-/* ---- the review panel ---- */
-let bdmCandidatesOpen = false;         /* session state — a review, not a setting */
-let bdmCandidateServiceOpen = false;   /* ⚠️ the less-likely group starts COLLAPSED */
-function toggleBdmCandidates(){ bdmCandidatesOpen = !bdmCandidatesOpen; renderMain(); }
-function toggleBdmCandidateService(){ bdmCandidateServiceOpen = !bdmCandidateServiceOpen; renderMain(); }
-/* ⚠️ DISMISSALS PERSIST, in budget:<projectId> beside the lines they refer to — a
-   suggestion that has been considered and rejected must not come back every time the
-   screen is opened. Stored as line ids, so a dismissed line that is later deleted
-   simply stops matching anything. */
-function dismissBdmCandidate(lineId){
-  const rec = currentBudgetDemoProject(); if(!rec) return;
-  rec.dismissedCandidates = rec.dismissedCandidates || [];
-  if(!rec.dismissedCandidates.includes(lineId)) rec.dismissedCandidates.push(lineId);
-  bdmTouch();
-  renderMain();
-}
-function restoreBdmCandidates(){
-  const rec = currentBudgetDemoProject(); if(!rec || !(rec.dismissedCandidates||[]).length) return;
-  rec.dismissedCandidates = [];
-  bdmTouch();
-  renderMain();
-}
-/* ACCEPT. Two endings, and neither of them is allowed to move a figure on the line.
-     already in the database  → link, and nothing else. No copy in either direction:
-                                the line keeps its rate, the person keeps theirs, and
-                                if they differ the ≠ marker says so, which is exactly
-                                what that marker is for.
-     not in the database      → the add-person dialog in 'accept' mode, which is where
-                                the CANONICAL ROLE is chosen. ⚠️ Phase R forbids
-                                free-text roles, so the line's item string is never
-                                written to c.role. An exact match pre-selects; anything
-                                else leaves the picker empty and the user must choose. */
-function bdmAcceptCandidate(lineId){
-  const rec = currentBudgetDemoProject(); if(!rec) return;
-  const l = budgetDemoLine(lineId); if(!l) return;
-  const existing = bdmExistingCrewByName(l.name);
-  if(existing){ bdmFinishAcceptCandidate(lineId, existing); return; }
-  const rm = bdmRoleMatchFor(l.item, bdmCanonicalRoles());
-  const exact = rm && rm.score>=3;
-  bdmAddPerson = { lineId, name:(l.name||''), mode:'accept',
-                   dept: exact ? rm.dept : '', role: exact ? rm.role : '',
-                   seed: { rate: bdmNum(l.rate), vat: bdmNum(l.vatRate)>0 } };
-  renderGlobalOverlay();
-}
-/* The shared ending: attach the pointer and stop. ⚠️ bdmAttachCrewToLine(), NOT
-   bdmCopyCrewToLine() — running the copy here would re-read the rate, re-read the VAT
-   and refill the days from a Production assignment the person hasn't got, silently
-   zeroing a line budgeted at six days. */
-function bdmFinishAcceptCandidate(lineId, c){
-  const l = budgetDemoLine(lineId);
-  if(l && c) bdmAttachCrewToLine(l, c);
-  bdmTouch();
-  renderMain();
-}
-function bdmCandidateRowHTML(r){
-  const days = r.days ? r.days + ' day' + (r.days===1?'':'s') : '—';
-  return `<tr>
-    <td>${esc(r.name)}${r.existing?`<span class="empty-note bdm-cand-known">already in the crew database</span>`:''}</td>
-    <td>${esc(r.item)}</td>
-    <td>${r.roleMatch && r.roleMatch.score>=1
-        ? esc(r.roleMatch.role) + (r.exactRole?'' : ' <span class="empty-note">(close, not exact)</span>')
-        : '<span class="empty-note">no role match</span>'}</td>
-    <td class="bdm-num">${budgetFmt(r.rate)}</td>
-    <td class="bdm-num">${days}</td>
-    <td class="bdm-num">${r.vatRate?'20%':'0%'}</td>
-    <td class="bdm-cand-sig">${r.signals.map(s=>`<span class="bdm-cand-chip">${esc(s)}</span>`).join('')}</td>
-    <td class="bdm-cand-acts">
-      <button class="small" title="${r.existing
-          ? 'Links this line to '+esc(r.existing.name)+', who is already in the crew database. Nothing is created and no figure on this line changes.'
-          : 'Opens the role picker, then creates the crew record from this line and links it. The line’s rate, days, VAT and total do not change.'}"
-        onclick="bdmAcceptCandidate('${esc(r.id)}')">${r.existing?'Link':'Accept'}</button>
-      <button class="small" title="Not a person. This line won’t be suggested again on this budget." onclick="dismissBdmCandidate('${esc(r.id)}')">Dismiss</button>
-    </td>
-  </tr>`;
-}
-function bdmCandidatesTableHTML(rows){
-  return `<div class="tablewrap bdm-cand-wrap"><table>
-    <tr><th>Name on the line</th><th>Item</th><th>Closest saved role</th>
-      <th class="bdm-num">Rate</th><th class="bdm-num">Days</th><th class="bdm-num">VAT</th>
-      <th>Why it’s here</th><th></th></tr>
-    ${rows.map(bdmCandidateRowHTML).join('')}
-  </table></div>`;
-}
-function bdmCandidatesPanelHTML(rec, cands){
-  const dismissed = (rec.dismissedCandidates||[]).length;
-  const foot = dismissed
-    ? `<div class="toolbar bdm-cand-foot"><span class="status">${dismissed} dismissed on this budget</span>
-         <button class="small" onclick="restoreBdmCandidates()">Show them again</button></div>`
-    : '';
-  if(!cands.crew.length && !cands.service.length){
-    return `<div class="section bdm-cand-panel"><h2>Suggested crew</h2>
-      <div class="empty-note">No unlinked line on this budget reads as a person${dismissed?' that hasn’t been dismissed':''}.</div>
-      ${foot}</div>`;
-  }
-  return `<div class="section bdm-cand-panel">
-    <h2>Suggested crew</h2>
-    <div class="hint">Lines with nobody behind them that look like a person. Nothing is created until you
-      accept a row, and accepting never changes what a line costs — the figures travel the other way,
-      from the line onto the new crew record.</div>
-    ${cands.crew.length
-      ? bdmCandidatesTableHTML(cands.crew)
-      : '<div class="empty-note">No crew-typed line is left to suggest.</div>'}
-    ${cands.service.length ? `
-      ${deptHeaderHTML('On service lines — less likely', cands.service.length, !bdmCandidateServiceOpen, 'toggleBdmCandidateService()', '')}
-      ${bdmCandidateServiceOpen ? `<div class="hint">A service line is a buyout, supplier, venue or fee, so most of these are companies —
-          but a freelancer invoicing through their own company sits here too, which is why they are shown rather than filtered out.</div>
-        ${bdmCandidatesTableHTML(cands.service)}` : ''}` : ''}
-    ${foot}
-  </div>`;
 }
 
 /* ---- grouping: the lines never change, only the bucket they are read in ----
@@ -10189,18 +9660,6 @@ function renderBudgetDemo(m){
   }
   const groups = budgetDemoGroups(rec);
   const allCollapsed = groups.length>0 && groups.every(g=>budgetDemoCollapsed.has(g.key));
-  /* Phase AY-b — the two crew actions. ⚠️ The candidate SCAN runs on every render
-     because its count IS the affordance ("Suggested crew (51)" is the reason anyone
-     opens it); the PANEL itself only builds when it is open, which is what keeps the
-     cost off a screen nobody is reviewing. MEASURED on the live ROW budget: the scan
-     is 82 lines against ~50 saved roles at **5.3ms**, on a render measured at 229ms
-     against HEAD's 216–238ms in the same session — inside the noise. Opening the panel
-     costs ~60ms more while it is on screen, and both groups open ~110ms; that is 51
-     rows of table and it is opt-in.
-     ⚠️ Nothing added here builds a <select> — see bdmFillCrewPicker() for the 1,207ms
-     that rule cost, and do not "improve" either new screen with a picker per row. */
-  const cands = bdmCandidates(rec);
-  const candCount = cands.crew.length + cands.service.length;
   /* Phase AX — the project selector is gone (this screen renders whichever project
      the sidebar has selected — see bdmCurrentProjectId()). Float %/Fee % are project
      SETTINGS, not view controls, so they stay here as a slim strip directly under the
@@ -10223,17 +9682,10 @@ function renderBudgetDemo(m){
       <div class="tab ${budgetDemoLens==='dept'?'active':''}" onclick="setBudgetDemoLens('dept')">DEPARTMENTS</div>
       <div class="tab ${budgetDemoLens==='bbc'?'active':''}" onclick="setBudgetDemoLens('bbc')">BBC</div>
     </div>
-    <div class="toolbar bdm-crew-tools">
-      <button class="small" title="Create a budget line for each person on this project's Production crew. Shows you exactly what it would create before anything is written; anyone already on a line is left out."
-        onclick="openBdmGenerateDialog()">Generate lines from crew…</button>
-      <button class="small" title="Unlinked lines that look like a person rather than a supplier, offered as additions to the crew database. Nothing is created until you accept a row."
-        onclick="toggleBdmCandidates()">${bdmCandidatesOpen?'Hide suggested crew':'Suggested crew'} (${candCount})</button>
-    </div>
     <div class="section">
       <h2>Top sheet</h2>
       <div id="bdmTopSheet">${budgetDemoTopSheetHTML(rec)}</div>
     </div>
-    ${bdmCandidatesOpen ? bdmCandidatesPanelHTML(rec, cands) : ''}
     <div class="section">
       <h2>Line detail</h2>
       ${groups.length ? expandCollapseAllHTML('toggleAllBudgetDemoSections()', undefined, allCollapsed, 'bdm') : ''}

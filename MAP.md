@@ -768,10 +768,7 @@ editable, never re-synced on their own (`bdmDayDriftFlag()`, ↻).
   a later phase rather than a code change — [Budget (B-1)]
 - `bdmNormalizeSettings()` / `bdmNormalizeRecord()` — everything downstream reads these
   shapes without defending itself, so a record off the wire (or out of
-  `budget-seed-row.json`) is put into shape once, here. Phase AY-b added
-  `dismissedCandidates` (line ids the candidate review screen has been told are not
-  people) by the same "normalise on read, land on next save" route `lineType` uses —
-  [Budget (B-1)]
+  `budget-seed-row.json`) is put into shape once, here — [Budget (B-1)]
 - `BDM_DEFAULT_FLOAT_PERCENT` / `BDM_DEFAULT_FEE_PERCENT` / `bdmPercentOr()` — 5% and
   10% for a budget that has never been touched. ⚠️ **A fallback for ABSENT, not for
   zero**: Proper Corn's fee genuinely is 0% and must come back as 0%, so this tests
@@ -938,25 +935,6 @@ never touch `db:crew`.
   text), rate and VAT, then fills days from Production, and sets `lineType:'crew'`.
   Unlinking keeps everything the line already holds — it is "stop tracking this person",
   not "throw the content away" — [Budget (B-1), Crew]
-- ⚠️ **Phase AY-b split that function in two — `bdmAttachCrewToLine()` and
-  `bdmCopyCrewToLine()`** — because AY-b needs the halves separately, and duplicating
-  either is how two ideas of "linking" start to drift apart. There is now exactly one
-  implementation of each, and three callers:
-
-  | caller | attach | copy | why |
-  |---|---|---|---|
-  | `bdmLinkLineToCrew()` — the picker | ✓ | ✓ | AY-a's behaviour, unchanged |
-  | `confirmBdmGenerate()` — bulk generation | ✓ | ✓ | a generated line IS a fresh copy |
-  | `bdmFinishAcceptCandidate()` — candidate accept | ✓ | ✗ | the copy runs the OTHER way |
-
-  - `bdmAttachCrewToLine(l, c)` — the POINTER only: `crewId`, the `name` mirror, and
-    `lineType:'crew'`. **It touches no figure.**
-  - `bdmCopyCrewToLine(rec, l, c, p)` — attach, then THE COPY: position→item, rate,
-    VAT, and days from Production. Returns whether the days mapped.
-  - ⚠️ **The accept path is why the attach half has to exist on its own.** Running the
-    copy there would refill the days from a Production assignment a person created five
-    seconds ago has not got, **silently zeroing a line budgeted at six days**. See
-    **Accepting a candidate** below — [Budget (B-1), Crew]
 - `bdmCrewPickerHTML()` / `bdmFillCrewPicker()` — the per-line picker over the whole
   crew database (not just this project's roster — a budget routinely books someone who
   isn't on the Production crew yet, and picking them is how they get there). Built on
@@ -1279,178 +1257,11 @@ the live linking tests.
 | 375px | ✓ `scrollWidth === clientWidth` (375 === 375) on Budget, Overview and Crew — no page-level overflow; the wide line table scrolls inside its own `.tablewrap` (1636px table in a 926px wrap) |
 | **render cost, measured like-for-like against HEAD on the same machine and session** | pre-AY-a **239ms** median / 378KB → AY-a **303ms** / 471KB. **+27%**, the genuine cost of two extra columns per row. The eager picker measured **~1,207ms / 979KB** in the same session — see `bdmFillCrewPicker()` for why it is lazy |
 
-⚠️ **Not done in AY-a, deliberately:** bulk generation of budget lines from the
-Production crew and the candidate review screen — **both are now built, in AY-b, below.**
+⚠️ **Not done, deliberately, and not to be inferred as missing:** bulk generation of
+budget lines from the Production crew and the candidate review screen are **AY-b**.
 Burn-in on database deletion, the Line Items / Top Sheets restructure, presentation
 override layers, pre-production and post views, and any change to the VAT basis or to
 an existing budget calculation were all out of scope and none was touched.
-
-### Bulk generation and candidate review (Phase AY-b)
-
-The two things AY-a left. Both sit on AY-a's functions rather than beside them — see
-the attach/copy table under **Crew linking** above, which is the split that made it
-possible for the accept path to link a line without moving a figure on it.
-
-#### Defaulting section and code from a department
-
-- `bdmMatchKey()` / `bdmMatchScore()` / `bdmBestMatch()` / `bdmCodeForDepartment()` /
-  `bdmSectionForDepartment()` — ⚠️ **there is NO department→code table in this app and
-  AY-b does not add one.** Both answers are derived by matching the person's DEPARTMENT
-  against text that already exists and is already user-editable: the **label of a code**
-  in `db:budget_settings` ("Cinematography", "Vanities", "Catering & travel") and the
-  **name of a section** on this budget ("Grip", "Set / Venue", "Travel").
-  - ⚠️ **Section and code are resolved INDEPENDENTLY and are allowed to disagree.** They
-    routinely do on a real sheet — ROW carries a Production Coordinator in the
-    Production section coded SET. AY-b makes no attempt to reconcile them; both are
-    DEFAULTS, both are shown in the preview before anything is written, and recoding
-    afterwards is the normal way this screen is used, not a correction.
-  - The one place they meet is a FALLBACK, in each direction: a section that can't be
-    found by name is looked up by the `expectedCode` the department resolved to, and a
-    department that matches no code (Client, Other) takes the code its section declares
-    — the same fallback `addBudgetDemoLine()` already uses. That is reading a section's
-    own declared code, not inventing a mapping.
-  - ⚠️ `bdmMatchScore()`'s prefix test is on **whole words**, and that is not fussiness:
-    measured against ROW's real items, a character-prefix test read "Painters Ladder" as
-    the role "PA" and offered a stepladder as a production assistant — [Budget (B-1)]
-
-#### Part 1 — generate lines from the project's crew
-
-- `bdmGen` / `bdmGeneratePlanRows()` / `openBdmGenerateDialog()` /
-  `bdmGenerateDialogHTML()` / `toggleBdmGenRow()` / `setBdmGenAll()` /
-  `bdmGenRefreshCount()` / `confirmBdmGenerate()` — one line per person on `p.crewIds`.
-  - ⚠️ **NOTHING IS WRITTEN UNTIL THE PREVIEW IS CONFIRMED.** `confirmBdmGenerate()` is
-    the only write in Part 1; everything before it is read-only and safe to cancel. A
-    `confirm()` was not an option: it cannot say "these three have no rate on file and
-    this one's days can't be mapped".
-  - ⚠️ **NO DUPLICATES, EVER.** Anyone already carried by a line on this budget is
-    absent from the plan, not unticked — and the guard is re-tested against the record
-    as it stands at confirm time, in case the picker linked somebody while the dialog
-    was open.
-  - The two flagged cases are **shown, not fixed**: no rate on the crew record (the line
-    is created at £0 and the rate is typed on it) and days that can't be mapped because
-    the section is on the post phaseSet (buckets left at zero, line wears ⚠). Neither is
-    silently zeroed and neither is excluded — the user decides with both figures visible.
-  - Generated lines are **spliced in after the last line of their own section**, not
-    pushed at the end of the record.
-  - `bdmGen` is held **outside the DOM** for the reason `aiScanDraftText` documents; a
-    tick must not be lost to a re-render — [Budget (B-1), Crew, Shoot Days]
-
-#### Part 2 — the candidate review screen
-
-- `bdmCanonicalRoles()` / `bdmRoleMatchFor()` / `BDM_COMPANY_TOKENS` /
-  `bdmNameLooksPersonal()` / `bdmExistingCrewByName()` / `bdmCandidates()` — the scan.
-  ⚠️ **It reads ALL 82 lines, not the 50 typed `crew`.** A freelancer invoicing through
-  their own company sits on a service line, and that is the person most likely to be
-  missing from the database. Already-linked lines are not candidates — there is nothing
-  to suggest.
-  - Three signals, combined, each reported on the row that fired it: the **item** is (or
-    is close to) a saved canonical role; the **name** reads as a person; the line has
-    **days and a rate** rather than a bare quantity.
-  - ⚠️ **The name test is a GATE, not a third vote.** The brief's Ltd/Limited/LLP/&/
-    Hire/Rentals/Services are decisive on real data, not suggestive: "Prevent Security"
-    against the item "Security" scores a role match AND has a rate. Four rejections,
-    all documented on `bdmNameLooksPersonal()`: a company token; the name IS the item
-    ("ORGAN FACTORY"/"ORGAN FACTORY"); the name overlaps the item ("Greenkit"/"Greenkit
-    Rental"); the name is a section or a code on this very budget ("SET", "Travel").
-  - ⚠️ **Deliberately NOT tested: how many words the name has.** Sid, Sam, Jojo, Amrita,
-    Hana, Isha and Brian are all one word and all real people on ROW; Beazley and
-    Greenkit are one word and neither is. A word count cannot tell them apart.
-  - ⚠️ **A crew line needs the gate plus one more signal; a SERVICE line needs the gate
-    alone.** A service line carries a bare quantity by definition, so the DAYS signal
-    can never fire on one — requiring two there would systematically exclude exactly the
-    population Part 2 exists to find. Measured on ROW it is the difference between
-    finding one such person and three. The price is a few suppliers in the list, which
-    is why that group is **separate, collapsed and labelled less likely** rather than
-    filtered harder.
-- `bdmCandidatesOpen` / `bdmCandidateServiceOpen` / `toggleBdmCandidates()` /
-  `toggleBdmCandidateService()` / `bdmCandidatesPanelHTML()` / `bdmCandidatesTableHTML()`
-  / `bdmCandidateRowHTML()` — the panel, rendered into the Budget screen body rather
-  than `#globalOverlay`: accepting a row opens a dialog, and a dialog on top of a dialog
-  is not a review screen. ⚠️ **The SCAN runs on every render** (its count is the whole
-  affordance) but the **panel only builds when open** — 5.3ms vs ~60ms.
-- `dismissBdmCandidate()` / `restoreBdmCandidates()` — ⚠️ **dismissals PERSIST**, as
-  `rec.dismissedCandidates` in `budget:<projectId>`, normalised in
-  `bdmNormalizeRecord()` the same "normalise on read, land on next save" way `lineType`
-  is. A suggestion that has been considered and rejected must not come back every visit.
-  Stored as line ids, so a dismissed line that is later deleted stops matching anything.
-  "Show them again" clears the list — [Budget (B-1)]
-
-#### Accepting a candidate
-
-- `bdmAcceptCandidate()` / `bdmFinishAcceptCandidate()` — ⚠️ **ACCEPTING MUST NOT MOVE A
-  FIGURE ON THE LINE.** The copy runs the OPPOSITE way here: the LINE's rate becomes the
-  new crew record's rate, and its VAT becomes their VAT status. Two endings:
-  - **already in the database** (the name is exactly one existing record's) — LINK, and
-    nothing else. ⚠️ This branch is not in the brief and is not optional: **27 of ROW's
-    82 lines name somebody already in `db:crew`**, and by the brief's definition they
-    are all candidates because none is linked. Creating from them would have made a
-    second Matt Wells. No copy runs in either direction — the line keeps its rate, the
-    person keeps theirs, and the ≠ marker says so if they differ, which is what that
-    marker is for. Exact, trimmed, case-insensitive only; where two records share a name
-    it deliberately falls back to the create flow rather than guessing.
-  - **not in the database** — the add-person dialog in `'accept'` mode. ⚠️ **Phase R
-    forbids free-text roles, so the line's `item` string is NEVER written to `c.role`.**
-    An exact role match pre-selects the department and role; anything less leaves the
-    picker empty and the record cannot be created until one is chosen.
-  - ⚠️ Both endings finish through `bdmAttachCrewToLine()`, **not** `bdmCopyCrewToLine()`
-    — see the attach/copy table above for what the copy would have destroyed.
-- `bdmAddPerson` gained `mode` (`'link'` | `'accept'`) and `seed` — ⚠️ **a second MODE,
-  not a second dialog**: both flows ask for exactly the same three things, and only the
-  hint text, the button label and the last three lines of `confirmBdmAddPerson()`
-  differ. `addNewCrewFromProposal()` gained an optional 5th argument, `extra`, so the
-  record is still created in ONE write through AY-a's one commit path — the rate and VAT
-  seeded from the line land with it, which is why the ≠ marker has nothing to report the
-  moment the record exists. Its other three callers pass nothing and are unchanged —
-  [Budget (B-1), Crew]
-
-### Verified (Phase AY-b), driven through the live page against the real Supabase
-
-**Backups taken before any write**: `db:crew_backup_pre_AYb_2026-08-08` (88 records),
-`db:projects_backup_pre_AYb_2026-08-08` (4), `backup:budget_row_pre_AYb_2026-08-08` —
-each verified byte-identical to its source with the source's `updated_at` unmoved.
-
-⚠️ **Every write test ran on a SCRATCH PROJECT** (`ayb-scratch-project`), whose crew
-were five **existing** `db:crew` records chosen to cover the awkward cases — a rate on
-file and none, VAT registered and not, a Client department that matches no code, a Post
-Production person on a shoot day so the ⚠ unmappable case was real. **ROW's budget key
-was never written**; its `updated_at` is unmoved.
-
-| check | result |
-|---|---|
-| inline script extracts and parses | ✓ `node --check` clean |
-| CSS brace balance | ✓ 495 open / 495 close (was 480 at AY-a; AY-b added 15 pairs) |
-| orphan sweep over all 33 new identifiers | ✓ every one has a call site outside its own definition |
-| new CSS classes | ✓ all 13 have both a rule and a render site |
-| **ROW 2026 totals, Inc. VAT** | ✓ **£318,668.31 / £31,866.83 / £350,535.14**, VAT £26,354.20 |
-| all eight department codes | ✓ SET £96,996.90 / PROD £64,829.10 / CIN £45,355.35 / CAT/TRA £33,425.34 / GRIP £24,987.69 / EQUIP £23,520.42 / AUD £16,419.06 / HMU £13,134.45 — unchanged |
-| Ex. VAT basis | ✓ £291,178.58 / £29,117.86 / £320,296.44, VAT £26,354.20 — exactly AY-a's figures |
-| **Proper Corn** | ✓ **£22,778.28** / £0.00 / £22,778.28, VAT £1,015.60 — unchanged |
-| LMAOF, Fashion Files | ✓ £0.00, no candidates, no errors |
-| **`db:crew` at the end of the session** | ✓ **88 records, md5 `1bab00732d024117b36ca2d3134318ec`** — byte-identical to the pre-session backup AND to `db:crew_backup_pre_AY_2026-08-08`. 88 → 90 during the accept tests (two deliberate creations), then restored |
-| `db:projects` / `db:shootdays` at the end | ✓ both byte-identical to their session-start values; scratch project and its 3 shoot days gone |
-| **generation plan, all five fixture people** | ✓ Cinematography→Cinematography/CIN, Production→Production/PROD, **Client→Production/PROD (no code match, falls back to the section's own code)**, **Post Production→Post-production/POST flagged ⚠ 1 unmapped**, three flagged "no rate on file" |
-| **nothing is written until confirm** | ✓ opening and cancelling the dialog left 0 lines; unticking one person created 4 of 5 |
-| **the copy is AY-a's copy** | ✓ item←position, rate 800/700 via `resolveCrewRate()`, VAT 0.2 only for the registered person, days Shoot 3/3/1 from Production, `lineType:'crew'` |
-| **unmappable days are not guessed** | ✓ the post-section line's `days` is `{}`, not `{Shoot:1}`, and the line wears ⚠ |
-| **no duplicates** | ✓ reopening the dialog offered only the one person left unticked |
-| lines land in their own section | ✓ array order `sc-cam, sc-shoot, sc-shoot, sc-post` |
-| **candidate scan on ROW's real 82 lines** | ✓ 41 crew-typed + 10 service-typed; **31 lines rejected by the name gate**, each with its reason; the 4 the brief names (Greenkit, Organ Factory, Travel Buyout, Per Diems) all rejected or in the collapsed group |
-| service group starts collapsed | ✓ "▸ ON SERVICE LINES — LESS LIKELY (10)" |
-| **accept an existing person → figures must not move** | ✓ Heather Bradley: crew rate £250 vs line rate £300, 0 shoot days vs the line's 4. After Link: **rate still 300, days still `{Shoot:4}`, total still £1,260.00, subtotal still £18,874.80**, crew record untouched, roster untouched, count still 88 |
-| **accept a new person, exact role match** | ✓ role picker pre-selected **Grip / Gaffer** from the item text; record created with `role:'Gaffer'`, `roles:['Grip/Gaffer']`, `rate:'668'`, `vatRegistered:'Yes'` — all seeded FROM the line; **line rate/days/VAT/total unchanged, subtotal unchanged**; no ≠ marker |
-| **accept a new person, NO exact match** | ✓ nothing pre-selected; confirming refused ("Pick a department."), no record created; after choosing **Grip / Rigger** the record carries `role:'Rigger'` — **NOT the line's item text "Spark Load"**, and `ROLES_BY_DEPT` was not polluted with it |
-| dismissal persists | ✓ stored as `dismissedCandidates` in `budget:<projectId>`, still dismissed after a full reload; "1 dismissed on this budget / Show them again" |
-| **render cost, measured like-for-like against HEAD in the same session** | HEAD **216–238ms** median → AY-b **229ms**, panel closed. **Inside the noise.** The scan itself is **5.3ms**; opening the panel costs ~60ms and both groups ~110ms while on screen, which is opt-in |
-| eager picker rule still held | ✓ neither new screen builds a `<select>` per row |
-| 375px | ✓ `scrollWidth === clientWidth` (375 === 375) with the panel open, both groups expanded, and with the preview dialog open (343px box) |
-| window errors | ✓ zero, across all four projects |
-
-⚠️ **One artefact left behind, deliberately declared:** the key
-`budget:ayb-scratch-project` still exists in `app_data` — the publishable key's policy
-allows the DELETE statement but matches no rows, so it could not be removed from here.
-It has been **blanked** (no sections, no lines) and is inert: `bdmEnsureLoaded()` is
-only ever called with the id of a project that exists in `db:projects`, and that project
-is gone. Delete it from the Supabase dashboard when convenient.
 
 ## Preview & Export
 
@@ -1695,9 +1506,7 @@ keys and for SECTIONS vs CODES, and **Sidebar & navigation — VIEWS** for the a
 | B-1.5 | · Line detail | Collapsible section per group, one editable row per line, carrying all four information-only markers: ⚑ miscode, ≠ rate drift, ↻ day drift and ⚠ unmappable days. Phase AY-a added the **Type** (Crew/Service) and **OT** columns, renamed Days to **Days / Qty**, and put a crew picker in the Name cell | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
 | B-1.6 | · Add section | Phase AV — name + expected code + phase set. The minimum that stops an empty budget being a dead end | `addBudgetDemoSection()` |
 | B-1.7 | · Crew link on a line | Phase AY-a — optional per-line picker over the whole crew database, plus "+ Add new person…". Linking copies name, position→item, rate and VAT and fills days from Production; the link stays optional forever for supplier/venue/buyout lines | `bdmCrewPickerHTML()` / `bdmLinkLineToCrew()` |
-| B-1.8 | · Add a person from the Budget | Phase AY-a — Name / Department / Role dialog. Creates the crew record AND adds them to the project's Production crew, through the existing `addNewCrewFromProposal()` commit path. Phase AY-b gave it a second **mode** (`'accept'`) rather than a second dialog — same three fields, different ending | `bdmAddPersonDialogHTML()` / `confirmBdmAddPerson()` |
-| B-1.9 | · Generate lines from crew | Phase AY-b — one line per person on the project's Production crew, through a **mandatory tick-able preview**: name, role, department, the section and code the line would take, rate and days, with "no rate on file" and "⚠ n unmapped" shown rather than silently zeroed. Anyone already carried by a line is absent from the plan. Nothing is written until confirm | `openBdmGenerateDialog()` / `confirmBdmGenerate()` |
-| B-1.10 | · Suggested crew | Phase AY-b — unlinked lines across **all** 82 that read as a person, crew-typed expanded and service-typed in a separate collapsed "less likely" group, each row saying which signals fired. Per-row accept/dismiss, dismissals persisted in `budget:<projectId>`. Accepting links (or creates through the canonical role picker) and **never changes what the line costs** | `bdmCandidatesPanelHTML()` / `bdmAcceptCandidate()` |
+| B-1.8 | · Add a person from the Budget | Phase AY-a — Name / Department / Role dialog. Creates the crew record AND adds them to the project's Production crew, through the existing `addNewCrewFromProposal()` commit path | `bdmAddPersonDialogHTML()` / `confirmBdmAddPerson()` |
 
 ## S — Settings
 
