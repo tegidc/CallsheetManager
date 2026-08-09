@@ -495,7 +495,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   spells out how much of it is travel. Per Department is the view AO extended Itemize
   VAT into (see **VAT follows the person** above) — [Budget, Crew]
 
-## Budget (B-1) — the line-item budget
+## Budget (demo) — the line-item budget
 
 ⚠️ **This is NOT the Budget tab (T-6).** T-6 is cost visibility only, rolled up from
 data entered on other tabs. This is **B-1**, a separate screen reached from the side
@@ -505,263 +505,121 @@ everything here is named `budgetDemo*` / `bdm*` precisely so it cannot collide w
 T-6's `budget*` family. The one thing it *does* reuse is `budgetFmt()`, the app's one
 money formatter.
 
-⚠️ **The "Demo" in `budgetDemo*` is HISTORICAL.** Phase AU built this as a demo;
-**Phase AV gave it real storage** and it is no longer one. The names were kept rather
-than churned through forty call sites — the thing they protect against (a collision
-with T-6) is unchanged. Do not read `budgetDemo` as "this is throwaway".
-
-⚠️ **The AU note that this screen touches no database is SUPERSEDED.** It writes,
-through the app's existing `loadDB`/`saveDB` choke point and the same `app_data`
-key/value table `db:crew` uses. Do not reinstate "persistence is a separate
-decision" — it was decided, in AV.
-
-### The three keys (Phase AV)
-
-| key | shape | what |
-|---|---|---|
-| `db:budget_settings` | object, ONE shared record | `codes` / `phaseSets` / `bbcRules` / `bbcCats` — not per project |
-| `budget:<projectId>` | object, ONE per project | `{floatPercent, feePercent, sections[], lines[]}` |
-
-- `BUDGET_KEY_PREFIX` / `isBudgetKey()` / `isObjDB()` — `budget:<projectId>` is the
-  first key family whose members are **not known ahead of time**, so `isObjDB()` is no
-  longer a flat `includes` on `DB_OBJECT_KEYS` alone; it also matches the prefix. Both
-  new keys are object-shaped, so a missing/errored read falls back to `{}` not `[]` —
-  [Shared/utility functions, Budget (B-1)]
-- `dbKeyLabel()` (**replaces the inline `DB_KEY_LABELS[f.key] || f.key`** in
-  `renderSaveFailureBanner()`) — there is one `budget:` key per project, so they can't
-  be listed in `DB_KEY_LABELS`; this names the project instead of printing a raw key
-  at the user — [Shared/utility functions]
-- `applyMergedDB()` gained two branches. The budget keys live in their own caches
-  (`bdmSettings`, `bdmRecords`) rather than one of the four top-level arrays, so
-  without them an R18 merge would land in the database while this tab kept rendering
-  the pre-merge copy — [Shared/utility functions]
-- `initApp()` loads `db:budget_settings` ONLY, and seeds it from
-  `BDM_SETTINGS_DEFAULTS` on first run — the same seed-if-empty idiom
-  `travelMethodsList` already uses. ⚠️ **The per-project `budget:` records are
-  deliberately NOT loaded here**: there is one per project and startup already makes
-  ten sequential round trips. `bdmEnsureLoaded()` fetches the one the screen needs —
-  [Shared/utility functions]
-
-### SECTIONS vs CODES — the AV split, and the point of the phase
-
-AU had one axis: a line's code was both where it displayed and what it counted under.
-**AV splits them, because on a real budget they routinely disagree.**
-
-- `section` — **where the line DISPLAYS.** A named bucket on the project record:
-  `{id, name, expectedCode, phaseSet}`. `phaseSet` is `"shoot"` or `"post"` and names
-  one of the sets in `db:budget_settings`.
-- `code` — **what the line COUNTS UNDER** on the top sheet. Frequently differs from its
-  section's `expectedCode`, **and that is intentional, not an error to be fixed.**
-
-So in the Departments lens the **line detail groups by section** while the **top sheet
-totals by code**, and the two need not match row-for-row: a camera operator carried in
-the Travel section still counts as Cinematography. Both lenses still reach the same
-subtotal, because every line is counted exactly once on whichever axis you read it.
-⚠️ **Verified numerically on a deliberately-disagreeing dataset** — see the table below.
-
-### COPY NOT LOOKUP — do not "fix" this into a live lookup
-
-A line may carry `crewId`, a pointer at a crew record; most lines are suppliers or
-locations and carry `null`.
-
-⚠️ **Rate and VAT status are COPIED at the moment of linking and NEVER re-read into an
-existing line**, automatically or otherwise. A crew member putting their day rate up
-must not silently rewrite a budget that was signed off six months ago. Where a linked
-line's stored rate no longer matches the crew record's current rate, the line shows a
-small marker whose tooltip says what the crew rate is now — **no auto-update, no
-prompt, no bulk action**. That comparison (`bdmRateDriftFlag()`) is the **only** read
-of `crewDB` anywhere in this section, and nothing here writes to it.
-
-⚠️ **There is no linking UI yet** — `crewId` only ever arrives from seed data. AV
-deliberately did not build one ("adding crew from within the budget view" is out of
-scope); the rule above is what a future linking action must obey.
-
-### Functions
+⚠️ **It touches no database.** There is no `saveDB`/`loadDB` call and no Supabase
+read or write anywhere in this section. The data is `BUDGET_DEMO_DATA`, a plain
+constant; `budgetDemoInit()` takes ONE deep copy into `budgetDemoProjects` and every
+edit mutates that copy. Edits therefore survive lens switches, project switches and
+navigating away and back — and are gone on reload. **Persistence is a separate
+decision.** Do not wire this to a `db:*` key without one.
 
 - `goBudgetDemo()` — **the one sidebar route that does not clear `currentProjectId`.**
   `goDatabase()`/`goSettings()` both null it because they go to project-independent
   screens; this is a different view *of* a project, so the project you were in stays
   open behind it. `renderSide()` was widened to keep the open project highlighted on
-  `route.screen==='budget'` for the same reason — [Shared/utility functions, Budget (B-1)]
+  `route.screen==='budget'` for the same reason — [Shared/utility functions, Budget (demo)]
 - `renderBudgetDemo()` — the screen: `.page-head`, the project selector + Float %/Fee %
-  row + save-status flash, the lens `.tabs`, the Top sheet section, then the Line detail
-  sections and the add-section row. ⚠️ Paints a **loading shell** and re-renders when
-  `bdmEnsureLoaded()` resolves, because the record arrives on demand — [Budget (B-1)]
-- `BDM_SETTINGS_DEFAULTS` — the shared record's starting content: the ten codes, the
-  two named phase sets, the ordered BBC rules table, the 17 A–Q categories. ⚠️ Seeded
-  ONCE into `db:budget_settings`; from then on the **stored** record is the source of
-  truth and these defaults are never consulted again, which is what makes editing them
-  a later phase rather than a code change — [Budget (B-1)]
-- `bdmNormalizeSettings()` / `bdmNormalizeRecord()` — everything downstream reads these
-  shapes without defending itself, so a record off the wire (or out of
-  `budget-seed-row.json`) is put into shape once, here — [Budget (B-1)]
-- `BDM_DEFAULT_FLOAT_PERCENT` / `BDM_DEFAULT_FEE_PERCENT` / `bdmPercentOr()` — 5% and
-  10% for a budget that has never been touched. ⚠️ **A fallback for ABSENT, not for
-  zero**: Proper Corn's fee genuinely is 0% and must come back as 0%, so this tests
-  `null`/`undefined`/`''` rather than falsiness. The same helper is what lets a LINE
-  store a float of 0 without falling through to the project's — [Budget (B-1)]
-- `bdmProjectList()` / `bdmProjectName()` / `bdmCurrentProjectId()` — the selector now
-  offers the **real projects** from `projectsDB`, plus Proper Corn. Defaults to the
-  project you already have open, since `goBudgetDemo()` is the one sidebar route that
-  keeps `currentProjectId` — [Budget (B-1)]
-- `bdmEnsureLoaded(projectId)` — the on-demand load, one key. ⚠️ **A second call while
-  the first is in flight gets THE SAME PROMISE, never a null.** `renderBudgetDemo()`
-  paints a loading shell and re-renders when this resolves, so returning an
-  already-settled null to the second caller made it re-render immediately, re-enter
-  with the record still absent, and spin — **a hard hang of the whole tab**, on nothing
-  more exotic than a slow read plus any re-render landing in the same window (which
-  `applyMergedDB()` does on its own after a merge). Caught in AV testing; do not
-  "simplify" the in-flight promise back into a boolean — [Budget (B-1)]
-- `bdmTouch()` / `bdmSaveNow()` — autosave on edit, debounced through the app's
-  existing `scheduleAutosave()` and reported through `flashSaveResult('bdmStatus', …)`,
-  the same indicator every other autosaving field uses. ⚠️ **Keyed per project and it
-  writes ONE key** — a budget edit must never rewrite every project's budget — [Budget (B-1)]
-- `bdmPhaseSet()` / `bdmGroupPhases()` — **phase buckets are per SECTION, not global.**
-  Shoot sections get PreProd/Shoot/Strike/Buyout; post gets PreProd/Assembly/PreV1/V1
-  Feedback/PreV2/V2 Feedback/Delivery/Buyout. `bdmGroupPhases()` exists for the BBC
-  lens, where a category can collect lines from sections with different sets — it
-  unions them, first set wins on order — [Budget (B-1)]
-- `bdmLineFloatPercent()` / `budgetDemoLineMath()` / `budgetDemoTotals()` — **every
-  calculated field, in one place, never stored.** `daysTotal` = sum of the phase
-  buckets, `total` = rate × daysTotal, `vat` = total × vatRate, `float` = total ×
-  **the line's own** float %, `totalWithFloat` = total + float. ⚠️ **Float is per LINE**
-  — a section or code total already includes it. ⚠️ **The production fee is calculated
-  on the float-INCLUSIVE subtotal**, deliberately. ⚠️ **VAT is excluded from every
-  percentage and from the grand total** and shown in its own column — [Budget (B-1)]
-- `budgetDemoBbcCategory(rec, l)` — ⚠️ **now data-driven, not a `switch`.** It walks the
-  ordered `bbcRules` table in `db:budget_settings` and the **first match wins**. A rule
-  matches when its `code` equals the line's code, its `phase` is `any` or equals the
-  **phaseSet of the section the line sits in**, and its `match` is empty or one of its
-  comma-separated terms appears in the line's **ITEM text**.
-  - ⚠️ **`match` is tested against the item ONLY, never the name.** Every term in the
-    table is a job or a thing ("Producer", "Kit", "Crypt"); matching the name too would
-    route "Hear More Audio Kit Ltd" on the strength of its company name.
-  - ⚠️ **Insurance/Risk is now a PROD rule sitting BELOW the Producer/Exec/Director
-    rule.** In AU it was a cross-cutting rule tested before everything. It is not that
-    any more — this is the table as specified in AV, and first-match-wins is the whole
-    contract. Do not re-promote it.
-  - `bbcOverride` still beats the whole table — [Budget (B-1)]
-- `bdmMiscodeFlag()` / `bdmRateDriftFlag()` — **the two information-only markers.**
-  Neither changes a value and neither excludes a line from any total. ⚑ = the line's
-  code differs from its section's expectedCode, tooltip "Coded CIN, sits in Travel".
-  ≠ = a crew-linked line whose stored rate differs, tooltip "Crew rate is now £X" —
-  [Budget (B-1), Crew]
-- `budgetDemoGroups()` — Departments lens groups by **section** and totals
-  `totalWithFloat`; BBC lens groups by derived category and totals `total` **ex-float**,
-  because in that lens the float is pooled into P and must not also be spread through
-  the categories. A line whose section id doesn't resolve gets a "Not in a section"
-  bucket rather than being invisible in the line detail while still counting on the top
-  sheet — [Budget (B-1)]
-- `budgetDemoTopSheetRows()` — ⚠️ **the Departments lens totals by CODE, not by
-  section.** A code carried by a line but absent from the settings list still gets a
-  row. BBC shows all 17 A–Q in order **including the empty ones at £0**, labelled
-  "— no lines" rather than hidden. Q renders below the subtotal because that is both
-  its ordered position and where the fee actually applies — [Budget (B-1)]
-- `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` — top sheet and line detail.
-  Sections collapse through `deptHeaderHTML()` + a re-render, the same idiom as the
-  Crew list's department groups (**not** `applyBlockState`, whose keys are a fixed set
-  and these are not), with the shared `expandCollapseAllHTML()` above them. AV added a
-  **Section** column and a **Float %** column to the line row — [Budget (B-1), Shared/utility functions]
+  row, the lens `.tabs`, the Top sheet section, then the Line detail sections — [Budget (demo)]
+- `BUDGET_DEMO_DATA` / `budgetDemoProjects` / `budgetDemoInit()` /
+  `currentBudgetDemoProject()` / `budgetDemoProjectId` / `setBudgetDemoProject()` —
+  the two demo projects and the in-memory working copy. The project selector is a
+  **placeholder**: it switches between those two and does nothing else — [Budget (demo)]
+- `BUDGET_DEMO_SHOOT_PHASES` / `BUDGET_DEMO_POST_PHASES` / `budgetDemoPhases()` /
+  `budgetDemoGroupPhases()` — **phase buckets are per section, not global.** A project
+  carries `phaseSets` keyed by code with a `default` fallback, so a third set is a data
+  edit rather than a code change. Shoot sections get PreProd/Shoot/Strike/Buyout; POST
+  gets PreProd/Assembly/PreV1/V1 Feedback/PreV2/V2 Feedback/Delivery/Buyout.
+  `budgetDemoGroupPhases()` exists for the BBC lens, where a category could in
+  principle collect codes with different sets — it unions them, first set wins on
+  order. On the real data it always returns exactly one set — [Budget (demo)]
+- `budgetDemoLineMath()` / `budgetDemoTotals()` — **every calculated field, in one
+  place, never stored.** `daysTotal` = sum of the phase buckets, `total` = rate ×
+  daysTotal, `vat` = total × vatRate, `float` = total × floatPercent, `totalWithFloat`
+  = total + float. ⚠️ **Float is per LINE, not one bottom-line row** — a department
+  total already includes it. ⚠️ **The production fee is calculated on the
+  float-INCLUSIVE subtotal**, deliberately. ⚠️ **VAT is excluded from every percentage
+  and from the grand total** and shown in its own column — [Budget (demo)]
+- `budgetDemoBbcCategory()` — the BBC lens's only real logic. Order matters:
+  `bbcOverride` wins over everything; then the cross-cutting Insurance / Risk
+  Assessment rule (→ N), which applies whatever the code says, which is why it is
+  tested *before* the per-code rules rather than inside PROD's; then the per-code
+  rules. Float shows as P and the fee as Q — neither ever holds a line — [Budget (demo)]
+- `BUDGET_DEMO_BBC_CATEGORIES` / `budgetDemoTopSheetRows()` — the BBC lens shows **all
+  17 categories A–Q in order, including the empty ones at £0**, labelled "— no lines"
+  rather than hidden. On the demo data that is A, B, E, K, M and O for IRL London.
+  Q renders below the subtotal because that is both its ordered position and where the
+  fee actually applies — [Budget (demo)]
+- `budgetDemoGroups()` — **the lines never change, only the bucket they are read in.**
+  Departments lens groups by `code` and totals `totalWithFloat`; BBC lens groups by
+  derived category and totals `total` **ex-float**, because in that lens the float is
+  pooled into P and must not also be spread through the categories. Both give the same
+  subtotal — verified below — [Budget (demo)]
+- `budgetDemoTopSheetHTML()` / `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()`
+  — top sheet and line detail. Sections collapse through `deptHeaderHTML()` +
+  a re-render, the same idiom as the Crew list's department groups (not
+  `applyBlockState`, whose keys are a fixed set and these are not), with the shared
+  `expandCollapseAllHTML()` above them — [Budget (demo), Shared/utility functions]
   - ⚠️ **Deliberately NOT Phase AT's `collapsibleSectionHTML()`**, nor the
     `applyBlockState`/`toggleBlock` plumbing under it. That idiom is built on a `state`
     object whose keys are a small FIXED set of section names, toggled by direct DOM
     updates instead of a re-render. These sections are neither: the key set is derived
-    from the data, and it changes completely when you switch lens (sections ↔ BBC
-    letters) or project — [Budget (B-1), Shared/utility functions]
-- `setBudgetDemoRate()` / `setBudgetDemoDay()` / `setBudgetDemoLineFloat()` /
-  `setBudgetDemoPercent()` / `refreshBudgetDemoNumbers()` — **the live-recalculation
-  path.** These update the model on `oninput`, schedule the save, and then rewrite only
-  the *derived* text through `refreshBudgetDemoNumbers()`, touching no input — the same
-  targeted-refresh rule as `renderCateringSummaryGridSection()`, for the reason
-  `aiScanDraftText` documents — [Budget (B-1)]
-  - ⚠️ `setBudgetDemoLineFloat()`: an **empty** field means "follow the project"; a
-    typed **0** means "no float on this line" and is stored as 0. Those are different
-    and both are legitimate — real lines carry zero float — [Budget (B-1)]
+    from the data, and it changes completely when you switch lens (codes ↔ BBC letters)
+    or project. `deptHeaderHTML()` + a re-render is the app's other, equally canonical
+    collapse pattern and is the one built for a group list computed from data — the
+    same reason `setAllDeptsCollapsed()` re-renders where `setAllBlocksCollapsed()`
+    doesn't — [Budget (demo), Shared/utility functions]
+- `setBudgetDemoRate()` / `setBudgetDemoDay()` / `setBudgetDemoPercent()` /
+  `refreshBudgetDemoNumbers()` — **the live-recalculation path.** These update the model
+  on `oninput` and then rewrite only the *derived* text through
+  `refreshBudgetDemoNumbers()`, touching no input — the same targeted-refresh rule as
+  `renderCateringSummaryGridSection()`, for the reason `aiScanDraftText` documents: a
+  re-render replaces the panel and blanks whatever is half-typed. Verified: editing a
+  rate updates the line, the section total and the top sheet with focus retained —
+  [Budget (demo)]
 - `setBudgetDemoLineText()` / `setBudgetDemoLineField()` — the other speed. Only an edit
-  that can MOVE a line between groups re-renders: its **section**, its code, its BBC
-  override, or the item text the BBC rules read. Text fields re-render on `onchange`
-  (focus has left), never on `oninput` — [Budget (B-1)]
-- `addBudgetDemoLine()` / `deleteBudgetDemoLine()` — add takes its section from the
-  group it was pressed in and its code from that section's `expectedCode` (in the BBC
-  lens it also sets `bbcOverride` to that category, so the new line stays where you
-  added it). Delete has **no `confirm()`** — one row, autosaved, and the app's undo
-  toast is not wired into this screen — [Budget (B-1)]
-- `setBudgetDemoNewSection()` / `addBudgetDemoSection()` / `deleteBudgetDemoSection()` /
-  `bdmNewSection` — **the minimum needed for a budget that starts empty to be usable at
-  all.** With no sections there is no "+ Add line" anywhere, so LMAOF and Fashion Files
-  would have had a budget that could never be started. Add, and remove-when-empty only;
-  renaming and re-coding a section is a later phase, same as editing the settings
-  tables. `bdmNewSection` is held **outside the DOM** for the reason `aiScanDraftText`
-  documents — `renderMain()` would blank a half-typed name — [Budget (B-1)]
-- `BDM_PROPER_CORN_SEED` / `BDM_PROPER_CORN_ID` — **Proper Corn is kept from AU
-  deliberately**: ROW has no post work, so this is the only project on which the "post"
-  phaseSet is visible at all. It is **not** a project in `projectsDB` — it appears in
-  the Budget screen's selector and nowhere else in the app. Its lines live inline
-  purely as the starting content for its budget record; `bdmEnsureLoaded()` writes them
-  to `budget:bdm-proper-corn-hot-sauce` the first time the record is found absent, and
-  from then on storage is the source of truth and the constant is never read again —
-  [Budget (B-1)]
-- ⚠️ **REMOVED in Phase AV — do not look for these**: `BUDGET_DEMO_DATA` and its
-  **"IRL London 2026"** dataset (dropped entirely), `BUDGET_DEMO_CODE_LABELS`,
-  `BUDGET_DEMO_CODES`, `BUDGET_DEMO_BBC_CATEGORIES`, `BUDGET_DEMO_BBC_LABELS`,
-  `BUDGET_DEMO_SHOOT_PHASES`, `BUDGET_DEMO_POST_PHASES`, `budgetDemoProjects`,
-  `budgetDemoInit()`, `budgetDemoPhases()`, `budgetDemoGroupPhases()`. The four
-  constants became fields of `db:budget_settings`; the rest were replaced by the
-  storage layer above — [Budget (B-1)]
-- `BDM_ROW_SEED_FILE` / `seedRowBudget()` — **the ROW 2026 seed action (S-1.6).**
-  ROW's budget lives in `budget-seed-row.json` **in the repo, not inline in the app
-  source**: it is data, it is long, and once seeded the app is where it is edited. The
-  action reads that file once, resolves the target project by `projectId` (falling back
-  to `projectTitle`), **warns and requires a `confirm()` if that project's budget
-  already has lines** — seeding REPLACES, it does not merge — and writes. After that
-  the file is never read again. It refuses to seed a file with no lines in it —
-  [Budget (B-1), Shared/utility functions]
-- `bdmSettingsTablesHTML()` — **the codes, phase sets and BBC rules, READ ONLY, in
-  Settings (S-1.5).** The point is that the rules can be seen rather than being buried
-  in code. Editing them is a later phase — [Budget (B-1), Shared/utility functions]
+  that can MOVE a line between groups re-renders: its code, its BBC override, or the
+  item/name text the BBC rules read. Text fields re-render on `onchange` (focus has
+  left), never on `oninput` — [Budget (demo)]
+- `addBudgetDemoLine()` / `deleteBudgetDemoLine()` — add takes its code from the section
+  it was pressed in (in the BBC lens it also sets `bbcOverride` to that category, so the
+  new line stays where you added it). Delete has **no `confirm()`** — unlike the app's
+  record deletes this is one row of a demo, in memory, with no undo to integrate — [Budget (demo)]
+- `bdmNum()` / `bdmSlug()` — parse a free-text figure; make a group key safe as a DOM id
+  (`CAT/TRA` carries a slash) — [Budget (demo)]
 - `.main:has(#bdmTopSheet){max-width:1320px}` — ⚠️ **the one screen that opts out of the
   app's 840px reading column.** At 840px the Total / Float / Total+float columns sat off
   the right edge, which are the three you actually read. Scoped by `:has()` on this
   screen's own top sheet — the same selector idiom the field-layout rules already use —
-  so every other screen is untouched. AV's Section and Float % columns pushed the line
-  table's `min-width` from 1080/1340px to 1230/1490px; on a narrower window it scrolls
-  inside its own `.tablewrap`, and at 375px there is **no page-level horizontal
-  overflow** (verified) — [Budget (B-1)]
+  so every other screen is untouched (verified: 840px everywhere else, 1320px here).
+  At 1680px the whole line row fits with no scroll; at 1440px it needs ~70px inside its
+  own `.tablewrap`, and on mobile the table scrolls in its own box with no page-level
+  horizontal overflow — [Budget (demo)]
 - ⚠️ **The field-width rules are qualified with their element on purpose** —
   `input.bdm-rate-input`, not `.bdm-rate-input`. `input[type=text]{width:100%}` is an
   attribute selector at specificity (0,1,1) and beats a bare class (0,1,0), so the
   unqualified version silently collapsed every field to its cell (measured: a £5,000
   rate rendering in 39px, clipped). Same reason `.ts-field input.fld-xs` is written the
-  way it is. Don't "tidy" the element off the front — [Budget (B-1)]
+  way it is. Don't "tidy" the element off the front — [Budget (demo)]
 
-### Verified (Phase AV), driven through the live page against the real Supabase
+**Verified on both demo projects**, driven through the live page with `saveDB()`
+stubbed and the write log empty apart from `openProject()`'s own pre-existing
+`lastOpenedAt` stamp:
 
-| check | result |
-|---|---|
-| `db:crew` untouched — count, every field, byte-for-byte | ✓ 88 records, md5 `8e1989…be28` identical before and after, `updated_at` unmoved |
-| only the ONE project's key is written on a budget edit | ✓ only `budget:bdm-proper-corn-hot-sauce` appeared |
-| Proper Corn survives the AU→AV rewrite unchanged | ✓ subtotal £21,711.90 / fee £0.00 / grand £21,711.90 / VAT £1,015.60 — AU's figures exactly |
-| edit a rate → reload → still there | ✓ 668→700 persisted, subtotal £21,745.50, then restored |
-| both lenses total identically | ✓ sections £21,711.90 = codes £21,711.90 = BBC cats+float £21,711.90 = BBC rows inc. P £21,711.90 |
-| every line in exactly one group, both lenses | ✓ 15 / 15 |
-| **sections and codes deliberately disagreeing still reconcile** | ✓ Camera section £5,985 vs CIN code £8,010, Travel section £9,600 vs CAT/TRA £6,000 — all four axes still £17,378.75 |
-| POST section renders its own 8 phase columns | ✓ PreProd·Assembly·PreV1·V1 Feedback·PreV2·V2 Feedback·Delivery·Buyout |
-| every row of the BBC rules table | ✓ all 15 rules + first-match order + `CIN`/post→L + override + item-only matching (a supplier "Kit House Ltd" does NOT route AUD→H) |
-| miscode marker | ✓ "Coded CIN, sits in Catering & travel"; value, code and every total unchanged; clears when they match |
-| crew rate-drift marker | ✓ absent when equal, "Crew rate is now £800.00" when not; the line's own rate never overwritten by a render |
-| per-line float | ✓ blank follows project (5% → £46.25), stored **0** gives £0.00, stored 12 gives £111.00 |
-| empty state (LMAOF, Fashion Files) | ✓ £0.00 throughout, 5%/10% defaults, add-section row so the budget can be started |
-| seed action | ✓ refuses an empty file; writes; on a second run warns "already has a budget with N lines… will REPLACE", cancel changes nothing, confirm replaces |
-| re-render during an in-flight load | ✓ survives (this is the hang described under `bdmEnsureLoaded()`) |
-| every existing screen still loads | ✓ Welcome, Crew db, Locations db, Settings, T-1…T-7, T-6's four views + VAT toggle + filter, T-2's five grids + filter, B-1 × 4 projects × 2 lenses — no window errors |
-| mobile 375px | ✓ no page-level horizontal overflow; the wide tables scroll inside their own `.tablewrap` |
+| check | IRL London 2026 | Proper Corn Hot Sauce |
+|---|---|---|
+| subtotal == Σ line total + Σ line float | ✓ £92,736.00 | ✓ £21,711.90 |
+| Σ department totals == subtotal | ✓ | ✓ |
+| Σ BBC (A–O) + float == subtotal | ✓ | ✓ |
+| every line in exactly one group, both lenses | ✓ 31 | ✓ 15 |
+| fee == subtotal × fee% | ✓ £9,273.60 (10%) | ✓ £0.00 (**0%**) |
+| grand == subtotal + fee | ✓ £102,009.60 | ✓ £21,711.90 |
+| VAT total == Σ line vat, excluded from grand | ✓ £12,200.00 | ✓ £1,015.60 |
 
-⚠️ **NOT verified, because the data was never supplied:** ROW 2026 London's own budget
-and its three expected totals (subtotal £318,669 / fee £31,867 / total £350,536). The
-AV brief's paste placeholder for the ROW line data was never filled in, so
-`budget-seed-row.json` carries the schema, the target project and the 5%/10%
-percentages but **no sections and no lines**, and the Settings action correctly refuses
-to seed it. Paste the real data into that file and it works with no code change.
+Also exercised live: rate edit (20 × £600 → £12,000 / float £600 / VAT £2,400, focus
+retained), day-bucket edit and clear, VAT 0↔20%, Float % 5→10 (subtotal £97,152),
+Fee % →0 (grand == subtotal), item text moving a line C→E in the BBC lens, a `bbcOverride`
+beating the derived category, add + delete line, per-section and Expand/Collapse-all,
+project switch (POST renders its own 8 phase columns), and mobile at 375px (no page-level
+horizontal overflow — the wide table scrolls inside its own `.tablewrap`).
 
 ## Preview & Export
 
@@ -786,11 +644,6 @@ to seed it. Paste the real data into that file and it works with no code change.
 - `sb` (Supabase client) — the shared Supabase client instance used by every DB read/write — [Shared/utility functions]
 - `loadDB()` / `saveDB()` — the single choke point for reading/writing any app data collection to/from Supabase, keyed by a `db:*` string. **Since Phase AR (G11) `saveDB()` returns a result — `{ok:true}` or `{ok:false, kind, detail}` — and raises the failure banner itself.** The ~80 call sites that ignore the return are still correct; don't add per-call-site error handling (same rule R18 set) — [Shared/utility functions]
 - `DB_OBJECT_KEYS` / `isObjDB()` — which collections are object-shaped rather than arrays of records. Governs exactly ONE thing: the empty value `loadDB()` falls back to on a missing or errored row (`{}` vs `[]`). It does **not** gate merging — `mergeDB()` branches on the runtime shape of what it's handed and `applyMergedDB()` switches on the key by name. `db:roles` was missing from it until Phase AR (**G13**) — [Shared/utility functions]
-  - ⚠️ **Since Phase AV `isObjDB()` is no longer just `DB_OBJECT_KEYS.includes(key)`.**
-    `budget:<projectId>` is the first key family whose members aren't known ahead of
-    time (one per project), so it also matches `BUDGET_KEY_PREFIX`. `dbKeyLabel()`
-    exists for the same reason — the save-failure banner can't look those keys up in
-    `DB_KEY_LABELS`, so it names the project instead. See **Budget (B-1)** — [Shared/utility functions, Budget (B-1)]
 - `saveFailure` / `DB_KEY_LABELS` / `reportSaveFailure()` / `clearSaveFailure()` / `dismissSaveFailure()` / `retrySaveFailure()` / `renderSaveFailureBanner()` (**G11**) — the save-failure surface. See the Phase AR section for the two kinds and why they're two — [Shared/utility functions]
 - `saveInBackground(key, value)` (**G14**, Phase AS) — the render-first save path used by the eleven grid interactions. Calls `saveDB()` WITHOUT awaiting it before the render, and re-renders if the result comes back `{ok:false}`. ⚠️ **This is only safe because G11 exists** — see the Phase AS Commit B section. Never roll back a failed save here — [Shared/utility functions]
 - `initApp()` — bootstraps the app: loads all DB collections into memory and does the first render — [Shared/utility functions]
@@ -968,34 +821,30 @@ coarse information first, finest detail last.
 | D-2.1 | · Location form | Address search, map preview, access/recce/parking notes | `locFormHTML()` |
 | D-2.2 | · Nearest hospital / parking | OpenStreetMap Overpass lookup, saved onto the location | `lookupAmenityForForm()` |
 
-## B — Budget
+## B — Budget (demo)
 
-A different thing from **T-6**. Reached from the side panel, not the project tab
-strip, and it keeps the open project open behind it. **Phase AV gave it real
-storage** — it is no longer a demo, despite the `budgetDemo*` function names. See the
-**Budget (B-1)** section above for the three keys and for SECTIONS vs CODES.
+A DEMO, and a different thing from **T-6**. Reached from the side panel, not the
+project tab strip, and it keeps the open project open behind it. See the
+**Budget (demo)** section above for why, and for the no-database rule.
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
-| **B-1** | **Budget** | Line-item budget: you type the lines, every figure is derived, every edit is saved | `renderBudgetDemo()` |
-| B-1.1 | · Project selector | The real projects from `projectsDB`, plus Proper Corn (which lives only here). Defaults to the project you have open | `bdmProjectList()` / `setBudgetDemoProject()` |
-| B-1.2 | · Float % / Fee % | Project-level, editable, live, autosaved. A line may carry its own float, including 0 | `setBudgetDemoPercent()` |
+| **B-1** | **Budget (demo)** | Line-item budget: you type the lines, every figure is derived | `renderBudgetDemo()` |
+| B-1.1 | · Project selector | Placeholder — switches between the two demo projects, nothing else | `setBudgetDemoProject()` |
+| B-1.2 | · Float % / Fee % | Project-level, editable, live | `setBudgetDemoPercent()` |
 | B-1.3 | · Lens toggle | Departments ↔ BBC. Same lines, different grouping and totalling | `setBudgetDemoLens()` |
-| B-1.4 | · Top sheet | Rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total. ⚠️ Departments totals by CODE, while the line detail below groups by SECTION | `budgetDemoTopSheetHTML()` |
-| B-1.5 | · Line detail | Collapsible section per group, one editable row per line, carrying the ⚑ miscode and ≠ rate-drift markers | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
-| B-1.6 | · Add section | Phase AV — name + expected code + phase set. The minimum that stops an empty budget being a dead end | `addBudgetDemoSection()` |
+| B-1.4 | · Top sheet | Category rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total | `budgetDemoTopSheetHTML()` |
+| B-1.5 | · Line detail | Collapsible section per group, one editable row per line | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
 
 ## S — Settings
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
-| **S-1** | **Settings** | App-wide font and brand colour, plus the budget codes/rules and the ROW seed action, reached from the sidebar | `renderSettings()` |
+| **S-1** | **Settings** | App-wide font and brand colour, reached from the sidebar | `renderSettings()` |
 | S-1.1 | · Fonts | Phase R/R15 — one picker per role: display/headings, labels, body text | `FONT_CHOICES` |
 | S-1.2 | · Brand colours | Brand colour (light backgrounds) + sidebar accent (dark), driving every tint | `applyAppSettings()` |
 | S-1.3 | · Preview | A sample call sheet card, so a pick can be judged before it's used | `renderSettings()` |
 | S-1.4 | · Company | Read-only `COMPANY`. Deliberately not editable — see the Phase Q section | `COMPANY` |
-| S-1.5 | · Budget codes & rules | Phase AV — the codes, the named phase sets and the ordered BBC rules table from `db:budget_settings`, **read only**. Editing them is a later phase; the point is that the rules can be seen | `bdmSettingsTablesHTML()` |
-| S-1.6 | · Budget seed data | Phase AV — the one "Seed ROW 2026 budget" action. Reads `budget-seed-row.json` once, warns and confirms if that budget already has lines, then writes | `seedRowBudget()` |
 
 ## G — Global chrome
 
@@ -2124,36 +1973,12 @@ inconsistency: the VIEW is export-only state (you can export Per Person while
 looking at Per Day) because nothing on screen claims otherwise, whereas VAT is a
 footing the screen is actively displaying, so a second one would be a lie.
 
-## Budget (B-1) — the decisions
+## Budget (demo) — the decisions
 
-**It is no longer a demo.** Phase AU shipped it with the `.page-head` line
-"DEMO · EDITS LAST FOR THIS SESSION ONLY"; **Phase AV removed that line and gave the
-screen real storage**, because the honest statement is now the opposite one — every
-edit saves itself. The `budgetDemo*`/`bdm*` names stayed; they exist to avoid a
-collision with T-6, not to say "throwaway".
-
-**Storage discipline was the whole point of AV.** Three keys, the app's existing
-`saveDB`/`loadDB` choke point, the existing `app_data` table. `db:crew` was read-only
-throughout and is byte-identical afterwards. A budget edit writes exactly one
-`budget:<projectId>` key and never all of them.
-
-**Sections and codes are two axes on purpose.** A line displays under a *section* and
-counts under a *code*, and the two frequently disagree — a camera operator carried in
-the Travel section still counts as Cinematography. The ⚑ marker says so and does
-nothing else: it never changes a value and never moves a line out of a total. A future
-session tempted to "fix" the disagreement by forcing `code = section.expectedCode`
-would be deleting the information the phase was built to show.
-
-**Copy, never look up.** A crew-linked line's rate is copied once and never re-read.
-Where the crew record has since moved, the line shows ≠ and a tooltip — no
-auto-update, no prompt, no bulk action. Re-reading crew rates into existing lines
-would silently rewrite historic, signed-off budgets.
-
-**Float per line, fee on the float-inclusive subtotal.** Both were specified and both
-are unusual enough to be "fixed" by a well-meaning future session. They are not
-mistakes. A section total already contains its float; the fee is a percentage of a
-number that already contains float. AV added the per-line float %: **blank follows the
-project, a typed 0 means this line carries no float**, and real lines do carry zero.
+**It is a demo, and the file says so.** The screen's own `.page-head` code line reads
+"DEMO · EDITS LAST FOR THIS SESSION ONLY". That is not decoration — it is the honest
+statement of what `budgetDemoProjects` is. Anyone reviewing this should be able to type
+into it freely knowing nothing survives a reload and nothing reaches the database.
 
 **Two Budgets, on purpose, for now.** T-6 rolls up costs the app already holds; B-1 is
 a budget you build. They answer different questions and share no code. If B-1 is
@@ -2166,6 +1991,11 @@ have been unreadable. The cost of a sidebar entry is that sidebar routes null
 `currentProjectId`, so `goBudgetDemo()` is the one that doesn't, and `renderSide()`
 keeps the open project lit while you're on it. Leave from Budget and you land back on
 the tab you left.
+
+**Float per line, fee on the float-inclusive subtotal.** Both were specified and both
+are unusual enough to be "fixed" by a well-meaning future session. They are not
+mistakes. A department total already contains its float; the fee is a percentage of a
+number that already contains float.
 
 **VAT sits outside the arithmetic.** It has its own column on every table and it is in
 none of the percentages and not in the grand total. Note this is a *different* model
@@ -2183,23 +2013,9 @@ the right edge. `.main:has(#bdmTopSheet)` widens this screen alone to 1320px. Ev
 else — headings, labels, greens, fields, tables, collapsibles, the tab switcher, the
 money figures — is the app's existing rules, unmodified.
 
-**The BBC rules moved out of code and into data.** AU had them as a `switch`; AV has
-them as an ordered, first-match-wins table in `db:budget_settings`, shown read-only in
-Settings so they can be read rather than reverse-engineered. Two things about that
-table changed from AU and are deliberate: Insurance/Risk is now a PROD rule *below* the
-Producer/Exec/Director rule rather than a cross-cutting rule tested first, and `match`
-is tested against a line's **item** text only, never the supplier or person name.
-
-**Adding a section was in scope; editing the rules was not.** With no sections there is
-no "+ Add line" anywhere, so an empty budget could never be started — LMAOF and Fashion
-Files would have had a screen that looked finished and did nothing. Add and
-remove-when-empty is the minimum that fixes that. Renaming sections, and editing the
-codes/phase sets/BBC rules, are a later phase.
-
 **Explicitly not built, and not to be added without a decision:** per-person breakdown,
-cost reporting, invoiced/paid tracking, markup, bank reconciliation, a sidebar
-restructure, linking a line to a crew record from the UI, and adding crew from within
-the budget view. The only read of the crew database is the rate-drift comparison.
+cost reporting, invoiced/paid tracking, markup, bank reconciliation, and any read from
+the crew database or the call sheet.
 
 ## The design system, as decided (Phase Detail)
 
