@@ -1295,14 +1295,85 @@ async function addRoleToCrew(crewId, selectEl){
   await saveDB('db:crew', crewDB);
   refreshCrewScreen();
 }
+/* ---- role-deletion dialog (Phase BH) ----
+   removeRoleFromCrew() is the ONE call site behind rolesTagListHTML()'s × — reachable
+   identically from the Crew Database screen (D-1) and every project Crew tab's Edit-pencil
+   expansion (crewExpansionHTML() resolves an entryId there, but the × ignores it and always
+   calls this same shared function). There is no per-screen branch to hang a "Crew Database
+   only" dialog off, so this wraps the shared mutation itself — the dialog now fires
+   identically wherever the × is clicked. That makes the project-screen trigger point safer
+   (warned + undoable on the cascade path) than before, but it does not newly scope or
+   disable it — a project screen can still reach a crew-database-wide role deletion, which
+   remains the pre-existing gap (see MAP.md, Phase BF/AZ) and stays open.
+   The "at least one saved role" guard runs first, same as before the dialog existed, so it
+   gates every path below regardless of usage. */
 async function removeRoleFromCrew(crewId, rolePath){
   const c = crewById(crewId); if(!c) return;
   if((c.roles||[]).length<=1){ alert('Every crew member needs at least one saved role — add a replacement before removing this one.'); return; }
+  const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
+  const projectIds = roleUsageProjectIds(crewId, roleName);
+  if(!projectIds.length){ await commitRoleRemoval(crewId, rolePath, roleName, false, []); return; }
+  removeRoleDialogFor = { crewId, rolePath, roleName, projectIds };
+  renderGlobalOverlay();
+}
+/* distinct projects where this person holds an entry currently using this exact role name —
+   a full scan of projectsDB, cheap at this data volume (~88 crew, low dozens of projects),
+   no index kept for it */
+function roleUsageProjectIds(crewId, roleName){
+  return projectsDB.filter(p => entriesForCrew(crewId, p).some(e => e.role===roleName)).map(p => p.id);
+}
+let removeRoleDialogFor = null;   // { crewId, rolePath, roleName, projectIds } | null
+function closeRemoveRoleDialog(){ removeRoleDialogFor = null; renderGlobalOverlay(); refreshCrewScreen(); }
+function removeRoleDialogHTML(){
+  const d = removeRoleDialogFor; if(!d) return '';
+  const c = crewById(d.crewId); const who = (c&&c.name) || 'This person';
+  const n = d.projectIds.length;
+  return `<div class="modal-overlay" onclick="if(event.target===this) closeRemoveRoleDialog()">
+    <div class="modal-box">
+      <h3>Remove saved role</h3>
+      <p>${esc(who)}'s <strong>${esc(d.roleName)}</strong> role is used on <strong>${n} project${n===1?'':'s'}</strong>. What should happen to those?</p>
+      <div class="toolbar" style="flex-direction:column; align-items:stretch;">
+        <button class="primary" onclick="confirmRemoveRoleDialog(false)">Leave in old call sheets</button>
+        <button class="danger" onclick="confirmRemoveRoleDialog(true)">Delete from all projects — affects budgets</button>
+        <button onclick="closeRemoveRoleDialog()">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function confirmRemoveRoleDialog(cascade){
+  const d = removeRoleDialogFor; if(!d) return;
+  removeRoleDialogFor = null;
+  await commitRoleRemoval(d.crewId, d.rolePath, d.roleName, cascade, d.projectIds);
+}
+/* the one write path for both dialog choices (and the no-usage skip-the-dialog case):
+   always drops the role from c.roles and reactivates a replacement if it was the active
+   one; only cascades into projectIds when cascade is true. Cascade removals route through
+   removeCrewEntries() per project — the same hook the single/bulk remove-from-project
+   actions use — so positions/crewOverrides/prepSchedule are pruned correctly rather than
+   left dangling, and only runs beginUndo/finishUndo on the cascade path, matching R17's
+   scope ("destructive actions... not a general edit history") — the no-cascade path was
+   never undoable before this phase either. */
+async function commitRoleRemoval(crewId, rolePath, roleName, cascade, projectIds){
+  const c = crewById(crewId); if(!c) return;
+  const snaps = cascade ? beginUndo(['db:crew','db:projects','db:shootdays']) : null;
   const wasActive = c.role && rolePath.endsWith('/'+c.role);
   c.roles = (c.roles||[]).filter(r=>r!==rolePath);
   if(wasActive && c.roles.length){ await setActiveRole(crewId, c.roles[0], true); }
+  if(cascade){
+    projectIds.forEach(pid=>{
+      const p = projById(pid); if(!p) return;
+      const kill = entriesForCrew(crewId, p).filter(e=>e.role===roleName).map(e=>e.id);
+      if(kill.length) removeCrewEntries(p, kill);
+    });
+  }
   await saveDB('db:crew', crewDB);
+  if(cascade){ await saveDB('db:projects', projectsDB); await saveDB('db:shootdays', shootDaysDB); }
   refreshCrewScreen();
+  if(cascade){
+    const who = c.name || 'crew member';
+    const n = projectIds.length;
+    finishUndo(`Deleted role "${roleName}" from ${who} across ${n} project${n===1?'':'s'}.`, snaps);
+  }
 }
 /* ---- the two role setters (Phase BF split this in half) ----
    Department is authoritatively derived from the role's path in both: a saved role
@@ -1392,10 +1463,12 @@ async function confirmAddRoleDialog(){
   refreshCrewScreen();
 }
 /* re-renders the persistent overlay (id="globalOverlay", outside #main) that hosts
-   the add-role dialog so it survives whichever screen re-render triggered it */
+   the add-role and remove-role dialogs so either survives whichever screen re-render
+   triggered it. The two are never open together, so concatenating both (each is '' when
+   its own state is null) is enough — no need to pick between them. */
 function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
-  if(el) el.innerHTML = addRoleDialogHTML();
+  if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML();
 }
 /* "Use as template" (Phase BG) — the confirm step in front of duplicateCrew().
    The control is for making a DIFFERENT PERSON off an existing record (same company,

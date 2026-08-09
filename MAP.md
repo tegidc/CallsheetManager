@@ -92,7 +92,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `crewRolesRowHTML()` — renders one ENTRY's row in the Roles tab (Phase BF — was one row per person; with one entry per person the two are the same, and a second entry is what BA's "Add again as" will create) as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (`roleBannerHTML()`, Phase AZ — one read-only chip, no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
 - `roleBannerHTML()` (Phase AZ; restyled Phase BE) — the Roles-view row's Role cell. Renders exactly one chip — the role this row is currently using (`c.role`) — plus a plain "+" marker to its right, inert until Phase BA wires it to a menu (weight-only for now: solid when `c.roles.length>1`, i.e. the person has other saved roles to offer, faint otherwise; renders for every row including zero-saved-role people). Replaces a direct call to `rolesTagListHTML()` in this one spot — that function used to render **every** saved role as a clickable-to-activate, ×-to-delete chip directly in the row, which was a live path from the project Crew tab to `removeRoleFromCrew()` (a shared crew-database mutation) with no confirmation. `rolesTagListHTML()` itself is unchanged and still the multi-role editor, now reached only through the Edit-pencil expansion (`crewFormHTML()`, alongside `roleAddPickerHTML()`) — [Crew]
   - Phase BE gave the chip its own class, `.role-chip` (`active` modifier for the currently-active one) — see **The design system, as decided (Phase Detail)** below for why this is a new class rather than a restyled `.pill.dept`
-  - ⚠️ **Known gap, narrowed by Phase BF but still open.** The Edit-pencil expansion (`crewExpansionHTML()`→`crewFormHTML()`) is shared, unscoped state (`editingCrewId`) reachable from **every** project Crew tab view (Roles, Days/Hotel, Catering, Travel) as well as the standalone Crew Database screen. **BF closed the role-SWITCHING half of it** — clicking a chip from a project screen now calls `setEntryRole()` and touches only that project (verified: the crew record and the same person's entry on another project both unchanged). **The × still calls `removeRoleFromCrew()`, a shared crew-database mutation**, from any project crew view. So "no path from any project screen deletes a saved role" is still NOT true — [Crew]
+  - ⚠️ **Known gap, narrowed by Phase BF, made safer (not closed) by Phase BH.** The Edit-pencil expansion (`crewExpansionHTML()`→`crewFormHTML()`) is shared, unscoped state (`editingCrewId`) reachable from **every** project Crew tab view (Roles, Days/Hotel, Catering, Travel) as well as the standalone Crew Database screen. **BF closed the role-SWITCHING half of it** — clicking a chip from a project screen now calls `setEntryRole()` and touches only that project (verified: the crew record and the same person's entry on another project both unchanged). **The × still calls `removeRoleFromCrew()`, a shared crew-database mutation, from any project crew view — so "no path from any project screen deletes a saved role" is still NOT true.** What BH changed: that shared mutation is now behind an in-use warning dialog with an undoable cascade option, fired identically (same function, same one call site — see `rolesTagListHTML()`) whether reached from D-1 or from a project screen. It is safer than before, not scoped away — a project screen can still trigger a crew-database-wide role deletion, deliberately left open since separating it would be a new behaviour change, not this phase's job. See **Phase BH** — [Crew]
 - `showAsQuickEditHTML()` / `saveQuickShowAs()` — inline "Show as" quick-edit, used on the Roles row. Renders via the same `.icon-btn` pencil button as every other edit affordance in the row (Phase S item 2) rather than a separately-styled control — [Crew]
 - `groupedCrewOptionsHTML()` — builds `<option>` groups (by department) for crew-picker selects — [Crew]
 - `crewAssignRowHTML()` — renders one crew row in the "days on site"/"hotel" grid. Department badge and Lead Company pill are hidden (Phase S item 6) and role display falls back to Show-as (`showAsOrRole`, item 8) — this row no longer offers any role editing (the old per-row role quick-edit was removed; role/department/Show-as are only ever edited on the Roles tab) — [Crew]
@@ -652,7 +652,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `rolesTagListHTML(c, entryId)` / `roleAddPickerHTML()` / `addRoleToCrew()` / `removeRoleFromCrew()` / `setActiveRole()` / `setEntryRole()` — render and manage a crew member's multiple assignable roles. ⚠️ **Phase BF split the setter in two, and which one a chip calls is decided by `rolesTagListHTML()`'s `entryId` argument:**
   - `setEntryRole(entryId, rolePath)` — writes role/department onto the ENTRY, saves `db:projects`. **Every project screen routes here.** Nothing outside that project changes. Keeps the `selectedEditTargets()` fan-out (over entry ids). This is what BA's "Change to" consumes
   - `setActiveRole(crewId, rolePath, skipSave)` — writes the PERSON's database default (`c.role`/`c.department`) and saves `db:crew`. **Reachable only from the Crew Database screen (D-1)** — `goDatabase()` nulls `currentProjectId`, which is what makes `crewExpansionHTML()` pass no `entryId` there. Do not wire a project screen back to it. Still the sole place `department`/`subDepartment` are derived rather than typed, and still what `addRoleToCrew()`/`removeRoleFromCrew()`/`confirmAddRoleDialog()` call internally for their first-role and replacement-role fixups
-  - `removeRoleFromCrew()` refuses to remove a person's last remaining role, and re-activates a replacement if the removed one was active — unchanged, and still a shared crew-database mutation (the AZ × gap) — [Shared/utility functions]
+  - `removeRoleFromCrew()` refuses to remove a person's last remaining role (guard unchanged, runs first) and re-activates a replacement if the removed one was active — still a shared crew-database mutation reachable from any project crew view (the AZ × gap; unchanged by Phase BH, see the ⚠️ above `roleBannerHTML()`). **Since Phase BH**, if the role being removed is in use anywhere it no longer removes silently: it opens `removeRoleDialogHTML()` (`removeRoleDialogFor` state, rendered into the same `#globalOverlay` as the add-role dialog above) offering "Leave in old call sheets" (default — drops the role from `c.roles` only, existing entries untouched since role is copied onto the entry, not referenced live) or "Delete from all projects" (also cascades: every matching entry, across every project including finished ones, removed via `removeCrewEntries()` one project at a time, wrapped in R17's `beginUndo()`/`finishUndo()`). A role with zero usage skips the dialog and deletes directly, as before. `roleUsageProjectIds(crewId, roleName)` is the usage check — a full `projectsDB` scan via `entriesForCrew()`, cheap at ~88 crew/low-dozens of projects. `commitRoleRemoval()` is the one write path both dialog choices (and the no-usage skip) funnel through — [Shared/utility functions, Crew]
 - `pendingNewCrewRole` / `newCrewRolePickerHTML()` / `onNewCrewRolePick()` — single-role picker for a brand-new, not-yet-saved crew member (no id yet to attach a saved role to) — stashed here until `saveCrew()` creates the record with it — [Shared/utility functions]
 - `addRoleDialogFor` / `openAddRoleDialog()` / `closeAddRoleDialog()` / `addRoleDialogHTML()` / `confirmAddRoleDialog()` / `renderGlobalOverlay()` — the "Add new role" dialog (Phase R item 5): one in-page dialog (Department select + Role name) rendered into the persistent `#globalOverlay` div outside `#main`, replacing the old two-`prompt()` flow. Adds straight onto a crew id, or (when opened as `'__new__'`) feeds `pendingNewCrewRole` for the not-yet-saved crew form — [Shared/utility functions]
 - `useCrewAsTemplate()` / `duplicateCrew()` (Phase BG renamed the control and added the first of these) — **"Use as template"**, the D-1 crew-card action that clones a record as the starting point for a DIFFERENT PERSON (same company, agent and rate; new name). Never a second role for the same person — that's BA's "Add again as" once it ships. `useCrewAsTemplate()` is a confirm step and nothing else; `duplicateCrew()` below it is unchanged and still does the actual clone (new `uid()`, `_copyOriginalRole` stamp, `saveDB('db:crew')`). ⚠️ **The guard sits BEFORE the write, not at save**: `duplicateCrew()` writes to `db:crew` on click, so there is no pending record and no save step to gate — cancelling has to mean "don't create it", which only exists as a choice up front. Cancel writes nothing at all. Uses native `confirm()`, matching `deleteCrew()`/`removeSubDeptAdmin()` on this same screen; D-1.5's `addRoleDialogHTML()` is a picker, not a confirmation, so it isn't the pattern to copy — [Crew, Shared/utility functions]
@@ -2798,3 +2798,133 @@ the pre-session backup.
 
 Full JSON exports of everything deleted are on disk at
 `_exports/2026-08-09-pre-budget-v1-revert/` (untracked).
+
+## Phase BH — crew role-deletion dialog (9 Aug 2026)
+
+Ships on top of `e5a3048` (BC) / `1c56578` (BD) / `9ca9fdf` (BF) / `02d58c9` (BG) /
+`4d6f0a3` (BE) / `bfac972` (AZ). Adds a warning + undoable cascade to the one place a
+saved role could vanish off a crew record with zero confirmation.
+
+### The premise the brief started with didn't match the code, and got corrected mid-phase
+
+The original brief framed this as "a delete FROM the Crew Database screen", distinct
+from the standing rule that a project screen may add to the crew database but never
+delete from it. That framing doesn't hold: `rolesTagListHTML()`'s × has exactly **one**
+call site (`removeRoleFromCrew(crewId, rolePath)`), reachable identically from the Crew
+Database screen (D-1) and from **every** project Crew tab's Edit-pencil expansion — the
+AZ/BF known gap MAP.md already documented (see the ⚠️ above `roleBannerHTML()`). There is
+no code-level "D-1 only" version of this delete to attach a dialog to. Flagged and
+stopped on rather than guessed at; the follow-up instruction confirmed **Option A — wrap
+the shared function itself, universally**. The dialog now fires the same way regardless
+of which screen's × triggered it, which makes the project-screen trigger point safer
+(warned, and undoable on the cascade path) than it was. It does **not** newly scope or
+disable that trigger point, and does not close the AZ/BF gap — a project screen can still
+reach a crew-database-wide role deletion. That gap stays open, on purpose; separating it
+would be a real behaviour change and wasn't this phase's brief.
+
+### What changed
+
+- `removeRoleFromCrew(crewId, rolePath)` — the "at least one saved role" guard is
+  unchanged and still runs first, before anything else. Past the guard, it now computes
+  `roleUsageProjectIds(crewId, roleName)` and either commits directly (zero usage — same
+  as the old behaviour, no dialog) or opens the new dialog.
+- `roleUsageProjectIds(crewId, roleName)` — new. A role is "in use" if any project's
+  `p.crewEntries` holds an entry with this `crewId` and this exact role NAME (not path —
+  entries store the plain name, same as `c.role`; `setEntryRole()`/`entryView()` already
+  established that). Full scan of `projectsDB`, one `entriesForCrew()` call per project.
+  At ~88 crew records and low dozens of projects this is trivially cheap — no index kept
+  for it, and none is warranted at this volume. Returns distinct project ids, so two
+  entries on the same project count once.
+- `removeRoleDialogFor` / `removeRoleDialogHTML()` / `closeRemoveRoleDialog()` /
+  `confirmRemoveRoleDialog(cascade)` — the dialog itself, rendered into the same
+  persistent `#globalOverlay` div the "Add new role" dialog (`addRoleDialogHTML()`, Phase
+  R item 5) already uses. `renderGlobalOverlay()` now concatenates both dialogs' HTML —
+  safe because the two are never open together. States the affected DISTINCT project
+  count before either button; "Leave in old call sheets" is `.primary` (filled,
+  prominent, listed first — the default); "Delete from all projects — affects budgets" is
+  `.danger` (red text only, not prominent) — deliberately not styled as the encouraged
+  choice. A plain "Cancel" closes with zero mutation.
+- `commitRoleRemoval(crewId, rolePath, roleName, cascade, projectIds)` — the one write
+  path both dialog buttons (and the zero-usage skip-the-dialog case) funnel through.
+  Always: drops the role from `c.roles`, and re-activates a replacement via
+  `setActiveRole(crewId, c.roles[0], true)` if the removed role was the active one
+  (`wasActive` check, unchanged from the old function body). Only when `cascade` is true:
+  loops `projectIds`, and for each project filters that project's `entriesForCrew(crewId,
+  p)` down to entries whose `role===roleName`, then removes them via `removeCrewEntries(p,
+  ids)` **one project at a time** — the same hook `removeCrewFromProject()` and
+  `bulkRemoveSelectedFromProject()` already route through, so positions, `crewOverrides`
+  and `p.prepSchedule` (via `prunePrepSchedule()`) are pruned correctly rather than left
+  dangling. Cascade wraps the whole thing in R17's existing undo —
+  `beginUndo(['db:crew','db:projects','db:shootdays'])` before mutation,
+  `finishUndo(label, snaps)` after — no new confirmation mechanism invented.
+  ⚠️ **The no-cascade path ("Leave in old call sheets") is NOT undo-armed**, matching
+  `removeRoleFromCrew()`'s pre-existing behaviour (it never had undo either) and R17's own
+  scope ("destructive actions... not a general edit history") — it's a single-collection,
+  non-cascading change with nothing further to accidentally lose.
+
+### Verification
+
+- `node --check` on the extracted inline script (both `<script>` blocks, in document
+  order): clean.
+- CSS brace balance: 478 open / 478 close — untouched by this phase, checked anyway.
+- Every new identifier (`removeRoleFromCrew`, `roleUsageProjectIds`,
+  `removeRoleDialogFor`, `closeRemoveRoleDialog`, `removeRoleDialogHTML`,
+  `confirmRemoveRoleDialog`, `commitRoleRemoval`) greps to a definition plus at least one
+  real call site — no orphans.
+- **Fixture**: `bh-fixture.html`, built by a real script (`build-fixture.js`, refuses an
+  already-stubbed source, requires each anchor — `saveDB`/`loadDB`/`scheduleAutosave` —
+  to match exactly once, prints the bytes it wrote), served from a directory containing
+  **no `index.html`** (confirmed: `/index.html` on that server 404s, so a dropped path
+  cannot fall through to the real file). Carries a random per-session token
+  (`window.__BH_FIXTURE__`); the token, both stubs (`saveDB`→`__BH_SAVES__`,
+  `loadDB`→`window.__BH_SEED__`) and `location.href` were asserted before any interaction.
+  `loadDB` never touches the network or the real Supabase project at all — it returns
+  seed data (or the empty default) synchronously from memory.
+- Dialog fires **identically** from both trigger screens: `crewFormHTML(c, null)` (D-1
+  shape) and `crewFormHTML(c, entryId)` (project shape) produce byte-identical × onclick
+  markup (`rolesTagListHTML()`'s × ignores `entryId`, as established). Confirmed further
+  with two real DOM click-throughs via the actual router (`renderMain()` →
+  `renderCrewDatabase()` / `renderMain()` → `renderProject()` → `renderProjectBody()` →
+  `renderProjectCrew()`, Roles view, Edit-pencil open): same project count text, same
+  three buttons in the same order and classes, from both screens.
+- "Leave in old call sheets": role dropped from `c.roles`, active role reassigned when it
+  was the one removed, and the existing project entry's role field verified
+  **byte-identical** to its pre-deletion snapshot (`JSON.stringify` equality) — only
+  `db:crew` saved, no undo armed.
+- "Delete from all projects": built a fixture with Alice (role "Grip", in use on an
+  active project P1 and a finished project P3) and Bob (also role "Grip", on P1, sharing
+  the exact role name). Cascade removed Alice's two entries and left **Bob's identical-
+  role-name entry, and an unrelated Carol entry on P1, provably byte-unchanged**. Both
+  P1's and P3's shoot days had their `positions` and `crewOverrides` pruned for Alice's
+  entry only (Bob's own `crewOverrides` entry on the same day survived); both projects'
+  `prepSchedule` records were pruned per-entry, and P3's `prepSchedule` (Alice's entry was
+  its only key) was deleted outright rather than left as an empty husk — matching Phase
+  BD's documented "delete rather than husk" rule. `db:crew`/`db:projects`/`db:shootdays`
+  all saved; `finishUndo()` armed with the expected label.
+- **Undo**, exercised in a single script tick (a real two-round-trip test first false-
+  failed by tripping R17's genuine 10-second window between separate tool calls — not a
+  bug, a reminder that `UNDO_WINDOW_MS` is real): `undoLastAction()` restored
+  `crewDB`/`projectsDB`/`shootDaysDB` to their pre-cascade state exactly — both roles
+  back, active role back to "Grip", both entries back, both shoot days' positions/
+  overrides back, both `prepSchedule` records back (including P3's, un-deleted).
+- Affected-project-count scenarios, both required cases, via `roleUsageProjectIds()`
+  directly: two entries on one project → `['x1']` (count 1); one entry each on two
+  projects → `['x1','x2']` (count 2).
+- A role with zero usage anywhere (`carol`/"Boom Operator") deleted with no dialog at
+  all — `removeRoleDialogFor` stayed `null` throughout.
+- The "at least one saved role" guard, re-tested through the new flow: fired its original
+  alert text unchanged, left `c.roles` untouched, never opened the dialog, made zero
+  writes — confirmed it still runs before any usage check or dialog logic.
+
+### Left alone, as instructed
+- AZ's `.role-add-marker` and the roles menu (BA/BB) — not built, not touched.
+- `deleteCrew()` — unchanged; still the third entry-dropping path, still leaves shoot-day
+  positions dangling as "(removed crew)", still does not route through
+  `removeCrewEntries()`, still prunes `prepSchedule` for itself. This phase's dialog logic
+  was not extended to it.
+- The AZ/BF known gap itself (project screen → crew-database-wide role deletion) — made
+  safer, deliberately not closed. See the ⚠️ above `roleBannerHTML()` for the corrected
+  note.
+- "+ Add crew member" form visibility, and a shoot day's `dayTotal` not resyncing —
+  untouched, pre-existing, tracked separately.
+- No code from `budget-v1-fail` was read or reused.
