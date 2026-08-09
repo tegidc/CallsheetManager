@@ -16,7 +16,9 @@ Every screen needs the same handful of records. These are the single place that 
 - `crewById()` / `dayById()` / `locById()` — a crew member / shoot day / location by id, `null` if missing — [Shared/utility functions]
 - `currentDay()` — the shoot day currently being edited or previewed — [Shared/utility functions]
 - `projectDays()` — a project's shoot days, always in day order (defaults to the open project) — [Shared/utility functions]
-- `projectCrew()` — a project's crew records, in the order they were added to it — [Shared/utility functions]
+- `projectEntries()` / `entryById()` / `entriesForCrew()` / `entryView()` / `projectEntryViews()` — **Phase BF, the crew-entry layer.** A project's roster is `p.crewEntries` (entries, not people); `entryView()` returns the crew record with that entry's id/role/department layered on, which is why almost every existing sort/group/filter/identity helper kept working unchanged — [Crew, Shared/utility functions]
+- `projectCrew()` — the DISTINCT PEOPLE on a project, deduplicated by `crewId`, in roster order. ⚠️ Since Phase BF this is no longer "the roster" — the roster is `projectEntries()`. Use this one for the person-level tabs (hotel/travel/catering) and any "how many humans" question; its `.id` is a CREW id, and role/department come from that person's first entry — [Shared/utility functions]
+- `entryOnDay()` / `entryDayCount()` / `crewOnDay()` / `crewDayCount()` — days on site, at the two grains. ⚠️ The `crew*` pair folds a person's entries together and is what every PERSON-level count must use; the `entry*` pair is per row on Roles/Days on site. Mixing them up is the Phase AO double-count — [Crew, Shared/utility functions]
 - `projectOf()` — the project a given shoot day belongs to — [Shared/utility functions]
 - `selectedDayLocation()` — the location currently picked in the Shoot Day form's primary-location select — [Shoot Days]
 - `refreshCrewDatabase()` — full re-render of the Crew Database screen (its filter/sort/admin controls live outside `#crewList`, so `renderCrewList()` alone isn't enough) — [Crew]
@@ -78,19 +80,19 @@ Every screen needs the same handful of records. These are the single place that 
 - `projectCrewFilter` / `projectCrewFilterOpen` — the ONE shared filter/sort/group-by state for "Crew on this project", global so it survives `setCrewGridView()` tab switches. Now also holds `days` (Set of shoot day ids) and `daysMode` ('or'/'and') — the multiselect Days filter (Phase T item 3) — [Crew]
 - `matchesCrewFilterState()` — shared match rules (depts, lead company, roles, exclude-Talent, exclude-other-companies) used by both this screen's filter and the Crew database's. Does NOT include the Days filter — the Crew database screen has no project/shoot-day context, so that's a separate check (`personMatchesProjectDayFilter`) only applied on the project screen. Lead company match (Phase AC) treats the sentinel `'__blank__'` as "no lead company set" (`!c.coProductionCompany`), distinct from `''` which means "no company filter active, show all" — the project Filter panel's Lead Company `<select>` only offers a "Blank" option when at least one assigned crew member actually has no lead company (`hasBlankCompany`) — [Crew, Shared/utility functions]
 - `personMatchesProjectDayFilter()` — the Days filter (Phase T item 3): matches if the person has a position on any (`daysMode:'or'`) or every (`daysMode:'and'`) of the selected shoot days. An OR/AND `<select>` appears next to the day checkboxes once 2+ days are picked — [Crew]
-- `personMatchesProjectFilter()` / `personHasHotel()` / `sortProjectCrewGroup()` / `buildProjectCrewGroups()` — filter (`matchesCrewFilterState` + `personMatchesProjectDayFilter`), "has hotel" test, in-group sort and grouping for the assigned crew list. `personMatchesProjectFilter()` flips its own result when `projectCrewFilter.inverse` is set (Phase AE "Inverse" checkbox) — everyone who does NOT match the active criteria, rather than everyone who does; the day filter is included in what gets inverted — [Crew]
+- `personMatchesProjectFilter()` / `personHasHotel()` / `sortProjectCrewGroup()` / `buildProjectCrewGroups()` — (Phase BF: all four now take either an entry view or a person view and branch on `c.crewId`; `personHasHotel()` and the `travel` grouper read `personIdOf(c)` because hotel and travel are person-level) — filter (`matchesCrewFilterState` + `personMatchesProjectDayFilter`), "has hotel" test, in-group sort and grouping for the assigned crew list. `personMatchesProjectFilter()` flips its own result when `projectCrewFilter.inverse` is set (Phase AE "Inverse" checkbox) — everyone who does NOT match the active criteria, rather than everyone who does; the day filter is included in what gets inverted — [Crew]
 - `crewSeniorityBand()` (Phase Sort/Group A) — bands a crew member into "Department leads" / "Mid-level" / "Support / entry level" off the real per-department `roleSeniorityRank(dept, role)` (rank 0 = a department's first/most-senior listed role in `ROLES_BY_DEPT`, so low ranks band together sensibly across departments even though the underlying numbers aren't globally comparable) — not a separate flat seniority list. Used by both the Seniority Sort and Seniority Group by — [Crew]
 - `sortProjectCrewGroup(list, p, days)` (Phase Sort/Group A) — switches on `projectCrewFilter.sort`: `dept` (default, `sortHoDFirst`) / `name` / `role` / `seniority` (via `crewSeniorityBand`'s underlying rank) / `company` (`c.coProductionCompany`) / `daysCount` (most shoot days on site first, via `d.positions`) / `added` (index in `p.crewIds` — the same add-order signal `projectCrew()` relies on elsewhere). Takes `p`/`days` now (not list-only) since `daysCount`/`added` need project context — only ever called from `buildProjectCrewGroups()` — [Crew]
 - `buildProjectCrewGroups(list, p, days)` (Phase Sort/Group A) — switches on `projectCrewFilter.groupBy`, twelve options: `dept` (default) / `deptCompany` (flat composite bucket, e.g. "Cinematography — Creative Dynamic", not a true nested group — avoided touching every `crewGridView` row renderer for a two-level header) / `company` / `role` / `subDept` / `personType` (Crew/Talent/Client, derived off `deptBucketKey`) / `hotel` (existing, via `personHasHotel`) / `travel` (`p.travelMethods[c.id]`) / `vat` (`c.vatRegistered`, strictly `''`/`'Yes'`/`'No'` — same field Budget's VAT calc reads) / `catering` (`c.dietaryGeneral`) / `seniority` (via `crewSeniorityBand`) / `daysOnSite` (**multi-bucket** — a person on 3 shoot days appears in 3 groups, same `(d.positions||[]).some(pos=>pos[0]===c.id)` signal `buildTransportSummary()` uses) / `none` (single ungrouped bucket, still rendered with a header — "All crew" — no `crewGridView` branch currently supports a header-less group). Every non-`dept`/`hotel` bucket set sorts blank/"Not set" values last rather than alphabetically first — [Crew]
 - `toggleProjectCrewFilterPanel()` / `toggleProjectFilterDept()` / `toggleProjectFilterRole()` / `toggleProjectFilterDay()` / `setProjectFilterField()` / `toggleProjectFilterFlag()` / `clearProjectCrewFilter()` / `projectCrewActiveFilterCount()` / `projectCrewFilterPanelHTML()` — collapsible filter panel state and rendering, including the Days filter-chips + OR/AND select (Phase T item 3), the Roles filter-chips sub-section (Phase AB — its own collapse toggle, `projectCrewFilterRolesOpen`/`toggleProjectFilterRolesSection()`, independent of the panel's own open/closed state) and the Inverse checkbox (Phase AE, `toggleProjectFilterFlag('inverse', …)` — no new setter needed, the existing generic flag setter covers it). Sort/Group by (Phase Sort/Group A) each carry a broad curated option list rather than the earlier two/one-option shell — see `sortProjectCrewGroup()`/`buildProjectCrewGroups()` above for what each value does. The panel's trailing row (the three exclusion checkboxes + hint + "Clear filters") is the shared `filterPanelFootHTML()` — see **The filter-panel foot** — and `projectCrewActiveFilterCount()` is what gates that row's "Clear filters" link; note it counts filters only, so choosing a Sort or Group by never makes the panel look filtered — [Crew]
 - `projectCrewSelected` / `toggleCrewSelected()` / `toggleSelectAllFilteredCrew()` / `clearCrewSelection()` / `bulkRemoveSelectedFromProject()` / `bulkActionBarHTML()` — bulk-select (checkbox swapped in for the view/eye icon via `crewIdentityHTML`'s `bulkSelect` option) and the bulk "Remove from project" action. `toggleSelectAllFilteredCrew()` is the "Select all" checkbox next to Expand/Collapse all (Phase T item 2) — it's always handed exactly the currently-filtered/visible crew ids, never the full project roster, so it only ever selects what the active filter is showing — [Crew]
   - ⚠️ **`bulkRemoveSelectedFromProject()` clears BOTH `p.crewIds` and every shoot day's `positions`** — the same two places `removeCrewFromProject()` has always cleared. It used to filter `crewIds` only, which left a bulk-removed person holding their position on the days they'd been assigned to, so they stayed on the call sheet after being taken off the project. Its undo snapshot covers `db:shootdays` as well as `db:projects` for the same reason. This fix originally arrived inside Phase AY-a and was **re-applied on its own** when Budget View V1 was reverted — it is the one thing from that workstream that was kept. Do not "simplify" the second filter away — [Crew, Shoot Days]
-- `selectedEditTargets(crewId)` (Phase Bulk Edit) — **the selected-set bulk-edit pattern.** Every per-field editor on the Crew tab calls this first: if `crewId` is part of the current multi-select AND at least one other person is also selected, it returns every selected id; otherwise just `[crewId]`. The caller then loops its own field-specific mutation over the returned ids and does ONE `saveDB`/render at the end — this is the reusable "which ids does this edit apply to" decision, not a per-field bulk-edit implementation. Wired into `toggleCrewOnDay()` (Days on site), `toggleHotelNight()` / `toggleHotelPre()` (Hotel), `toggleMeal()` (Catering), `setTravelMethod()` (Travel), `saveQuickShowAs()` (Roles — Show as) and `setActiveRole()` (Roles — role/department; only on a direct user pick, i.e. `skipSave` falsy — the internal `skipSave:true` calls used to reactivate a replacement role after `removeRoleFromCrew()` do NOT fan out, since that's a single-person consistency fixup, not a user edit). `bulkActionBarHTML()` shows a one-line hint ("Editing a field for one selected person applies it to all N") whenever 2+ are selected. Deliberately NOT wired into `toggleAllForPerson()` / `toggleAllMealForPerson()` (the per-person "All" button) — that's a different axis (all days for one person), mixing it with cross-person propagation would be confusing — [Crew]
+- `selectedEditTargets(entryId)` / `selectedCrewTargets(crewId)` / `crewIsSelected()` / `toggleCrewPersonSelected()` / `personIdOf()` (Phase Bulk Edit; **split by Phase BF**) — **the selected-set bulk-edit pattern.** ⚠️ `projectCrewSelected` now always holds ENTRY ids (it is module-level and survives `setCrewGridView()`, so it has to mean one thing, and the entry is the finer grain). Entry-level fields fan out through `selectedEditTargets()`; the person-level ones (hotel, travel, catering, Show as) go through `selectedCrewTargets()`, which maps the selection back to DISTINCT people so a two-entry person is written once. The person-level views render their select-all/checkbox state through `crewIsSelected()`/`toggleCrewPersonSelected()`, which cover all of that person's entries together. The original description: Every per-field editor on the Crew tab calls this first: if `crewId` is part of the current multi-select AND at least one other person is also selected, it returns every selected id; otherwise just `[crewId]`. The caller then loops its own field-specific mutation over the returned ids and does ONE `saveDB`/render at the end — this is the reusable "which ids does this edit apply to" decision, not a per-field bulk-edit implementation. Wired into `toggleCrewOnDay()` (Days on site), `toggleHotelNight()` / `toggleHotelPre()` (Hotel), `toggleMeal()` (Catering), `setTravelMethod()` (Travel), `saveQuickShowAs()` (Roles — Show as) and `setActiveRole()` (Roles — role/department; only on a direct user pick, i.e. `skipSave` falsy — the internal `skipSave:true` calls used to reactivate a replacement role after `removeRoleFromCrew()` do NOT fan out, since that's a single-person consistency fixup, not a user edit). `bulkActionBarHTML()` shows a one-line hint ("Editing a field for one selected person applies it to all N") whenever 2+ are selected. Deliberately NOT wired into `toggleAllForPerson()` / `toggleAllMealForPerson()` (the per-person "All" button) — that's a different axis (all days for one person), mixing it with cross-person propagation would be confusing — [Crew]
 - `bulkEditOpen` / `toggleBulkEdit()` / `bulkEditPanelHTML()` / `applyBulkLeadCompany()` — bulk-edit panel opened from the bulk-action bar; currently just Lead Company, the field Phase R moved off the main Roles row — [Crew]
-- `crewRolesRowHTML()` — renders one person's row in the Roles tab as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (`roleBannerHTML()`, Phase AZ — one read-only chip, no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
+- `crewRolesRowHTML()` — renders one ENTRY's row in the Roles tab (Phase BF — was one row per person; with one entry per person the two are the same, and a second entry is what BA's "Add again as" will create) as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (`roleBannerHTML()`, Phase AZ — one read-only chip, no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
 - `roleBannerHTML()` (Phase AZ; restyled Phase BE) — the Roles-view row's Role cell. Renders exactly one chip — the role this row is currently using (`c.role`) — plus a plain "+" marker to its right, inert until Phase BA wires it to a menu (weight-only for now: solid when `c.roles.length>1`, i.e. the person has other saved roles to offer, faint otherwise; renders for every row including zero-saved-role people). Replaces a direct call to `rolesTagListHTML()` in this one spot — that function used to render **every** saved role as a clickable-to-activate, ×-to-delete chip directly in the row, which was a live path from the project Crew tab to `removeRoleFromCrew()` (a shared crew-database mutation) with no confirmation. `rolesTagListHTML()` itself is unchanged and still the multi-role editor, now reached only through the Edit-pencil expansion (`crewFormHTML()`, alongside `roleAddPickerHTML()`) — [Crew]
   - Phase BE gave the chip its own class, `.role-chip` (`active` modifier for the currently-active one) — see **The design system, as decided (Phase Detail)** below for why this is a new class rather than a restyled `.pill.dept`
-  - ⚠️ **Known gap, not closed by Phase AZ:** the Edit-pencil expansion (`crewExpansionHTML()`→`crewFormHTML()`) is shared, unscoped state (`editingCrewId`) reachable from **every** project Crew tab view (Roles, Days/Hotel, Catering, Travel — not just this row) as well as the standalone Crew Database screen. Opening it for an existing crew member still renders `rolesTagListHTML()` with a live ×→`removeRoleFromCrew()`, so a project user can still delete a saved role from the crew database via Edit pencil → chip × on any crew view, not only via the Crew Database screen. This was flagged and, per explicit decision, deliberately left as-is for this phase — do not treat "no path from any project screen deletes a saved role" as actually true yet — [Crew]
+  - ⚠️ **Known gap, narrowed by Phase BF but still open.** The Edit-pencil expansion (`crewExpansionHTML()`→`crewFormHTML()`) is shared, unscoped state (`editingCrewId`) reachable from **every** project Crew tab view (Roles, Days/Hotel, Catering, Travel) as well as the standalone Crew Database screen. **BF closed the role-SWITCHING half of it** — clicking a chip from a project screen now calls `setEntryRole()` and touches only that project (verified: the crew record and the same person's entry on another project both unchanged). **The × still calls `removeRoleFromCrew()`, a shared crew-database mutation**, from any project crew view. So "no path from any project screen deletes a saved role" is still NOT true — [Crew]
 - `showAsQuickEditHTML()` / `saveQuickShowAs()` — inline "Show as" quick-edit, used on the Roles row. Renders via the same `.icon-btn` pencil button as every other edit affordance in the row (Phase S item 2) rather than a separately-styled control — [Crew]
 - `groupedCrewOptionsHTML()` — builds `<option>` groups (by department) for crew-picker selects — [Crew]
 - `crewAssignRowHTML()` — renders one crew row in the "days on site"/"hotel" grid. Department badge and Lead Company pill are hidden (Phase S item 6) and role display falls back to Show-as (`showAsOrRole`, item 8) — this row no longer offers any role editing (the old per-row role quick-edit was removed; role/department/Show-as are only ever edited on the Roles tab) — [Crew]
@@ -106,7 +108,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `jumpToCateringSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Catering sub-tab: expands `cateringSummaryOpen` if collapsed, then scrolls `#cateringSummarySection` into view — [Crew]
 - `crewTravelRowHTML()` / `setTravelMethod()` — render and update a crew member's travel method row. Department/Lead Company hidden, role display is Show-as-or-role, display-only (Phase S) — [Crew]
 - `getTransportCosts()` / `saveTransportCosts()` (Phase W) — read/persist the project's transport cost inputs (`p.transportCosts.{publicPerDay,mileage}`): a flat daily rate for public transport and a single general mileage rate for people using their own car (one rate overall, not per-person) — [Crew]
-- `buildTransportSummary()` (Phase W) — the Travel tab's own summary data: since travel method (`p.travelMethods`) is stored once per person per PROJECT, not per day, the per-day breakdown is derived by crossing each person's method with the days they're actually on site (has a position that day — same signal as the Days-on-site grid). Counts every method actually in use per day, plus a computed Daily cost (Own car count × mileage rate + Public transport count × daily rate — the only two methods that carry a cost; Train/Flying/Production transport/custom methods are counted but not costed) — [Crew]
+- `buildTransportSummary()` (Phase W; **deduplicated by Phase BF**) — the Travel tab's own summary data: since travel method (`p.travelMethods`) is stored once per person per PROJECT, not per day, the per-day breakdown is derived by crossing each person's method with the days they're actually on site. ⚠️ **It now iterates `projectCrew()` (distinct people) and tests `crewOnDay()`, not the roster × positions.** This is the exact function Phase AO flagged: it asks "is anyone on site that day", and a person holding two entries that both cover Day 3 would satisfy that twice. Counts every method actually in use per day, plus a computed Daily cost (Own car count × mileage rate + Public transport count × daily rate — the only two methods that carry a cost; Train/Flying/Production transport/custom methods are counted but not costed) — [Crew]
 - `transportSummaryGridBodyHTML()` / `renderTransportSummaryGridSection()` (Phase W) — render the grid (rows=methods in use+Daily cost, columns=days) into `#tsmGridWrap`, re-rendered on cost-field input without touching the cost inputs themselves (same targeted-refresh pattern as `renderCateringSummaryGridSection()`) — [Crew]
 - `transportSummaryOpen` / `toggleTransportSummaryBlock()` / `transportSummaryHTML()` / `copyTransportSummary()` (Phase W) — the collapsible "Transport summary" block on the Travel sub-tab (T-2.4): cost fields (public transport cost/day, mileage rate) above the grid. Collapsed by default, positioned below "Crew on this project", same pattern as the Hotel/Catering summary blocks — [Crew]
 - `jumpToTransportSummary()` (Phase W) — the "Summary" jump-link next to Expand all/Collapse all on the Travel sub-tab: expands `transportSummaryOpen` if collapsed, then scrolls `#transportSummarySection` into view — [Crew]
@@ -116,10 +118,11 @@ Every screen needs the same handful of records. These are the single place that 
 - `hotelSummaryOpen` / `toggleHotelSummaryBlock()` / `hotelSummaryHTML()` / `copyHotelSummary()` — the collapsible "Hotel summary" block: a cost field ("Est. cost per room/night", id `hcRoomNight`, Phase AD — moved here from Budget, same `getHotelCosts()`/`saveHotelCosts()` pair, same `field-inline` markup as Catering's cost fields) above room-booking table (Room No./Name/Date from–to/Total nights), then per-night table (Night/Rooms/Names) below it, no separate rooming list. Shared markup/state rendered in two places (Phase O + follow-up) — below the person × night matrix on the Hotel sub-tab (T-2.3), and again below the WhatsApp text block on Preview & Export (T-7.2b) — same `hsmb-summary`/`hsmc-summary` ids either way since only one tab body is ever in the DOM at once, which is also why the cost field shows up on both (same precedent as Travel's cost fields at T-7.4). Autosave for `hcRoomNight` is wired per-screen: `renderProjectCrew()`'s `body.oninput` when `crewGridView==='hotel'`, and `renderProjectPreview()`'s scoped `e.target.id==='hcRoomNight'` check (alongside the Travel fields, Phase AD) — [Crew, Budget, Preview & Export]
 - `jumpToHotelSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Hotel sub-tab: expands `hotelSummaryOpen` if collapsed, then scrolls `#hotelSummarySection` into view — [Crew]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
-- `addCrewToProject()` / `removeCrewFromProject()` — add/remove a crew member from the current project's roster. `addCrewToProject()` has **three** callers now: this tab's picker, AI Scan's `propose_crew` matched-accept, and Overview Quick Add's crew search — it also calls `resetQuickAdd()` so that box settles back after the third — [Crew, Overview]
+- `addCrewEntry()` / `removeCrewEntries()` (Phase BF) — the one place an entry is created, and the one place entries + their positions + their day overrides are removed together. ⚠️ `removeCrewEntries()` deliberately does NOT clear travel/hotel/catering: removing someone from a project never did, and BF has no behaviour changes. It also happens to be right for the entry model — two roles is one bed — [Crew]
+- `addCrewToProject()` / `removeCrewFromProject(entryId)` — add a crew member to / remove an ENTRY from the current project's roster. `addCrewToProject()` has **three** callers now: this tab's picker, AI Scan's `propose_crew` matched-accept, and Overview Quick Add's crew search — it also calls `resetQuickAdd()` so that box settles back after the third — [Crew, Overview]
 - `crewInfo()` — looks up a crew member's basic display info by id, with a fallback for removed crew — [Crew]
-- `resolveCrewForDay()` / `hasOverride()` — resolve a crew member's effective role/dept for a specific day, accounting for per-day overrides — [Crew, Shoot Days]
-- `dayOverrideFormHTML()` / `saveDayOverride()` / `clearDayOverride()` — render/save/clear a per-day override of a crew member's role/department/company — [Crew, Shoot Days]
+- `resolveCrewForDay(entryId, day)` / `hasOverride(entryId, day)` — resolve an ENTRY's effective role/dept for a specific day (Phase BF — was keyed by crew id). The base is the entry view, so a person holding two entries resolves to their AC role on one position and their operator role on the other. An id that no longer resolves still falls back to `(removed crew)` — [Crew, Shoot Days]
+- `dayOverrideFormHTML()` / `saveDayOverride()` / `clearDayOverride()` — render/save/clear a per-day override of an ENTRY's role/department/company. ⚠️ `d.crewOverrides` is keyed by ENTRY id since Phase BF (it overrides role, which is entry-level). It was empty on all ten live shoot days at migration time, so this rekey moved no data — [Crew, Shoot Days]
 - `OVERRIDABLE_FIELDS` — list of crew fields that can be overridden per shoot day — [Crew, Shoot Days]
 
 ## Locations
@@ -193,7 +196,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `togglePosnCompany()` / `togglePosnDept()` — collapse/expand a company/department group within the position assignments list — [Shoot Days]
 - `captureInProgressPositions()` — snapshots in-progress position edits before a re-render so they aren't lost — [Shoot Days]
 - `renderPositionAssignments()` — renders the position (crew call time) assignment list for a shoot day, grouped by company/department, roles within a department ordered by `roleSeniorityRank()` (Phase N item 2) — [Shoot Days]
-- `refreshAddPosnPick()` / `addPosnToDay()` / `removePosnRow()` — refresh the "add position" picker and add/remove a crew position on the day — [Shoot Days]
+- `refreshAddPosnPick()` / `addPosnToDay()` / `removePosnRow()` — refresh the "add position" picker and add/remove a position on the day. ⚠️ **`d.positions[i][0]` is an ENTRY id since Phase BF**, so the picker offers entries ("Meurig — AC" and "Meurig — operator" are two selectable things, which is exactly why the shoot day stores entry ids). `projectCrewOptions()` returns entry views — [Shoot Days]
 - `addSchedRow()` / `insertSchedRowBefore()` — add a new schedule row, optionally inserted before another row — [Shoot Days]
 - `parseTimeStrToMins()` / `parseTimeRangeToMins()` / `parseDurationToMins()` / `formatMinsAsDuration()` / `formatMinsAsTime()` — parse and format time/duration strings for the schedule table — [Shoot Days]
 - `onScheduleTimeInput()` / `onScheduleDurationInput()` — recompute dependent schedule fields as the user types times/durations — [Shoot Days]
@@ -226,19 +229,23 @@ matching cross-reference in **Preview & Export**.
   free-text Fee/rate field ("£450/day" → 450); returns `null` (not 0) when nothing
   numeric is found, so "no rate on file" stays distinguishable from "costs nothing" —
   [Budget]
-- `resolveCrewRate()` — **the per-project day-rate override mechanism.** Day rate
-  needs to vary by job, so it follows the same shape as every other per-project
-  per-crew-id map already in the app (`p.travelMethods`, `p.hotelNightBefore`,
-  `day.crewOverrides`): `p.crewRateOverrides[crewId]`. Checked first; falls back to
-  `parseRateNumber(c.rate)`; falls back to "no rate on file" (`hasRate:false`) rather
-  than silently costing someone at 0 — [Budget]
-- `saveCrewRateOverride()` — writes/clears one person's override (empty input clears
-  it, reverting to the database rate); rejects a non-numeric entry by re-rendering
+- `resolveEntryRate(entryId, p)` — **the per-entry day rate** (Phase BF; ⚠️ **renamed
+  from `resolveCrewRate(c, p)`, and `p.crewRateOverrides` no longer exists** — the rate
+  moved onto the entry as `entry.rate`, because rate is one of the three things that
+  vary per role: the same person can be an AC at one rate and an operator at another on
+  one project). Checked first; falls back to `parseRateNumber(c.rate)` on the crew
+  record; falls back to "no rate on file" (`hasRate:false`) rather than silently costing
+  someone at 0. The rename was deliberate rather than re-pointing the old name: the
+  argument changed from a crew record to an entry id, and a silent signature change on a
+  money field reads fine and computes wrong. Do not look for `resolveCrewRate` — [Budget]
+- `saveEntryRate(entryId, rawValue)` (**renamed from `saveCrewRateOverride`**) — writes/
+  clears one entry's rate (empty input deletes the key, reverting to the database rate);
+  rejects a non-numeric entry by re-rendering
   without saving, so the field visibly reverts instead of holding invalid text —
   edited inline on the Per Person view, no separate edit affordance (matches the
   Phase Detail "Show as" decision — a plain input, not a pencil-and-save control) —
   [Budget]
-- `crewRateSaveIconHTML()` / `saveCrewRateToDatabase()` (Phase AG) — the Day Rate
+- `crewRateSaveIconHTML(entryId, context)` / `saveCrewRateToDatabase(entryId, context)` (Phase AG; entry-keyed since Phase BF — the write still lands on the PERSON each entry points at, so two entries for one person resolve to one crew record and the last one wins) — the Day Rate
   "Save to database" icon, the first thing in the app that writes from a project back
   onto the shared crew database itself (everything else is the reverse: database →
   per-project override). A deliberately separate, explicit action from the project's
@@ -441,8 +448,16 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   `dayNum` is free text the user types: non-unique, routinely blank, and mixed-type
   across records. It is a column *heading*, not an identity. Don't reintroduce it as
   a join key.
-  Days worked = shoot days where `(d.positions||[]).some(pos=>pos[0]===crewId)`,
-  the same on-day signal `buildTransportSummary()`/Days-on-site already use. Hotel
+  ⚠️ **Phase BF — one row per ENTRY, not per person** (day rate and days worked are both
+  entry-level now), **but travel is charged ONCE PER PERSON** over the deduplicated union
+  of their days. `travelClaimed` attributes it to whichever of a person's entries is in
+  scope first, and `perDay`'s `travelClaimedToday` does the same per day. Charging it per
+  entry would double a two-role person's travel AND the VAT on it, since AO's VAT base is
+  (day rate + travel). Verified on ROW 2026: every AO invariant still holds exactly —
+  VAT £3,517.00 across summary/departments/people/perDay, travel £1,660.00 across the
+  people-sum, the Travel extras row and `buildTransportSummary()`.
+  Days worked = shoot days where that ENTRY holds a position (`entryDayCount()`);
+  person-level counts use `crewDayCount()`. Hotel
   room-nights are counted directly off `d.hotelNights`/`p.hotelNightBefore` rather
   than via `buildHotelSummary()`, which filters to "active" nights only and would
   need label-matching to recover one specific day's figure — this way project-wide
@@ -546,7 +561,10 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `ROLES_BY_DEPT` / `rolesFor()` — canonical role list per department; each entry declaratively belongs to a department (Phase R item 1) — a saved role IS a department, there's no separate mapping to keep in sync — [Shared/utility functions]
 - `ROLE_SENIORITY` / `roleSeniorityRank()` / `moveRoleSeniority()` — per-role seniority rank within a department (Phase N item 2, e.g. DOP outranks 1st AC outranks Camera Operator), keyed by "Department/Role" path, persisted to `db:roleseniority`. Falls back to the role's position in `ROLES_BY_DEPT[dept]` when no explicit rank is set, so canonical roles sort sensibly with zero admin action; unmatched/custom-typed roles rank last. `moveRoleSeniority()` swaps a role up/down and renumbers its department densely (0,10,20…); edited via the "Role seniority order" reorder list in `renderDeptAdminPanel()` — [Shared/utility functions]
 - `departmentForRolePath()` — extracts the department from a "Department/Role" saved-role path string; the one place department is ever read off a role — [Shared/utility functions]
-- `rolesTagListHTML()` / `roleAddPickerHTML()` / `addRoleToCrew()` / `removeRoleFromCrew()` / `setActiveRole()` — render and manage a crew member's multiple assignable roles. `setActiveRole()` is the sole place a crew member's `department`/`subDepartment` are ever set — always derived from whichever saved role just became active, never typed directly. `removeRoleFromCrew()` refuses to remove a person's last remaining role, and re-activates a replacement if the removed one was active — [Shared/utility functions]
+- `rolesTagListHTML(c, entryId)` / `roleAddPickerHTML()` / `addRoleToCrew()` / `removeRoleFromCrew()` / `setActiveRole()` / `setEntryRole()` — render and manage a crew member's multiple assignable roles. ⚠️ **Phase BF split the setter in two, and which one a chip calls is decided by `rolesTagListHTML()`'s `entryId` argument:**
+  - `setEntryRole(entryId, rolePath)` — writes role/department onto the ENTRY, saves `db:projects`. **Every project screen routes here.** Nothing outside that project changes. Keeps the `selectedEditTargets()` fan-out (over entry ids). This is what BA's "Change to" consumes
+  - `setActiveRole(crewId, rolePath, skipSave)` — writes the PERSON's database default (`c.role`/`c.department`) and saves `db:crew`. **Reachable only from the Crew Database screen (D-1)** — `goDatabase()` nulls `currentProjectId`, which is what makes `crewExpansionHTML()` pass no `entryId` there. Do not wire a project screen back to it. Still the sole place `department`/`subDepartment` are derived rather than typed, and still what `addRoleToCrew()`/`removeRoleFromCrew()`/`confirmAddRoleDialog()` call internally for their first-role and replacement-role fixups
+  - `removeRoleFromCrew()` refuses to remove a person's last remaining role, and re-activates a replacement if the removed one was active — unchanged, and still a shared crew-database mutation (the AZ × gap) — [Shared/utility functions]
 - `pendingNewCrewRole` / `newCrewRolePickerHTML()` / `onNewCrewRolePick()` — single-role picker for a brand-new, not-yet-saved crew member (no id yet to attach a saved role to) — stashed here until `saveCrew()` creates the record with it — [Shared/utility functions]
 - `addRoleDialogFor` / `openAddRoleDialog()` / `closeAddRoleDialog()` / `addRoleDialogHTML()` / `confirmAddRoleDialog()` / `renderGlobalOverlay()` — the "Add new role" dialog (Phase R item 5): one in-page dialog (Department select + Role name) rendered into the persistent `#globalOverlay` div outside `#main`, replacing the old two-`prompt()` flow. Adds straight onto a crew id, or (when opened as `'__new__'`) feeds `pendingNewCrewRole` for the not-yet-saved crew form — [Shared/utility functions]
 - `useCrewAsTemplate()` / `duplicateCrew()` (Phase BG renamed the control and added the first of these) — **"Use as template"**, the D-1 crew-card action that clones a record as the starting point for a DIFFERENT PERSON (same company, agent and rate; new name). Never a second role for the same person — that's BA's "Add again as" once it ships. `useCrewAsTemplate()` is a confirm step and nothing else; `duplicateCrew()` below it is unchanged and still does the actual clone (new `uid()`, `_copyOriginalRole` stamp, `saveDB('db:crew')`). ⚠️ **The guard sits BEFORE the write, not at save**: `duplicateCrew()` writes to `db:crew` on click, so there is no pending record and no save step to gate — cancelling has to mean "don't create it", which only exists as a choice up front. Cancel writes nothing at all. Uses native `confirm()`, matching `deleteCrew()`/`removeSubDeptAdmin()` on this same screen; D-1.5's `addRoleDialogHTML()` is a picker, not a confirmation, so it isn't the pattern to copy — [Crew, Shared/utility functions]
@@ -570,7 +588,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `saveCrew()` — persist a crew record. Refuses to create a brand-new crew member without `pendingNewCrewRole` set ("every crew member needs at least one saved role"); for a new record, role/department/`roles` are derived entirely from that pick. For an existing record, role/department/`roles` are left untouched (they're managed live by `addRoleToCrew`/`setActiveRole` elsewhere, not by this form) — [Crew]
   - **Duplicate-name warning (Phase BG)** — a `confirm()` between the role check and the first mutation, so cancelling returns cleanly with nothing written and nothing renamed. Matches on the **name alone**, normalised (`trim()` + `toLowerCase()`), against every other record in `crewDB`. ⚠️ **Never name + role**: under BF one record holds several saved roles, so one person with two roles is one CORRECT record and two records sharing a name are wrong whatever roles they carry — building role into the comparison breaks the moment BF lands. It is a **warning, not a block** (two different people genuinely can share a name), and it only fires when the name is new or actually changed, so re-saving an unchanged record never nags. Covers the hand-entry paths — "+ Add crew member" and renaming in the Edit expansion — which are the ones that pass through this function; the template flow doesn't reach here at all and carries its own guard in `useCrewAsTemplate()` — [Crew]
   - ⚠️ **Not a duplicate finder, and it must not be sold as one.** Exact-string matching is weak against years of hand entry: normalising catches trailing spaces and casing, and nothing else — "M. Marshall" vs "Marshall, M" vs "Mike Marshall" all slip through. It also says nothing about pairs **already** in the database; it only guards new entry. Reconciling the existing ~88 records is BF's job — [Crew]
-- `deleteCrew()` — delete a crew record — [Crew]
+- `deleteCrew()` — delete a crew record, and drop every roster ENTRY that points at them on every project. ⚠️ **Deliberately leaves their shoot-day positions behind**, because that is exactly what it did before Phase BF (it filtered `p.crewIds` and touched nothing else); an unresolvable position has always rendered as `(removed crew)` via `crewInfo()`, and still does. Cleaning those up is a real improvement and a real behaviour change, so it was not BF's to make — [Crew]
 - `renderDeptAdminPanel()` / `toggleDeptAdminPanel()` — collapsible "Departments & sub-departments" panel on the Crew database screen: one block per department showing its sub-departments (add/rename/remove), its "Role seniority order" reorder list (Phase N item 2 — up/down via `moveRoleSeniority()`), and its roster, Heads of Department pinned to the top — [Crew]
 - `addSubDeptAdmin()` / `renameSubDeptAdmin()` / `removeSubDeptAdmin()` — add, rename (updates any crew already on it) and remove (clears it off any crew) a sub-department from the admin panel — [Crew]
 - `toggleHoD()` — toggles a crew member's `isHoD` flag (Head of Department), used to pin them to the top of their department's roster in the admin panel and, via `crewRolesRowHTML`/roster sorts, elsewhere — [Crew]
@@ -2212,6 +2230,143 @@ to, making BF's job harder rather than easier. Don't re-propose it.
   unlike the original brief's section 5, which scoped the warning to the template flow
   only. The spec correction moved it deliberately: hand entry is the path that actually
   passes through `saveCrew()`.
+
+## Phase BF — crew entry ids (9 Aug 2026)
+
+The schema migration the AZ–BG group was built around. Ships alone: a migration bundled
+with feature work can't be reverted without taking the feature with it.
+
+**The model — Option 2 of three.** An entry gets its OWN id plus a `crewId` pointer back
+to the person. One person, many entries, each carrying its own role and rate. Option 1
+(duplicate crew records — what "Duplicate crew member" does) was rejected because the two
+records aren't linked. Option 3 (composite `crewId` + role) was rejected because it breaks
+the moment someone holds the SAME role twice at different rates — so **nothing may assume
+(`crewId`, role) is unique, and no uniqueness constraint was added.**
+
+```
+p.crewEntries = [{ id, crewId, role, department, subDepartment, rate? }, …]
+```
+
+Replaces `p.crewIds` AND `p.crewRateOverrides`, both deleted by the migration.
+`d.positions[i][0]` and `d.crewOverrides` keys are ENTRY ids.
+
+### The scope rule — what moved and what deliberately didn't
+
+| Keyed to | What | Where |
+|---|---|---|
+| **Entry** | role, rate, days on site | `entry.role`/`entry.department`, `entry.rate`, `d.positions`, `d.crewOverrides` |
+| **Person** | hotel, travel, catering | `p.travelMethods`, `p.hotelNightBefore`, `d.hotelNights`, `d.cateringMeals` — **untouched** |
+
+Two roles is still one bed and one lunch. Days on site for the person-level tabs is the
+UNION of that person's entries' days, deduplicated (`crewDayCount()`), which holds even
+when both roles land on the same day. **Explicitly out of scope and not built:** whether
+hotel/catering days can be ticked independently of the roster.
+
+### Why `entryView()` made this a migration rather than a rewrite
+
+`entryView(e)` returns the crew record with the entry's `id`/`role`/`department` layered
+on top. Every existing sort, group, filter and identity helper reads `.id`/`.name`/
+`.role`/`.department`, so they all kept working — they just receive an entry-shaped object
+instead of a person-shaped one. `.crewId` is the marker that distinguishes the two, and
+the handful of genuinely person-level call sites branch on it (`personIdOf()`).
+`renderProjectCrew()` picks the list per view: **Roles and Days on site are entry-level;
+Hotel, Travel and Catering render `projectCrew()`, the deduplicated people.**
+
+### The migration — silent on load, not a supervised run
+
+⚠️ **This reverses the trigger decision recorded on the phases page**, on the evidence
+below and with explicit sign-off. `migrateCrewEntries()` runs in `initApp()` after the
+loads and before the first render, so **no screen ever meets the old shape and there is no
+dual-shape read path anywhere in the file** — the cost that got the split option rejected.
+
+- **Idempotent**: a project already carrying `crewEntries` is skipped, so a reload or a
+  second tab can't re-migrate. Verified: a second load performs **zero writes**.
+- **Backup before any migration write**, and only when there is something to migrate.
+  Three keys, because positions and overrides move too:
+  **`backup_pre_BF_20260809:db:projects` / `:db:shootdays` / `:db:crew`**.
+  If a backup write fails it aborts before touching anything.
+  ⚠️ The repo had **three** incompatible backup-key conventions already; the `prefix:key`
+  form was chosen because it is the only one that scales to a set.
+- Reports to the console; drops (and counts) any position it cannot map rather than
+  leaving a dangling id.
+
+### The duplicate-crew check was DROPPED, on evidence
+
+The phases page asserts same-name pairs "may well exist among the ~88 records" and calls
+the check "necessary, not precautionary". **That premise is false against the real data.**
+Scanned read-only before any change: **0 pairs** on exact normalised name (BG's own
+`trim()`+`toLowerCase()` matcher), **0** on same surname, **0** on first-initial+surname,
+and **0** records carrying `_copyOriginalRole` — the stamp `duplicateCrew()` writes and
+never deletes. So no record in `db:crew` was ever made by the old Duplicate feature.
+Identical across every crew snapshot back to 6 Aug (77 records then, 88 now).
+
+Since the supervised trigger existed *because* pairs needed confirming, and there are
+none, both were dropped together. **BG's two guards are untouched and still the defence
+against new ones.** A future pass wanting reconciliation should re-scan first.
+
+### `setActiveRole()` split in two
+
+See the entry in **Shared/utility functions**. `setEntryRole()` is what every project
+screen reaches; `setActiveRole()` survives for the Crew Database screen only. This closes
+the role-SWITCHING half of the AZ Edit-pencil gap; the × that deletes a saved role is
+still shared and still open.
+
+### Summary builders audited — all 13, including the ones that were fine
+
+Double-counted under the entry model and were fixed: **`buildTransportSummary()`** (the
+one Phase AO named), **`buildBudgetData()`** (travel and its VAT — not previously flagged),
+**`buildProjectCrewGroups('daysOnSite')`**, **`sortProjectCrewGroup('daysCount')`**,
+`personMatchesProjectDayFilter()`, and `cinematographyCrew()` (one camera letter per
+person, so it reads `projectCrew()`).
+Unaffected, because they are person-keyed or map over positions on purpose:
+`buildCateringSummaryGrid()`, `buildCateringExport()`/`cateringOrderLines()`,
+`buildHotelSummary()`/`hotelSummaryLines()`, `buildBudgetData()`'s hotel room-nights,
+`buildTaskFlags()`, `buildCrewSummary()`, and `buildFullData()`/`buildWAText()`/
+`downloadExcel()` — one call-sheet line per position is *correct*; two roles legitimately
+print twice.
+
+### Verification
+
+- Inline `<script>` extracted (2 blocks, 7,548 lines in the main one) — `node --check`
+  clean. `<style>` brace-balanced, **444/444** (no CSS changed).
+- Orphan sweep: zero live references to `p.crewIds`, `p.crewRateOverrides`,
+  `resolveCrewRate` or `saveCrewRateOverride` (only the deliberate "do not look for these"
+  note survives). No dead helpers left behind.
+- **Migration output checked in SQL against the backups**: 66/33/3 entries for exactly the
+  old 66/33/3 rosters, in the same order; 25/0/3 rates carried across matching the old
+  override counts; **238/238 positions**, every one resolving to an entry on the right
+  project and holding the same person in the same slot; every entry's role equal to its
+  crew record's role; no duplicate entry ids; `crewIds`/`crewRateOverrides` gone.
+  **Hotel nights, catering meals, travel methods, night-before and all three cost objects
+  byte-identical across all 10 days and 3 projects. `db:crew` never written.**
+- **Whole-output diff, pre vs post.** A 228,302-character fingerprint — every budget total,
+  department/day/person row, all four export views, transport/catering/hotel summaries,
+  the full WhatsApp call sheet for all 10 days, every position list, all 13 group-bys, all
+  7 sorts, task flags and cinematography crew, across all 3 projects — captured from
+  **pre-BF code reading the pre-BF backup** and from **post-BF code reading the migrated
+  data**. **SHA-256 identical: `bca199fb0dfc70a7ce8c2aed5b82ec3624e2f0c2f481ba6fb047b23781838304`.**
+- Mutation paths driven live: an entry role change leaves the crew record AND the same
+  person's entry on another project untouched (and writes `db:projects`, not `db:crew`);
+  rate is per entry and doesn't leak across projects; day toggles are per entry; hotel
+  toggles stay keyed by crew id; the selection Set translates correctly between the two
+  view kinds; the Crew Database screen still routes chips to `setActiveRole()` and shows
+  no per-project rate field.
+- **BG's two guards re-tested and unchanged**: the template confirm fires before any write
+  and cancelling creates nothing (zero `db:crew` writes); the duplicate-name confirm still
+  matches through padding and case (`"   JUSTIN SCHOENROCK  "`), and a unique name still
+  prompts not at all.
+- Zero console errors across 3 projects × 7 tabs × every sub-view × all 10 shoot days,
+  plus both databases, Settings and Welcome. Roles view renders 66 rows identical to before.
+
+### Left alone, as instructed
+- The AZ Edit-pencil **deletion** gap (chip ×) is still open.
+- `dayTotal` not resyncing when a day is added — untouched.
+- "+ Add crew member" form visibility — untouched.
+- BG's Solution B (prefilled form, block Save while the name matches) still deferred.
+- No code from `budget-v1-fail` was reused. No rate × days totals, aggregations or
+  rollups were added.
+
+---
 
 ---
 

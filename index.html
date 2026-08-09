@@ -1164,13 +1164,22 @@ function subDeptsFor(dept){
    c.roles is a list of "Department/Role" folder-path strings — the roles this person
    is booked as across projects. c.role (singular, free text) is still what's actually
    shown/exported everywhere; picking a saved role here just sets it in one click. */
-function rolesTagListHTML(c){
+/* Phase BF — `entryId` decides WHERE clicking a chip writes. Opened from a project
+   screen it is set, and the pick lands on that ENTRY (setEntryRole); opened from the
+   Crew Database screen it is null, and the pick sets the person's database default
+   (setActiveRole). That split is what stops a project screen rewriting someone's role
+   in every project they appear on — see the two functions below. */
+function rolesTagListHTML(c, entryId){
   const roles = c.roles || [];
   if(!roles.length) return '<span class="hint" style="margin-right:4px;">No saved roles yet.</span>';
+  const activeRole = entryId ? ((entryById(entryId, currentProject())||{}).role||'') : (c.role||'');
+  const pick = entryId
+    ? (rp)=>`setEntryRole('${entryId}','${esc(rp)}')`
+    : (rp)=>`setActiveRole('${c.id}','${esc(rp)}')`;
   return `<span class="taglist" style="display:inline-flex;">${roles.map(rp=>{
     const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
-    const active = !!c.role && c.role===name;
-    return `<span class="role-chip${active?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();setActiveRole('${c.id}','${esc(rp)}')" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
+    const active = !!activeRole && activeRole===name;
+    return `<span class="role-chip${active?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();${pick(rp)}" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
   }).join('')}</span>`;
 }
 /* Phase AZ — the Roles-view row banner. Used to render rolesTagListHTML() directly
@@ -1219,27 +1228,43 @@ async function removeRoleFromCrew(crewId, rolePath){
   await saveDB('db:crew', crewDB);
   refreshCrewScreen();
 }
-/* sets a saved role as the person's current/active title (c.role) — used everywhere
-   on the call sheet. Department is authoritatively derived from the role's path: a
-   saved role declares its own department (item 1 of Phase R), so there is no separate
-   department field to keep in sync — this is the one place department ever changes. */
+/* ---- the two role setters (Phase BF split this in half) ----
+   Department is authoritatively derived from the role's path in both: a saved role
+   declares its own department (Phase R item 1), so there is no separate department
+   field to keep in sync.
+
+   setActiveRole() — writes the PERSON's database default (c.role / c.department) and
+   persists db:crew, which changes what they look like everywhere they are not already
+   booked. Before BF this was reachable from every project Crew tab through the Edit
+   pencil, so picking a role on one project silently re-roled that person on every other
+   one. ⚠️ It is now reachable ONLY from the Crew Database screen (D-1) — rolesTagListHTML()
+   routes project-side clicks to setEntryRole() instead. Do not wire a project screen
+   back to this. (This also closes the AZ Edit-pencil gap for role SWITCHING as a side
+   effect; the × that deletes a saved role is still shared, and still open.)  */
 async function setActiveRole(crewId, rolePath, skipSave){
   const c = crewById(crewId); if(!c) return;
   const dept = departmentForRolePath(rolePath);
   const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
   c.role = roleName;
   if(dept){ c.department = dept; c.subDepartment = ''; }
-  if(!skipSave){
-    // skipSave calls are internal consistency fixups (e.g. reactivating a
-    // replacement role after removeRoleFromCrew) — only a direct, user-initiated
-    // role pick fans out to the rest of the current selection.
-    selectedEditTargets(crewId).filter(id=>id!==crewId).forEach(id=>{
-      const other = crewById(id); if(!other) return;
-      other.role = roleName;
-      if(dept){ other.department = dept; other.subDepartment = ''; }
-    });
-    await saveDB('db:crew', crewDB); refreshCrewScreen();
-  }
+  if(!skipSave){ await saveDB('db:crew', crewDB); refreshCrewScreen(); }
+}
+/* setEntryRole() — the project-scoped one: writes role/department onto the ENTRY and
+   persists db:projects. Nothing outside this project changes. This is what every
+   project screen reaches, and what BA's "Change to" will consume.
+   Keeps the selected-set fan-out the old function had (over entry ids now), because
+   that was a Crew-tab bulk-edit affordance, not a crew-database one. */
+async function setEntryRole(entryId, rolePath){
+  const p = currentProject(); if(!p) return;
+  const dept = departmentForRolePath(rolePath);
+  const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
+  selectedEditTargets(entryId).forEach(id=>{
+    const e = entryById(id, p); if(!e) return;
+    e.role = roleName;
+    if(dept){ e.department = dept; e.subDepartment = ''; }
+  });
+  await saveDB('db:projects', projectsDB);
+  refreshCrewScreen();
 }
 /* ---- "Add new role" dialog (item 5) ----
    Single in-page dialog: canonical Department select + free-text Role name,
@@ -1365,8 +1390,12 @@ function crewIdentityHTML(c, opts){
   opts = opts||{};
   const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
   // bulk-select mode swaps the "view" toggle for a plain checkbox (Crew on this project)
+  // Phase BF — an entry view selects itself; a person view selects all of that
+  // person's entries at once (see crewIsSelected/toggleCrewPersonSelected).
+  const selCheckedAttr = c.crewId ? (projectCrewSelected.has(c.id)?'checked':'') : (crewIsSelected(c.id)?'checked':'');
+  const selToggle = c.crewId ? `toggleCrewSelected('${c.id}', this.checked)` : `toggleCrewPersonSelected('${c.id}', this.checked)`;
   const viewOrSelect = opts.bulkSelect
-    ? `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`
+    ? `<input type="checkbox" class="bulk-select-cb" ${selCheckedAttr} onclick="event.stopPropagation()" onchange="${selToggle}" title="Select">`
     : `<button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>`;
   const buttons = `
     ${viewOrSelect}
@@ -1412,10 +1441,28 @@ function posnIdentityHTML(c, crewId, isEditing, overridden){
   </div>`;
 }
 /* the accordion panel that opens under a crew row when View or Edit is active */
-function crewExpansionHTML(c, wrapClass){
-  if(editingCrewId===c.id) return `<div class="${wrapClass}">${crewFormHTML(c)}</div>`;
-  if(viewingCrewId===c.id) return `<div class="${wrapClass}">${crewViewHTML(c)}</div>`;
-  return '';
+/* Phase BF — `v` is an ENTRY view on Roles/Days on site, a PERSON view on
+   Hotel/Travel/Catering, and a plain crew record on the Crew Database screen. The
+   expansion always edits the underlying PERSON (that is what the crew form is), so the
+   real crew record is resolved first — passing an entry id into crewFormHTML()'s
+   #crewEditId would make saveCrew() write a crew record under an entry's id.
+   `entryId` rides alongside it so the form's two project-scoped controls (the day rate
+   and the role chips) act on the right entry. On a person-level view there is no single
+   entry, so it falls back to that person's first one — which is exactly the one rate
+   the row showed before BF. */
+function crewExpansionHTML(v, wrapClass){
+  const isEntryView = !!v.crewId;
+  const c = isEntryView ? crewById(v.crewId) : v;
+  if(!c) return '';
+  const openEdit = editingCrewId===v.id, openView = viewingCrewId===v.id;
+  if(!openEdit && !openView) return '';
+  let entryId = null;
+  const p = currentProject();
+  if(p){
+    entryId = isEntryView ? v.id : ((entriesForCrew(c.id, p)[0]||{}).id || null);
+  }
+  if(openEdit) return `<div class="${wrapClass}">${crewFormHTML(c, entryId)}</div>`;
+  return `<div class="${wrapClass}">${crewViewHTML(c)}</div>`;
 }
 let crewDB = [], locationsDB = [], projectsDB = [], shootDaysDB = [];
 let route = { screen: 'welcome' };
@@ -1457,8 +1504,184 @@ const currentDay = () => dayById(currentShootDayId);
 const projectDays = (projectId) => shootDaysDB
   .filter(d=>d.projectId===(projectId||currentProjectId))
   .sort((a,b)=>(Number(a.dayNum)||0)-(Number(b.dayNum)||0));
-/* crew records for a project, in the order they were added to it */
-const projectCrew = (p) => ((p||currentProject()||{}).crewIds||[]).map(crewById).filter(Boolean);
+/* ============================================================ CREW ENTRIES (Phase BF)
+   THE SCHEMA, in one place. A project's roster is a list of ENTRIES, not of people:
+
+     p.crewEntries = [{ id, crewId, role, department, subDepartment, rate? }, …]
+
+   `id` is the entry's own id; `crewId` points back at the shared crew record. One
+   person can hold several entries on one project (Meurig as AC *and* as operator),
+   each carrying its own role and its own rate. That is Option 2 of the three compared
+   on 9 Aug; Option 3 (composite crewId+role) was rejected precisely because it breaks
+   when someone holds the SAME role twice at different rates — so nothing here may
+   assume (crewId, role) is unique.
+
+   ⚠️ THE SCOPE RULE — what is keyed to an entry and what is keyed to a person:
+     PER ENTRY  — role, rate, days on site.  d.positions[i][0] is an ENTRY id.
+                  d.crewOverrides is keyed by ENTRY id.
+     PER PERSON — hotel, travel, catering.   p.travelMethods, p.hotelNightBefore,
+                  d.hotelNights and d.cateringMeals stay keyed by CREW id, untouched.
+                  Two roles is still one bed and one lunch.
+   Days on site for the person-level tabs is the UNION of that person's entries' days,
+   DEDUPLICATED — see crewDayCount(). Getting that wrong is the Phase AO double-count:
+   a builder that asks "does anyone hold a position that day" answers twice for a
+   person with two entries covering it.
+
+   Replaces p.crewIds (a flat array of crew ids) and p.crewRateOverrides (a per-project
+   crewId→rate map); both are removed by migrateCrewEntries() below. */
+const projectEntries = (p) => ((p||currentProject()||{}).crewEntries||[]);
+const entryById = (entryId, p) => projectEntries(p).find(e=>e.id===entryId) || null;
+/* every entry a given person holds on a project, in roster order */
+const entriesForCrew = (crewId, p) => projectEntries(p).filter(e=>e.crewId===crewId);
+/* ---- the view objects every screen actually renders from ----
+   entryView() is the reason this migration is not a rewrite: it hands back the crew
+   record with the ENTRY's id/role/department layered on top, so every existing sort,
+   group, filter and identity helper that reads `.id` / `.name` / `.role` /
+   `.department` keeps working unchanged — it just gets an entry-shaped object instead
+   of a person-shaped one. `.crewId` is what marks it as an entry view; anything that
+   needs the real person (the crew form, hotel/travel/catering) reads that. */
+function entryView(e){
+  const c = crewById(e.crewId);
+  if(!c) return null;
+  return Object.assign({}, c, {
+    id: e.id, crewId: e.crewId, role: e.role||'',
+    department: e.department||'', subDepartment: e.subDepartment||''
+  });
+}
+const projectEntryViews = (p) => projectEntries(p).map(entryView).filter(Boolean);
+/* DISTINCT people on a project, in roster order — for the person-level tabs (hotel,
+   travel, catering) and anywhere "how many humans" is the question. `.id` is the CREW
+   id here, deliberately: those tabs' toggles are all keyed by crewId. Role/department
+   come from the person's FIRST entry so the row reads the same as the Roles tab
+   rather than falling back to their crew-database default. */
+function projectCrew(p){
+  const seen = new Set(), out = [];
+  projectEntries(p).forEach(e=>{
+    if(seen.has(e.crewId)) return;
+    seen.add(e.crewId);
+    const c = crewById(e.crewId); if(!c) return;
+    out.push(Object.assign({}, c, {
+      id: c.id, role: e.role||'', department: e.department||'', subDepartment: e.subDepartment||''
+    }));
+  });
+  return out;
+}
+/* ---- days on site ----
+   entryDayCount: days THIS entry holds a position on.
+   crewDayCount:  days ANY of this person's entries holds a position on, deduplicated.
+   ⚠️ Use the second for anything person-level (travel, hotel, headcounts). Using the
+   first, or counting positions directly, double-counts a person with two entries on
+   one day — the exact shape Phase AO flagged in buildTransportSummary(). */
+const entryOnDay = (entryId, d) => (d.positions||[]).some(pos=>pos[0]===entryId);
+const entryDayCount = (entryId, days) => (days||[]).filter(d=>entryOnDay(entryId, d)).length;
+function crewOnDay(crewId, d, p){
+  const ids = new Set(entriesForCrew(crewId, p).map(e=>e.id));
+  return (d.positions||[]).some(pos=>ids.has(pos[0]));
+}
+const crewDayCount = (crewId, days, p) => (days||[]).filter(d=>crewOnDay(crewId, d, p)).length;
+/* the one place an entry is created — every "put this person on this project" path
+   (the Crew tab picker, AI Scan's matched-accept, Overview Quick add, and saveCrew()'s
+   brand-new-person-inside-a-project branch) goes through here, so a new entry can't
+   drift into three slightly different shapes. Role/department seed from the person's
+   crew-database record, which is exactly what the roster showed before BF. Returns the
+   new entry, or the existing one when this is a re-add of someone already on the
+   project (pre-BF behaviour: adding twice was a no-op, and stays one until BA's
+   "Add again as" makes a second entry a deliberate act). */
+function addCrewEntry(p, crewId){
+  if(!p || !crewId) return null;
+  p.crewEntries = p.crewEntries || [];
+  const already = p.crewEntries.find(e=>e.crewId===crewId);
+  if(already) return already;
+  const c = crewById(crewId);
+  const e = { id: uid(), crewId,
+    role: (c&&c.role)||'', department: (c&&c.department)||'', subDepartment: (c&&c.subDepartment)||'' };
+  p.crewEntries.push(e);
+  return e;
+}
+/* remove entries and everything keyed to THEM — the entry-id equivalent of what
+   removeCrewFromProject()/bulkRemoveSelectedFromProject() have always cleared, which is
+   the roster slot and the shoot-day positions.
+   ⚠️ Person-level data (travel method, hotel nights, catering meals) is deliberately
+   NOT cleared here, because it never was before BF. Removing someone from a project has
+   always left those behind; changing that would be a behaviour change, and this phase
+   has none. It also happens to be the right shape for the entry model — two roles is
+   one bed, so dropping one entry must not cancel a booking the other still needs. */
+function removeCrewEntries(p, entryIds){
+  if(!p) return;
+  const kill = new Set(entryIds);
+  p.crewEntries = (p.crewEntries||[]).filter(e=>!kill.has(e.id));
+  shootDaysDB.forEach(d=>{
+    if(d.projectId!==p.id) return;
+    if(d.positions) d.positions = d.positions.filter(pos=>!kill.has(pos[0]));
+    if(d.crewOverrides) kill.forEach(id=>{ delete d.crewOverrides[id]; });
+  });
+}
+/* ---- the migration ----
+   Runs once from initApp(), before the first render, and is IDEMPOTENT: a project that
+   already carries crewEntries is skipped, so re-running it (a reload, a second tab) can
+   never re-migrate or duplicate. It writes its backup keys BEFORE any migration write,
+   and only when there is actually something to migrate — a no-op load writes nothing at
+   all. Returns a short report for the console.
+
+   One entry per (project, person), carrying that person's role/department at migration
+   time and their existing per-project rate override, so a person with one role is
+   indistinguishable from how they looked before this ran. Positions and per-day crew
+   overrides are rekeyed crewId→entryId in the same pass. Hotel, travel and catering are
+   deliberately NOT touched. */
+async function migrateCrewEntries(){
+  const stale = projectsDB.filter(p=>!Array.isArray(p.crewEntries));
+  if(!stale.length) return null;
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const prefix = `backup_pre_BF_${stamp}`;
+  // Backup first, always — three collections, because positions and crewOverrides move
+  // too. If any backup write fails, stop: no migration write happens.
+  for(const [key, val] of [['db:projects', projectsDB], ['db:shootdays', shootDaysDB], ['db:crew', crewDB]]){
+    const res = await saveDB(`${prefix}:${key}`, val);
+    if(res && res.ok===false){ console.error('[BF] backup failed, migration aborted:', key, res); return {aborted:key}; }
+  }
+  const report = { backupPrefix:prefix, projects:0, entries:0, positions:0, overrides:0, rates:0, orphanPositions:0 };
+  stale.forEach(p=>{
+    const map = {};   // crewId -> entryId, for rekeying this project's days
+    p.crewEntries = (p.crewIds||[]).map(crewId=>{
+      const c = crewById(crewId);
+      const e = { id: uid(), crewId,
+        role: (c&&c.role)||'', department: (c&&c.department)||'', subDepartment: (c&&c.subDepartment)||'' };
+      const ov = (p.crewRateOverrides||{})[crewId];
+      if(ov!==undefined && ov!==null && !isNaN(Number(ov))){ e.rate = Number(ov); report.rates++; }
+      map[crewId] = e.id;
+      return e;
+    });
+    report.projects++; report.entries += p.crewEntries.length;
+    shootDaysDB.filter(d=>d.projectId===p.id).forEach(d=>{
+      if(Array.isArray(d.positions)){
+        // An unmappable position has no entry to point at. Drop it rather than leave a
+        // dangling id — it was already invisible (the roster is what every screen
+        // renders from), and the count is reported rather than swallowed.
+        const before = d.positions.length;
+        d.positions = d.positions.map(pos=>{
+          const eid = map[pos[0]];
+          return eid ? [eid, ...pos.slice(1)] : null;
+        }).filter(Boolean);
+        report.positions += d.positions.length;
+        report.orphanPositions += before - d.positions.length;
+      }
+      if(d.crewOverrides && Object.keys(d.crewOverrides).length){
+        const next = {};
+        Object.keys(d.crewOverrides).forEach(crewId=>{
+          const eid = map[crewId];
+          if(eid){ next[eid] = d.crewOverrides[crewId]; report.overrides++; }
+        });
+        d.crewOverrides = next;
+      }
+    });
+    delete p.crewIds;
+    delete p.crewRateOverrides;
+  });
+  await saveDB('db:projects', projectsDB);
+  await saveDB('db:shootdays', shootDaysDB);
+  console.info('[BF] crew entries migration:', report);
+  return report;
+}
 /* the location currently picked in the Shoot Day form's primary-location select */
 const selectedDayLocation = () => locById(document.getElementById('sdLocation')?.value);
 /* the whole Crew Database screen — the filter/sort/admin controls all live outside
@@ -1817,6 +2040,13 @@ async function initApp(){
   if(!crewDB.length && !locationsDB.length && !projectsDB.length){
     await seedSampleData();   // first-ever load — populate with the OFTV sample so there's something to work with
   }
+  /* Phase BF — convert p.crewIds to p.crewEntries before anything renders, so no screen
+     ever meets the old shape and no dual-shape read path is needed anywhere in the file.
+     Idempotent and a no-op (zero writes) once every project carries crewEntries, which
+     is why it can sit on the load path safely. Backups are written inside it, before any
+     migration write. Placed after seedSampleData() so a first-ever load migrates the
+     seed in the same pass rather than leaving it on the old shape. */
+  await migrateCrewEntries();
   renderSide(); renderMain();
 }
 initApp();
@@ -1870,9 +2100,14 @@ document.addEventListener('keydown', function(e){
 /* ---- toggle-all per person: Days on site + Hotel (kind: 'days' | 'hotel') ----
    Genuine on/off toggle: if everything for this person is already ticked, turn
    it all off; otherwise turn it all on. */
-async function toggleAllForPerson(crewId, kind){
+/* ⚠️ Phase BF — the two branches take DIFFERENT ids. 'hotel' is person-level, so it
+   takes a crewId; 'days' is entry-level, so it takes an entryId. The caller
+   (crewAssignRowHTML) is rendering a person row on the Hotel view and an entry row on
+   Days on site, so it already has the right one in hand either way. */
+async function toggleAllForPerson(id, kind){
   const days = projectDays();
   if(kind==='hotel'){
+    const crewId = id;
     const p = currentProject();
     p.hotelNightBefore = p.hotelNightBefore || [];
     const allOn = p.hotelNightBefore.includes(crewId) && days.every(d=>(d.hotelNights||[]).includes(crewId));
@@ -1885,13 +2120,14 @@ async function toggleAllForPerson(crewId, kind){
     }
     saveInBackground('db:projects', projectsDB);
   } else {
-    // 'days' — Days on site
-    const allOn = days.length>0 && days.every(d=>(d.positions||[]).some(pos=>pos[0]===crewId));
+    // 'days' — Days on site, keyed by ENTRY id
+    const entryId = id;
+    const allOn = days.length>0 && days.every(d=>entryOnDay(entryId, d));
     days.forEach(d=>{
       d.positions = d.positions || [];
-      const idx = d.positions.findIndex(pos=>pos[0]===crewId);
+      const idx = d.positions.findIndex(pos=>pos[0]===entryId);
       if(allOn){ if(idx>-1) d.positions.splice(idx,1); }
-      else if(idx===-1){ d.positions.push([crewId, '', '', '', '']); }
+      else if(idx===-1){ d.positions.push([entryId, '', '', '', '']); }
     });
   }
   // G14 — render first, save after (see saveInBackground)
@@ -2734,7 +2970,7 @@ async function createProject(){
   const client=val('npClient'), title=val('npTitle'), start=val('npStart');
   if(!client||!title||!start){ alert('Client, working title and initial shoot date are all required.'); return; }
   const rec = { id: uid(), client, title, startDate: start, company: COMPANY,
-    logline: val('npLogline'), description: val('npDescription'), crewIds: [], locationIds: [], createdAt: new Date().toISOString() };
+    logline: val('npLogline'), description: val('npDescription'), crewEntries: [], locationIds: [], createdAt: new Date().toISOString() };
   projectsDB.push(rec); await saveDB('db:projects', projectsDB);
   // every project starts life with one shoot day — nobody wants to hunt for "+ New day" first
   const day = makeShootDayRecord(rec.id, rec);
@@ -2998,7 +3234,7 @@ function onQuickCrewInput(q){
 }
 function quickCrewResultsHTML(){
   const p = currentProject(); if(!p) return '';
-  const assignedIds = p.crewIds||[];
+  const assignedIds = projectEntries(p).map(e=>e.crewId);
   const q = quickCrewQuery.trim();
   const ql = q.toLowerCase();
   const blob = c => (c.name+' '+(c.role||'')+' '+(c.department||'')).toLowerCase();
@@ -3130,7 +3366,7 @@ function buildTaskFlags(p, days){
   const noDateDays = days.filter(d=>!d.date);
   if(noDateDays.length) items.push({ label:`${noDateDays.length} shoot day${noDateDays.length>1?'s':''} missing a date`, onclick:`currentShootDayId='${noDateDays[0].id}';goProjectTab('days')` });
   if(!(p.locationIds||[]).length) items.push({ label:'No locations added yet', onclick:`goProjectTab('locations')` });
-  if(!(p.crewIds||[]).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
+  if(!projectEntries(p).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
 
   days.filter(d=>!d.locationId).forEach(d=>{
     items.push({ label:`No location — ${shootDayLabel(d)}`, onclick:`currentShootDayId='${d.id}';goProjectTab('days')` });
@@ -3144,9 +3380,9 @@ function buildTaskFlags(p, days){
   // box. Clicking jumps to Budget's Per Person view, where every no-rate
   // person is already listed together with an inline field to fix it.
   // Guarded with a typeof check so this rule degrades to a no-op, not an
-  // error, if Budget's resolveCrewRate() isn't present in some future branch.
-  if(typeof resolveCrewRate==='function'){
-    const noRateCount = projectCrew(p).filter(c=>!resolveCrewRate(c,p).hasRate).length;
+  // error, if Budget's resolveEntryRate() isn't present in some future branch.
+  if(typeof resolveEntryRate==='function'){
+    const noRateCount = projectEntries(p).filter(e=>!resolveEntryRate(e.id,p).hasRate).length;
     if(noRateCount) items.push({ label:`${noRateCount} crew member${noRateCount>1?'s':''} with no day rate set`, onclick:`budgetView='person';goProjectTab('budget')` });
   }
   return items;
@@ -3351,7 +3587,7 @@ async function addNewCrewFromProposal(name, department, role){
     rate:'', notes:'' };
   crewDB.push(rec);
   await saveDB('db:crew', crewDB);
-  p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(rec.id)) p.crewIds.push(rec.id);
+  addCrewEntry(p, rec.id);
   await saveDB('db:projects', projectsDB);
   return rec;
 }
@@ -3823,11 +4059,16 @@ function matchesCrewFilterState(c, f){
    OR = on any of the selected days, AND = on every one of the selected days.
    "On" a day means they have a position assignment on it (same definition the
    Days on site grid itself uses). */
+/* Phase BF — `c` is an ENTRY view on Roles/Days on site (c.crewId set) and a PERSON view
+   on Hotel/Travel/Catering (no c.crewId). An entry matches on its own days; a person
+   matches on the UNION of their entries' days, which is what "is this human on site that
+   day" has to mean once one human can hold two entries. */
 function personMatchesProjectDayFilter(c){
   const f = projectCrewFilter;
   if(!f.days.size) return true;
+  const p = currentProject();
   const days = shootDaysDB.filter(d=>d.projectId===currentProjectId && f.days.has(d.id));
-  const onDay = d => (d.positions||[]).some(pos=>pos[0]===c.id);
+  const onDay = c.crewId ? (d => entryOnDay(c.id, d)) : (d => crewOnDay(c.id, d, p));
   return f.daysMode==='and' ? days.every(onDay) : days.some(onDay);
 }
 function personMatchesProjectFilter(c){
@@ -3835,8 +4076,9 @@ function personMatchesProjectFilter(c){
   return projectCrewFilter.inverse ? !matches : matches;
 }
 function personHasHotel(c, p, days){
-  if(((p&&p.hotelNightBefore)||[]).includes(c.id)) return true;
-  return days.some(d=>(d.hotelNights||[]).includes(c.id));
+  const id = personIdOf(c);   // hotel is person-level; `c` may be an entry view
+  if(((p&&p.hotelNightBefore)||[]).includes(id)) return true;
+  return days.some(d=>(d.hotelNights||[]).includes(id));
 }
 /* seniority BAND for the Group by "Seniority" option — derived from the real
    per-department roleSeniorityRank() (index/ROLE_SENIORITY), not a separate
@@ -3857,11 +4099,13 @@ function sortProjectCrewGroup(list, p, days){
     case 'seniority': return list.slice().sort((a,b)=>roleSeniorityRank(a.department,a.role)-roleSeniorityRank(b.department,b.role)||byName(a,b));
     case 'company': return list.slice().sort((a,b)=>(a.coProductionCompany||'￿').localeCompare(b.coProductionCompany||'￿')||byName(a,b));
     case 'daysCount': {
-      const dayCount = c => (days||[]).filter(d=>(d.positions||[]).some(pos=>pos[0]===c.id)).length;
+      // entry view → that entry's days; person view → the deduplicated union
+      const pj = currentProject();
+      const dayCount = c => c.crewId ? entryDayCount(c.id, days) : crewDayCount(c.id, days, pj);
       return list.slice().sort((a,b)=>dayCount(b)-dayCount(a)||byName(a,b));
     }
     case 'added': {
-      const order = (p&&p.crewIds)||[];
+      const order = projectEntries(p).map(e=>e.id);
       return list.slice().sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
     }
     case 'dept':
@@ -3906,7 +4150,7 @@ function buildProjectCrewGroups(list, p, days){
     company:  () => groupAlpha(c => c.coProductionCompany, 'No lead company'),
     role:     () => groupAlpha(c => c.role, 'No role set'),
     subDept:  () => groupAlpha(c => c.subDepartment, 'No sub-department'),
-    travel:   () => groupAlpha(c => ((p&&p.travelMethods)||{})[c.id], 'Not set'),
+    travel:   () => groupAlpha(c => ((p&&p.travelMethods)||{})[personIdOf(c)], 'Not set'),
     catering: () => groupAlpha(c => c.dietaryGeneral, 'Standard / not set'),
     hotel:      () => groupFixed(c => personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel', ['Has hotel','No hotel']),
     personType: () => groupFixed(c => deptBucketKey(c.department)==='Talent' ? 'Talent' : deptBucketKey(c.department)==='Client' ? 'Client' : 'Crew', ['Crew','Talent','Client']),
@@ -3931,10 +4175,10 @@ function buildProjectCrewGroups(list, p, days){
   if(gb==='daysOnSite'){
     const buckets = {};
     (days||[]).forEach(d=>{
-      const onDay = list.filter(c=>(d.positions||[]).some(pos=>pos[0]===c.id));
+      const onDay = list.filter(c=>c.crewId ? entryOnDay(c.id, d) : crewOnDay(c.id, d, p));
       if(onDay.length) buckets[`Day ${d.dayNum||'?'}`] = onDay;
     });
-    const notOn = list.filter(c=>!(days||[]).some(d=>(d.positions||[]).some(pos=>pos[0]===c.id)));
+    const notOn = list.filter(c=>!(days||[]).some(d=>c.crewId ? entryOnDay(c.id, d) : crewOnDay(c.id, d, p)));
     if(notOn.length) buckets['Not on any shoot day'] = notOn;
     const keys = (days||[]).map(d=>`Day ${d.dayNum||'?'}`).filter(k=>buckets[k]).concat(notOn.length?['Not on any shoot day']:[]);
     return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
@@ -4065,12 +4309,43 @@ function clearCrewSelection(){ projectCrewSelected.clear(); bulkEditOpen = false
    phase. Callers still own their own field-specific mutation — this only answers
    "which ids", so a single loop + one save/render per call site covers every field
    without a per-field bulk-edit implementation. */
-function selectedEditTargets(crewId){
-  if(projectCrewSelected.size>1 && projectCrewSelected.has(crewId)) return [...projectCrewSelected];
-  return [crewId];
+function selectedEditTargets(entryId){
+  if(projectCrewSelected.size>1 && projectCrewSelected.has(entryId)) return [...projectCrewSelected];
+  return [entryId];
 }
-/* ⚠️ This clears BOTH p.crewIds and every shoot day's `positions`, the same two
-   places removeCrewFromProject() has always cleared. Removing only crewIds left a
+/* ---- Phase BF: one Set, two currencies ----
+   projectCrewSelected always holds ENTRY ids — it is module-level and deliberately
+   survives setCrewGridView(), so it has to mean one thing, and the entry is the finer
+   grain of the two. The person-level views (Hotel/Travel/Catering) render one row per
+   human, so they translate at the edges:
+     crewIsSelected()      — is ANY of this person's entries selected
+     toggleCrewPersonSelected() — select/deselect ALL of them together
+     selectedCrewTargets() — the distinct PEOPLE behind the current selection, for the
+                             person-level fields that fan out (hotel, travel, catering,
+                             Show as). Deduplicated, so a two-entry person is written once.
+   With one entry per person all three collapse to exactly the pre-BF behaviour. */
+function crewIsSelected(crewId){
+  return entriesForCrew(crewId, currentProject()).some(e=>projectCrewSelected.has(e.id));
+}
+function toggleCrewPersonSelected(crewId, checked){
+  entriesForCrew(crewId, currentProject()).forEach(e=>{
+    if(checked) projectCrewSelected.add(e.id); else projectCrewSelected.delete(e.id);
+  });
+  renderProjectBody();
+}
+function selectedCrewTargets(crewId){
+  if(!(projectCrewSelected.size>1 && crewIsSelected(crewId))) return [crewId];
+  const p = currentProject();
+  const out = new Set();
+  projectCrewSelected.forEach(entryId=>{ const e = entryById(entryId, p); if(e) out.add(e.crewId); });
+  out.add(crewId);
+  return [...out];
+}
+/* the person behind a row, whichever kind of view it is */
+const personIdOf = (c) => c.crewId || c.id;
+/* ⚠️ This clears BOTH the roster entries and every shoot day's `positions` (via
+   removeCrewEntries(), Phase BF), the same two
+   places removeCrewFromProject() has always cleared. Removing only the roster slot left a
    bulk-removed person sitting on the call sheet — they were off the roster but still
    holding a position on the days they'd been assigned to. The undo snapshot has to
    cover db:shootdays for the same reason. */
@@ -4079,8 +4354,7 @@ async function bulkRemoveSelectedFromProject(){
   const n = projectCrewSelected.size;
   if(!n || !confirm(`Remove ${n} crew member(s) from this project?`)) return;
   const snaps = beginUndo(['db:projects','db:shootdays']);
-  p.crewIds = (p.crewIds||[]).filter(id=>!projectCrewSelected.has(id));
-  shootDaysDB.forEach(d=>{ if(d.projectId===p.id && d.positions) d.positions = d.positions.filter(pos=>!projectCrewSelected.has(pos[0])); });
+  removeCrewEntries(p, [...projectCrewSelected]);
   projectCrewSelected.clear();
   await saveDB('db:projects', projectsDB);
   await saveDB('db:shootdays', shootDaysDB);
@@ -4195,8 +4469,14 @@ function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='',
 function renderProjectCrew(body){
   const p = currentProject();
   const days = projectDays();
-  const assigned = (p.crewIds||[]).map(id=>crewById(id)).filter(Boolean);
-  const unassigned = crewDB.filter(c=>!(p.crewIds||[]).includes(c.id));
+  // Roles and Days on site are ENTRY-level (role, rate and days all live on an entry);
+  // Hotel, Travel and Catering are PERSON-level and must show one row per human, so they
+  // render the deduplicated projectCrew() list instead. With one entry per person the two
+  // lists are identical, which is why this reads the same as it did before BF.
+  const entryLevel = crewGridView==='roles' || crewGridView==='days';
+  const assigned = entryLevel ? projectEntryViews(p) : projectCrew(p);
+  const onProject = new Set(projectEntries(p).map(e=>e.crewId));
+  const unassigned = crewDB.filter(c=>!onProject.has(c.id));
   const filtered = assigned.filter(personMatchesProjectFilter);
 
   const viewLabels = {roles:'Roles', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
@@ -4223,8 +4503,13 @@ function renderProjectCrew(body){
     const groupsCSV = groups.map(g=>g.key).join(',');
     // Select all (item 2) only ever acts on `filtered` — whatever the active filter
     // is currently showing, never every crew member on the project.
-    const filteredIdsCSV = filtered.map(c=>c.id).join(',');
-    const allFilteredSelected = filtered.every(c=>projectCrewSelected.has(c.id));
+    // Phase BF — the selection Set is always entry ids, so a person-level view expands
+    // each visible human back to their entries before offering "Select all".
+    const filteredEntryIds = entryLevel
+      ? filtered.map(c=>c.id)
+      : filtered.flatMap(c=>entriesForCrew(c.id, p).map(e=>e.id));
+    const filteredIdsCSV = filteredEntryIds.join(',');
+    const allFilteredSelected = filteredEntryIds.length>0 && filteredEntryIds.every(id=>projectCrewSelected.has(id));
     selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
     const summaryLinkHTML = ['hotel','catering'].includes(crewGridView) ? `<span onclick="jumpToSummary('${crewGridView}')">Summary</span>`
       : crewGridView==='travel' ? `<span onclick="jumpToSummary('transport')">Summary</span>` : '';
@@ -4321,7 +4606,7 @@ function renderProjectCrew(body){
 }
 /* Roles tab row (Phase S, reordered Phase Z) — tidy grid columns: CONTROLS | Name | Role | Rate | Show as.
    Department was dropped in Phase Z (redundant with the group headers); Rate is the same
-   per-project day-rate override as Budget's Per Person view (resolveCrewRate/saveCrewRateOverride).
+   per-entry day rate as Budget's Per Person view (resolveEntryRate/saveEntryRate).
    "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (crewFormHTML)
    or the bulk-edit panel — neither appears on this main row. Phone is not shown here either. */
 function crewRolesRowHTML(c){
@@ -4329,12 +4614,12 @@ function crewRolesRowHTML(c){
   const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
   const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
   const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
-  const rate = resolveCrewRate(c, currentProject());
+  const rate = resolveEntryRate(c.id, currentProject());
   return `<div class="roles-grid roles-grid-row ${isEditing?'roles-grid-row-editing':''}">
     <div class="roles-grid-controls">${selectCb}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}${copyBadge}</div>
     <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(c)}</span></div>
-    <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveCrewRateOverride('${c.id}', this.value)">${crewRateSaveIconHTML(c.id, 'r')}</span></div>
+    <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${c.id}', this.value)">${crewRateSaveIconHTML(c.id, 'r')}</span></div>
     <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(c)}</div>
     ${crewExpansionHTML(c, 'roles-grid-editform')}
   </div>`;
@@ -4345,10 +4630,12 @@ function crewRolesRowHTML(c){
    no edit state, no save button. onchange (not oninput) means it only writes when the
    value actually changed and focus has left, so tabbing through 66 rows saves nothing. */
 function showAsQuickEditHTML(c){
+  // Phase BF — "Show as" lives on the crew record (one person, one display name), so
+  // this writes against the PERSON even though the row it sits on is an entry.
   return `<span class="roles-grid-showas">
     <input type="text" value="${esc(c.showAs||'')}" placeholder="Show as…"
       onclick="event.stopPropagation()"
-      onchange="saveQuickShowAs('${c.id}', this.value)"
+      onchange="saveQuickShowAs('${personIdOf(c)}', this.value)"
       onkeydown="if(event.key==='Enter')this.blur()">
   </span>`;
 }
@@ -4356,7 +4643,7 @@ async function saveQuickShowAs(crewId, value){
   const c = crewById(crewId); if(!c) return;
   const next = (value||'').trim();
   if(c.showAs === next) return;
-  selectedEditTargets(crewId).forEach(id=>{ const other = crewById(id); if(other) other.showAs = next; });
+  selectedCrewTargets(crewId).forEach(id=>{ const other = crewById(id); if(other) other.showAs = next; });
   await saveDB('db:crew', crewDB);
   // no re-render: the input already shows the new value, and re-rendering here
   // would steal focus from wherever the user tabbed to next. Other selected
@@ -4384,8 +4671,8 @@ function crewAssignRowHTML(c, days){
       const inHotel = (d.hotelNights||[]).includes(c.id);
       return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
     }
-    // default: 'days'
-    const onDay = (d.positions||[]).some(pos=>pos[0]===c.id);
+    // default: 'days' — c is an ENTRY view here, so this is the entry's own day
+    const onDay = entryOnDay(c.id, d);
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${onDay?'checked':''} onchange="toggleCrewOnDay('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
   const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
@@ -4436,7 +4723,7 @@ function crewCateringBlockHTML(c, days){
 async function toggleHotelNight(crewId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
   d.hotelNights = d.hotelNights || [];
-  selectedEditTargets(crewId).forEach(id=>{
+  selectedCrewTargets(crewId).forEach(id=>{
     if(checked){ if(!d.hotelNights.includes(id)) d.hotelNights.push(id); }
     else { d.hotelNights = d.hotelNights.filter(x=>x!==id); }
   });
@@ -4447,7 +4734,7 @@ async function toggleHotelNight(crewId, dayId, checked){
 async function toggleHotelPre(crewId, checked){
   const p = currentProject(); if(!p) return;
   p.hotelNightBefore = p.hotelNightBefore || [];
-  selectedEditTargets(crewId).forEach(id=>{
+  selectedCrewTargets(crewId).forEach(id=>{
     if(checked){ if(!p.hotelNightBefore.includes(id)) p.hotelNightBefore.push(id); }
     else { p.hotelNightBefore = p.hotelNightBefore.filter(x=>x!==id); }
   });
@@ -4609,7 +4896,7 @@ function getCateringMeals(dayId, crewId){
 async function toggleMeal(crewId, dayId, meal, checked){
   const d = dayById(dayId); if(!d) return;
   d.cateringMeals = d.cateringMeals || {};
-  selectedEditTargets(crewId).forEach(id=>{
+  selectedCrewTargets(crewId).forEach(id=>{
     d.cateringMeals[id] = d.cateringMeals[id] || {b:false, l:false, d:false};
     d.cateringMeals[id][meal] = checked;
     // clean up if all false
@@ -4798,7 +5085,7 @@ async function setTravelMethod(crewId, selectEl){
     }
     applied = newOpt || '';
   }
-  selectedEditTargets(crewId).forEach(id=>{ p.travelMethods[id] = applied; });
+  selectedCrewTargets(crewId).forEach(id=>{ p.travelMethods[id] = applied; });
   // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
   saveInBackground('db:projects', projectsDB);
@@ -4833,13 +5120,19 @@ function buildTransportSummary(){
   if(!days.length) return null;
   const costs = getTransportCosts(p);
   const travelMethods = p.travelMethods || {};
-  const assigned = p.crewIds || [];
+  /* ⚠️ Phase BF — DEDUPLICATED PEOPLE, not entries. Travel is person-level: one human
+     travelling to set once, whatever they are booked as when they get there. Phase AO
+     flagged this exact function as the double-count risk, because it asks "is anyone on
+     site that day" — and a person holding two entries that both cover Day 3 satisfies
+     that twice. projectCrew() is the distinct-people list and crewOnDay() folds a
+     person's entries together, so both halves count each human once. */
+  const assigned = projectCrew(p).map(c=>c.id);
   // only show methods actually chosen by someone on this project, in travelMethodsList order
   const usedMethods = travelMethodsList.filter(m=>assigned.some(id=>travelMethods[id]===m));
   if(!usedMethods.length) return null;
   const cols = days.map(d=>{
     const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
-    const onSite = assigned.filter(id=>(d.positions||[]).some(pos=>pos[0]===id));
+    const onSite = assigned.filter(id=>crewOnDay(id, d, p));
     const counts = {};
     usedMethods.forEach(m=>counts[m]=0);
     onSite.forEach(id=>{
@@ -4901,10 +5194,11 @@ function copyTransportSummary(){
   const lines = transportSummaryLines(); if(!lines) return;
   copyText(lines.join('\n'), 'Copied!');
 }
-async function toggleCrewOnDay(crewId, dayId, checked){
+/* takes an ENTRY id — Days on site is an entry-level grid (Phase BF) */
+async function toggleCrewOnDay(entryId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
   d.positions = d.positions || [];
-  selectedEditTargets(crewId).forEach(id=>{
+  selectedEditTargets(entryId).forEach(id=>{
     if(checked){
       if(!d.positions.some(pos=>pos[0]===id)) d.positions.push([id, '', '', '', '']);
     } else {
@@ -5009,7 +5303,9 @@ function letterForIndex(i){ return CAMERA_LETTERS[i] || ('#'+(i+1)); }
 /* camera crew for a project — Cinematography department, in project crew-assignment order */
 function cinematographyCrew(projectId){
   const p = projById(projectId); if(!p) return [];
-  return (p.crewIds||[]).map(id=>crewById(id)).filter(c=>c && c.department==='Cinematography');
+  // deduplicated: a person holding two Cinematography entries is still one operator
+  // with one camera letter, so this reads projectCrew() rather than the entry list
+  return projectCrew(p).filter(c=>c.department==='Cinematography');
 }
 /* brings a possibly-stale/legacy cams object up to the current shape:
    - migrates the old {assign:{crewId:{a,b,bodyA,bodyB}}} shape (sorted by its old
@@ -5244,7 +5540,7 @@ function refreshTechSpecsBanner(){
 async function addCrewToProject(id){
   id = id || val('addCrewPick'); if(!id) return;
   const p = currentProject();
-  p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(id)) p.crewIds.push(id);
+  addCrewEntry(p, id);
   resetQuickAdd();   // also Overview Quick Add's "existing crew member" path
   // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
@@ -5252,8 +5548,7 @@ async function addCrewToProject(id){
 }
 async function removeCrewFromProject(id){
   const p = currentProject();
-  p.crewIds = (p.crewIds||[]).filter(x=>x!==id);
-  shootDaysDB.forEach(d=>{ if(d.projectId===currentProjectId && d.positions) d.positions = d.positions.filter(pos=>pos[0]!==id); });
+  removeCrewEntries(p, [id]);
   // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
   saveInBackground('db:projects', projectsDB);
@@ -5613,31 +5908,37 @@ function parseRateNumber(str){
   return m ? Number(m[0]) : null;
 }
 
-/* Day rate needs a PER-PROJECT override (rate can vary by job) — same shape as
-   every other per-project per-crew-id map in the app (p.travelMethods,
-   p.hotelNightBefore, day.crewOverrides): p.crewRateOverrides[crewId]. Falls
-   back to a best-effort parse of the crew database's Fee/rate field, and
-   finally to "no rate on file" rather than silently costing someone at 0. */
-function resolveCrewRate(c, p){
-  const overrides = (p && p.crewRateOverrides) || {};
-  if(Object.prototype.hasOwnProperty.call(overrides, c.id)){
-    const n = Number(overrides[c.id]);
+/* Phase BF — the day rate now lives ON THE ENTRY (`entry.rate`), replacing the old
+   p.crewRateOverrides[crewId] map, because rate is one of the three things that vary
+   per role: the same person can be booked as an AC at one rate and an operator at
+   another on the same project. Falls back to a best-effort parse of the crew database's
+   Fee/rate field, and finally to "no rate on file" rather than silently costing someone
+   at 0 — both unchanged.
+   ⚠️ Renamed from resolveCrewRate(c, p) deliberately rather than kept and re-pointed:
+   the argument changed from a crew record to an entry id, and a silent signature change
+   on a money field is exactly the kind of thing that reads fine and computes wrong. Do
+   not look for resolveCrewRate / saveCrewRateOverride. */
+function resolveEntryRate(entryId, p){
+  const e = entryById(entryId, p || currentProject());
+  if(e && Object.prototype.hasOwnProperty.call(e, 'rate')){
+    const n = Number(e.rate);
     if(!isNaN(n)) return { rate:n, hasRate:true, isOverride:true };
   }
-  const parsed = parseRateNumber(c.rate);
+  const c = e ? crewById(e.crewId) : null;
+  const parsed = parseRateNumber(c && c.rate);
   if(parsed!=null) return { rate:parsed, hasRate:true, isOverride:false };
   return { rate:0, hasRate:false, isOverride:false };
 }
-async function saveCrewRateOverride(crewId, rawValue){
+async function saveEntryRate(entryId, rawValue){
   const p = currentProject(); if(!p) return;
-  p.crewRateOverrides = p.crewRateOverrides || {};
+  const e = entryById(entryId, p); if(!e) return;
   const trimmed = (rawValue||'').trim();
   if(trimmed===''){
-    delete p.crewRateOverrides[crewId];
+    delete e.rate;                                  // clearing reverts to the database rate
   } else {
     const n = Number(trimmed);
-    if(isNaN(n)){ renderProjectBody(); return; } // reject garbage, revert the field to the last valid value
-    p.crewRateOverrides[crewId] = n;
+    if(isNaN(n)){ renderProjectBody(); return; }    // reject garbage, revert the field to the last valid value
+    e.rate = n;
   }
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
@@ -5646,34 +5947,38 @@ async function saveCrewRateOverride(crewId, rawValue){
 /* AG: the Day Rate "Save to database" icon — the first thing in the app that writes
    from a project back to the shared crew database itself (everything else here is the
    opposite direction: database → per-project override). Deliberately a separate,
-   explicit action from the project's own autosave: p.crewRateOverrides keeps behaving
+   explicit action from the project's own autosave: the entry's own rate keeps behaving
    exactly as before, this only pushes the currently-resolved rate onto c.rate, the
    crew member's STANDING rate. Reused verbatim in all three places the Day Rate field
    appears (Roles tab, Budget Per Person, the crew Edit expansion) — `context` just
    keeps their status-flash element ids from colliding when more than one is on screen
    at once (the Roles row and its own Edit expansion render simultaneously). */
-function crewRateSaveIconHTML(crewId, context){
-  const elId = `crsStatus-${context}-${crewId}`;
-  return `<button type="button" class="icon-btn" onclick="saveCrewRateToDatabase('${crewId}','${context}')" title="Saves to Database" aria-label="Save day rate to database">${icon('save')}</button><span class="hint" id="${elId}"></span>`;
+function crewRateSaveIconHTML(entryId, context){
+  const elId = `crsStatus-${context}-${entryId}`;
+  return `<button type="button" class="icon-btn" onclick="saveCrewRateToDatabase('${entryId}','${context}')" title="Saves to Database" aria-label="Save day rate to database">${icon('save')}</button><span class="hint" id="${elId}"></span>`;
 }
-async function saveCrewRateToDatabase(crewId, context){
+async function saveCrewRateToDatabase(entryId, context){
   // Same selected-set fan-out as every other bulk-editable field on the Crew tab
   // (selectedEditTargets) — but this is the one field that can silently rewrite
   // someone else's standing database record, so unlike those, a 2+ selection gets an
   // explicit confirmation first. Cancelling changes nothing.
-  const targets = selectedEditTargets(crewId);
+  const targets = selectedEditTargets(entryId);
   if(targets.length>1 && !confirm('This will change all these entries in the database — is that ok?')) return;
   const p = currentProject();
+  // Phase BF — targets are ENTRY ids; the write lands on the PERSON each one points at.
+  // Two entries for one person resolve to one crew record, so the last one wins — which
+  // is the honest outcome for a field the database only has one of.
   targets.forEach(id=>{
-    const c = crewById(id); if(!c) return;
-    const { rate, hasRate } = resolveCrewRate(c, p);
+    const e = entryById(id, p); if(!e) return;
+    const c = crewById(e.crewId); if(!c) return;
+    const { rate, hasRate } = resolveEntryRate(id, p);
     // vatRegistered is NOT touched here — AH's Budget VAT checkbox already mutates
     // it directly on the live crewDB record the moment it's ticked, so whatever's
     // currently in memory rides along with this same saveDB call for free (AH's
     // "pushes both fields together in one action").
     if(hasRate) c.rate = `£${rate}/day`;
   });
-  flashSaveResult(`crsStatus-${context}-${crewId}`, await saveDB('db:crew', crewDB), 'Saved to database');
+  flashSaveResult(`crsStatus-${context}-${entryId}`, await saveDB('db:crew', crewDB), 'Saved to database');
 }
 
 let budgetView = 'department'; // 'department' | 'person' | 'day' | 'costs'
@@ -5816,7 +6121,7 @@ function budgetFilterPanelHTML(){
     ).join('') : '<span class="hint">No shoot days yet.</span>';
   // Only departments actually present on this project — same rule as the Crew panel.
   const p = currentProject();
-  const present = DEPARTMENTS.filter(d=>projectCrew(p).some(c=>deptBucketKey(c.department)===d));
+  const present = DEPARTMENTS.filter(d=>projectEntryViews(p).some(c=>deptBucketKey(c.department)===d));
   const deptChips = present.length ? present.map(d=>
       `<label><input type="checkbox" ${budgetDeptFilter.has(d)?'checked':''} onchange="toggleBudgetFilterDept('${d}', this.checked)"> ${esc(d)}</label>`
     ).join('') : '<span class="hint">No crew on this project yet.</span>';
@@ -5849,7 +6154,9 @@ function budgetFilterPanelHTML(){
 function buildBudgetData(){
   const p = currentProject();
   const days = budgetFilteredDays();
-  const crew = projectCrew(p);
+  /* Phase BF — one row per ENTRY, because day rate and days worked are both entry-level
+     now. Travel is NOT: see travelRateFor/firstEntryOnDay below. */
+  const crew = projectEntryViews(p);
   const hotelCosts = getHotelCosts(p);
 
   /* AO — VAT follows the PERSON, so a VAT-registered crew member's TRAVEL carries
@@ -5877,19 +6184,29 @@ function buildBudgetData(){
   const crewInScope = budgetDeptFilter.size
     ? crew.filter(c=>budgetDeptFilter.has(deptBucketKey(c.department)))
     : crew;
+  /* ⚠️ Phase BF — travel is charged ONCE PER PERSON, not once per entry, and over the
+     DEDUPLICATED union of that person's days. Attributing it to whichever of their
+     entries is in scope first keeps AO's reconciliation exact in both directions:
+     summed over rows it still equals buildTransportSummary()'s travelTotal, and summed
+     over days (see firstEntryOnDay in perDay below) it still equals each person's own
+     figure. Charging it per entry would double a two-role person's travel AND the VAT
+     on it, since AO's VAT base is (day rate + travel). */
+  const travelClaimed = new Set();
   const people = crewInScope.map(c=>{
-    const {rate, hasRate, isOverride} = resolveCrewRate(c, p);
-    const daysWorked = days.filter(d=>(d.positions||[]).some(pos=>pos[0]===c.id)).length;
+    const {rate, hasRate, isOverride} = resolveEntryRate(c.id, p);
+    const daysWorked = entryDayCount(c.id, days);
     const subtotal = rate * daysWorked;
-    const travelRate = travelRateFor(c.id);
-    const travelCost = travelRate * daysWorked;
+    const claimsTravel = !travelClaimed.has(c.crewId);
+    if(claimsTravel) travelClaimed.add(c.crewId);
+    const travelRate = claimsTravel ? travelRateFor(c.crewId) : 0;
+    const travelCost = travelRate * crewDayCount(c.crewId, days, p);
     const vatRegistered = c.vatRegistered==='Yes';
     // AO — the VAT base is day rate AND travel, both invoiced by this person.
     // travelCost itself is NOT added to `subtotal`/`display`: it's already counted
     // once in the Travel extras row, and counting it here too would double it.
     const vat = vatRegistered ? (subtotal + travelCost) * VAT_RATE : 0;
     return {
-      id:c.id, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
+      id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
       rate, hasRate, isOverride, daysWorked, subtotal, travelRate, travelCost, vatRegistered, vat,
       display: budgetPersonDisplay(subtotal, vat)
     };
@@ -5986,12 +6303,21 @@ function buildBudgetData(){
   const perDay = days.map((d,i)=>{
     const onDayIds = new Set((d.positions||[]).map(pos=>pos[0]));
     const dayPeople = people.filter(pp=>onDayIds.has(pp.id));
+    /* Phase BF — a person on this day via two entries must carry their travel (and its
+       VAT) ONCE. The first of their entries on this day claims it; the rest score zero.
+       That is what keeps the per-day VAT column summing back to the per-person one. */
+    const travelClaimedToday = new Set();
+    const dayTravelRate = pp => {
+      if(travelClaimedToday.has(pp.crewId)) return 0;
+      travelClaimedToday.add(pp.crewId);
+      return travelRateFor(pp.crewId);
+    };
     const dayDeptTotals = {}, dayDeptCounts = {}, dayDeptExVat = {}, dayDeptVat = {};
     dayPeople.forEach(pp=>{
       // AO — one day's share of this person's VAT base: their day rate plus that
       // day's travel (travelRate is per on-site day by construction). Summed over
       // every day they work this gives back pp.vat exactly.
-      const dayVat = pp.vatRegistered ? (pp.rate + pp.travelRate)*VAT_RATE : 0;
+      const dayVat = pp.vatRegistered ? (pp.rate + dayTravelRate(pp))*VAT_RATE : 0;
       dayDeptTotals[pp.department] = (dayDeptTotals[pp.department]||0) + budgetPersonDisplay(pp.rate, dayVat);
       dayDeptCounts[pp.department] = (dayDeptCounts[pp.department]||0) + 1;
       dayDeptExVat[pp.department] = (dayDeptExVat[pp.department]||0) + pp.rate;
@@ -6128,7 +6454,7 @@ function budgetPersonViewHTML(data){
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
-      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveCrewRateOverride('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
+      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
       <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
       <td style="text-align:center;">${pp.daysWorked}</td>
       ${budgetVatToggle?vatCell(pp):''}
@@ -6814,28 +7140,28 @@ function onNewCrewRolePick(selectEl){
   if(selectEl.value==='__addrole__'){ selectEl.value = pendingNewCrewRole; openAddRoleDialog('__new__'); return; }
   pendingNewCrewRole = selectEl.value;
 }
-function crewFormHTML(c){
+function crewFormHTML(c, entryId){
   c=c||{};
   const yn = (id,cur)=>`<select id="${id}"><option value="">—</option><option ${cur==='Yes'?'selected':''}>Yes</option><option ${cur==='No'?'selected':''}>No</option></select>`;
   // saved role is the sole source of role + department (item 1): existing crew get the
   // live tag-list editor (immediate save, same widget as the Roles grid); a brand-new
   // not-yet-saved person picks one role up front via pendingNewCrewRole, required to save.
   const roleFieldHTML = c.id
-    ? `<span class="roles-inline">${rolesTagListHTML(c)}${roleAddPickerHTML(c)}</span>`
+    ? `<span class="roles-inline">${rolesTagListHTML(c, entryId)}${roleAddPickerHTML(c)}</span>`
     : newCrewRolePickerHTML();
   // AG, place 1 of 2: the Save-to-database icon inside this Edit expansion. Only
   // shown for an existing crew member (c.id) opened from within a project (the same
   // form also renders on the standalone Crew database screen, which has no project
   // and so no per-project override to show) — reads/writes the exact same
-  // p.crewRateOverrides field as the Roles row and Budget's Per Person view, not a
+  // entry.rate field as the Roles row and Budget's Per Person view, not a
   // second copy of it.
-  const projectForRate = c.id ? currentProject() : null;
+  const projectForRate = (c.id && entryId) ? currentProject() : null;
   const projectDayRateHTML = projectForRate ? (()=>{
-    const rate = resolveCrewRate(c, projectForRate);
+    const rate = resolveEntryRate(entryId, projectForRate);
     return `<div><label>Day rate (this project)</label>
       <span class="rate-with-save">
-        <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onchange="saveCrewRateOverride('${c.id}', this.value)">
-        ${crewRateSaveIconHTML(c.id, 'e')}
+        <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onchange="saveEntryRate('${entryId}', this.value)">
+        ${crewRateSaveIconHTML(entryId, 'e')}
       </span>
       <div class="hint">Per-project override — same field as the Roles tab and Budget's Per Person view.</div>
     </div>`;
@@ -7087,7 +7413,7 @@ async function saveCrew(){
   // if this was a brand-new person added from inside a project, put them on that project straight away
   if(!existing && route.screen==='project' && currentProjectId){
     const p = currentProject();
-    if(p){ p.crewIds = p.crewIds||[]; if(!p.crewIds.includes(merged.id)) p.crewIds.push(merged.id); await saveDB('db:projects', projectsDB); }
+    if(p){ addCrewEntry(p, merged.id); await saveDB('db:projects', projectsDB); }
   }
   pendingNewCrewRole = '';
   editingCrewId = null; addingCrewNew = false;
@@ -7098,7 +7424,18 @@ async function deleteCrew(id){
   const who = (crewById(id)||{}).name || 'crew member';
   const snaps = beginUndo(['db:crew','db:projects']);
   crewDB = crewDB.filter(x=>x.id!==id);
-  projectsDB.forEach(p=>{ if(p.crewIds) p.crewIds = p.crewIds.filter(x=>x!==id); });
+  /* ⚠️ Drops the roster ENTRIES only, and deliberately leaves their shoot-day positions
+     behind — because that is exactly what this did before BF, when it filtered p.crewIds
+     and touched nothing else. A position whose id no longer resolves has always rendered
+     as "(removed crew)" via crewInfo()/resolveCrewForDay(), and it still does; the id in
+     it is now an entry id rather than a crew id, which changes nothing about the output.
+     Cleaning those up would be a real improvement and a real behaviour change, so it is
+     not BF's to make. Contrast removeCrewFromProject()/bulkRemoveSelectedFromProject(),
+     which have always cleared positions and so go through removeCrewEntries(). */
+  projectsDB.forEach(p=>{
+    const gone = new Set(entriesForCrew(id, p).map(e=>e.id));
+    if(gone.size) p.crewEntries = (p.crewEntries||[]).filter(e=>!gone.has(e.id));
+  });
   await saveDB('db:crew', crewDB); await saveDB('db:projects', projectsDB);
   renderCrewList();
   finishUndo(`Deleted ${who} from the crew database.`, snaps);
@@ -7424,8 +7761,7 @@ function shootDayBuildHTML(){
 function projectCrewOptions(){
   const day = currentDay(); if(!day) return [];
   const p = projById(day.projectId);
-  const ids = p ? (p.crewIds||[]) : [];
-  return ids.map(id=>crewById(id)).filter(Boolean);
+  return p ? projectEntryViews(p) : [];
 }
 /* shared option-list builder for every location <select> on the Shoot Day screen —
    primary (#sdLocation) and each additional-location row (.sdaddloc-sel) — so both
@@ -7527,6 +7863,8 @@ function renderPositionAssignments(){
   const positions = day.positions || [];
   if(!positions.length){ el.innerHTML = '<div class="empty-note">No one added to this day yet.</div>'; return; }
   const companies = {};
+  // Phase BF — cid is an ENTRY id. Two entries for one person are two separate rows
+  // here on purpose: that is the whole reason the shoot day stores entry ids.
   positions.forEach(([cid,call,note])=>{
     const c = resolveCrewForDay(cid, day);
     const company = c.coProductionCompany || COMPANY;
@@ -7576,6 +7914,7 @@ function refreshAddPosnPick(){
   const sel = document.getElementById('addPosnPick'); if(!sel) return;
   const day = currentDay(); if(!day) return;
   const already = new Set((day.positions||[]).map(p=>p[0]));
+  // entry views — "Meurig — AC" and "Meurig — operator" are two selectable things
   const crew = projectCrewOptions().filter(c=>!already.has(c.id));
   sel.innerHTML = '<option value="">— Select crew —</option>' + groupedCrewOptionsHTML(crew);
 }
@@ -7589,10 +7928,10 @@ async function addPosnToDay(){
   renderPositionAssignments();
   refreshAddPosnPick();
 }
-async function removePosnRow(crewId){
+async function removePosnRow(entryId){
   const day = currentDay(); if(!day) return;
   captureInProgressPositions();
-  day.positions = (day.positions||[]).filter(p=>p[0]!==crewId);
+  day.positions = (day.positions||[]).filter(p=>p[0]!==entryId);
   await saveDB('db:shootdays', shootDaysDB);
   renderPositionAssignments();
   refreshAddPosnPick();
@@ -7830,27 +8169,49 @@ async function saveShootDay(thenGenerate){
 }
 
 /* ---------- preview / export ---------- */
-function crewInfo(id){ return crewById(id)||{name:'(removed crew)',role:'',phone:''}; }
+/* Phase BF — `id` may be an ENTRY id (shoot-day positions, catering meals keyed by
+   crew id both reach here). Resolves an entry first, then a crew record, then the
+   "(removed crew)" fallback that has always caught ids which no longer exist. */
+function crewInfo(id){
+  const c = crewById(id);
+  if(c) return c;
+  for(const p of projectsDB){
+    const e = entryById(id, p);
+    if(e){ const v = entryView(e); if(v) return v; }
+  }
+  return {name:'(removed crew)',role:'',phone:''};
+}
 /* ---- per-day crew overrides ----
    A shoot day may override someone's role / department / sub-department / lead company
    for that day only. Person-level facts (phone, email, dietary, sizes) always fall
    through to the crew database, so later database fixes propagate automatically. */
 const OVERRIDABLE_FIELDS = ['role','department','subDepartment','coProductionCompany'];
-function resolveCrewForDay(crewId, day){
-  const base = crewById(crewId) || {id:crewId, name:'(removed crew)', role:'', phone:''};
-  const ov = day && day.crewOverrides && day.crewOverrides[crewId];
+/* Phase BF — takes an ENTRY id. The base record is the entry view (the crew record with
+   the entry's own role/department layered on), so a person holding two entries resolves
+   to their AC role on one position and their operator role on the other. An id that no
+   longer resolves still falls back to "(removed crew)", exactly as it did when this took
+   a crew id — a deleted person's positions have always been left behind. */
+function resolveCrewForDay(entryId, day){
+  const p = projById(day && day.projectId);
+  const e = entryById(entryId, p);
+  const base = (e && entryView(e)) || {id:entryId, name:'(removed crew)', role:'', phone:''};
+  const ov = day && day.crewOverrides && day.crewOverrides[entryId];
   if(!ov || !Object.keys(ov).length) return base;
   return Object.assign({}, base, ov, {_overridden:true});
 }
-function hasOverride(crewId, day){
-  const ov = day && day.crewOverrides && day.crewOverrides[crewId];
+function hasOverride(entryId, day){
+  const ov = day && day.crewOverrides && day.crewOverrides[entryId];
   return !!(ov && Object.keys(ov).length);
 }
-function dayOverrideFormHTML(crewId){
+/* Phase BF — entry-scoped. `base` is the ENTRY's own role/department (what this row is
+   booked as on this project), not the person's crew-database default, so "the crew
+   database keeps X as…" now reads against the right baseline for a two-role person. */
+function dayOverrideFormHTML(entryId){
   const day = currentDay(); if(!day) return '';
-  const base = crewById(crewId) || {};
-  const eff = resolveCrewForDay(crewId, day);
-  const overridden = hasOverride(crewId, day);
+  const e = entryById(entryId, projById(day.projectId));
+  const base = (e && entryView(e)) || {};
+  const eff = resolveCrewForDay(entryId, day);
+  const overridden = hasOverride(entryId, day);
   const currentPath = eff.subDepartment ? `${eff.department}/${eff.subDepartment}` : (eff.department||'');
   let deptOpts = '<option value="">— Department —</option>';
   DEPARTMENTS.forEach(d=>{
@@ -7883,15 +8244,16 @@ function dayOverrideFormHTML(crewId){
       <div><label>Lead company</label><select id="ovCoPro">${coOpts}</select></div>
     </div>
     <div class="toolbar">
-      <button class="primary" onclick="saveDayOverride('${crewId}')">Save for this day</button>
-      ${overridden?`<button class="danger" onclick="clearDayOverride('${crewId}')">Revert to database</button>`:''}
-      <button onclick="editCrew('${crewId}')">Cancel</button>
+      <button class="primary" onclick="saveDayOverride('${entryId}')">Save for this day</button>
+      ${overridden?`<button class="danger" onclick="clearDayOverride('${entryId}')">Revert to database</button>`:''}
+      <button onclick="editCrew('${entryId}')">Cancel</button>
     </div>
   </div>`;
 }
-async function saveDayOverride(crewId){
+async function saveDayOverride(entryId){
   const day = currentDay(); if(!day) return;
-  const base = crewById(crewId) || {};
+  const e = entryById(entryId, projById(day.projectId));
+  const base = (e && entryView(e)) || {};
   const pathVal = val('ovDept');
   const [dept, ...rest] = pathVal.split('/');
   const proposed = { role: val('ovRole'), department: dept||'', subDepartment: rest.join('/'), coProductionCompany: val('ovCoPro') };
@@ -7899,14 +8261,14 @@ async function saveDayOverride(crewId){
   const ov = {};
   OVERRIDABLE_FIELDS.forEach(f=>{ if((proposed[f]||'') !== (base[f]||'')) ov[f] = proposed[f]; });
   day.crewOverrides = day.crewOverrides || {};
-  if(Object.keys(ov).length) day.crewOverrides[crewId] = ov; else delete day.crewOverrides[crewId];
+  if(Object.keys(ov).length) day.crewOverrides[entryId] = ov; else delete day.crewOverrides[entryId];
   await saveDB('db:shootdays', shootDaysDB);
   editingCrewId = null;
   renderPositionAssignments();
 }
-async function clearDayOverride(crewId){
+async function clearDayOverride(entryId){
   const day = currentDay(); if(!day) return;
-  if(day.crewOverrides) delete day.crewOverrides[crewId];
+  if(day.crewOverrides) delete day.crewOverrides[entryId];
   await saveDB('db:shootdays', shootDaysDB);
   editingCrewId = null;
   renderPositionAssignments();
