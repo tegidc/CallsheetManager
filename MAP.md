@@ -558,15 +558,6 @@ decision.** Do not wire this to a `db:*` key without one.
   a re-render, the same idiom as the Crew list's department groups (not
   `applyBlockState`, whose keys are a fixed set and these are not), with the shared
   `expandCollapseAllHTML()` above them — [Budget (demo), Shared/utility functions]
-  - ⚠️ **Deliberately NOT Phase AT's `collapsibleSectionHTML()`**, nor the
-    `applyBlockState`/`toggleBlock` plumbing under it. That idiom is built on a `state`
-    object whose keys are a small FIXED set of section names, toggled by direct DOM
-    updates instead of a re-render. These sections are neither: the key set is derived
-    from the data, and it changes completely when you switch lens (codes ↔ BBC letters)
-    or project. `deptHeaderHTML()` + a re-render is the app's other, equally canonical
-    collapse pattern and is the one built for a group list computed from data — the
-    same reason `setAllDeptsCollapsed()` re-renders where `setAllBlocksCollapsed()`
-    doesn't — [Budget (demo), Shared/utility functions]
 - `setBudgetDemoRate()` / `setBudgetDemoDay()` / `setBudgetDemoPercent()` /
   `refreshBudgetDemoNumbers()` — **the live-recalculation path.** These update the model
   on `oninput` and then rewrite only the *derived* text through
