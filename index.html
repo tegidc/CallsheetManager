@@ -1275,15 +1275,25 @@ function roleBannerHTML(c){
   const marker = `<span class="role-add-marker${hasOtherRoles?' has-roles':''}" onclick="event.stopPropagation();openRolesMenu('${c.id}')" title="Change or add a role">+</span>`;
   return `${chip}${marker}`;
 }
-function roleAddPickerHTML(c){
+/* the canonical-role <option> list (Phase R item 1 — no free-text role anywhere): every
+   ROLES_BY_DEPT role the person doesn't already hold, grouped by department, plus a
+   trailing "+ Add new role…" escape hatch onto the canonical list itself. Shared by
+   roleAddPickerHTML() (D-1/crewFormHTML's own "add a saved role" picker) and Phase BB's
+   rolesMenuAddRolePickerHTML() (the roles menu's footer item) — same source, same
+   exclusion, so the two can never quietly diverge on what counts as "already held". */
+function newRolePickerOptionsHTML(c){
   const has = new Set(c.roles||[]);
-  let opts = '<option value="">+ Add a saved role…</option>';
+  let opts = '';
   DEPARTMENTS.forEach(d=>{
     const rs = rolesFor(d).filter(r=>!has.has(`${d}/${r}`));
     if(!rs.length) return;
     opts += `<optgroup label="${esc(d)}">${rs.map(r=>`<option value="${esc(d)}/${esc(r)}">${esc(r)}</option>`).join('')}</optgroup>`;
   });
   opts += '<option value="__addrole__">+ Add new role…</option>';
+  return opts;
+}
+function roleAddPickerHTML(c){
+  const opts = '<option value="">+ Add a saved role…</option>' + newRolePickerOptionsHTML(c);
   return `<select class="pill-select empty" onchange="addRoleToCrew('${c.id}', this)" onclick="event.stopPropagation()" title="Add a saved role">${opts}</select>`;
 }
 async function addRoleToCrew(crewId, selectEl){
@@ -1495,6 +1505,42 @@ async function pickRolesMenuRole(entryId, crewId, rolePath){
   rolesMenuMode = 'change';
   await applyRoleToEntryByMode(entryId, crewId, mode, rolePath);
 }
+/* ---- Phase BB — "Add a new role…", the menu's persistent footer item ----
+   Present in BOTH modes: it creates a new SAVED ROLE on c.roles via the exact canonical
+   picker Phase R already established (newRolePickerOptionsHTML() — no free-text input),
+   then applies whichever mode is currently active, through the same
+   applyRoleToEntryByMode() the saved-roles list above already uses. No extra confirmation
+   — adding to the crew database from a project screen is explicitly allowed by the
+   standing rule and is recoverable.
+   The canonical picker already excludes roles the person has saved on BOTH its paths:
+   newRolePickerOptionsHTML() filters ROLES_BY_DEPT against c.roles directly, and
+   confirmAddRoleDialog() (the "+ Add new role…" typed-department/typed-name escape
+   hatch) guards with `if(!c.roles.includes(path))` before ever pushing. So this menu
+   cannot reopen the same-role-twice path BA's list deliberately closes — confirmed by
+   reading both functions, not assumed; no decision needed from whoever scoped this
+   bundle. */
+function rolesMenuAddRolePickerHTML(entryId, crewId, c){
+  const opts = '<option value="">+ Add a new role…</option>' + newRolePickerOptionsHTML(c);
+  return `<select class="pill-select empty" onchange="pickRolesMenuNewRole('${entryId}','${crewId}', this)" onclick="event.stopPropagation()" title="Add a new saved role and apply it">${opts}</select>`;
+}
+async function pickRolesMenuNewRole(entryId, crewId, selectEl){
+  const c = crewById(crewId); if(!c) return;
+  const value = selectEl.value;
+  if(!value) return;
+  const mode = rolesMenuMode;
+  if(value==='__addrole__'){
+    rolesMenuFor = null;
+    openAddRoleDialog(crewId, (path)=>applyRoleToEntryByMode(entryId, crewId, mode, path));
+    return;
+  }
+  c.roles = c.roles || [];
+  if(!c.roles.includes(value)) c.roles.push(value);
+  if(c.roles.length===1) await setActiveRole(crewId, value, true);
+  await saveDB('db:crew', crewDB);
+  rolesMenuFor = null;
+  rolesMenuMode = 'change';
+  await applyRoleToEntryByMode(entryId, crewId, mode, value);
+}
 function rolesMenuHTML(){
   if(!rolesMenuFor) return '';
   const entryId = rolesMenuFor;
@@ -1509,6 +1555,7 @@ function rolesMenuHTML(){
         <div class="tab ${rolesMenuMode==='add'?'active':''}" onclick="setRolesMenuMode('add')">Add again as</div>
       </div>
       ${rolesMenuListHTML(entryId, e.crewId, c)}
+      <div style="margin-top:10px;">${rolesMenuAddRolePickerHTML(entryId, e.crewId, c)}</div>
       <div class="toolbar" style="margin-top:14px;">
         <button onclick="closeRolesMenu()">Close</button>
       </div>
@@ -1519,10 +1566,17 @@ function rolesMenuHTML(){
    Single in-page dialog: canonical Department select + free-text Role name,
    replacing the old two-prompt() flow. addRoleDialogFor is either a crew id
    (add straight onto that person, existing behaviour) or '__new__' (feeding
-   the not-yet-saved crew-creation form's role picker instead). */
+   the not-yet-saved crew-creation form's role picker instead).
+   Phase BB — addRoleDialogThen is an optional continuation, called with the resulting
+   "Department/Role" path once it's actually landed on c.roles. Only the roles menu's
+   footer item passes one (to then apply the new role to an entry, per its active mode);
+   every other caller (the D-1/crewFormHTML picker) passes nothing, so nothing changes
+   for them. Never invoked for target==='__new__' — BB only ever opens this against an
+   existing crew id, the person behind the entry the menu was opened from. */
 let addRoleDialogFor = null;
-function openAddRoleDialog(forId){ addRoleDialogFor = forId; renderGlobalOverlay(); }
-function closeAddRoleDialog(){ addRoleDialogFor = null; renderGlobalOverlay(); refreshCrewScreen(); }
+let addRoleDialogThen = null;
+function openAddRoleDialog(forId, onAdded){ addRoleDialogFor = forId; addRoleDialogThen = onAdded||null; renderGlobalOverlay(); }
+function closeAddRoleDialog(){ addRoleDialogFor = null; addRoleDialogThen = null; renderGlobalOverlay(); refreshCrewScreen(); }
 function addRoleDialogHTML(){
   if(!addRoleDialogFor) return '';
   const deptOpts = ['<option value="">— Department —</option>']
@@ -1550,7 +1604,9 @@ async function confirmAddRoleDialog(){
   await saveDB('db:roles', ROLES_BY_DEPT);
   const path = `${dept}/${role}`;
   const target = addRoleDialogFor;
+  const onAdded = addRoleDialogThen;
   addRoleDialogFor = null;
+  addRoleDialogThen = null;
   if(target && target!=='__new__'){
     const c = crewById(target);
     if(c){
@@ -1558,6 +1614,7 @@ async function confirmAddRoleDialog(){
       if(!c.roles.includes(path)) c.roles.push(path);
       if(c.roles.length===1) await setActiveRole(target, path, true);
       await saveDB('db:crew', crewDB);
+      if(onAdded) await onAdded(path);
     }
   } else {
     pendingNewCrewRole = path;
