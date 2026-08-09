@@ -2536,16 +2536,6 @@ future dense screen that doesn't fit 1188px should scroll its own wide table ins
 **Budget (B-1)** above), not widen `.main`. `:has(#bdmTopSheet)` no longer appears
 anywhere in `index.html`.
 
-**One-line change (post-Gate 1): 64px horizontal margin.** `.main` now carries
-`padding:20px 64px 90px` (was `20px 22px 90px`) — one value, applied globally,
-Production and Budget alike, no per-view or per-component override. Usable content
-width inside the 1188px container is ~1060px. B-1's line-detail table scrolls
-horizontally inside its own `.tablewrap` slightly sooner as a result — expected,
-not a regression; do not widen `.main` or shrink this margin to compensate. The
-existing `@media(max-width:900px)` and `@media(max-width:420px)` rules already
-collapse this padding to 13px and 11px respectively on narrow screens, so the
-64px value only applies at the wider breakpoints — it was left untouched.
-
 ## The design system, as decided (Phase Detail)
 
 Applied from the `style-audit-detail.html` decisions. Supersedes the Phase Fonts
