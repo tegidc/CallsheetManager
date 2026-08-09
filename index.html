@@ -657,7 +657,7 @@
     letter-spacing:0; text-transform:none; color:var(--muted);}
   .bdm-section{margin-bottom:4px;}
   .bdm-sec-foot{margin:8px 0 20px;}
-  .bdm-settings-strip{margin-bottom:14px;}
+  .bdm-proj-row{margin-bottom:14px;}
 
   /* AI Scan (Phase AI Scan) — the first chat UI in the app. Deliberately NOT
      rounded chat bubbles: this app's whole visual language is ruled lines and
@@ -995,15 +995,14 @@
 <div class="app">
   <aside class="side" id="side">
     <div class="brand"><span class="dot"></span><strong>Call Sheets</strong></div>
-    <div class="side-label">Views</div>
-    <div class="side-item" data-side="production" onclick="goProduction()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg></span> Production</div>
-    <div class="side-item" data-side="budget" onclick="goBudgetDemo()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h11M8 20V9a4 4 0 0 1 7.5-2M6 11h7M6 14.5h6"/></svg></span> Budget</div>
     <div class="side-label">Databases</div>
     <div class="side-item" data-side="crew" onclick="goDatabase('crew')"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></span> Crew</div>
     <div class="side-item" data-side="locations" onclick="goDatabase('locations')"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 1 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span> Locations</div>
     <div class="side-label">Projects</div>
     <div id="sideProjects"></div>
     <button class="side-new" onclick="goNewProject()">+ New project</button>
+    <div class="side-label">Project</div>
+    <div class="side-item" data-side="budget" onclick="goBudgetDemo()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h11M8 20V9a4 4 0 0 1 7.5-2M6 11h7M6 14.5h6"/></svg></span> Budget</div>
     <div class="side-label">App</div>
     <div class="side-item" data-side="settings" onclick="goSettings()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4M6.7 6.7L5 5M19 19l-1.7-1.7M6.7 17.3L5 19M19 5l-1.7 1.7"/></svg></span> Settings</div>
   </aside>
@@ -1855,14 +1854,7 @@ async function initApp(){
   if(!crewDB.length && !locationsDB.length && !projectsDB.length){
     await seedSampleData();   // first-ever load — populate with the OFTV sample so there's something to work with
   }
-  /* Phase AX — no empty state: reopen straight into Production instead of parking on
-     Welcome. goProduction() already falls back through mostRecentProject() (highest
-     lastOpenedAt, ties keeping projectsDB's own order) to the first project when
-     nothing has ever been opened — the exact "remembered, else first in the list"
-     rule, off data already loaded above. No new persistence layer, and nothing new
-     written to Supabase: goProduction() itself never stamps lastOpenedAt. */
-  if(projectsDB.length) goProduction();
-  else { renderSide(); renderMain(); }
+  renderSide(); renderMain();
 }
 initApp();
 
@@ -1968,14 +1960,14 @@ function projCode(p){
 /* ============================================================ SIDE PANEL */
 function renderSide(){
   document.querySelectorAll('.side-item').forEach(el=>{
-    el.classList.toggle('active', (route.screen==='db-crew'&&el.dataset.side==='crew') || (route.screen==='db-locations'&&el.dataset.side==='locations') || (route.screen==='settings'&&el.dataset.side==='settings') || (route.screen==='budget'&&el.dataset.side==='budget') || (route.screen==='project'&&el.dataset.side==='production'));
+    el.classList.toggle('active', (route.screen==='db-crew'&&el.dataset.side==='crew') || (route.screen==='db-locations'&&el.dataset.side==='locations') || (route.screen==='settings'&&el.dataset.side==='settings') || (route.screen==='budget'&&el.dataset.side==='budget'));
   });
   const wrap = document.getElementById('sideProjects');
   if(!projectsDB.length){ wrap.innerHTML = '<div class="side-empty">No projects yet</div>'; return; }
   const sorted = [...projectsDB].sort((a,b)=> (b.startDate||'').localeCompare(a.startDate||''));
-  /* Both VIEWS (Production, Budget) keep the open project highlighted: neither
-     goProduction() nor goBudgetDemo() touches currentProjectId, so "which project am
-     I in" must not go blank just because the main panel switched view. */
+  /* Budget (B-1) keeps the open project highlighted: goBudgetDemo() deliberately
+     leaves currentProjectId alone, so "which project am I in" must not go blank
+     just because the main panel switched view. */
   wrap.innerHTML = sorted.map(p=>`
     <div class="side-proj ${(route.screen==='project'||route.screen==='budget')&&currentProjectId===p.id?'active':''}" onclick="openProject('${p.id}')">
       ${esc(p.title||'(untitled)')}
@@ -2029,35 +2021,12 @@ window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer();
 function goDatabase(which){ route={screen:'db-'+which}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
 function goNewProject(){ route={screen:'new-project'}; closeDrawer(); renderSide(); renderMain(); }
 function goSettings(){ route={screen:'settings'}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
-/* Budget, B-1, and Production (below) are the VIEWS (Phase AX) — the two sidebar
-   routes that do NOT clear currentProjectId. Project and view are independent axes:
-   these switch which VIEW of a project you're looking at, so the project you were in
-   stays open behind it and the sidebar keeps saying so. */
+/* Budget, B-1. The ONE sidebar route that does NOT clear currentProjectId:
+   this is a different view OF a project, not a project-independent screen, so the
+   project you were in stays open behind it and the sidebar keeps saying so. */
 function goBudgetDemo(){ route={screen:'budget'}; closeDrawer(); renderSide(); renderMain(); window.scrollTo(0,0); }
-/* Production — the project workspace and its tabs (T-1..T-7). Only touches
-   currentProjectId/currentProjectTab when nothing valid is already open (deleted
-   project, or landing here before any project has ever been picked), falling back to
-   the most-recently-opened project — the same signal Welcome's "Recent" button and
-   the no-empty-state boot sequence in initApp() use. Does NOT stamp lastOpenedAt: that
-   only happens when a project is actually chosen (openProject()), not when you switch
-   views without touching which project is open. */
-function goProduction(){
-  if(!currentProjectId || !projById(currentProjectId)){
-    const p = mostRecentProject();
-    if(!p){ route={screen:'welcome'}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); return; }
-    currentProjectId = p.id;
-  }
-  route={screen:'project'}; closeDrawer(); renderSide(); renderMain(); window.scrollTo(0,0);
-}
-/* Sidebar project list — the PROJECT axis (Phase AX). Changes which project is open;
-   if a VIEW (Production or Budget) is already on screen, that view stays put (mirrors
-   goProduction()/goBudgetDemo() leaving the project alone). From anywhere else — a
-   database, Settings, Welcome, New project — picking a project is still the way IN,
-   same as before this phase, and lands in Production with its tab reset to Overview. */
 function openProject(id){
-  currentProjectId=id;
-  if(route.screen!=='budget'){ route={screen:'project'}; currentProjectTab='overview'; }
-  closeDrawer(); renderSide(); renderMain();
+  currentProjectId=id; route={screen:'project'}; currentProjectTab='overview'; closeDrawer(); renderSide(); renderMain();
   const p = projById(id);
   if(p){ p.lastOpenedAt = Date.now(); saveDB('db:projects', projectsDB); }
 }
@@ -8207,12 +8176,9 @@ function downloadExcel(){
 
 /* ============================================================ BUDGET — B-1
 
-   A real line-item budget. Reached from the sidebar's VIEWS section (Phase AX),
-   alongside Production — the two independent-axes VIEWS of a project, neither of
-   which clears currentProjectId, since both are a different view OF a project, not
-   a project-independent screen. Has no project selector of its own any more (Phase
-   AX): it renders whichever project the sidebar has selected — see
-   bdmCurrentProjectId().
+   A real line-item budget. Reached from the side panel ("Budget"), which is why
+   goBudgetDemo() is the one sidebar route that leaves currentProjectId alone: this
+   is a different view of a project, not a project-independent screen.
 
    ⚠️ NOT the Budget TAB (T-6). That one is cost visibility only, rolled up from the
    Crew/Catering/Travel/Hotel tabs, and is untouched by any of this. Every name here
@@ -8395,6 +8361,7 @@ const BDM_PROPER_CORN_SEED = {
 let bdmSettings = null;             /* the db:budget_settings record, once loaded */
 let bdmRecords  = {};               /* projectId -> the budget:<id> record, once loaded */
 let bdmLoading  = {};               /* projectId -> true while a load is in flight */
+let budgetDemoProjectId = null;
 let budgetDemoLens = 'dept';        /* 'dept' | 'bbc' */
 let budgetDemoCollapsed = new Set();/* group keys currently collapsed */
 /* Phase AW — which VAT basis this whole screen is showing: true = Inc. VAT (VAT
@@ -8458,11 +8425,9 @@ function bdmNormalizeRecord(r){
   };
 }
 
-/* ---- name lookups + the fallback list ----
-   Phase AX removed the screen's own project selector; this now only backs
-   bdmProjectName() (the page title) and bdmCurrentProjectId()'s last-resort
-   fallback. The real projects, plus Proper Corn, which is not in projectsDB and
-   exists only here (see BDM_PROPER_CORN_SEED). */
+/* ---- which projects the selector offers ----
+   The real projects, plus Proper Corn, which is not in projectsDB and exists only
+   here (see BDM_PROPER_CORN_SEED). */
 function bdmProjectList(){
   return projectsDB.map(p=>({ id:p.id, name:p.title || p.client || p.id }))
     .concat([{ id:BDM_PROPER_CORN_ID, name:'Proper Corn Hot Sauce' }]);
@@ -8471,15 +8436,11 @@ function bdmProjectName(id){
   const hit = bdmProjectList().find(x=>x.id===id);
   return hit ? hit.name : id;
 }
-/* Phase AX — no dropdown of its own any more: this screen renders whichever project
-   the sidebar has selected, full stop. Falls back to the first in the list only for
-   the edge case currentProjectId is unset/invalid (e.g. every project was deleted
-   while this screen was open). ⚠️ Proper Corn is not a real project and so can never
-   be currentProjectId — removing the dropdown makes it unreachable through the UI
-   except in that one fallback case (projectsDB itself empty, so list[0] is Proper
-   Corn). Its stored budget key is untouched; nothing here deletes or migrates it. */
+/* Defaults to the project you already have open — goBudgetDemo() is the one sidebar
+   route that keeps it — and falls back to the first in the list. */
 function bdmCurrentProjectId(){
   const list = bdmProjectList();
+  if(budgetDemoProjectId && list.some(x=>x.id===budgetDemoProjectId)) return budgetDemoProjectId;
   if(currentProjectId && list.some(x=>x.id===currentProjectId)) return currentProjectId;
   return list.length ? list[0].id : BDM_PROPER_CORN_ID;
 }
@@ -8940,6 +8901,7 @@ function toggleAllBudgetDemoSections(){
   budgetDemoCollapsed = allCollapsed ? new Set() : new Set(groups.map(g=>g.key));
   renderMain();
 }
+function setBudgetDemoProject(id){ budgetDemoProjectId = id; budgetDemoCollapsed = new Set(); renderMain(); }
 function setBudgetDemoLens(lens){ budgetDemoLens = lens; budgetDemoCollapsed = new Set(); renderMain(); }
 /* Phase AW — same markup/styling/state-handling pattern as T-6's toggleBudgetVat():
    a checkbox bound straight to the module-level flag, a full re-render since the
@@ -8967,14 +8929,12 @@ function renderBudgetDemo(m){
   }
   const groups = budgetDemoGroups(rec);
   const allCollapsed = groups.length>0 && groups.every(g=>budgetDemoCollapsed.has(g.key));
-  /* Phase AX — the project selector is gone (this screen renders whichever project
-     the sidebar has selected — see bdmCurrentProjectId()). Float %/Fee % are project
-     SETTINGS, not view controls, so they stay here as a slim strip directly under the
-     header rather than moving into the content area below — the Top sheet section is
-     the first thing in the content proper. The VAT toggle is a VIEW control (Phase
-     AW) and stays where it's always been, inside the top sheet itself. */
   m.innerHTML = head + `
-    <div class="ts-grid bdm-settings-strip">
+    <div class="ts-grid bdm-proj-row">
+      <div class="ts-field"><label for="bdmProject">Project</label>
+        <select id="bdmProject" onchange="setBudgetDemoProject(this.value)">
+          ${bdmProjectList().map(x=>`<option value="${esc(x.id)}" ${x.id===id?'selected':''}>${esc(x.name)}</option>`).join('')}
+        </select></div>
       <div class="ts-field"><label for="bdmFloat">Float %</label>
         <input type="text" id="bdmFloat" class="fld-xs" inputmode="decimal" value="${esc(String(rec.floatPercent))}"
           oninput="setBudgetDemoPercent('floatPercent', this.value)"></div>
@@ -9056,12 +9016,8 @@ async function seedRowBudget(){
   const res = await saveDB(BUDGET_KEY_PREFIX + target.id, seeded);
   flashSaveResult('bdmSeedStatus', res, 'Seeded');
   if(res && res.ok){
-    /* Phase AX — Budget has no project selector of its own any more; jumping to see
-       the freshly-seeded budget means selecting it on the one shared axis, same as
-       picking it from the sidebar's project list would. */
-    currentProjectId = target.id;
+    budgetDemoProjectId = target.id;
     budgetDemoCollapsed = new Set();
-    renderSide();
   }
 }
 
