@@ -530,20 +530,16 @@ once. After AX the project is chosen exactly once, in the sidebar, and the view
   actually picked; `goProduction()`'s fallback only *reads* it, and deliberately never
   stamps it itself, so viewing on load isn't treated as "opening" a project the way a
   sidebar click is.
-- **Consequence, not a bug (at AX) — fixed at Gate 1: Proper Corn is reachable again.**
-  Removing B-1's own project dropdown (see **Budget (B-1)** below) meant the screen only
-  ever rendered `currentProjectId`, and Proper Corn was never a real project you could
+- **Consequence, not a bug: Proper Corn is no longer reachable through the UI.**
+  Removing B-1's own project dropdown (see **Budget (B-1)** below) means the screen now
+  always renders `currentProjectId`, and Proper Corn was never a real project you could
   select from the sidebar — it only ever existed as an extra option in the dropdown
-  that AX removed. AX left it there deliberately (see the AX addendum below), on the
-  grounds that building a new way to reach a demo fixture would be a feature, not
-  navigation. **Gate 1 is that fixed navigation**: Proper Corn is now a real
-  `projectsDB` record (id `bdm-proper-corn-hot-sauce`, titled "Proper Corn Hot Sauce
-  (demo)"), added to the sidebar's PROJECTS list like any other project, so
-  `bdmCurrentProjectId()` resolves it the same way it resolves any other project —
-  through `currentProjectId`, no special-casing. Its stored budget
-  (`budget:bdm-proper-corn-hot-sauce`) was not touched or reseeded; only the missing
-  click path was added. See **Budget (B-1)** below for what changed in
-  `bdmProjectList()` as a direct consequence.
+  that's now gone. Its stored budget (`budget:bdm-proper-corn-hot-sauce`) is untouched
+  and still loads correctly if `bdmCurrentProjectId()` ever falls back to it (only
+  possible if `projectsDB` itself is empty), but there is no click path to it any more.
+  Not fixed here — the brief was to delete the dropdown, and building a new way to reach
+  a project that was only ever a demo fixture would be a feature this phase didn't ask
+  for.
 
 ## Budget (B-1) — the line-item budget
 
@@ -655,14 +651,9 @@ scope); the rule above is what a future linking action must obey.
   store a float of 0 without falling through to the project's — [Budget (B-1)]
 - `bdmProjectList()` / `bdmProjectName()` / `bdmCurrentProjectId()` — ⚠️ **Phase AX
   removed this screen's own project selector; these no longer back one.**
-  `bdmProjectList()` offers name lookups plus the last-resort fallback below, but
-  nothing calls it to build a `<select>` any more. ⚠️ **Gate 1: it is now exactly
-  `projectsDB`** — the `.concat([{id:BDM_PROPER_CORN_ID, ...}])` that used to stand in
-  for Proper Corn while it had no project record of its own is gone, now that Proper
-  Corn is a real `projectsDB` entry (see **Budget (B-1)** and the Sidebar &
-  navigation — VIEWS section above); keeping both would have meant two list entries
-  for the same id. Do not re-add a Proper Corn concat here. `bdmCurrentProjectId()`
-  simply returns `currentProjectId`
+  `bdmProjectList()` still offers the real projects from `projectsDB` plus Proper Corn
+  (name lookups, plus the last-resort fallback below), but nothing calls it to build a
+  `<select>` any more. `bdmCurrentProjectId()` now simply returns `currentProjectId`
   when it resolves to something in that list, falling back to the first entry only if
   it doesn't (e.g. every project was deleted while this screen was open) — the earlier
   `budgetDemoProjectId` override variable and its setter (`setBudgetDemoProject()`) are
@@ -800,15 +791,12 @@ scope); the rule above is what a future linking action must obey.
   documents — `renderMain()` would blank a half-typed name — [Budget (B-1)]
 - `BDM_PROPER_CORN_SEED` / `BDM_PROPER_CORN_ID` — **Proper Corn is kept from AU
   deliberately**: ROW has no post work, so this is the only project on which the "post"
-  phaseSet is visible at all. Its lines live inline purely as the starting content for
-  its budget record; `bdmEnsureLoaded()` writes them to `budget:bdm-proper-corn-hot-sauce`
-  the first time the record is found absent, and from then on storage is the source of
-  truth and the constant is never read again. ⚠️ **Gate 1: it IS now a project in
-  `projectsDB`** (same id, `BDM_PROPER_CORN_ID`, titled "Proper Corn Hot Sauce (demo)"),
-  reachable from the sidebar's PROJECTS list like any other project — see the Sidebar &
-  navigation — VIEWS section above. This constant still seeds only the budget's lines
-  and sections; the project record itself lives in `projectsDB`, not here, and was not
-  generated from this constant — [Budget (B-1)]
+  phaseSet is visible at all. It is **not** a project in `projectsDB` — it appears in
+  the Budget screen's selector and nowhere else in the app. Its lines live inline
+  purely as the starting content for its budget record; `bdmEnsureLoaded()` writes them
+  to `budget:bdm-proper-corn-hot-sauce` the first time the record is found absent, and
+  from then on storage is the source of truth and the constant is never read again —
+  [Budget (B-1)]
 - ⚠️ **REMOVED in Phase AV — do not look for these**: `BUDGET_DEMO_DATA` and its
   **"IRL London 2026"** dataset (dropped entirely), `BUDGET_DEMO_CODE_LABELS`,
   `BUDGET_DEMO_CODES`, `BUDGET_DEMO_BBC_CATEGORIES`, `BUDGET_DEMO_BBC_LABELS`,
@@ -912,37 +900,6 @@ Inc./Ex. VAT toggle so both bases are still reachable.
 | sidebar at 375px | ✓ VIEWS (Production, Budget) at top, then Databases/Projects/App, no layout breakage; page-level `scrollWidth===clientWidth` on the Budget screen (no horizontal overflow) |
 | stray writes from testing | ✓ `budget:*` keys in storage still exactly the pre-existing two (`id_msc4nv2c0g178`, `bdm-proper-corn-hot-sauce`) — rapid switching never auto-created a budget record for LMAOF/Fashion Files |
 | unrelated console noise seen during the heaviest stress round | "Supabase save gave up after repeated conflicts (db:projects)" — the app's pre-existing optimistic-concurrency retry/merge path (see `saveDB()`), exhausted by ~30 same-key writes fired faster than any real click stream plus a second live session on the same Supabase project; not a hang, not data loss (`db:projects` count and content verified intact after), and not code this phase touched |
-
-### Verified (Gate 1), driven through the live page against the real Supabase
-
-Light consistency pass following AU/AV/AW/AX — dead-code sweep, Proper Corn's
-navigation fix, the 1320px width rule documented, a design-system light pass. No
-behaviour changed except the one navigation fix (Proper Corn reachable again).
-
-| check | result |
-|---|---|
-| inline script extracts and parses | ✓ `node --check` clean |
-| CSS brace balance | ✓ 462 open / 462 close (one fewer pair than AX's 463 — `.bdm-sec-total` removed, see below) |
-| genuinely dead code found and removed | ✓ one: the CSS selector `.bdm-sec-total` (line ~656) — defined but never referenced by any rendered markup; the section total it once styled is now the `.status`/`<strong id="bdm-secttl-…">` pair in `budgetDemoSectionHTML()`'s foot row |
-| dead `bdm*`/`budgetDemo*` functions | ✓ none — every one of the ~48 functions in the B-1 block has at least one call site outside its own definition |
-| `IRL London 2026` / `BUDGET_DEMO_DATA` and siblings | ✓ no surviving references (comment-only mentions saying they're gone) |
-| the removed B-1 project `<select>` / old sidebar handlers | ✓ no surviving references |
-| "VAT sits outside" wording or logic | ✓ none — `budgetDemoLineMath()`'s `total = net + (bdmVatToggle ? vat : 0)` is the AW-corrected formula, no dead branch beside it |
-| commented-out code blocks from AU–AX | ✓ none found in the B-1 region |
-| `db:crew` untouched | ✓ 88 records, md5 `8e1989859a1a5153ff03ba137e11be28` (matches AV/AW/AX exactly), `updated_at` unmoved |
-| ROW 2026, Inc. VAT basis, unchanged | ✓ Subtotal £318,668.31 / Production fee £31,866.83 / Grand total £350,535.14 / VAT £26,354.20; all eight department totals unchanged (SET £96,996.90 / PROD £64,829.10 / CIN £45,355.35 / CAT/TRA £33,425.34 / GRIP £24,987.69 / EQUIP £23,520.42 / AUD £16,419.06 / HMU £13,134.45) |
-| VAT toggle, ROW, both bases | ✓ Inc. VAT → Ex. VAT gives exactly £291,178.58 / £29,117.86 / £320,296.44, VAT reference unchanged at £26,354.20 |
-| **Proper Corn added to `projectsDB`** (id `bdm-proper-corn-hot-sauce`, title "Proper Corn Hot Sauce (demo)") | ✓ one `db:projects` write, verified by direct read afterward: 3 → 4 records; the existing `budget:bdm-proper-corn-hot-sauce` record was not touched, reseeded or read from `BDM_PROPER_CORN_SEED` again (still 15 lines / 7 sections / 5% float / 0% fee, unchanged) |
-| Proper Corn opens from the sidebar | ✓ appears in PROJECTS, sorted by `startDate` like any other project, opens Production (Overview) normally |
-| Proper Corn's Budget renders its POST section | ✓ its own 8-column post phaseSet (PreProd/Assembly/PreV1/V1 Feedback/PreV2/V2 Feedback/Delivery/Buyout) — the only place in the app this renders; figures exactly match AW's table: Subtotal £22,778.28 / fee £0.00 / grand £22,778.28 / VAT £1,015.60, all seven department totals sum to the subtotal exactly |
-| `.main:has(#bdmTopSheet)` still scoped to B-1 alone | ✓ `#bdmTopSheet` set nowhere but `renderBudgetDemo()`; live-measured `.main` max-width is 1320px on Budget and 840px on every other screen checked (Production/Overview) |
-| other screens' tables vs. the 1320px rule | ✓ every table besides B-1's line table sits on `.tablewrap table`'s default 520px min-width, including T-6 Budget's three rollup tables — nothing else currently needs the exception |
-| Production tabs (Tech, Shoot Days, T-6 Budget's 4 views + Itemize VAT + filter, Preview & Export) | ✓ all load and render, no console errors |
-| both databases (Crew, Locations) + their filter panels | ✓ load and render, no console errors |
-| Settings (fonts, brand colours, preview, budget codes & rules, ROW seed action) | ✓ loads and renders, no console errors |
-| project/view switching, all four projects × both views | ✓ no hangs, no stuck "Loading budget…", figures update correctly each time, including the newly-added Proper Corn |
-| 375px, Production and Budget screens | ✓ `scrollWidth===clientWidth` (375===375) on both — no page-level horizontal overflow; B-1's line/summary tables scroll inside their own `.tablewrap` as designed |
-| design-system light pass over Budget (B-1) | ✓ no drift found beyond the one dead CSS rule above — Pattern A headings, the Label family, ruled-line fields, `.ts-grid`/`.ts-field`, `.budget-summary`/`.budget-stat`/`.budget-total-row`, and the two-greens rule are all the same shared classes the rest of the app uses, not local reimplementations |
 
 ## Preview & Export
 
@@ -2420,18 +2377,13 @@ exactly where AW put it, inside the top sheet — keeps that line visible rather
 blurring "a property of this budget" and "a lens on this budget" into one strip because
 they happen to both be a checkbox/input near the top of the screen.
 
-**Proper Corn becomes unreachable, and that's accepted, not overlooked — at AX.** It
-was never a real project — only ever an extra option in the dropdown this phase
-deleted. Its stored budget is untouched and would still render correctly if something
-pointed `currentProjectId` at it, but nothing in the app did or should: building a new
-way to reach a fixture that only ever existed to give AU/AV/AW something with
-post-phaseSet lines to test against would be a feature, not navigation. See **Sidebar &
-navigation — VIEWS** for the exact fallback path this phase left it on.
-
-⚠️ **Superseded at Gate 1.** The click path this addendum deliberately declined to
-build turned out to be exactly what Gate 1 was asked for — see **Sidebar & navigation
-— VIEWS** above and **Budget (B-1)**'s `BDM_PROPER_CORN_SEED` note. Nothing about AX's
-reasoning above was wrong at the time; a later phase simply had a different brief.
+**Proper Corn becomes unreachable, and that's accepted, not overlooked.** It was never
+a real project — only ever an extra option in the dropdown this phase deleted. Its
+stored budget is untouched and would still render correctly if something pointed
+`currentProjectId` at it, but nothing in the app does or should: building a new way to
+reach a fixture that only ever existed to give AU/AV/AW something with post-phaseSet
+lines to test against would be a feature, not navigation. See **Sidebar & navigation —
+VIEWS** for the exact fallback path.
 
 **No new persistence layer for "remembered project," and nothing new in Supabase.**
 The no-empty-state boot sequence reuses `lastOpenedAt` — already on every project
@@ -2440,40 +2392,6 @@ actually picked. `goProduction()`'s own fallback to `mostRecentProject()` only r
 it. The alternative — a new `localStorage`/`sessionStorage` key for "last view/project"
 — was avoided on purpose: the app has never used browser storage for anything, and
 the existing Supabase-backed signal already says exactly what was needed.
-
-## The wide-view exception, as decided (Gate 1)
-
-Every screen in this app reads at the same 840px column (`.main{max-width:840px}`)
-— a call sheet is a form, and a form is easiest to read narrow. Budget (B-1) is
-the one screen that opts out: `.main:has(#bdmTopSheet){max-width:1320px}`, added
-in Phase AU because at 840px the Total / Float / Total+float columns — the exact
-figures a budget is read for — sat off the right edge. Checked at Gate 1 that the
-`:has()` scoping still holds: `#bdmTopSheet` is set nowhere but
-`renderBudgetDemo()`, so every other screen measures 840px and B-1 alone measures
-1320px, live-verified against both.
-
-**Naming this as a pattern, so a future dense screen reuses it rather than
-reinventing it:**
-
-- A screen earns the exception only when its own **read-at-a-glance** columns —
-  not incidental ones — would otherwise sit off the edge. Scrolling to check a
-  secondary figure is fine; scrolling to check the number the screen exists to
-  show is not.
-- Scope it with `:has()` on an id unique to that screen's own root wrapper
-  (`#bdmTopSheet` here), the same idiom the field-layout rules already use —
-  never widen `.main` bare, which would widen every screen at once.
-- Width is the **only** thing that moves. Type, colour, headings, tables,
-  fields and collapsibles all stay the app's existing rules — B-1 proves this
-  works: nothing else about it deviates from the design system below.
-
-**Checked at Gate 1, nothing else currently qualifies.** Every table in the app
-other than B-1's line table sits on `.tablewrap table`'s default 520px
-min-width (T-6 Budget's own three rollup tables included) and reads fine inside
-840px with its ordinary internal scroll. Only B-1's line table (1230px, or
-1490px in the post phaseSet, `.bdm-lines`/`.bdm-lines-post`) is wide enough to
-need the column itself widened rather than scrolled. If a future screen (an
-eventual T-6 rebuild, a new reporting view) hits the same problem, this is the
-pattern to reuse.
 
 ## The design system, as decided (Phase Detail)
 

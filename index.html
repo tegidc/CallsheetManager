@@ -653,6 +653,8 @@
   .bdm-cat-letter{font-family:var(--label); font-weight:600; letter-spacing:1.2px; color:var(--tape); margin-right:7px;}
   /* an A–Q category with no lines still gets a row at £0 — muted, not hidden */
   .bdm-cat-empty td{color:var(--muted);}
+  .bdm-sec-total{margin-left:auto; font-family:var(--body); font-weight:400; font-size:var(--fs-meta);
+    letter-spacing:0; text-transform:none; color:var(--muted);}
   .bdm-section{margin-bottom:4px;}
   .bdm-sec-foot{margin:8px 0 20px;}
   .bdm-settings-strip{margin-bottom:14px;}
@@ -8353,12 +8355,8 @@ const BDM_SETTINGS_DEFAULTS = {
    budget:bdm-proper-corn-hot-sauce the first time the record is found absent, the
    same seed-if-empty idiom initApp() uses for travelMethodsList, and from then on
    storage is the source of truth and this constant is never read again.
-   ⚠️ Gate 1: Proper Corn IS now a project in projectsDB (id BDM_PROPER_CORN_ID,
-   titled "Proper Corn Hot Sauce (demo)"), reachable from the sidebar's PROJECTS
-   list like any other project — AX's dropdown removal had orphaned it, and it was
-   the only project exercising the "post" phaseSet. Its budget record above is
-   untouched; this only restores a click path to it. See Sidebar & navigation —
-   PROPER CORN in MAP.md.
+   Proper Corn is not a project in projectsDB; it appears in the Budget screen's
+   project selector alongside the real ones and nowhere else in the app.
    ⚠️ AU's other dataset, "IRL London 2026", is GONE — dropped entirely in AV. Do not
    look for BUDGET_DEMO_DATA. */
 const BDM_PROPER_CORN_SEED = {
@@ -8463,13 +8461,11 @@ function bdmNormalizeRecord(r){
 /* ---- name lookups + the fallback list ----
    Phase AX removed the screen's own project selector; this now only backs
    bdmProjectName() (the page title) and bdmCurrentProjectId()'s last-resort
-   fallback. ⚠️ Gate 1: Proper Corn is a real projectsDB record now (see the
-   Proper Corn note above), so this list is exactly projectsDB — the old
-   `.concat([{id:BDM_PROPER_CORN_ID, ...}])` that stood in for it while it had
-   no project record of its own is gone; keeping both would have meant two
-   entries for the same id. Do not re-add a Proper Corn concat here. */
+   fallback. The real projects, plus Proper Corn, which is not in projectsDB and
+   exists only here (see BDM_PROPER_CORN_SEED). */
 function bdmProjectList(){
-  return projectsDB.map(p=>({ id:p.id, name:p.title || p.client || p.id }));
+  return projectsDB.map(p=>({ id:p.id, name:p.title || p.client || p.id }))
+    .concat([{ id:BDM_PROPER_CORN_ID, name:'Proper Corn Hot Sauce' }]);
 }
 function bdmProjectName(id){
   const hit = bdmProjectList().find(x=>x.id===id);
@@ -8478,11 +8474,10 @@ function bdmProjectName(id){
 /* Phase AX — no dropdown of its own any more: this screen renders whichever project
    the sidebar has selected, full stop. Falls back to the first in the list only for
    the edge case currentProjectId is unset/invalid (e.g. every project was deleted
-   while this screen was open); if projectsDB is itself empty that falls all the way
-   through to BDM_PROPER_CORN_ID as a last resort, even though (Gate 1) Proper Corn
-   is now an ordinary project and so would already be list[0] in every case short of
-   someone deleting it too. Its stored budget key is untouched either way; nothing
-   here deletes or migrates it. */
+   while this screen was open). ⚠️ Proper Corn is not a real project and so can never
+   be currentProjectId — removing the dropdown makes it unreachable through the UI
+   except in that one fallback case (projectsDB itself empty, so list[0] is Proper
+   Corn). Its stored budget key is untouched; nothing here deletes or migrates it. */
 function bdmCurrentProjectId(){
   const list = bdmProjectList();
   if(currentProjectId && list.some(x=>x.id===currentProjectId)) return currentProjectId;
