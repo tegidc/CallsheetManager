@@ -205,16 +205,6 @@ Every screen needs the same handful of records. These are the single place that 
 
 ## Budget
 
-⚠️ **This is T-6, labelled COSTS in the UI since Gate 1 (Part One), not "Budget" any
-more.** Every function/variable/DOM id/CSS class below still reads `budget*` — this was
-a visible-text-only rename of the Production tab (`index.html` line ~2848), nothing
-else. Reason: with the VIEWS switcher now in the project header offering a "Budget"
-route (B-1, a completely different screen — see **Budget (B-1)** below), a tab called
-"Budget" *inside* Production was ambiguous. Note the tab is now labelled COSTS while
-one of its own four sub-views (`BUDGET_VIEW_LABELS`, T-6.5) is ALSO labelled "Costs" —
-a pre-existing naming collision this rename makes more visible, left as-is per the
-brief; don't try to fix it as part of a future tidy without checking first.
-
 Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already
 entered elsewhere in the app rather than owning any of its own — including hotel cost
 per room/night (`getHotelCosts()`/`saveHotelCosts()`, Phase Budget originally, moved to
@@ -548,49 +538,22 @@ once. After AX the project is chosen exactly once, in the sidebar, and the view
   grounds that building a new way to reach a demo fixture would be a feature, not
   navigation. **Gate 1 is that fixed navigation**: Proper Corn is now a real
   `projectsDB` record (id `bdm-proper-corn-hot-sauce`, titled "Proper Corn Hot Sauce
-  (demo)"), pushed by `seedSampleData()` alongside ROW/LMAOF, added to the sidebar's
-  PROJECTS list like any other project, so `bdmCurrentProjectId()` resolves it the same
-  way it resolves any other project — through `currentProjectId`, no special-casing.
-  Its stored budget (`budget:bdm-proper-corn-hot-sauce`) was not touched or reseeded;
-  only the missing click path was added. (`seedSampleData()` only ever runs against a
-  completely empty database, so this line is for a fresh install — the live production
-  Supabase project already carried this project record from before the seed function
-  was fixed.) See **Budget (B-1)** below for what changed in `bdmProjectList()` as a
-  direct consequence.
-
-⚠️ **The VIEWS control itself moved out of the sidebar, into the project header, at
-Gate 1.** Everything above this line still describes the *routing* correctly — project
-and view are still independent axes, `goProduction()`/`goBudgetDemo()` are unchanged,
-`openProject()` is unchanged, the no-empty-state boot sequence is unchanged. Only the
-clickable control moved:
-- The sidebar's **VIEWS** section (the `Production`/`Budget` `.side-item` pair, `Views`
-  `.side-label`) is gone. The sidebar is back to its pre-AX shape: **Databases,
-  Projects, App** — no top section.
-- In its place, both `renderProject()` and `renderBudgetDemo()` now render a small
-  `viewSwitcherHTML()` control top-right of their `.page-head`, level with the project
-  title, above the tab row. It's the exact same two routes (`goProduction()` /
-  `goBudgetDemo()`), rendered with the app's existing `.tabs`/`.tab`/`.tab.active`
-  idiom — not a new control type, just relocated. `.page-head` is now a flex row
-  (title block in a new `.page-head-titles` wrapper on the left, the switcher on the
-  right) instead of a plain stacked block.
-- Reason: with the Views/Databases/Projects/App stack gone, the sidebar reads as pure
-  navigation again, and the view toggle sits next to the thing it's switching the view
-  *of* (the project you're looking at) rather than in a separate panel.
-- `renderSide()`'s active-item toggle no longer checks `data-side==='production'`/
-  `'budget'` — those elements don't exist any more, so the two clauses were dead code
-  and were removed. The project-list highlight (`route.screen==='project'||
-  route.screen==='budget'`) is untouched — that logic was never about the VIEWS items.
+  (demo)"), added to the sidebar's PROJECTS list like any other project, so
+  `bdmCurrentProjectId()` resolves it the same way it resolves any other project —
+  through `currentProjectId`, no special-casing. Its stored budget
+  (`budget:bdm-proper-corn-hot-sauce`) was not touched or reseeded; only the missing
+  click path was added. See **Budget (B-1)** below for what changed in
+  `bdmProjectList()` as a direct consequence.
 
 ## Budget (B-1) — the line-item budget
 
 ⚠️ **This is NOT the Budget tab (T-6).** T-6 is cost visibility only, rolled up from
-data entered on other tabs. This is **B-1**, a real line-item budget: you type the
-lines, and every figure on it is derived from them. Reached via the view switcher in
-the project header (moved here from its own sidebar section at Gate 1 — see **Sidebar
-& navigation — VIEWS** above). The two do not share a single function, constant or DOM
-id — everything here is named `budgetDemo*` / `bdm*` precisely so it cannot collide
-with T-6's `budget*` family. The one thing it *does* reuse is `budgetFmt()`, the app's
-one money formatter.
+data entered on other tabs. This is **B-1**, a separate screen reached from the side
+panel, and it is a real line-item budget: you type the lines, and every figure on it
+is derived from them. The two do not share a single function, constant or DOM id —
+everything here is named `budgetDemo*` / `bdm*` precisely so it cannot collide with
+T-6's `budget*` family. The one thing it *does* reuse is `budgetFmt()`, the app's one
+money formatter.
 
 ⚠️ **The "Demo" in `budgetDemo*` is HISTORICAL.** Phase AU built this as a demo;
 **Phase AV gave it real storage** and it is no longer one. The names were kept rather
@@ -864,25 +827,14 @@ scope); the rule above is what a future linking action must obey.
 - `bdmSettingsTablesHTML()` — **the codes, phase sets and BBC rules, READ ONLY, in
   Settings (S-1.5).** The point is that the rules can be seen rather than being buried
   in code. Editing them is a later phase — [Budget (B-1), Shared/utility functions]
-- ⚠️ **Superseded at Gate 1 (Part One): the `.main:has(#bdmTopSheet){max-width:1320px}`
-  one-off is GONE.** It existed because at the app's old 840px reading column the
-  Total / Float / Total+float columns sat off the right edge. Gate 1 replaced the
-  840px default with one landscape container for every screen (`.main{max-width:1188px}`
-  — see **The wide-view exception** below, now retitled to record its removal), so
-  this screen no longer needs its own exception — do not look for `:has(#bdmTopSheet)`.
-  The line table (`min-width:1230px`/`1490px`, from AV's Section column) is still wider
-  than 1188px, so it now scrolls inside its own `.tablewrap` at the SAME width every
-  other screen uses, rather than the page growing to fit it — live-verified: `.main` is
-  1188px on every screen checked (Production's seven tabs, both databases, Settings,
-  B-1), no page-level horizontal overflow at any of them, down to 375px — [Budget (B-1)]
-- Gate 1 (Part One) also: removed the rule between individual line rows
-  (`.bdm-lines td{border-bottom:none}` — the field underlines already delineate each
-  row; the header row's own rule, a `.section th`, is untouched), and widened the Item
-  column (`.bdm-item-input`, 130px→220px min-width, since it was truncating real values
-  like "Field Producer on Set" and "Production Coordinator") — funded by narrowing
-  Notes (120px→90px) and this table's Section/Code/BBC pickers (`.bdm-lines
-  select.pill-select`, scoped to this table only, 180px→120px max-width; the shared
-  `select.pill-select` class elsewhere in the app is untouched) — [Budget (B-1)]
+- `.main:has(#bdmTopSheet){max-width:1320px}` — ⚠️ **the one screen that opts out of the
+  app's 840px reading column.** At 840px the Total / Float / Total+float columns sat off
+  the right edge, which are the three you actually read. Scoped by `:has()` on this
+  screen's own top sheet — the same selector idiom the field-layout rules already use —
+  so every other screen is untouched. AV's Section and Float % columns pushed the line
+  table's `min-width` from 1080/1340px to 1230/1490px; on a narrower window it scrolls
+  inside its own `.tablewrap`, and at 375px there is **no page-level horizontal
+  overflow** (verified) — [Budget (B-1)]
 - ⚠️ **The field-width rules are qualified with their element on purpose** —
   `input.bdm-rate-input`, not `.bdm-rate-input`. `input[type=text]{width:100%}` is an
   attribute selector at specificity (0,1,1) and beats a bare class (0,1,0), so the
@@ -983,40 +935,14 @@ behaviour changed except the one navigation fix (Proper Corn reachable again).
 | **Proper Corn added to `projectsDB`** (id `bdm-proper-corn-hot-sauce`, title "Proper Corn Hot Sauce (demo)") | ✓ one `db:projects` write, verified by direct read afterward: 3 → 4 records; the existing `budget:bdm-proper-corn-hot-sauce` record was not touched, reseeded or read from `BDM_PROPER_CORN_SEED` again (still 15 lines / 7 sections / 5% float / 0% fee, unchanged) |
 | Proper Corn opens from the sidebar | ✓ appears in PROJECTS, sorted by `startDate` like any other project, opens Production (Overview) normally |
 | Proper Corn's Budget renders its POST section | ✓ its own 8-column post phaseSet (PreProd/Assembly/PreV1/V1 Feedback/PreV2/V2 Feedback/Delivery/Buyout) — the only place in the app this renders; figures exactly match AW's table: Subtotal £22,778.28 / fee £0.00 / grand £22,778.28 / VAT £1,015.60, all seven department totals sum to the subtotal exactly |
-| `.main:has(#bdmTopSheet)` still scoped to B-1 alone | ✓ `#bdmTopSheet` set nowhere but `renderBudgetDemo()`; live-measured `.main` max-width is 1320px on Budget and 840px on every other screen checked (Production/Overview) — ⚠️ **superseded at the next Gate 1 pass below: this rule and both figures are gone, replaced by one 1188px container everywhere** |
-| other screens' tables vs. the 1320px rule | ✓ every table besides B-1's line table sits on `.tablewrap table`'s default 520px min-width, including T-6 Budget's three rollup tables — nothing else currently needs the exception — ⚠️ **the 1320px half of this is superseded too, see below** |
+| `.main:has(#bdmTopSheet)` still scoped to B-1 alone | ✓ `#bdmTopSheet` set nowhere but `renderBudgetDemo()`; live-measured `.main` max-width is 1320px on Budget and 840px on every other screen checked (Production/Overview) |
+| other screens' tables vs. the 1320px rule | ✓ every table besides B-1's line table sits on `.tablewrap table`'s default 520px min-width, including T-6 Budget's three rollup tables — nothing else currently needs the exception |
 | Production tabs (Tech, Shoot Days, T-6 Budget's 4 views + Itemize VAT + filter, Preview & Export) | ✓ all load and render, no console errors |
 | both databases (Crew, Locations) + their filter panels | ✓ load and render, no console errors |
 | Settings (fonts, brand colours, preview, budget codes & rules, ROW seed action) | ✓ loads and renders, no console errors |
 | project/view switching, all four projects × both views | ✓ no hangs, no stuck "Loading budget…", figures update correctly each time, including the newly-added Proper Corn |
 | 375px, Production and Budget screens | ✓ `scrollWidth===clientWidth` (375===375) on both — no page-level horizontal overflow; B-1's line/summary tables scroll inside their own `.tablewrap` as designed |
 | design-system light pass over Budget (B-1) | ✓ no drift found beyond the one dead CSS rule above — Pattern A headings, the Label family, ruled-line fields, `.ts-grid`/`.ts-field`, `.budget-summary`/`.budget-stat`/`.budget-total-row`, and the two-greens rule are all the same shared classes the rest of the app uses, not local reimplementations |
-
-### Verified (Gate 1, Part One — cosmetic changes), driven through the live page against the real Supabase
-
-A second Gate 1 pass, same threshold, combining the tidy items above with a set of
-layout/labelling changes: the VIEWS control relocated from the sidebar into the
-project header, T-6 relabelled COSTS, one 1188px landscape container everywhere
-(superseding the 1320px exception above), B-1's line-detail row separators removed,
-and its Item column widened. No budget figure, calculation or VAT logic touched.
-
-| check | result |
-|---|---|
-| inline script extracts and parses | ✓ `node --check` clean |
-| CSS brace balance | ✓ 466 open / 466 close |
-| dead references: old `data-side="production"`/`"budget"`, `840px`, `1320` (as a live rule, not a comment) | ✓ none — sidebar VIEWS markup gone, `renderSide()`'s two dead active-toggle clauses removed, `.main:has(#bdmTopSheet)` rule deleted |
-| `db:crew` untouched | ✓ 88 records, md5 `8e1989859a1a5153ff03ba137e11be28` (matches every prior phase), `updated_at` unmoved |
-| ROW 2026, Inc. VAT basis, unchanged | ✓ Subtotal £318,668.31 / Production fee £31,866.83 / Grand total £350,535.14 / VAT £26,354.20; all eight department totals unchanged |
-| VAT toggle, ROW, both bases | ✓ Inc. VAT → Ex. VAT gives exactly £291,178.58 / £29,117.86 / £320,296.44, VAT reference unchanged at £26,354.20 |
-| Proper Corn, Inc. VAT | ✓ Subtotal £22,778.28 / fee £0.00 / grand £22,778.28 / VAT £1,015.60 — unchanged; budget record untouched (`updated_at` unmoved) |
-| `.main` width, every screen | ✓ live-measured 1188px on all of: Production's seven tabs (Overview/Crew/Locations/Tech/Shoot Days/Costs/Preview & Export), T-6 Costs' four sub-views (Per Department/Per Day/Per Person/Costs), both databases, Settings, and B-1 Budget — no page-level horizontal overflow (`scrollWidth===clientWidth`) at 1280px, 1920px or 375px |
-| B-1 line-detail table vs. the new 1188px container | ✓ does NOT fit at 1188px (table's own `min-width` is 1230px/1490px) — scrolls horizontally inside its own `.tablewrap`, page itself never overflows; this is the expected, by-design outcome, not a regression |
-| Item column truncation | ✓ fixed without the container change — "Field Producer on Set" and "Production Coordinator" (previously clipped to ~20 characters) now render in full at 220px min-width |
-| view switcher, both directions, project open throughout | ✓ clicked BUDGET → PRODUCTION → BUDGET on the same project (instant, no hang); clicked a different project (Proper Corn) while Budget was already open (the exact `bdmEnsureLoaded()` case AV flagged) — instant switch, correct data, no stuck "Loading budget…" |
-| Proper Corn opens from the sidebar and renders its POST section | ✓ appears in PROJECTS; opens Production normally; Budget shows its own 8-column post phaseSet (PreProd/Assembly/PreV1/V1 Feedback/PreV2/V2 Feedback/Delivery/Buyout), figures unchanged |
-| remembered project reopens on refresh | ✓ confirmed after the switching above |
-| 375px | ✓ view switcher wraps below the title (`.page-head`'s `flex-wrap`) rather than overflowing; no page-level horizontal overflow on Production or Budget |
-| design-system pass over the new/changed CSS | ✓ no new colours or fonts — `.page-head-titles`/`.view-switcher` are layout-only wrappers, the switcher reuses `.tabs`/`.tab`/`.tab.active` verbatim, the Item/Notes/pill-select width changes are the same "width or alignment" territory the rest of B-1's CSS already occupies |
 
 ## Preview & Export
 
@@ -1195,7 +1121,7 @@ coarse information first, finest detail last.
 | T-5.4 | · Position assignments | Call times, grouped by company → department → role seniority (Phase N item 2) | `renderPositionAssignments()` |
 | T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
-| **T-6** | **Budget** — labelled **COSTS** in the UI since Gate 1 (Part One); code/ids/section-code stay "Budget"/`budget*`, label-only rename | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
+| **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
 | T-6.0 | · Filter & output | Phase Refinement/R16 — tick shoot days and/or departments to cost part of the shoot, plus the Per Person sort (R4) and the Copy/Export controls (R1). Scopes all four views at once, so it sits above the switcher, not in it. Nothing ticked = whole project. Foot row shared with T-2.6/D-1.2 — see **The filter-panel foot** | `budgetFilterPanelHTML()` / `filterPanelFootHTML()` / `copyBudget()` |
 | T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
 | T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
@@ -1228,8 +1154,7 @@ coarse information first, finest detail last.
 
 ## B — Budget
 
-A different thing from **T-6**. Reached from the VIEWS switcher in the project header
-(Phase AX; moved from its own sidebar section into the header at Gate 1, Part One),
+A different thing from **T-6**. Reached from the sidebar's VIEWS section (Phase AX),
 not the project tab strip, and it keeps the open project open behind it. **Phase AV
 gave it real storage** — it is no longer a demo, despite the `budgetDemo*` function
 names. **Phase AX removed its own project selector** — it now renders whichever
@@ -1262,8 +1187,9 @@ keys and for SECTIONS vs CODES, and **Sidebar & navigation — VIEWS** for the a
 
 | Code | Section | What it is | Entry point |
 |---|---|---|---|
-| **G-1** | Sidebar | Databases, Projects (project list + New project), App (Settings). The VIEWS section Phase AX added at the top is gone since Gate 1 (Part One) — see **Sidebar & navigation — VIEWS** | `renderSide()` |
-| G-1.1 | · Views (Production/Budget) — MOVED, no longer in the sidebar | Relocated to the project header at Gate 1 (Part One): a `.tabs`/`.tab` switcher, top-right of `.page-head`, rendered by `viewSwitcherHTML()` from both `renderProject()` and `renderBudgetDemo()` | `viewSwitcherHTML()` / `goProduction()` / `goBudgetDemo()` |
+| **G-1** | Sidebar | **VIEWS** (Production → T-1…T-7, Budget → B-1) at the top since Phase AX, then Databases, Projects (project list + New project), App (Settings) — see **Sidebar & navigation — VIEWS** | `renderSide()` |
+| G-1.1 | · VIEWS — Production | The project workspace and its tabs — the VIEW counterpart to Budget, added in Phase AX so a project could be opened without a route already forcing it | `goProduction()` |
+| G-1.2 | · VIEWS — Budget | B-1, unchanged; sat alone in a "Project" section before Phase AX moved it up alongside Production | `goBudgetDemo()` |
 | **G-2** | Mobile top bar & drawer | Burger, title, slide-out nav | `toggleDrawer()` / `setTopbarTitle()` |
 | **G-3** | Welcome screen | Landing state when no project is open — since Phase AX, only reachable with zero projects in `projectsDB` (no empty state otherwise skips straight to Production) | `renderWelcome()` |
 | ~~**G-4**~~ | ~~Sample data reset~~ | **Removed in Phase AS (G12)** — the section and its button are gone; first-load auto-seeding survives in `initApp()` | — |
@@ -2445,13 +2371,11 @@ a line is what gets invoiced. Don't unify them without deciding which model wins
 is information — it says what wasn't spent — and a top sheet with categories missing
 is a top sheet somebody has to cross-check by hand.
 
-**The one styling deviation is `max-width`.** The app's 840px reading column was right
+**The one styling deviation is `max-width`.** The app's 840px reading column is right
 for a call sheet form and wrong for a budget: it pushed Total / Float / Total+float off
-the right edge. `.main:has(#bdmTopSheet)` widened this screen alone to 1320px. Everything
+the right edge. `.main:has(#bdmTopSheet)` widens this screen alone to 1320px. Everything
 else — headings, labels, greens, fields, tables, collapsibles, the tab switcher, the
-money figures — was the app's existing rules, unmodified. ⚠️ **The `max-width` deviation
-itself is gone as of Gate 1 (Part One) — see "The wide-view exception" below, now
-retitled to record its removal.** Everything else in this paragraph still holds.
+money figures — is the app's existing rules, unmodified.
 
 **The BBC rules moved out of code and into data.** AU had them as a `switch`; AV has
 them as an ordered, first-match-wins table in `db:budget_settings`, shown read-only in
@@ -2517,24 +2441,39 @@ it. The alternative — a new `localStorage`/`sessionStorage` key for "last view
 — was avoided on purpose: the app has never used browser storage for anything, and
 the existing Supabase-backed signal already says exactly what was needed.
 
-## ⚠️ The wide-view exception — REMOVED at Gate 1 (Part One). Do not look for it.
+## The wide-view exception, as decided (Gate 1)
 
-**Historical record, kept for context — this pattern no longer exists in the code.**
-Every screen in this app used to read at the same 840px column
-(`.main{max-width:840px}`) except Budget (B-1), which opted out via
-`.main:has(#bdmTopSheet){max-width:1320px}` (added in Phase AU, because at 840px the
-Total / Float / Total+float columns — the exact figures a budget is read for — sat
-off the right edge). The prior Gate 1 pass checked the `:has()` scoping still held and
-documented the technique as a named, reusable pattern for a future dense screen.
+Every screen in this app reads at the same 840px column (`.main{max-width:840px}`)
+— a call sheet is a form, and a form is easiest to read narrow. Budget (B-1) is
+the one screen that opts out: `.main:has(#bdmTopSheet){max-width:1320px}`, added
+in Phase AU because at 840px the Total / Float / Total+float columns — the exact
+figures a budget is read for — sat off the right edge. Checked at Gate 1 that the
+`:has()` scoping still holds: `#bdmTopSheet` is set nowhere but
+`renderBudgetDemo()`, so every other screen measures 840px and B-1 alone measures
+1320px, live-verified against both.
 
-**Gate 1 (Part One) superseded this.** The app now reads at one landscape container
-everywhere — `.main{max-width:1188px}`, Production and Budget alike, no per-screen
-opt-out — because having a page shape that changes screen to screen was the thing
-under review, not just this one selector. There is no exception left to reuse: a
-future dense screen that doesn't fit 1188px should scroll its own wide table inside
-`.tablewrap` (the mechanism that already handles B-1's own line-detail table — see
-**Budget (B-1)** above), not widen `.main`. `:has(#bdmTopSheet)` no longer appears
-anywhere in `index.html`.
+**Naming this as a pattern, so a future dense screen reuses it rather than
+reinventing it:**
+
+- A screen earns the exception only when its own **read-at-a-glance** columns —
+  not incidental ones — would otherwise sit off the edge. Scrolling to check a
+  secondary figure is fine; scrolling to check the number the screen exists to
+  show is not.
+- Scope it with `:has()` on an id unique to that screen's own root wrapper
+  (`#bdmTopSheet` here), the same idiom the field-layout rules already use —
+  never widen `.main` bare, which would widen every screen at once.
+- Width is the **only** thing that moves. Type, colour, headings, tables,
+  fields and collapsibles all stay the app's existing rules — B-1 proves this
+  works: nothing else about it deviates from the design system below.
+
+**Checked at Gate 1, nothing else currently qualifies.** Every table in the app
+other than B-1's line table sits on `.tablewrap table`'s default 520px
+min-width (T-6 Budget's own three rollup tables included) and reads fine inside
+840px with its ordinary internal scroll. Only B-1's line table (1230px, or
+1490px in the post phaseSet, `.bdm-lines`/`.bdm-lines-post`) is wide enough to
+need the column itself widened rather than scrolled. If a future screen (an
+eventual T-6 rebuild, a new reporting view) hits the same problem, this is the
+pattern to reuse.
 
 ## The design system, as decided (Phase Detail)
 

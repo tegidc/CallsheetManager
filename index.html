@@ -68,7 +68,7 @@
   .app{display:flex; min-height:100vh;}
   .side{width:var(--sidew); flex:0 0 var(--sidew); background:var(--side-bg); border-right:1px solid var(--side-line);
     padding:16px 12px; position:sticky; top:0; height:100vh; overflow-y:auto;}
-  .main{flex:1; min-width:0; padding:20px 22px 90px; max-width:1188px; margin:0 auto;}
+  .main{flex:1; min-width:0; padding:20px 22px 90px; max-width:840px; margin:0 auto;}
 
   /* top bar + scrim: only ever visible on mobile */
   .topbar{display:none;}
@@ -258,17 +258,12 @@
   /* Page headline follows the preview-card pattern picked in the Style Review:
      a large all-caps display title, with upper-and-lower-case sub information
      in the body font beneath it (not an uppercase eyebrow above it). */
-  .page-head{margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px 16px;}
-  .page-head-titles{min-width:0;}
+  .page-head{margin-bottom:16px;}
   .page-head h1{font-family:var(--disp); font-weight:700; font-size:22px; letter-spacing:.4px;
     text-transform:uppercase; margin:0; color:var(--text);}
   .page-head .eyebrow{font-family:var(--body); font-size:13px; letter-spacing:0; color:var(--muted);
     text-transform:none; margin-top:2px;}
   .page-head .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:var(--tape); margin-top:4px;}
-  /* Gate 1: the VIEWS control, relocated here from the sidebar — reuses .tabs/.tab
-     as-is (see viewSwitcherHTML()), just cancelling its default bottom margin since
-     .page-head already carries one. */
-  .page-head .view-switcher{margin:2px 0 0; flex:0 0 auto;}
 
   .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
   .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px;
@@ -613,21 +608,18 @@
      .subhead.dept-toggle (deptHeaderHTML), .section table/th/td, the ruled-line
      inputs, .budget-summary/.budget-stat for the headline figures and
      .budget-total-row for the ruled total rows. No new colours, no new fonts. */
-  /* Gate 1: the AU 1320px page-width exception for this screen is gone — every view
-     now shares the one landscape container (1188px, see .main above). The line
-     detail table below is wider than that at both its min-widths, so it scrolls
-     horizontally inside its own .tablewrap (line ~574) instead of widening the page. */
+  /* A budget is wider than a call sheet form: at the app's 840px reading column the
+     Total / Float / Total+float columns sit off the right edge and have to be scrolled
+     to, which are the three you actually read. This ONE screen opts out, scoped by
+     :has() on its own top sheet — the same selector idiom the field-layout rules
+     above already use. Every other screen keeps 840px. */
+  .main:has(#bdmTopSheet){max-width:1320px;}
   .bdm-num{text-align:right; white-space:nowrap;}
   /* Phase AV added a Section column (a line's display bucket is now stored
      separately from the code it counts under), so both min-widths go up by one
      select's worth. */
   .bdm-lines table{min-width:1230px;}
   .bdm-lines.bdm-lines-post table{min-width:1490px;}
-  /* Gate 1: the rule between individual line rows is gone — each field already has
-     its own underline (.bdm-text-input etc.), and the .section td rule (line ~344)
-     was drawing a second line right under it. The header row keeps its rule: that's
-     a .section th, untouched by this. */
-  .bdm-lines td{border-bottom:none;}
   /* ⚠️ These MUST stay qualified with their element. `input[type=text]{width:100%}`
      above is an attribute selector — specificity (0,1,1) — so a bare `.bdm-rate-input`
      class (0,1,0) loses to it and every field silently collapses to its cell width
@@ -637,14 +629,7 @@
   input.bdm-day-input{width:46px; text-align:center;}
   input.bdm-rate-input{width:88px; text-align:right;}   /* wide enough for a four-figure buyout */
   input.bdm-text-input{width:100%; min-width:130px;}
-  /* Gate 1: Item was truncating real values ("Field Producer on Se…") at the same
-     min-width as Name, even though item text runs longer on average. Funded by
-     trimming Notes (was 120px — free text, least harmed by needing a click to read
-     the rest) and this table's own Section/Code/BBC pickers (was the shared
-     select.pill-select 180px cap; scoped here, not changed globally). */
-  input.bdm-item-input{width:100%; min-width:220px;}
-  input.bdm-note-input{width:90px;}
-  .bdm-lines select.pill-select{max-width:120px;}
+  input.bdm-note-input{width:120px;}
   select.bdm-code-select, select.bdm-vat-select, select.bdm-bbc-select,
   select.bdm-section-select{width:auto; padding:5px 4px 4px 2px;}
   input.bdm-float-input{width:46px; text-align:center;}
@@ -1008,6 +993,9 @@
 <div class="app">
   <aside class="side" id="side">
     <div class="brand"><span class="dot"></span><strong>Call Sheets</strong></div>
+    <div class="side-label">Views</div>
+    <div class="side-item" data-side="production" onclick="goProduction()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg></span> Production</div>
+    <div class="side-item" data-side="budget" onclick="goBudgetDemo()"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h11M8 20V9a4 4 0 0 1 7.5-2M6 11h7M6 14.5h6"/></svg></span> Budget</div>
     <div class="side-label">Databases</div>
     <div class="side-item" data-side="crew" onclick="goDatabase('crew')"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></span> Crew</div>
     <div class="side-item" data-side="locations" onclick="goDatabase('locations')"><span class="ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 1 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span> Locations</div>
@@ -1978,7 +1966,7 @@ function projCode(p){
 /* ============================================================ SIDE PANEL */
 function renderSide(){
   document.querySelectorAll('.side-item').forEach(el=>{
-    el.classList.toggle('active', (route.screen==='db-crew'&&el.dataset.side==='crew') || (route.screen==='db-locations'&&el.dataset.side==='locations') || (route.screen==='settings'&&el.dataset.side==='settings'));
+    el.classList.toggle('active', (route.screen==='db-crew'&&el.dataset.side==='crew') || (route.screen==='db-locations'&&el.dataset.side==='locations') || (route.screen==='settings'&&el.dataset.side==='settings') || (route.screen==='budget'&&el.dataset.side==='budget') || (route.screen==='project'&&el.dataset.side==='production'));
   });
   const wrap = document.getElementById('sideProjects');
   if(!projectsDB.length){ wrap.innerHTML = '<div class="side-empty">No projects yet</div>'; return; }
@@ -2039,11 +2027,10 @@ window.addEventListener('resize', ()=>{ if(window.innerWidth>900) closeDrawer();
 function goDatabase(which){ route={screen:'db-'+which}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
 function goNewProject(){ route={screen:'new-project'}; closeDrawer(); renderSide(); renderMain(); }
 function goSettings(){ route={screen:'settings'}; currentProjectId=null; closeDrawer(); renderSide(); renderMain(); }
-/* Budget, B-1, and Production (below) are the VIEWS (Phase AX; the control that
-   triggers them moved from its own sidebar section into the project header at Gate
-   1 — see viewSwitcherHTML() below). Neither route clears currentProjectId: project
-   and view are independent axes, so switching VIEW leaves the project you were in
-   open behind it and the sidebar keeps saying so. */
+/* Budget, B-1, and Production (below) are the VIEWS (Phase AX) — the two sidebar
+   routes that do NOT clear currentProjectId. Project and view are independent axes:
+   these switch which VIEW of a project you're looking at, so the project you were in
+   stays open behind it and the sidebar keeps saying so. */
 function goBudgetDemo(){ route={screen:'budget'}; closeDrawer(); renderSide(); renderMain(); window.scrollTo(0,0); }
 /* Production — the project workspace and its tabs (T-1..T-7). Only touches
    currentProjectId/currentProjectTab when nothing valid is already open (deleted
@@ -2059,17 +2046,6 @@ function goProduction(){
     currentProjectId = p.id;
   }
   route={screen:'project'}; closeDrawer(); renderSide(); renderMain(); window.scrollTo(0,0);
-}
-/* Gate 1 — the VIEWS control itself, relocated from the sidebar into the project
-   header (top-right of .page-head, level with the title). Same two routes, same
-   active-state idiom as every other tab row in the app (.tabs/.tab/.tab.active) —
-   not a new control type. Shared by renderProject() and renderBudgetDemo(), the
-   only two screens with a .page-head to put it in. */
-function viewSwitcherHTML(){
-  return `<div class="tabs view-switcher">
-    <div class="tab ${route.screen==='project'?'active':''}" onclick="goProduction()">PRODUCTION</div>
-    <div class="tab ${route.screen==='budget'?'active':''}" onclick="goBudgetDemo()">BUDGET</div>
-  </div>`;
 }
 /* Sidebar project list — the PROJECT axis (Phase AX). Changes which project is open;
    if a VIEW (Production or Budget) is already on screen, that view stays put (mirrors
@@ -2802,14 +2778,6 @@ async function seedSampleData(){
     notes:'Different venue and crew subset from the ROW studio shoot — production company OFTV, first aider Heather Bradley.' };
   shootDaysDB.push(lmaofDay);
 
-  // ---- Proper Corn Hot Sauce (demo) — no shoot days of its own; exists purely so
-  // Budget's "post" phaseSet (see BDM_PROPER_CORN_SEED) has a project to render
-  // under. Fixed id (BDM_PROPER_CORN_ID, not uid()) so it lines up with the budget
-  // record already stored under that same key.
-  const properCornProj = { id: BDM_PROPER_CORN_ID, client:'Proper Corn', title:'Proper Corn Hot Sauce (demo)',
-    startDate:'2026-01-01', company:COMPANY, logline:'', description:'', crewIds:[], locationIds:[], createdAt:new Date().toISOString() };
-  projectsDB.push(properCornProj);
-
   await saveDB('db:crew',crewDB); await saveDB('db:locations',locationsDB);
   await saveDB('db:projects',projectsDB); await saveDB('db:shootdays',shootDaysDB);
   currentProjectId = proj.id; route = {screen:'project'}; currentProjectTab = 'overview';
@@ -2867,12 +2835,9 @@ function renderProject(m){
   setTopbarTitle(p.title||'(untitled)');
   m.innerHTML = `
     <div class="page-head">
-      <div class="page-head-titles">
-        <h1>${esc(p.title||'(untitled)')}</h1>
-        <div class="eyebrow">${esc(p.company||COMPANY)} · ${esc(p.client||'')}</div>
-        <div class="code">${esc(projCode(p))}</div>
-      </div>
-      ${viewSwitcherHTML()}
+      <h1>${esc(p.title||'(untitled)')}</h1>
+      <div class="eyebrow">${esc(p.company||COMPANY)} · ${esc(p.client||'')}</div>
+      <div class="code">${esc(projCode(p))}</div>
     </div>
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
@@ -2880,7 +2845,7 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS</div>
       <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
-      <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">COSTS</div>
+      <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
       <div class="tab ${currentProjectTab==='preview'?'active':''}" onclick="goProjectTab('preview')">PREVIEW &amp; EXPORT</div>
     </div>
     <div id="projectBody"></div>`;
@@ -8389,14 +8354,11 @@ const BDM_SETTINGS_DEFAULTS = {
    same seed-if-empty idiom initApp() uses for travelMethodsList, and from then on
    storage is the source of truth and this constant is never read again.
    ⚠️ Gate 1: Proper Corn IS now a project in projectsDB (id BDM_PROPER_CORN_ID,
-   titled "Proper Corn Hot Sauce (demo)"), pushed alongside ROW/LMAOF in
-   seedSampleData(), reachable from the sidebar's PROJECTS list like any other
-   project — AX's dropdown removal had orphaned it, and it was the only project
-   exercising the "post" phaseSet. Its budget record above is untouched; this only
-   restores a click path to it. (The live Supabase project already carries this
-   record from before the seed function was fixed — seedSampleData() only fires on
-   a truly empty database, so this line matters for a fresh install, not a re-run
-   against existing data.) See Sidebar & navigation — PROPER CORN in MAP.md.
+   titled "Proper Corn Hot Sauce (demo)"), reachable from the sidebar's PROJECTS
+   list like any other project — AX's dropdown removal had orphaned it, and it was
+   the only project exercising the "post" phaseSet. Its budget record above is
+   untouched; this only restores a click path to it. See Sidebar & navigation —
+   PROPER CORN in MAP.md.
    ⚠️ AU's other dataset, "IRL London 2026", is GONE — dropped entirely in AV. Do not
    look for BUDGET_DEMO_DATA. */
 const BDM_PROPER_CORN_SEED = {
@@ -8851,7 +8813,7 @@ function budgetDemoLinesTableHTML(rec, g){
         <td><select class="pill-select bdm-code-select" onchange="setBudgetDemoLineField('${l.id}','code',this.value)">${codeOpts(l)}</select>${bdmMiscodeFlag(rec, l)}</td>
         <td><select class="pill-select bdm-bbc-select" title="Blank derives the category from the rules table in Settings" onchange="setBudgetDemoLineField('${l.id}','bbcOverride',this.value)">${bbcOpts(l)}</select>
             <span class="empty-note">${esc(budgetDemoBbcCategory(rec, l))}</span></td>
-        <td><input type="text" class="bdm-item-input" value="${esc(l.item||'')}" oninput="setBudgetDemoLineText('${l.id}','item',this.value)" onchange="renderMain()"></td>
+        <td><input type="text" class="bdm-text-input" value="${esc(l.item||'')}" oninput="setBudgetDemoLineText('${l.id}','item',this.value)" onchange="renderMain()"></td>
         <td><input type="text" class="bdm-text-input" value="${esc(l.name||'')}" oninput="setBudgetDemoLineText('${l.id}','name',this.value)" onchange="renderMain()"></td>
         ${phases.map(ph=>`<td class="bdm-num"><input type="text" class="bdm-day-input" inputmode="decimal" value="${esc(String((l.days&&l.days[ph])||''))}" oninput="setBudgetDemoDay('${l.id}','${esc(ph)}',this.value)"></td>`).join('')}
         <td class="bdm-num" id="bdm-${l.id}-days">${m.daysTotal}</td>
@@ -8997,11 +8959,8 @@ function renderBudgetDemo(m){
   const rec = bdmRecords[id];
   const head = `
     <div class="page-head">
-      <div class="page-head-titles">
-        <h1>${esc(name)}</h1>
-        <div class="eyebrow">${esc(COMPANY)} · Budget</div>
-      </div>
-      ${viewSwitcherHTML()}
+      <h1>${esc(name)}</h1>
+      <div class="eyebrow">${esc(COMPANY)} · Budget</div>
     </div>`;
   /* The record is loaded on demand, so the first paint for a project may have
      nothing to draw. bdmEnsureLoaded() always populates the cache — including on a
