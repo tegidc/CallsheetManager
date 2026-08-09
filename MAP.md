@@ -84,6 +84,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `buildProjectCrewGroups(list, p, days)` (Phase Sort/Group A) — switches on `projectCrewFilter.groupBy`, twelve options: `dept` (default) / `deptCompany` (flat composite bucket, e.g. "Cinematography — Creative Dynamic", not a true nested group — avoided touching every `crewGridView` row renderer for a two-level header) / `company` / `role` / `subDept` / `personType` (Crew/Talent/Client, derived off `deptBucketKey`) / `hotel` (existing, via `personHasHotel`) / `travel` (`p.travelMethods[c.id]`) / `vat` (`c.vatRegistered`, strictly `''`/`'Yes'`/`'No'` — same field Budget's VAT calc reads) / `catering` (`c.dietaryGeneral`) / `seniority` (via `crewSeniorityBand`) / `daysOnSite` (**multi-bucket** — a person on 3 shoot days appears in 3 groups, same `(d.positions||[]).some(pos=>pos[0]===c.id)` signal `buildTransportSummary()` uses) / `none` (single ungrouped bucket, still rendered with a header — "All crew" — no `crewGridView` branch currently supports a header-less group). Every non-`dept`/`hotel` bucket set sorts blank/"Not set" values last rather than alphabetically first — [Crew]
 - `toggleProjectCrewFilterPanel()` / `toggleProjectFilterDept()` / `toggleProjectFilterRole()` / `toggleProjectFilterDay()` / `setProjectFilterField()` / `toggleProjectFilterFlag()` / `clearProjectCrewFilter()` / `projectCrewActiveFilterCount()` / `projectCrewFilterPanelHTML()` — collapsible filter panel state and rendering, including the Days filter-chips + OR/AND select (Phase T item 3), the Roles filter-chips sub-section (Phase AB — its own collapse toggle, `projectCrewFilterRolesOpen`/`toggleProjectFilterRolesSection()`, independent of the panel's own open/closed state) and the Inverse checkbox (Phase AE, `toggleProjectFilterFlag('inverse', …)` — no new setter needed, the existing generic flag setter covers it). Sort/Group by (Phase Sort/Group A) each carry a broad curated option list rather than the earlier two/one-option shell — see `sortProjectCrewGroup()`/`buildProjectCrewGroups()` above for what each value does. The panel's trailing row (the three exclusion checkboxes + hint + "Clear filters") is the shared `filterPanelFootHTML()` — see **The filter-panel foot** — and `projectCrewActiveFilterCount()` is what gates that row's "Clear filters" link; note it counts filters only, so choosing a Sort or Group by never makes the panel look filtered — [Crew]
 - `projectCrewSelected` / `toggleCrewSelected()` / `toggleSelectAllFilteredCrew()` / `clearCrewSelection()` / `bulkRemoveSelectedFromProject()` / `bulkActionBarHTML()` — bulk-select (checkbox swapped in for the view/eye icon via `crewIdentityHTML`'s `bulkSelect` option) and the bulk "Remove from project" action. `toggleSelectAllFilteredCrew()` is the "Select all" checkbox next to Expand/Collapse all (Phase T item 2) — it's always handed exactly the currently-filtered/visible crew ids, never the full project roster, so it only ever selects what the active filter is showing — [Crew]
+  - ⚠️ **`bulkRemoveSelectedFromProject()` clears BOTH `p.crewIds` and every shoot day's `positions`** — the same two places `removeCrewFromProject()` has always cleared. It used to filter `crewIds` only, which left a bulk-removed person holding their position on the days they'd been assigned to, so they stayed on the call sheet after being taken off the project. Its undo snapshot covers `db:shootdays` as well as `db:projects` for the same reason. This fix originally arrived inside Phase AY-a and was **re-applied on its own** when Budget View V1 was reverted — it is the one thing from that workstream that was kept. Do not "simplify" the second filter away — [Crew, Shoot Days]
 - `selectedEditTargets(crewId)` (Phase Bulk Edit) — **the selected-set bulk-edit pattern.** Every per-field editor on the Crew tab calls this first: if `crewId` is part of the current multi-select AND at least one other person is also selected, it returns every selected id; otherwise just `[crewId]`. The caller then loops its own field-specific mutation over the returned ids and does ONE `saveDB`/render at the end — this is the reusable "which ids does this edit apply to" decision, not a per-field bulk-edit implementation. Wired into `toggleCrewOnDay()` (Days on site), `toggleHotelNight()` / `toggleHotelPre()` (Hotel), `toggleMeal()` (Catering), `setTravelMethod()` (Travel), `saveQuickShowAs()` (Roles — Show as) and `setActiveRole()` (Roles — role/department; only on a direct user pick, i.e. `skipSave` falsy — the internal `skipSave:true` calls used to reactivate a replacement role after `removeRoleFromCrew()` do NOT fan out, since that's a single-person consistency fixup, not a user edit). `bulkActionBarHTML()` shows a one-line hint ("Editing a field for one selected person applies it to all N") whenever 2+ are selected. Deliberately NOT wired into `toggleAllForPerson()` / `toggleAllMealForPerson()` (the per-person "All" button) — that's a different axis (all days for one person), mixing it with cross-person propagation would be confusing — [Crew]
 - `bulkEditOpen` / `toggleBulkEdit()` / `bulkEditPanelHTML()` / `applyBulkLeadCompany()` — bulk-edit panel opened from the bulk-action bar; currently just Lead Company, the field Phase R moved off the main Roles row — [Crew]
 - `crewRolesRowHTML()` — renders one person's row in the Roles tab as a proper tidy grid (`.roles-grid`, Phase S), not a packed inline row: CONTROLS (checkbox + Edit pencil) | Name | Role (saved-roles taglist only — no add-role picker here any more) | Rate | Show as. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all — [Crew, Budget]
@@ -1317,7 +1318,10 @@ two callers and only one of them was the button; `initApp()`'s
 `if(!crewDB.length && !locationsDB.length && !projectsDB.length)` branch is untouched.
 Exercised end-to-end (emptied the collections in memory, ran the branch: 77 crew,
 2 projects, 7 shoot days seeded, four `saveDB` calls attempted). `seedSampleData()`
-itself stays — that is **G20 / Phase AV**.
+itself stays — that is **G20**, which was never built. (It had been pencilled in for
+"Phase AV"; that letter went to the abandoned Budget View V1 workstream instead and has
+been reverted — see **Budget View V1 — abandoned and reverted** at the bottom of this
+file. G20 is still open and unassigned.)
 
 > The section's explanatory copy went with the button. Its remaining sentence described
 > a first-run behaviour the user only ever experiences *before* they could read it, and
@@ -2095,3 +2099,83 @@ than the font being added.
 **Open for the next round:** a fonts-only review. One thing to fold in — Fraunces is
 loaded at weights 500 and 700 only (see the Google Fonts `<link>`), but every display
 rule asks for 600 or 700; the 600s are being synthesised rather than using a real cut.
+
+---
+
+# Budget View V1 — abandoned and reverted (9 Aug 2026)
+
+⚠️ **The line-item budget (B-1, `bdm*`) no longer exists in this codebase. Do not go
+looking for it, and do not treat its absence as a bug.** It was built across seven
+phases, judged a wrong turn, and deliberately rolled back to be rebuilt from scratch in
+smaller steps. This is a record so the next session doesn't rediscover it by accident.
+
+**Reverted, not deleted.** Eleven `git revert` commits, one per original commit, on
+`main`. Nothing was reset or force-pushed — every original commit is still in history and
+still reachable, and the tag **`budget-v1-fail`** (pushed to `origin`) points at
+`9ed1e34`, the last commit before the rollback. To read any of this work again, or to
+mine it when the rebuild starts, check out that tag.
+
+| Phase | Commit | What it was |
+|---|---|---|
+| AU | `85df536` | B-1, a line-item budget view (demo, no database) |
+| — | `0c00592` | MAP.md note on B-1's collapse idiom |
+| AV | `d188793` | Budget storage: three keys, sections vs codes, no more demo |
+| AW | `a657006` | Correct VAT basis: VAT sits inside the total, Inc./Ex. toggle |
+| AX | `e35528e` | Project and view as independent axes (sidebar VIEWS) |
+| Gate 1 | `9fc428b` | Light tidy pass following AU–AX |
+| Gate 1 Pt 1 | `61eb111` | View selector into header, Costs rename, 1188px container |
+| — | `a629cf1` | 64px page margin on `.main` |
+| AY-a | `76b5173` | Crew linking, line types and overtime |
+| AY-b | `dc13822` | Bulk generation of budget lines from crew, candidate review |
+| AY-b | `9ed1e34` | Styling for the generation preview and Suggested crew panel |
+
+**Everything through Phase AT was kept**, including AQ's audit (`gate1-review.html`
+stays) and AR/AS/AT's whole-app fixes — those were never Budget work and reverting them
+would have re-introduced G11's silent failed saves, G12's one-click `resetAndReseed()`
+wipe and G19's stale `dayTotal`. AN/AO/AP were kept too, so **T-6's VAT model is still
+"VAT follows the person"** (AO) with `budgetFmt()` separators (AN) and the shared
+`outputMenuRowHTML()` export menu (AP).
+
+**Phase AM (Crew Sort/Group by) needed no action.** It landed at `91eaebc`, well below
+the cut, and survives untouched — 7 sort options and 13 group-by options, all with real
+logic. `sortProjectCrewGroup()` and `crewSeniorityBand()` are byte-identical to their
+pre-rollback state; `buildProjectCrewGroups()` carries Phase AT's table-driven
+refactor, which was kept along with the rest of AT.
+
+**One thing was carried forward out of the reverted range**: AY-a's fix to
+`bulkRemoveSelectedFromProject()`, re-applied as its own commit — see the ⚠️ under
+`projectCrewSelected` in the **Crew** section above.
+
+### What went with it, that you might notice
+- The sidebar's **VIEWS** section (AX). Sidebar is back to Crew / Locations / Settings.
+- The project tab reads **BUDGET** again, not COSTS (`61eb111` renamed it).
+- `.main{max-width}` is back to **840px** from 1188px — that rule was app-wide, not
+  Budget-scoped, so every screen narrows back.
+- The **"Proper Corn Hot Sauce (demo)"** project. It existed only so B-1's `post`
+  phaseSet had something to render; its record was removed from `db:projects` and its
+  `seedSampleData()` entry went with the revert.
+- `deleteCrew()`'s usage warning (AY-a's `crewUsageSummary()`) — back to the plain
+  "Delete this crew member from the database?" confirm. Deliberate: the useful half of
+  it counted budget lines.
+- `budget-seed-row.json`, deleted with AV/AW.
+
+### Storage — what was removed, and what was kept
+Deleted from `app_data`: **`db:budget_settings`** and **all three `budget:<projectId>`
+keys** (`budget:id_msc4nv2c0g178` — ROW, `budget:bdm-proper-corn-hot-sauce`,
+`budget:ayb-scratch-project`).
+
+⚠️ **`db:projects` needed no field surgery.** Budget V1 kept 100% of its state in its own
+keys and never added a field to a project record — verified against all four live
+records and against every `p.<field>` reference in `index.html`. The only change was
+removing the whole Proper Corn project record. **`crewRateOverrides`, `hotelCosts`
+(incl. `perRoomNight`), `cateringCosts`, `transportCosts` and `travelMethods` were never
+Budget V1's and are all intact** — T-6 reads every one of them.
+
+⚠️ **ROW's seed data is not lost.** It is kept at
+**`backup:budget_row_pre_AYb_2026-08-08`** (82 lines), along with
+`backup:budget_row_pre_AY_2026-08-08`. No backup key was deleted. `db:crew` was not
+touched at any point — 88 records, md5 `8e1989859a1a5153ff03ba137e11be28`, identical to
+the pre-session backup.
+
+Full JSON exports of everything deleted are on disk at
+`_exports/2026-08-09-pre-budget-v1-revert/` (untracked).
