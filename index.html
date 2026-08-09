@@ -510,10 +510,11 @@
      both figures taller than rows with one. */
   .prep-grid{display:grid; align-items:start; column-gap:10px;
     grid-template-columns:minmax(160px,280px) minmax(175px,1.2fr) 200px 32px minmax(0,1fr);}
-  /* the chip and AZ's inert "+" marker are one unit — scoped to this grid rather than
-     changing the shared .roles-inline, which the Roles view also uses. Without it a
-     long role ("Executive Producer") wrapped the marker onto its own line and made
-     that row taller than its neighbours. */
+  /* the chip and AZ's "+" marker (live since Phase BA, wired to the roles menu here too
+     since this row reuses roleBannerHTML() unchanged) are one unit — scoped to this grid
+     rather than changing the shared .roles-inline, which the Roles view also uses.
+     Without it a long role ("Executive Producer") wrapped the marker onto its own line
+     and made that row taller than its neighbours. */
   .prep-cell .roles-inline{flex-wrap:nowrap;}
   .prep-cell .role-chip{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .prep-grid-row{padding:8px 0;}
@@ -562,13 +563,14 @@
     display:flex; align-items:center; gap:8px;}
   .modal-box h3::after{content:''; flex:1; height:1px; background:var(--line);}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
-  /* Phase AZ — the roles-view banner's inert "+" marker (wired to a menu in Phase BA).
-     Weight signals whether the person has other saved roles to switch to; the mark
-     itself does nothing yet. */
+  /* Phase AZ — the roles-view banner's "+" marker. Weight signals whether the person
+     has other saved roles to switch to. Wired to the roles menu in Phase BA — click
+     opens openRolesMenu(entryId); see rolesMenuHTML(). */
   .role-add-marker{display:inline-flex; align-items:center; justify-content:center;
     width:16px; height:16px; font-family:var(--body); font-size:13px; line-height:1;
-    color:var(--muted); vertical-align:middle; user-select:none;}
+    color:var(--muted); vertical-align:middle; user-select:none; cursor:pointer;}
   .role-add-marker.has-roles{color:var(--text);}
+  .role-add-marker:hover{color:var(--text);}
   .formgroup{border:none; border-radius:0; padding:0; margin-bottom:16px; background:none;}
   .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;
     display:flex; align-items:center; gap:8px;}
@@ -1265,12 +1267,12 @@ function rolesTagListHTML(c, entryId){
    row is currently using (c.role), no click-to-switch, no ×. Saved-role management
    (add/switch/remove) still lives in the Edit-pencil expansion's tag-list editor
    (rolesTagListHTML() + roleAddPickerHTML(), inside crewFormHTML()) — untouched here.
-   The "+" marker is inert (no handler) until Phase BA wires it to a menu; its weight
-   just signals whether this person has other saved roles to offer. */
+   The "+" marker's weight signals whether this person has other saved roles to offer;
+   Phase BA wires the click itself to openRolesMenu() below. */
 function roleBannerHTML(c){
   const chip = c.role ? `<span class="role-chip active" title="${esc(c.role)}">${esc(c.role)}</span>` : '';
   const hasOtherRoles = (c.roles||[]).length > 1;
-  const marker = `<span class="role-add-marker${hasOtherRoles?' has-roles':''}" aria-hidden="true">+</span>`;
+  const marker = `<span class="role-add-marker${hasOtherRoles?' has-roles':''}" onclick="event.stopPropagation();openRolesMenu('${c.id}')" title="Change or add a role">+</span>`;
   return `${chip}${marker}`;
 }
 function roleAddPickerHTML(c){
@@ -1413,6 +1415,106 @@ async function setEntryRole(entryId, rolePath){
   await saveDB('db:projects', projectsDB);
   refreshCrewScreen();
 }
+/* ---- Phase BA — the roles menu ----
+   Wires AZ's "+" marker (roleBannerHTML()) to a menu, opened per entry. A mode toggle at
+   the top, "Change to" the default: mis-reading it in "Change to" edits one entry and is
+   trivially reversible, mis-reading it in "Add again as" leaves a stray duplicate entry —
+   reversible beats prominent, so neither mode is styled more prominently than the other,
+   only which one is CURRENTLY SELECTED is shown, via the same .tab/.active idiom the
+   view switchers (crewGridView, budgetView) already use elsewhere.
+   The list in BOTH modes comes from THIS PERSON'S SAVED ROLES (c.roles) — never the
+   canonical ROLES_BY_DEPT list. New saved roles only reach c.roles via Phase BB's footer
+   item, added in the next commit.
+   "Change to" omits the entry's own current role from the list and calls setEntryRole()
+   — one entry in, one entry out, nothing else created. Confirmed in code (not assumed):
+   every downstream reader of an entry's role — resolveCrewForDay()/dayOverrideFormHTML()
+   for shoot-day positions, and Pre-production's prepRowHTML() (via this same
+   roleBannerHTML()) — reads role fresh off the entry object on every render rather than
+   caching or duplicating it anywhere, exactly as BF's model established, so
+   setEntryRole()'s one write is the only write this needs.
+   "Add again as" hides every role the person already holds on ANY of their entries on
+   THIS project (including the one the menu was opened from) — never shown ticked or
+   greyed out, simply absent, so the same role can never be added twice through this menu
+   even though the BF schema itself permits a person holding one role on two entries. No
+   workaround/override for that is added, per the brief. Picking a role here calls
+   addCrewEntry(p, crewId, true) — the `force` flag Phase BA added specifically so this is
+   a genuinely new entry rather than the existing-entry no-op every other addCrewEntry()
+   caller still gets — then setEntryRole() on the new entry's id. */
+let rolesMenuFor = null;      // entry id the menu is open for, or null
+let rolesMenuMode = 'change'; // 'change' | 'add' — resets to 'change' every time the menu (re)opens
+function openRolesMenu(entryId){
+  rolesMenuFor = entryId;
+  rolesMenuMode = 'change';
+  renderGlobalOverlay();
+}
+function closeRolesMenu(){
+  rolesMenuFor = null;
+  rolesMenuMode = 'change';
+  renderGlobalOverlay();
+}
+function setRolesMenuMode(mode){
+  rolesMenuMode = mode;
+  renderGlobalOverlay();
+}
+/* the role NAMES to hide from the current mode's list: just this entry's own role in
+   "change", or every role any of this person's entries on this project currently holds
+   in "add" */
+function rolesMenuExcludedNames(entryId, crewId){
+  const p = currentProject();
+  if(rolesMenuMode==='add') return new Set(entriesForCrew(crewId, p).map(e=>e.role));
+  const e = entryById(entryId, p);
+  return new Set([e ? e.role : '']);
+}
+function rolesMenuListHTML(entryId, crewId, c){
+  const exclude = rolesMenuExcludedNames(entryId, crewId);
+  const items = (c.roles||[]).filter(rp=>{
+    const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+    return !exclude.has(name);
+  });
+  if(!items.length) return '<div class="hint">No other saved roles.</div>';
+  return `<div class="roles-inline">${items.map(rp=>{
+    const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+    return `<span class="role-chip" style="cursor:pointer;" onclick="pickRolesMenuRole('${entryId}','${crewId}','${esc(rp)}')">${esc(name)}</span>`;
+  }).join('')}</div>`;
+}
+/* the one place a picked role — from either the saved-roles list above or Phase BB's
+   canonical-picker footer item — is actually applied to an entry, per the active mode */
+async function applyRoleToEntryByMode(entryId, crewId, mode, rolePath){
+  if(mode==='add'){
+    const p = currentProject(); if(!p) return;
+    const e = addCrewEntry(p, crewId, true);
+    if(!e) return;
+    await setEntryRole(e.id, rolePath);
+  } else {
+    await setEntryRole(entryId, rolePath);
+  }
+}
+async function pickRolesMenuRole(entryId, crewId, rolePath){
+  const mode = rolesMenuMode;
+  rolesMenuFor = null;
+  rolesMenuMode = 'change';
+  await applyRoleToEntryByMode(entryId, crewId, mode, rolePath);
+}
+function rolesMenuHTML(){
+  if(!rolesMenuFor) return '';
+  const entryId = rolesMenuFor;
+  const p = currentProject(); if(!p) return '';
+  const e = entryById(entryId, p); if(!e) return '';
+  const c = crewById(e.crewId); if(!c) return '';
+  return `<div class="modal-overlay" onclick="if(event.target===this) closeRolesMenu()">
+    <div class="modal-box">
+      <h3>${esc(c.name||'Role')}</h3>
+      <div class="tabs" style="margin-bottom:12px;">
+        <div class="tab ${rolesMenuMode==='change'?'active':''}" onclick="setRolesMenuMode('change')">Change to</div>
+        <div class="tab ${rolesMenuMode==='add'?'active':''}" onclick="setRolesMenuMode('add')">Add again as</div>
+      </div>
+      ${rolesMenuListHTML(entryId, e.crewId, c)}
+      <div class="toolbar" style="margin-top:14px;">
+        <button onclick="closeRolesMenu()">Close</button>
+      </div>
+    </div>
+  </div>`;
+}
 /* ---- "Add new role" dialog (item 5) ----
    Single in-page dialog: canonical Department select + free-text Role name,
    replacing the old two-prompt() flow. addRoleDialogFor is either a crew id
@@ -1468,7 +1570,7 @@ async function confirmAddRoleDialog(){
    its own state is null) is enough — no need to pick between them. */
 function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
-  if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML();
+  if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML() + rolesMenuHTML();
 }
 /* "Use as template" (Phase BG) — the confirm step in front of duplicateCrew().
    The control is for making a DIFFERENT PERSON off an existing record (same company,
@@ -1733,14 +1835,18 @@ const crewDayCount = (crewId, days, p) => (days||[]).filter(d=>crewOnDay(crewId,
    brand-new-person-inside-a-project branch) goes through here, so a new entry can't
    drift into three slightly different shapes. Role/department seed from the person's
    crew-database record, which is exactly what the roster showed before BF. Returns the
-   new entry, or the existing one when this is a re-add of someone already on the
-   project (pre-BF behaviour: adding twice was a no-op, and stays one until BA's
-   "Add again as" makes a second entry a deliberate act). */
-function addCrewEntry(p, crewId){
+   new entry, or (when `force` is falsy — every existing caller) the existing one when
+   this is a re-add of someone already on the project: pre-BF behaviour, adding twice was
+   a no-op. Phase BA's "Add again as" is the one deliberate exception: it passes
+   force=true to skip that dedup and get a genuinely second entry, carrying its own role
+   (set right after by setEntryRole()) and its own independently-resolvable rate. */
+function addCrewEntry(p, crewId, force){
   if(!p || !crewId) return null;
   p.crewEntries = p.crewEntries || [];
-  const already = p.crewEntries.find(e=>e.crewId===crewId);
-  if(already) return already;
+  if(!force){
+    const already = p.crewEntries.find(e=>e.crewId===crewId);
+    if(already) return already;
+  }
   const c = crewById(crewId);
   const e = { id: uid(), crewId,
     role: (c&&c.role)||'', department: (c&&c.department)||'', subDepartment: (c&&c.subDepartment)||'' };
@@ -5918,8 +6024,8 @@ function prepCounterText(days, markCount){
 /* One ENTRY's row. Rate and days sit as two bare number fields with NO column headers
    and NO inline labels — the decision was that magnitude alone distinguishes them.
    Do not add labels back. The role cell reuses roleBannerHTML() exactly as the Roles
-   view has it, inert AZ "+" marker and all; this phase does not build the roles menu
-   and does not wire that marker. */
+   view has it — including the "+" marker, live since Phase BA opened the same roles
+   menu from here too, for free, since this row never had its own copy of that markup. */
 function prepRowHTML(c){
   const p = currentProject();
   const rate = resolveEntryRate(c.id, p);
