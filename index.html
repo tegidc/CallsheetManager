@@ -621,13 +621,8 @@
   /* Phase AV added a Section column (a line's display bucket is now stored
      separately from the code it counts under), so both min-widths go up by one
      select's worth. */
-  /* Phase AY-a added two more columns (Type, OT) and widened the Name cell to hold
-     the crew picker, so both min-widths go up again. The table already scrolls
-     inside its own .tablewrap at the shared 1188px container (Gate 1, Part One) —
-     that is the mechanism for a wide table here, so this stays a scroll width and
-     never becomes a reason to widen .main. */
-  .bdm-lines table{min-width:1430px;}
-  .bdm-lines.bdm-lines-post table{min-width:1690px;}
+  .bdm-lines table{min-width:1230px;}
+  .bdm-lines.bdm-lines-post table{min-width:1490px;}
   /* Gate 1: the rule between individual line rows is gone — each field already has
      its own underline (.bdm-text-input etc.), and the .section td rule (line ~344)
      was drawing a second line right under it. The header row keeps its rule: that's
@@ -676,40 +671,6 @@
   .bdm-section{margin-bottom:4px;}
   .bdm-sec-foot{margin:8px 0 20px;}
   .bdm-settings-strip{margin-bottom:14px;}
-
-  /* Phase AY-a — crew linking, line types and overtime. Same rule as the rest of
-     this block: everything here is a width, an alignment or a muted caption. No new
-     colours, no new fonts, no new control types — the pickers are the shared
-     .pill-select, the inputs the shared ruled line. */
-  /* ⚠️ Same element-qualified selectors as every other field above, for the same
-     reason: input[type=text]{width:100%} is (0,1,1) and beats a bare class. */
-  input.bdm-ot-input{width:46px; text-align:center;}
-  select.bdm-type-select{width:auto; padding:5px 4px 4px 2px;}
-  /* the Name cell is now a small stack: the name itself, the crew picker under it,
-     and the linked person's current role as read-only context */
-  .bdm-name-cell{min-width:160px;}
-  .bdm-name-cell .bdm-crew-select{margin-top:3px;}
-  .bdm-crew-role{display:block; margin-top:2px;}
-  /* a service line's single quantity, spanning where the phase columns would be —
-     the cell says "Qty" so the collapsed columns don't read as a rendering fault */
-  .bdm-qty-cell{text-align:left; white-space:nowrap;}
-  .bdm-qty-label{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
-    text-transform:uppercase; color:var(--muted); margin-right:6px;}
-  /* the manual "fill days from Production" action — deliberately quiet: it sits with
-     the markers, not with the primary actions, because re-syncing is the exception */
-  .bdm-resync{font-size:var(--fs-meta); color:var(--muted); margin-left:2px; line-height:1;}
-  /* the unmapped-days marker is the one of the four that means "something is
-     missing" rather than "these two differ", so it takes the ink weight the app
-     already uses for a live-but-quiet signal. Still no colour alarm, still no action. */
-  .bdm-flag-warn{color:var(--text);}
-
-  /* the two-option "remove from a project" dialog (Phase AY-a). Two stacked choice
-     buttons, each with its consequence written under it, rather than a confirm()
-     that can only say yes or no to a question it hasn't fully asked. */
-  .rm-options{display:flex; flex-direction:column; gap:8px; margin:6px 0 12px;}
-  .rm-option{display:block; width:100%; text-align:left; padding:10px 12px; cursor:pointer;}
-  .rm-option-label{display:block; font-family:var(--body); font-weight:600; font-size:var(--fs-name);}
-  .rm-option-detail{display:block; font-size:var(--fs-meta); color:var(--muted); margin-top:3px; white-space:normal;}
 
   /* AI Scan (Phase AI Scan) — the first chat UI in the app. Deliberately NOT
      rounded chat bubbles: this app's whole visual language is ruled lines and
@@ -1362,151 +1323,11 @@ async function confirmAddRoleDialog(){
   }
   refreshCrewScreen();
 }
-/* ============================================================================
-   REMOVING A PERSON FROM A PROJECT (Phase AY-a)
-
-   ⚠️ DESTRUCTIVE SCOPE MATCHES WHERE THE USER IS STANDING. From a PROJECT view —
-   Production or Budget — removing a person offers exactly two options:
-
-     1. Remove from this view only
-     2. Remove from this project entirely (both views)
-
-   and nothing else. THE CREW RECORD IS NEVER TOUCHED FROM A PROJECT VIEW. It is not
-   offered, and it is not mentioned — a project is not the place anyone reasons about
-   the shared database, and an option that deletes a person from every other project
-   has no business sitting next to "take them off this job".
-
-   Deleting from the database itself is the Crew database's own action (deleteCrew),
-   which warns with real counts first. These two never reach it.
-
-   ADD syncs both ways (see addNewCrewFromProposal / the Budget add-person dialog);
-   REMOVE deliberately does not mirror silently, which is the whole reason this
-   dialog exists rather than a confirm().
-   ============================================================================ */
-/* {crewIds:[…], from:'production'|'budget', lineId}. An array rather than one id so
-   the Crew tab's bulk "Remove from project" is the SAME decision at scale rather
-   than a second, quieter one that skips the choice — one click there can take 60
-   people off a project. */
-let removePersonDialog = null;
-/* ⚠️ Loads the project's budget record first, and that is not optional. Opened from
-   Production, bdmRecords[p.id] is normally absent (the budget:<projectId> key is
-   loaded on demand by the Budget screen alone — see bdmEnsureLoaded), so without
-   this the dialog would say "their budget lines" instead of a real count and the
-   "entirely" branch would have nothing to delete from. This is the one extra
-   bdmEnsureLoaded() call site AY-a adds, and it is safe for the reason AX's audit
-   records: it goes through the same promise-deduped loader, never around it. */
-async function openRemovePersonDialog(opts){
-  const p = removePersonProject();
-  if(p) await bdmEnsureLoaded(p.id);
-  removePersonDialog = opts;
-  renderGlobalOverlay();
-}
-function closeRemovePersonDialog(){ removePersonDialog = null; renderGlobalOverlay(); }
-/* How much of this project these people are actually in, so the dialog can say what
-   each option will do rather than describing it in the abstract. `days` is the number
-   of shoot-day ASSIGNMENTS across everyone selected (one person on 6 days and six
-   people on 1 day are both 6 things being undone), `lines` the budget lines. */
-function removePersonScope(crewIds){
-  const p = removePersonProject();
-  const ids = new Set(crewIds);
-  let days = 0;
-  if(p) projectDays(p.id).forEach(d=>{
-    (d.positions||[]).forEach(pos=>{ if(ids.has(pos[0])) days++; });
-  });
-  const rec = p ? bdmRecords[p.id] : null;
-  const lines = rec ? rec.lines.filter(l=>ids.has(l.crewId)).length : null;
-  return { days, lines, hasBudget: !!rec };
-}
-/* Whichever project the view the user is standing in is showing. */
-function removePersonProject(){
-  return (route.screen==='budget') ? projById(bdmCurrentProjectId()) : currentProject();
-}
-function removePersonDialogHTML(){
-  if(!removePersonDialog) return '';
-  const { crewIds, from } = removePersonDialog;
-  const names = crewIds.map(id=>(crewById(id)||{}).name).filter(Boolean);
-  const who = names.length===1 ? names[0] : `${crewIds.length} people`;
-  const s = removePersonScope(crewIds);
-  const p = removePersonProject();
-  const proj = p ? (p.title || p.id) : 'this project';
-  const nLines = s.lines===null ? null : s.lines;
-  const lineCount = nLines===null ? 'their budget lines' : `${nLines} budget line${nLines===1?'':'s'}`;
-  /* What "this view only" means depends on which view you're in — that's the point
-     of the option, so each side spells out its own consequence. */
-  const viewOnly = from==='budget'
-    ? { label:'Remove from the budget only',
-        detail:`Deletes ${removePersonDialog.lineId?'this budget line':lineCount} for ${esc(who)}. They stay on the Production crew${s.days?` and keep ${s.days} shoot-day assignment${s.days===1?'':'s'}`:''}.` }
-    : { label:'Remove from Production only',
-        detail:`Takes ${esc(who)} off this project's crew and off ${s.days?`${s.days} shoot-day assignment${s.days===1?'':'s'}`:'any shoot days'}. ${nLines===0?'There are no budget lines for them.':`Their ${lineCount} ${nLines===1?'stays exactly as it is':'stay exactly as they are'}.`}` };
-  const bothDetail = `Takes ${esc(who)} off the Production crew and off every shoot day, AND deletes ${lineCount}.`;
-  return `<div class="modal-overlay" onclick="if(event.target===this) closeRemovePersonDialog()">
-    <div class="modal-box">
-      <h3>Remove ${esc(who)} from ${esc(proj)}</h3>
-      ${names.length>1 ? `<div class="hint" style="margin-top:-4px;">${esc(names.join(', '))}</div>` : ''}
-      <div class="rm-options">
-        <button class="rm-option" onclick="confirmRemovePerson('view')">
-          <span class="rm-option-label">${viewOnly.label}</span>
-          <span class="rm-option-detail">${viewOnly.detail}</span>
-        </button>
-        <button class="rm-option" onclick="confirmRemovePerson('project')">
-          <span class="rm-option-label">Remove from this project entirely</span>
-          <span class="rm-option-detail">${bothDetail}</span>
-        </button>
-      </div>
-      <div class="hint">${names.length===1?esc(who)+' stays':'Everyone here stays'} in the crew database either way, with every other project untouched.</div>
-      <div class="toolbar"><button onclick="closeRemovePersonDialog()">Cancel</button></div>
-    </div>
-  </div>`;
-}
-async function confirmRemovePerson(scope){
-  const d = removePersonDialog; if(!d) return;
-  const { crewIds, from, lineId } = d;
-  const p = removePersonProject(); if(!p){ closeRemovePersonDialog(); return; }
-  const ids = new Set(crewIds);
-  const names = crewIds.map(id=>(crewById(id)||{}).name).filter(Boolean);
-  const who = names.length===1 ? names[0] : `${crewIds.length} crew members`;
-  closeRemovePersonDialog();
-  const rec = bdmRecords[p.id];
-  const dropBudgetLines = () => {
-    if(!rec) return;
-    /* from the budget view, "this view only" means this ONE line; from Production,
-       "entirely" means every line those people are linked to */
-    rec.lines = (from==='budget' && scope==='view' && lineId)
-      ? rec.lines.filter(l=>l.id!==lineId)
-      : rec.lines.filter(l=>!ids.has(l.crewId));
-    bdmTouch(p.id);
-  };
-  const dropFromProduction = () => {
-    p.crewIds = (p.crewIds||[]).filter(x=>!ids.has(x));
-    shootDaysDB.forEach(dd=>{ if(dd.projectId===p.id && dd.positions) dd.positions = dd.positions.filter(pos=>!ids.has(pos[0])); });
-    projectCrewSelected.clear();
-  };
-  /* R17 — snapshot before mutating, so the toast can put it all back. The budget
-     key is not a snapshot-able collection (undoCollectionFor only knows the four
-     top-level arrays), so a budget-side removal is covered by the same autosaved,
-     re-addable line the rest of this screen is. */
-  const snaps = (scope==='project' || from==='production') ? beginUndo(['db:projects','db:shootdays']) : null;
-  if(scope==='project'){ dropFromProduction(); dropBudgetLines(); }
-  else if(from==='budget'){ dropBudgetLines(); }
-  else { dropFromProduction(); }
-  if(scope==='project' || from==='production'){
-    await saveDB('db:projects', projectsDB);
-    await saveDB('db:shootdays', shootDaysDB);
-  }
-  renderMain();
-  if(snaps) finishUndo(scope==='project'
-    ? `Removed ${who} from ${p.title||'this project'}.`
-    : `Removed ${who} from Production on ${p.title||'this project'}.`, snaps);
-}
-
 /* re-renders the persistent overlay (id="globalOverlay", outside #main) that hosts
-   the in-page dialogs so they survive whichever screen re-render triggered them.
-   ⚠️ Only one can ever be open at a time — each opener sets its own state and every
-   other one is null, so concatenating them is safe and keeps this the single place
-   that knows what lives in the overlay. */
+   the add-role dialog so it survives whichever screen re-render triggered it */
 function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
-  if(el) el.innerHTML = addRoleDialogHTML() + removePersonDialogHTML() + bdmAddPersonDialogHTML();
+  if(el) el.innerHTML = addRoleDialogHTML();
 }
 /* clone a crew member — independent record, keeps everything, meant to be
    reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
@@ -3638,14 +3459,8 @@ async function addNewLocationFromProposal(name, addressOrNotes){
   await saveDB('db:projects', projectsDB);
   return rec;
 }
-/* ⚠️ Phase AY-a added the optional `proj` argument. Its two existing callers (AI
-   Scan's accept, Overview Quick add) pass nothing and are unchanged — both run on a
-   Production screen where currentProject() is the right answer. Budget (B-1) resolves
-   its project through bdmCurrentProjectId(), which can differ from currentProjectId
-   in one edge case (currentProjectId unset/invalid), so it passes the record it is
-   actually rendering rather than trusting the default. */
-async function addNewCrewFromProposal(name, department, role, proj){
-  const p = proj || currentProject(); if(!p || !name) return null;
+async function addNewCrewFromProposal(name, department, role){
+  const p = currentProject(); if(!p || !name) return null;
   const rolePath = `${department}/${role}`;
   const rec = { id:uid(), name, roles:[rolePath], role, department,
     subDepartment:'', showAs:'', coProductionCompany:'', phone:'', email:'', skills:'',
@@ -4374,19 +4189,16 @@ function selectedEditTargets(crewId){
   if(projectCrewSelected.size>1 && projectCrewSelected.has(crewId)) return [...projectCrewSelected];
   return [crewId];
 }
-/* ⚠️ Phase AY-a — the bulk remove goes through the same two-option dialog as the
-   single one, replacing its confirm(). It is the same decision (does the budget keep
-   their lines?) and the version that can rewrite sixty people at once is the last
-   place to ask a narrower question. The dialog handles the mutation, the undo
-   snapshot and the save.
-   ⚠️ It also fixes a real gap the old version had: it filtered p.crewIds but left
-   the selected people sitting in every shoot day's `positions`, so a bulk-removed
-   person stayed on the call sheet. confirmRemovePerson()'s dropFromProduction()
-   clears both, the same way the single-person path always did. */
-function bulkRemoveSelectedFromProject(){
+async function bulkRemoveSelectedFromProject(){
   const p = currentProject(); if(!p) return;
-  if(!projectCrewSelected.size) return;
-  openRemovePersonDialog({ crewIds:[...projectCrewSelected], from:'production' });
+  const n = projectCrewSelected.size;
+  if(!n || !confirm(`Remove ${n} crew member(s) from this project?`)) return;
+  const snaps = beginUndo(['db:projects']);
+  p.crewIds = (p.crewIds||[]).filter(id=>!projectCrewSelected.has(id));
+  projectCrewSelected.clear();
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+  finishUndo(`Removed ${n} crew member${n>1?'s':''} from this project.`, snaps);
 }
 /* bulk edit (item 2b) — right now just Lead Company, the one field this phase
    moved off the main "Crew on this project" row. Extend bulkEditPanelHTML /
@@ -4665,14 +4477,11 @@ async function saveQuickShowAs(crewId, value){
 }
 /* shared "add from crew database" option-list builder — grouped by department
    instead of a flat list, for the project Crew tab and Position Assignments pickers */
-/* `selectedId` (Phase AY-a) is optional — the two original callers are "add
-   somebody", which starts with nothing chosen, while Budget's line picker shows the
-   person a line is already linked to. Same option list either way. */
-function groupedCrewOptionsHTML(list, selectedId){
+function groupedCrewOptionsHTML(list){
   const buckets = {};
   list.forEach(c=>{ const key=deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
   return DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length).map(d=>
-    `<optgroup label="${esc(d)}">${buckets[d].map(c=>`<option value="${c.id}"${c.id===selectedId?' selected':''}>${esc(c.name)}${c.role?' ('+esc(c.role)+')':''}</option>`).join('')}</optgroup>`
+    `<optgroup label="${esc(d)}">${buckets[d].map(c=>`<option value="${c.id}">${esc(c.name)}${c.role?' ('+esc(c.role)+')':''}</option>`).join('')}</optgroup>`
   ).join('');
 }
 function crewAssignRowHTML(c, days){
@@ -5554,16 +5363,14 @@ async function addCrewToProject(id){
   renderProjectBody();
   saveInBackground('db:projects', projectsDB);
 }
-/* ⚠️ Phase AY-a — this no longer removes anybody on its own. Removing a person from
-   a project view is now a two-option decision (this view only / this project
-   entirely), because a budget can be carrying lines for them that Production knows
-   nothing about, and silently keeping or silently deleting those are both wrong.
-   The dialog does the work; see openRemovePersonDialog(). It never offers deleting
-   the crew record — that is the Crew database's own action.
-   ⚠️ This is why the G14 render-first/save-after shape moved into confirmRemovePerson()
-   rather than staying here: nothing is mutated until an option is picked. */
-function removeCrewFromProject(id){
-  openRemovePersonDialog({ crewIds:[id], from:'production' });
+async function removeCrewFromProject(id){
+  const p = currentProject();
+  p.crewIds = (p.crewIds||[]).filter(x=>x!==id);
+  shootDaysDB.forEach(d=>{ if(d.projectId===currentProjectId && d.positions) d.positions = d.positions.filter(pos=>pos[0]!==id); });
+  // G14 — render first, save after (see saveInBackground)
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 
 /* ---------- Project Locations ---------- */
@@ -7360,42 +7167,9 @@ async function saveCrew(){
   editingCrewId = null; addingCrewNew = false;
   refreshCrewScreen();
 }
-/* ⚠️ Phase AY-a — the warning states exactly WHAT is affected, with counts. This is
-   the one place in the app that deletes a person from the shared database, and
-   "this may affect budgets" is not a thing anybody can act on: "used in 3 projects,
-   11 budget lines" is.
-   It loads every project's budget record to count, because budget:<projectId> keys
-   are loaded on demand and are normally absent here (see bdmEnsureLoaded). That is a
-   handful of reads at the moment of a deliberate destructive action, not on render.
-   ⚠️ This phase builds the WARNING ONLY. What happens to those lines afterwards —
-   burning the person's details into them so the figures survive — is a later phase.
-   Today the lines keep their crewId, and every reader already copes: bdmLineName()
-   falls back to the line's own stored name and bdmRateDriftFlag()/bdmDayDriftFlag()
-   return nothing when the record has gone. No figure changes. */
-async function crewUsageSummary(id){
-  /* ⚠️ ONE list, so the count and the names it prints can't disagree. A project can
-     hold this person in Production (roster or a shoot-day position), in its budget,
-     or both — all three are "used in", and a project that carries only budget lines
-     for them is exactly the case a Production-only count would miss. */
-  const used = [];
-  let lines = 0;
-  for(const p of projectsDB){
-    const inProduction = (p.crewIds||[]).includes(id)
-      || projectDays(p.id).some(d=>(d.positions||[]).some(pos=>pos[0]===id));
-    const rec = await bdmEnsureLoaded(p.id);
-    const n = rec ? rec.lines.filter(l=>l.crewId===id).length : 0;
-    lines += n;
-    if(inProduction || n) used.push(p.title||p.id);
-  }
-  return { projects: used.length, lines, names: used };
-}
 async function deleteCrew(id){
+  if(!confirm('Delete this crew member from the database?')) return;
   const who = (crewById(id)||{}).name || 'crew member';
-  const u = await crewUsageSummary(id);
-  const usage = u.projects
-    ? `${who} is used in ${u.projects} project${u.projects===1?'':'s'}${u.names.length?' ('+u.names.join(', ')+')':''} and ${u.lines} budget line${u.lines===1?'':'s'}.\n\n`
-    : `${who} is not used in any project or budget line.\n\n`;
-  if(!confirm(usage + 'Delete them from the crew database?')) return;
   const snaps = beginUndo(['db:crew','db:projects']);
   crewDB = crewDB.filter(x=>x.id!==id);
   projectsDB.forEach(p=>{ if(p.crewIds) p.crewIds = p.crewIds.filter(x=>x!==id); });
@@ -8693,47 +8467,6 @@ function bdmNormalizeSettings(s){
 const BDM_DEFAULT_FLOAT_PERCENT = 5;
 const BDM_DEFAULT_FEE_PERCENT = 10;
 const bdmPercentOr = (v, dflt) => (v===null || v===undefined || v==='') ? dflt : bdmNum(v);
-
-/* ---- LINE TYPES (Phase AY-a) — two kinds of line, three kinds of quantity ----
-   'crew'    — a person. Has phase days, may link to a crew record, and its days may
-               be filled from that person's actual Production assignment.
-   'service' — a buyout, a supplier, a venue, a fee. Carries a QUANTITY, not days:
-               nothing about it is scheduled, so it never syncs with Production and
-               its quantity must never be read as shoot days.
-   Both can carry overtime.
-
-   ⚠️ THE MIGRATION, and why it is shaped this way. A pre-AY-a line has no lineType,
-   so one is inferred — ONCE, on normalisation — from where its quantity already
-   sits. ROW's service lines all park their quantity in the Buyout bucket (Greenkit
-   Buyout:1, the Organ Factory Buyout:1, Travel Buyout:40, Per Diems Buyout:7), which
-   is exactly what the Buyout column has always meant on these sheets: a thing bought
-   outright rather than a day worked. So: everything in Buyout (or nothing at all) is
-   a service; anything carrying a PreProd/Shoot/Strike day is crew.
-
-   Measured against ROW's real 82 lines this yields 32 service / 50 crew, and every
-   one of the 32 reads correctly as a supplier, venue, buyout or fee — including all
-   four the brief names. No person-day line is caught by it.
-
-   ⚠️ It is a DEFAULT, not a verdict — lineType is stored and editable per line, and
-   a kit rental billed by the day (ROW's "A Cam", "Sound Kit") legitimately lands on
-   'crew' because it genuinely is day-quantified. ⚠️ Inference reads `days` and never
-   writes it, so no total moves when a budget is migrated. */
-function bdmInferLineType(l){
-  const days = (l && l.days && typeof l.days==='object') ? l.days : {};
-  const live = Object.keys(days).filter(k=>bdmNum(days[k])!==0);
-  return (live.length===0 || live.every(k=>k==='Buyout')) ? 'service' : 'crew';
-}
-function bdmIsService(l){ return l.lineType==='service'; }
-/* Which single bucket a service line's quantity lives in. Read-only — it never
-   mutates the line. The sole occupied bucket when there is exactly one (true of
-   every ROW service line), otherwise 'Buyout', which is the last column of both
-   phase sets and the one that means "not a scheduled day". */
-function bdmServiceQtyKey(l){
-  const days = l.days || {};
-  const live = Object.keys(days).filter(k=>bdmNum(days[k])!==0);
-  return live.length===1 ? live[0] : 'Buyout';
-}
-
 function bdmNormalizeRecord(r){
   r = (r && typeof r==='object' && !Array.isArray(r)) ? r : {};
   const secs = Array.isArray(r.sections) ? r.sections : [];
@@ -8754,19 +8487,6 @@ function bdmNormalizeRecord(r){
       item:    l.item || '',
       name:    l.name || '',
       days:    (l.days && typeof l.days==='object') ? l.days : {},
-      /* Phase AY-a — see bdmInferLineType(). A record written before AY-a has no
-         lineType, so it is inferred here (the MIGRATION) and persisted the next time
-         that budget saves for any reason — the same "normalise on read, land on next
-         write" idiom G19 used for dayTotal, rather than a migration script. ⚠️ The
-         inference reads `days` but never rewrites it: a service line keeps the exact
-         quantity it was seeded with, so no total moves. */
-      lineType: (l.lineType==='crew' || l.lineType==='service') ? l.lineType : bdmInferLineType(l),
-      /* Phase AY-a — overtime, in DAYS, fractions allowed (0.5 = a half-day
-         surcharge). Kept out of `days` deliberately: it costs at the line's own rate
-         and folds into daysTotal, but it is not a scheduled day and must never reach
-         Production. Absent on every pre-AY-a line, so it normalises to 0 and no
-         existing total moves. */
-      overtime: bdmNum(l.overtime),
       rate:    bdmNum(l.rate),
       vatRate: bdmNum(l.vatRate),
       /* null/'' means "follow the project" — 0 is a real, stored value and must
@@ -8904,22 +8624,13 @@ function bdmLineFloatPercent(rec, l){
   return (l.floatPercent===null || l.floatPercent===undefined || l.floatPercent==='')
     ? bdmNum(rec.floatPercent) : bdmNum(l.floatPercent);
 }
-/* ⚠️ Phase AY-a — daysTotal is now scheduled + overtime, and the two are returned
-   separately as well. Overtime is DAYS at the line's own rate, so folding it into
-   daysTotal is all the costing needs; keeping `scheduled` beside it is what lets the
-   screen show scheduled work and surcharge apart, and is the ONLY figure the
-   Production day comparison is ever allowed to read — a half-day surcharge must
-   never imply a scheduled shoot day. Every pre-AY-a line normalises to overtime 0,
-   so daysTotal === scheduled for all of them and no existing total moves. */
 function budgetDemoLineMath(rec, l){
-  const scheduled = Object.values(l.days||{}).reduce((a,b)=>a+bdmNum(b), 0);
-  const overtime  = bdmNum(l.overtime);
-  const daysTotal = scheduled + overtime;
+  const daysTotal = Object.values(l.days||{}).reduce((a,b)=>a+bdmNum(b), 0);
   const net = bdmNum(l.rate) * daysTotal;
   const vat = net * bdmNum(l.vatRate);
   const total = net + (bdmVatToggle ? vat : 0);
   const flt = total * (bdmLineFloatPercent(rec, l)/100);
-  return { scheduled, overtime, daysTotal, net, vat, total, float: flt, totalWithFloat: total + flt };
+  return { daysTotal, net, vat, total, float: flt, totalWithFloat: total + flt };
 }
 function budgetDemoTotals(rec){
   let total=0, floatTotal=0, vat=0;
@@ -8971,313 +8682,6 @@ function bdmRateDriftFlag(l){
   const now = parseRateNumber(c.rate);
   if(now==null || now===bdmNum(l.rate)) return '';
   return `<span class="bdm-flag" title="Crew rate is now ${budgetFmt(now)}">≠</span>`;
-}
-
-/* ============================================================================
-   CREW LINKING (Phase AY-a) — the ownership model, in one block
-
-   CREW owns the person: name, position, day rate, VAT status, contact.
-   PRODUCTION owns the schedule: which days, which unit, call times.
-   BUDGET owns the money: code, section, float, overtime, buyouts.
-
-   Nothing is owned twice, with ONE deliberate exception:
-
-   ⚠️ A LINE'S RATE IS ITS OWN, COPIED ONCE AT LINKING AND NEVER RE-READ.
-   Crew rate = what this person costs today. Line rate = what this job is budgeted
-   at. Putting someone's rate up next year must not rewrite a budget signed off last
-   year. Where the two differ the line shows bdmRateDriftFlag()'s ≠ and nothing else
-   — no auto-update, no prompt, no bulk action. Do not "fix" this into a lookup.
-   The line's own field is labelled "Rate"; the comparison says "Crew rate is now £X".
-   They are deliberately not the same label.
-
-   The same rule, for the same reason, applies to DAYS: filled from Production once,
-   then editable and never re-synced. Production stays general; the budget holds the
-   concrete figure it was signed off on. bdmDayDriftFlag() reports a difference and
-   changes nothing.
-
-   NAME is the opposite case and is genuinely read-through: a linked line displays
-   the crew record's current name, and editing it here writes to db:crew. l.name is
-   kept in step on every write purely as the fallback for an unresolvable crewId
-   (a person deleted from the database) — it is never the authority while the link
-   resolves, so it cannot go stale the way a stored dayTotal did.
-
-   ITEM is the budget's own text. It is SEEDED from the person's position at linking
-   and editable thereafter, exactly as the brief specifies — the budget calls the job
-   "Field Producer on Set" where the crew record says "Producer", and both are right.
-   ⚠️ It is deliberately NOT written back to c.role: since Phase R a role is a saved
-   role path from ROLES_BY_DEPT, set only through setActiveRole(), never typed as free
-   text. The crew record's current role is shown beside the picker as read-only
-   context instead.
-
-   VAT is copied at linking like the rate. On this screen VAT is a property of the
-   LINE (vatRate 0 or 0.2) because a line is what gets invoiced — see MAP.md's
-   "Budget (B-1) — the decisions". Copy, then the line owns it.
-   ============================================================================ */
-function bdmLineCrew(l){ return l && l.crewId ? crewById(l.crewId) : null; }
-/* Read-through while the link resolves; the stored mirror only when it doesn't. */
-function bdmLineName(l){
-  const c = bdmLineCrew(l);
-  return c ? (c.name||'') : (l.name||'');
-}
-/* How many shoot days this person is actually assigned to in Production.
-   ⚠️ `d.positions.some(pos=>pos[0]===crewId)` is the app's one on-day signal —
-   the same one buildTransportSummary(), Days-on-site and buildBudgetData() use.
-   Don't invent a second. */
-function bdmProductionDayCount(crewId, projectId){
-  if(!crewId) return 0;
-  return projectDays(projectId).filter(d=>(d.positions||[]).some(pos=>pos[0]===crewId)).length;
-}
-/* The bucket a person's Production shoot days map onto, or null when the mapping is
-   not unambiguous. A shoot-phaseSet section has a literal 'Shoot' column and the
-   answer is obvious; a post section (PreProd/Assembly/PreV1/…) has no column that
-   means "a day on set", so there is nothing to fill and we must not guess. */
-function bdmShootPhaseFor(rec, l){
-  const sec = bdmSection(rec, l.section);
-  const phases = bdmPhaseSet((sec && sec.phaseSet) || 'shoot');
-  return phases.includes('Shoot') ? 'Shoot' : null;
-}
-/* Fill a line's day buckets from Production. Returns true when it mapped, false when
-   it couldn't — the caller flags rather than guessing. Only ever writes the Shoot
-   bucket: PreProd/Strike/Buyout are budget decisions Production knows nothing about,
-   so they are left exactly as they are. */
-function bdmFillDaysFromProduction(rec, l){
-  const phase = bdmShootPhaseFor(rec, l);
-  if(!phase) return false;
-  const n = bdmProductionDayCount(l.crewId, bdmCurrentProjectId());
-  l.days = l.days || {};
-  if(n) l.days[phase] = n; else delete l.days[phase];
-  return true;
-}
-/* ⚠️ Compares SCHEDULED days only — m.scheduled, never m.daysTotal. Overtime is not
-   a shoot day and must not make a correctly-scheduled line look divergent. */
-function bdmDayDriftFlag(rec, l){
-  if(!l.crewId || bdmIsService(l)) return '';
-  if(!bdmLineCrew(l)) return '';
-  const phase = bdmShootPhaseFor(rec, l);
-  if(!phase) return '';
-  const prod = bdmProductionDayCount(l.crewId, bdmCurrentProjectId());
-  const here = bdmNum((l.days||{})[phase]);
-  if(prod===here) return '';
-  return `<span class="bdm-flag" title="Production has this person on ${prod} shoot day${prod===1?'':'s'}; this line is budgeted at ${here}">↻</span>`;
-}
-/* The "couldn't map it" case, per the brief: buckets left at zero and the LINE
-   flagged, rather than a guess. Computed on every read like the other three markers
-   — never stored, so it clears itself the moment the section's phase set or the
-   person's assignment makes it resolvable. */
-function bdmUnmappedDaysFlag(rec, l){
-  if(!l.crewId || bdmIsService(l)) return '';
-  if(!bdmLineCrew(l)) return '';
-  if(bdmShootPhaseFor(rec, l)) return '';
-  const prod = bdmProductionDayCount(l.crewId, bdmCurrentProjectId());
-  if(!prod) return '';
-  return `<span class="bdm-flag bdm-flag-warn" title="This person has ${prod} shoot day${prod===1?'':'s'} in Production, but this line's section has no Shoot column to put them in — days left at zero rather than guessed">⚠</span>`;
-}
-
-/* Link a line to a crew record: copy name, position→item, rate and VAT across, then
-   fill the days from Production. Everything after this moment is the line's own. */
-function bdmLinkLineToCrew(lineId, crewId){
-  const rec = currentBudgetDemoProject(); if(!rec) return;
-  const l = budgetDemoLine(lineId); if(!l) return;
-  const c = crewById(crewId); if(!c) return;
-  const p = projById(bdmCurrentProjectId());
-  l.crewId = c.id;
-  l.name = c.name || '';
-  /* seed the item from the position only when the line hasn't been given one —
-     never overwrite what somebody has already typed */
-  if(!l.item || l.item==='New line') l.item = c.showAs || c.role || '';
-  const r = resolveCrewRate(c, p);
-  if(r.hasRate) l.rate = r.rate;                 /* THE COPY. Never re-read. */
-  l.vatRate = (c.vatRegistered==='Yes') ? 0.2 : 0;
-  /* a linked person is a person: a service line being pointed at one becomes crew */
-  l.lineType = 'crew';
-  bdmFillDaysFromProduction(rec, l);
-  bdmTouch();
-  renderMain();
-}
-function bdmUnlinkLine(lineId){
-  const l = budgetDemoLine(lineId); if(!l) return;
-  /* keep name/item/rate/days exactly as they are — unlinking is "stop tracking this
-     person", not "throw the line's content away" */
-  l.name = bdmLineName(l);
-  l.crewId = null;
-  bdmTouch();
-  renderMain();
-}
-/* The Name field. On a linked line this is the CREW record's name and writes back to
-   db:crew — the one place this screen writes to that table, and it writes exactly
-   one field. On an unlinked line it is the line's own free text, as it always was. */
-async function setBudgetDemoLineName(id, v){
-  const l = budgetDemoLine(id); if(!l) return;
-  const c = bdmLineCrew(l);
-  l.name = v;
-  bdmTouch();
-  if(c){
-    c.name = v;
-    flashSaveResult('bdmStatus', await saveDB('db:crew', crewDB));
-  }
-}
-/* Re-fill this line's days from Production, on an explicit click. Deliberately a
-   button and not automatic: see the ownership block above. */
-function bdmResyncLineDays(lineId){
-  const rec = currentBudgetDemoProject(); if(!rec) return;
-  const l = budgetDemoLine(lineId); if(!l) return;
-  if(!bdmFillDaysFromProduction(rec, l)) return;
-  bdmTouch();
-  renderMain();
-}
-
-/* ---- overtime, quantity and line type ---- */
-/* Overtime in DAYS, fractions allowed. Costs at the line's own rate through
-   daysTotal, sits outside the phase buckets, never reaches Production. */
-function setBudgetDemoOvertime(id, v){
-  const l = budgetDemoLine(id); if(!l) return;
-  l.overtime = bdmNum(v);
-  bdmTouch(); refreshBudgetDemoNumbers();
-}
-/* A service line's single quantity. Writing it REPLACES the day map, which is what
-   "no days at all" means — but reading never does, so a migrated line keeps its
-   stored buckets byte-for-byte until somebody actually edits it. */
-function setBudgetDemoQty(id, v){
-  const l = budgetDemoLine(id); if(!l) return;
-  const key = bdmServiceQtyKey(l);
-  const n = bdmNum(v);
-  l.days = n ? { [key]: n } : {};
-  bdmTouch(); refreshBudgetDemoNumbers();
-}
-/* Switching type changes NO figure: the stored quantity stays where it is and
-   daysTotal is the sum either way. It changes what the line MEANS — whether its
-   quantity is scheduled days that can follow Production, or a flat quantity that
-   never can. */
-function setBudgetDemoLineType(id, v){
-  const l = budgetDemoLine(id); if(!l) return;
-  l.lineType = (v==='service') ? 'service' : 'crew';
-  bdmTouch();
-  renderMain();
-}
-
-/* ---- the crew picker on a line ----
-   ⚠️ THE LINK IS OPTIONAL AND MUST STAY SO. Roughly half of ROW's 82 lines are
-   suppliers, venues and buyouts with nobody behind them — Greenkit, the Organ
-   Factory, Travel Buyout, Per Diems. Those keep crewId null forever and stay fully
-   editable as free text, which is why "— no crew link —" is the first option and the
-   free-text Name field is still there underneath.
-   Built on groupedCrewOptionsHTML(), the app's existing department-grouped crew
-   picker (T-2.8, Position Assignments), over the WHOLE crew database rather than
-   just this project's roster — a budget routinely books somebody who isn't on the
-   Production crew yet, and picking them is how they get there. */
-/* ⚠️ THE OPTIONS ARE FILLED ON FIRST USE, NOT ON RENDER — and that is not a
-   micro-optimisation. ROW carries 82 lines; a picker per line, each holding all 88
-   crew records, is 7,544 <option> nodes in one table. MEASURED on the live ROW
-   budget: a full renderMain() went from ~60ms to ~130ms, and this screen re-renders
-   on every section collapse, lens switch, VAT toggle, code/section/BBC change and
-   line add or delete. Caching the option STRING was tried and barely moved it (~120ms)
-   — the cost is parsing the nodes, not building the markup.
-   So a resting picker holds exactly one option: whoever the line is linked to (or
-   the no-link placeholder), which is all a closed select ever shows. The full list
-   is built on the first mousedown or focus, before the dropdown opens. Back to
-   ~60ms, with the same 88 records one click away. */
-function bdmCrewPickerHTML(l){
-  const c = bdmLineCrew(l);
-  return `<select class="pill-select bdm-crew-select" title="Link this line to a crew record, or leave it as free text"
-      onmousedown="bdmFillCrewPicker(this)" onfocus="bdmFillCrewPicker(this)"
-      onchange="bdmOnCrewPick('${l.id}', this.value)">
-    ${c ? `<option value="${esc(c.id)}" selected>${esc(c.name)}${c.role?' ('+esc(c.role)+')':''}</option>`
-        : `<option value="" selected>— no crew link —</option>`}
-  </select>`;
-}
-function bdmFillCrewPicker(sel){
-  if(sel.dataset.filled) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— no crew link —</option>'
-    + groupedCrewOptionsHTML(crewDB, cur)
-    + '<option value="__new__">+ Add new person…</option>';
-  sel.value = cur;              /* the selected option is rebuilt, so re-assert it */
-  sel.dataset.filled = '1';
-}
-function bdmOnCrewPick(lineId, value){
-  if(value==='__new__'){ openBdmAddPersonDialog(lineId); return; }
-  if(!value){ bdmUnlinkLine(lineId); return; }
-  bdmLinkLineToCrew(lineId, value);
-}
-
-/* ---- adding a person from the Budget ----
-   ⚠️ ADD SYNCS BOTH WAYS. A person added here becomes a crew record AND joins this
-   project's Production crew, through addNewCrewFromProposal() — the same commit path
-   AI Scan's accept and Overview's Quick add already use, not a second one. The other
-   direction needs no code: Budget's picker reads crewDB, so anyone added in
-   Production is already there.
-   ⚠️ A NAME IS THE MINIMUM. A line with no name stays budget-only and unlinked
-   rather than creating a half-formed crew record — which is also why this is a
-   dialog and not an inline "type a name and we'll make one".
-   Department + role are required for the same reason saveCrew() requires them:
-   since Phase R every crew member has at least one saved role, and role IS
-   department. Same two fields, same shape, as the existing Add-new-role dialog. */
-let bdmAddPerson = null;   /* {lineId, name, dept, role} — held outside the DOM */
-function openBdmAddPersonDialog(lineId){
-  const rec = currentBudgetDemoProject();
-  const l = rec ? budgetDemoLine(lineId) : null;
-  bdmAddPerson = { lineId, name:(l && !l.crewId ? (l.name||'') : ''), dept:'', role:'' };
-  renderGlobalOverlay();
-}
-function closeBdmAddPersonDialog(){ bdmAddPerson = null; renderGlobalOverlay(); renderMain(); }
-function setBdmAddPersonField(field, v){
-  if(!bdmAddPerson) return;
-  bdmAddPerson[field] = v;
-  /* the role list is the department's, so changing department re-renders the dialog
-     — which is exactly why the draft lives here and not in the inputs */
-  if(field==='dept'){ bdmAddPerson.role = ''; renderGlobalOverlay(); }
-}
-function bdmAddPersonDialogHTML(){
-  if(!bdmAddPerson) return '';
-  const d = bdmAddPerson;
-  const deptOpts = ['<option value="">— Department —</option>']
-    .concat(DEPARTMENTS.map(x=>`<option value="${esc(x)}"${d.dept===x?' selected':''}>${esc(x)}</option>`)).join('');
-  const roles = d.dept ? rolesFor(d.dept) : [];
-  return `<div class="modal-overlay" onclick="if(event.target===this) closeBdmAddPersonDialog()">
-    <div class="modal-box">
-      <h3>Add a person</h3>
-      <div class="grid g2" style="margin-bottom:12px;">
-        <div><label>Name</label><input type="text" id="bdmApName" placeholder="e.g. Alishia Shaw"
-          value="${esc(d.name)}" oninput="setBdmAddPersonField('name', this.value)"></div>
-        <div><label>Department</label><select id="bdmApDept" onchange="setBdmAddPersonField('dept', this.value)">${deptOpts}</select></div>
-        <div><label>Role</label>${roles.length
-          ? `<select id="bdmApRole" onchange="setBdmAddPersonField('role', this.value)">
-               <option value="">— Role —</option>
-               ${roles.map(r=>`<option value="${esc(r)}"${d.role===r?' selected':''}>${esc(r)}</option>`).join('')}
-             </select>`
-          : `<input type="text" id="bdmApRoleText" placeholder="${d.dept?'e.g. Steadicam Operator':'pick a department first'}"
-               value="${esc(d.role)}" oninput="setBdmAddPersonField('role', this.value)" ${d.dept?'':'disabled'}>`}</div>
-      </div>
-      <div class="hint">Adds them to the crew database and to this project's Production crew, then links this line to them.
-        Their day rate and VAT status copy onto the line; nothing schedules them onto a shoot day — that's Production's to decide.</div>
-      <div class="toolbar">
-        <button class="primary" onclick="confirmBdmAddPerson()">Add person</button>
-        <button onclick="closeBdmAddPersonDialog()">Cancel</button>
-      </div>
-    </div>
-  </div>`;
-}
-async function confirmBdmAddPerson(){
-  const d = bdmAddPerson; if(!d) return;
-  const name = (d.name||'').trim(), dept = d.dept, role = (d.role||'').trim();
-  if(!name){ alert('A person needs a name — a line with no name stays budget-only.'); return; }
-  if(!dept){ alert('Pick a department.'); return; }
-  if(!role){ alert('Pick or name a role — every crew member needs at least one saved role.'); return; }
-  const p = projById(bdmCurrentProjectId());
-  if(!p){ alert('No project is open.'); return; }
-  /* a typed role becomes a real saved role, so the record's role path resolves the
-     same way one picked from the list does — the same thing confirmAddRoleDialog does */
-  if(!rolesFor(dept).includes(role)){
-    ROLES_BY_DEPT[dept] = ROLES_BY_DEPT[dept] || [];
-    ROLES_BY_DEPT[dept].push(role);
-    await saveDB('db:roles', ROLES_BY_DEPT);
-  }
-  const lineId = d.lineId;
-  bdmAddPerson = null;
-  renderGlobalOverlay();
-  const c = await addNewCrewFromProposal(name, dept, role, p);
-  if(!c){ renderMain(); return; }
-  bdmLinkLineToCrew(lineId, c.id);   /* renders */
 }
 
 /* ---- grouping: the lines never change, only the bucket they are read in ----
@@ -9434,57 +8838,23 @@ function budgetDemoLinesTableHTML(rec, g){
     `<option value="${c[0]}" ${l.bbcOverride===c[0]?'selected':''}>${c[0]}</option>`).join('');
   return `<div class="tablewrap bdm-lines ${wide?'bdm-lines-post':''}"><table>
     <tr>
-      <th>Section</th><th>Code</th><th>BBC</th><th>Type</th><th>Item</th><th>Name</th>
+      <th>Section</th><th>Code</th><th>BBC</th><th>Item</th><th>Name</th>
       ${phases.map(ph=>`<th class="bdm-num">${esc(ph)}</th>`).join('')}
-      <th class="bdm-num" title="Scheduled days (or a service line's quantity) plus overtime — what the rate is multiplied by">Days / Qty</th>
-      <th class="bdm-num" title="Overtime in days, fractions allowed. Costs at this line's rate; never a scheduled shoot day">OT</th>
-      <th class="bdm-num">Rate</th><th class="bdm-num">Float %</th><th>VAT</th>
+      <th class="bdm-num">Days</th><th class="bdm-num">Rate</th><th class="bdm-num">Float %</th><th>VAT</th>
       <th class="bdm-num">Total (${bdmVatToggle?'inc.':'ex.'} VAT)</th><th class="bdm-num">Float</th><th class="bdm-num">Total + float</th>
       <th>Notes</th><th></th>
     </tr>
     ${g.lines.map(l=>{
       const m = budgetDemoLineMath(rec, l);
-      const service = bdmIsService(l);
-      const c = bdmLineCrew(l);
-      /* ⚠️ A service line has NO DAYS — it carries one quantity, so the phase columns
-         collapse into a single cell rather than pretending a buyout is scheduled
-         across a shoot week. The stored value is untouched until this field is
-         actually edited (see setBudgetDemoQty), so migrating a line moves no total. */
-      const qtyCells = service
-        ? `<td class="bdm-num bdm-qty-cell" colspan="${phases.length}">
-             <span class="bdm-qty-label">Qty</span>
-             <input type="text" class="bdm-day-input" inputmode="decimal" title="A service line's quantity — not days, and never synced with Production"
-               value="${esc(String(m.scheduled||''))}" oninput="setBudgetDemoQty('${l.id}',this.value)"></td>`
-        : phases.map(ph=>`<td class="bdm-num"><input type="text" class="bdm-day-input" inputmode="decimal" value="${esc(String((l.days&&l.days[ph])||''))}" oninput="setBudgetDemoDay('${l.id}','${esc(ph)}',this.value)"></td>`).join('');
-      const daysTitle = m.overtime
-        ? `${m.scheduled} ${service?'quantity':'scheduled'} + ${m.overtime} overtime`
-        : `${m.scheduled} ${service?'quantity':'scheduled day'+(m.scheduled===1?'':'s')}, no overtime`;
       return `<tr>
         <td><select class="pill-select bdm-section-select" onchange="setBudgetDemoLineField('${l.id}','section',this.value)">${sectionOpts(l)}</select></td>
         <td><select class="pill-select bdm-code-select" onchange="setBudgetDemoLineField('${l.id}','code',this.value)">${codeOpts(l)}</select>${bdmMiscodeFlag(rec, l)}</td>
         <td><select class="pill-select bdm-bbc-select" title="Blank derives the category from the rules table in Settings" onchange="setBudgetDemoLineField('${l.id}','bbcOverride',this.value)">${bbcOpts(l)}</select>
             <span class="empty-note">${esc(budgetDemoBbcCategory(rec, l))}</span></td>
-        <td><select class="pill-select bdm-type-select" title="Crew — a person, with days that can follow Production. Service — a buyout, supplier, venue or fee: a quantity, never days."
-              onchange="setBudgetDemoLineType('${l.id}',this.value)">
-              <option value="crew" ${service?'':'selected'}>Crew</option>
-              <option value="service" ${service?'selected':''}>Service</option>
-            </select></td>
         <td><input type="text" class="bdm-item-input" value="${esc(l.item||'')}" oninput="setBudgetDemoLineText('${l.id}','item',this.value)" onchange="renderMain()"></td>
-        <td class="bdm-name-cell">
-          <input type="text" class="bdm-text-input" value="${esc(bdmLineName(l))}"
-            title="${c?'This is '+esc(c.name)+'&#39;s name in the crew database — editing it here changes it everywhere':'Free text. Link a crew record below to read the name from there instead.'}"
-            oninput="setBudgetDemoLineName('${l.id}',this.value)" onchange="renderMain()">
-          ${bdmCrewPickerHTML(l)}
-          ${c ? `<span class="empty-note bdm-crew-role">${esc(c.showAs||c.role||'no role on file')}</span>` : ''}
-        </td>
-        ${qtyCells}
-        <td class="bdm-num" title="${esc(daysTitle)}"><span id="bdm-${l.id}-days">${m.daysTotal}</span>${bdmDayDriftFlag(rec, l)}${bdmUnmappedDaysFlag(rec, l)}${
-          (l.crewId && !service && bdmShootPhaseFor(rec, l))
-            ? `<button class="icon-btn bdm-resync" title="Fill the Shoot days from this person's current Production assignment. Nothing re-syncs on its own — the budget holds the figure it was signed off on." onclick="bdmResyncLineDays('${l.id}')">↻</button>`
-            : ''}</td>
-        <td class="bdm-num"><input type="text" class="bdm-ot-input" inputmode="decimal"
-          title="Overtime in days — 0.5 is a half-day surcharge. Costs at this line's rate and is counted in Days / Qty, but it is not a scheduled day and never reaches Production."
-          value="${l.overtime?esc(String(l.overtime)):''}" placeholder="0" oninput="setBudgetDemoOvertime('${l.id}',this.value)"></td>
+        <td><input type="text" class="bdm-text-input" value="${esc(l.name||'')}" oninput="setBudgetDemoLineText('${l.id}','name',this.value)" onchange="renderMain()"></td>
+        ${phases.map(ph=>`<td class="bdm-num"><input type="text" class="bdm-day-input" inputmode="decimal" value="${esc(String((l.days&&l.days[ph])||''))}" oninput="setBudgetDemoDay('${l.id}','${esc(ph)}',this.value)"></td>`).join('')}
+        <td class="bdm-num" id="bdm-${l.id}-days">${m.daysTotal}</td>
         <td class="bdm-num"><input type="text" class="bdm-rate-input" inputmode="decimal" value="${esc(String(l.rate||0))}" oninput="setBudgetDemoRate('${l.id}',this.value)">${bdmRateDriftFlag(l)}</td>
         <td class="bdm-num"><input type="text" class="bdm-float-input" inputmode="decimal" title="Blank follows the project's float. 0 is a real value — a line can carry no float." placeholder="${esc(String(bdmNum(rec.floatPercent)))}" value="${l.floatPercent===null?'':esc(String(l.floatPercent))}" oninput="setBudgetDemoLineFloat('${l.id}',this.value)"></td>
         <td><select class="pill-select bdm-vat-select" onchange="setBudgetDemoLineField('${l.id}','vatRate',this.value)">
@@ -9495,7 +8865,7 @@ function budgetDemoLinesTableHTML(rec, g){
         <td class="bdm-num" id="bdm-${l.id}-float">${budgetFmt(m.float)}</td>
         <td class="bdm-num" id="bdm-${l.id}-twf">${budgetFmt(m.totalWithFloat)}</td>
         <td><input type="text" class="bdm-note-input" value="${esc(l.notes||'')}" oninput="setBudgetDemoLineText('${l.id}','notes',this.value)"></td>
-        <td><button class="icon-btn danger-ic" title="${l.crewId?'Remove this person':'Delete line'}" onclick="deleteBudgetDemoLine('${l.id}')">${icon('trash')}</button></td>
+        <td><button class="icon-btn danger-ic" title="Delete line" onclick="deleteBudgetDemoLine('${l.id}')">${icon('trash')}</button></td>
       </tr>`;
     }).join('')}
   </table></div>`;
@@ -9543,14 +8913,7 @@ function addBudgetDemoLine(key){
   const sectionId = (g && g.addSection) || (rec.sections[0] && rec.sections[0].id) || '';
   const sec = bdmSection(rec, sectionId);
   rec.lines.push({ id:'bdm'+uid(), crewId:null, section:sectionId,
-                   /* ⚠️ the section's expectedCode is a SUGGESTION, not a fixture —
-                      the code select beside it is free, and ROW proves why: Alishia
-                      Shaw sits in Production and is coded SET. Overriding it is
-                      correct behaviour, not an error to be designed out. */
                    code:(sec && sec.expectedCode) || (bdmCodes()[0]||{}).code || '',
-                   /* a fresh line is a crew line with nothing filled in; a supplier
-                      or buyout is one pick away on the Type select */
-                   lineType:'crew', overtime:0,
                    item:'New line', name:'', days:{}, rate:0, vatRate:0, floatPercent:null,
                    /* in the BBC lens the section it was added from says nothing about
                       the category, so pin it to the one it was pressed in */
@@ -9558,19 +8921,9 @@ function addBudgetDemoLine(key){
   bdmTouch();
   renderMain();
 }
-/* ⚠️ Phase AY-a — an UNLINKED line deletes exactly as it always did: one row,
-   autosaved, no confirm (the undo toast isn't wired into this screen). A line linked
-   to a crew record is a different act — it is removing a PERSON from something — so
-   it goes through the shared two-option dialog instead. The dialog never offers, and
-   never mentions, deleting the crew record itself; see openRemovePersonDialog(). */
 function deleteBudgetDemoLine(id){
   const rec = currentBudgetDemoProject(); if(!rec) return;
-  const l = rec.lines.find(x=>x.id===id);
-  if(l && l.crewId && crewById(l.crewId)){
-    openRemovePersonDialog({ crewIds:[l.crewId], from:'budget', lineId:id });
-    return;
-  }
-  const i = rec.lines.findIndex(x=>x.id===id);
+  const i = rec.lines.findIndex(l=>l.id===id);
   if(i>-1) rec.lines.splice(i,1);
   bdmTouch();
   renderMain();

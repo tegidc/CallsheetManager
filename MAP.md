@@ -113,46 +113,6 @@ Every screen needs the same handful of records. These are the single place that 
 - `jumpToHotelSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Hotel sub-tab: expands `hotelSummaryOpen` if collapsed, then scrolls `#hotelSummarySection` into view — [Crew]
 - `toggleAllForPerson()` — toggles all day-assignment checkboxes for one person at once — [Crew]
 - `addCrewToProject()` / `removeCrewFromProject()` — add/remove a crew member from the current project's roster. `addCrewToProject()` has **three** callers now: this tab's picker, AI Scan's `propose_crew` matched-accept, and Overview Quick Add's crew search — it also calls `resetQuickAdd()` so that box settles back after the third — [Crew, Overview]
-  - ⚠️ **Phase AY-a: `removeCrewFromProject()` no longer removes anybody on its own.** It opens the two-option dialog (see **Removing a person from a project** below) and that does the work — a budget can be carrying lines for this person that Production knows nothing about, and silently keeping or silently deleting those are both wrong. This is also why the G14 render-first/save-after shape moved into `confirmRemovePerson()`: nothing is mutated until an option is picked — [Crew, Budget (B-1)]
-
-### Removing a person from a project (Phase AY-a)
-
-- `removePersonDialog` / `openRemovePersonDialog()` / `closeRemovePersonDialog()` /
-  `removePersonProject()` / `removePersonScope()` / `removePersonDialogHTML()` /
-  `confirmRemovePerson()` — **the one destructive-scope decision, shared by Production
-  and Budget**, rendered into `#globalOverlay` alongside the add-role dialog.
-
-⚠️ **DESTRUCTIVE SCOPE MATCHES WHERE THE USER IS STANDING.** From a PROJECT view —
-Production or Budget — removing a person offers exactly two options:
-
-1. **Remove from this view only** — Production-only, or the budget line only
-2. **Remove from this project entirely** (both views)
-
-and nothing else. **THE CREW RECORD IS NEVER TOUCHED FROM A PROJECT VIEW. It is not
-offered and it is not mentioned** — a project is not where anyone reasons about the
-shared database, and an option that deletes a person from every other project has no
-business next to "take them off this job". Each option spells out its own consequence
-with real counts (`removePersonScope()`), because "this view only" means something
-different depending on which view you are standing in.
-
-- ⚠️ `openRemovePersonDialog()` **awaits `bdmEnsureLoaded()` first, and that is not
-  optional.** Opened from Production, `bdmRecords[p.id]` is normally absent (the
-  `budget:<projectId>` key is loaded on demand by the Budget screen alone), so without
-  it the dialog would say "their budget lines" instead of a count and the "entirely"
-  branch would have nothing to delete from. **This is the one extra `bdmEnsureLoaded()`
-  call site AY-a adds**, and it is safe for the reason AX's audit records: it goes
-  through the promise-deduped loader, never around it.
-- State is `{crewIds:[…], from, lineId}` — an **array**, so the Crew tab's bulk "Remove
-  from project" is the SAME decision at scale rather than a second, quieter one that
-  skips the choice. One click there can rewrite sixty people.
-- ⚠️ **`bulkRemoveSelectedFromProject()` had a real gap this fixes**: it filtered
-  `p.crewIds` but left the selected people in every shoot day's `positions`, so a
-  bulk-removed person stayed on the call sheet. `confirmRemovePerson()`'s
-  `dropFromProduction()` clears both, the way the single-person path always did.
-- R17 undo covers it (`db:projects` + `db:shootdays`). A budget-only removal isn't
-  snapshotted — `undoCollectionFor()` only knows the four top-level arrays — so it is
-  covered by the same autosaved, re-addable line the rest of that screen is —
-  [Crew, Budget (B-1), Shared/utility functions]
 - `crewInfo()` — looks up a crew member's basic display info by id, with a fallback for removed crew — [Crew]
 - `resolveCrewForDay()` / `hasOverride()` — resolve a crew member's effective role/dept for a specific day, accounting for per-day overrides — [Crew, Shoot Days]
 - `dayOverrideFormHTML()` / `saveDayOverride()` / `clearDayOverride()` — render/save/clear a per-day override of a crew member's role/department/company — [Crew, Shoot Days]
@@ -699,53 +659,9 @@ small marker whose tooltip says what the crew rate is now — **no auto-update, 
 prompt, no bulk action**. That comparison (`bdmRateDriftFlag()`) is the **only** read
 of `crewDB` anywhere in this section, and nothing here writes to it.
 
-⚠️ **Phase AY-a built the linking UI** — see **Crew linking, line types and overtime
-(Phase AY-a)** below. The AV note that "there is no linking UI yet" and that `crewId`
-only ever arrives from seed data is SUPERSEDED. The rule above is unchanged and is
-exactly what `bdmLinkLineToCrew()` obeys: rate and VAT are copied at the moment of
-linking and never re-read.
-
-### THE OWNERSHIP MODEL (Phase AY-a) — the spine of the crew/production/budget split
-
-Three stores, nothing owned twice:
-
-| store | owns |
-|---|---|
-| **CREW** (`db:crew`) | the person — name, position, day rate, VAT status, contact |
-| **PRODUCTION** (`db:projects` / `db:shootdays`) | the schedule — which days, which unit, call times |
-| **BUDGET** (`budget:<projectId>`) | the money — code, section, float, overtime, buyouts |
-
-Neither Production nor Budget keeps its own copy of a person's NAME. Both read it
-from the crew record, and editing it in either view writes back to `db:crew`, so the
-other view sees it because there is only ever one value.
-
-⚠️ **THE ONE EXCEPTION, and it matters: a budget line also stores its own RATE**,
-copied from the crew record at the moment of linking.
-
-> **Crew rate** = what this person costs today.
-> **Line rate** = what this job is budgeted at.
-
-Never re-read the crew rate into an existing line automatically. Raising someone's
-rate next year must not rewrite last year's budget. Where the two differ, show the
-existing AV divergence marker (`bdmRateDriftFlag()`, ≠) with its "Crew rate is now £X"
-tooltip and nothing more — no auto-update, no prompt, no bulk action. The line's own
-field is labelled **Rate**; the comparison says **Crew rate is now £X**. They are
-deliberately not the same label.
-
-**DAYS follow the same rule for the same reason** — filled from Production once, then
-editable, never re-synced on their own (`bdmDayDriftFlag()`, ↻).
-
-**Two deliberate readings of the brief, recorded so they aren't re-litigated:**
-- **`item` is the budget's own text, seeded from the person's position and NOT written
-  back to `c.role`.** The brief says position copies "into item, editable"; since Phase
-  R a role is a saved role path out of `ROLES_BY_DEPT`, set only through
-  `setActiveRole()` and never typed as free text, so writing a free-text item into it
-  would break that rule. The crew record's current role renders beside the picker as
-  read-only context instead.
-- **VAT stays a property of the LINE after the copy.** B-1 has always modelled VAT per
-  line (`vatRate`, 0 or 0.2) because a line is what gets invoiced — see **Budget (B-1)
-  — the decisions**. AY-a copies `c.vatRegistered` in at linking and stops there; it
-  does not unify B-1's model with T-6's "VAT follows the person".
+⚠️ **There is no linking UI yet** — `crewId` only ever arrives from seed data. AV
+deliberately did not build one ("adding crew from within the budget view" is out of
+scope); the rule above is what a future linking action must obey.
 
 ### Functions
 
@@ -867,127 +783,11 @@ editable, never re-synced on their own (`bdmDayDriftFlag()`, ↻).
     any more — this is the table as specified in AV, and first-match-wins is the whole
     contract. Do not re-promote it.
   - `bbcOverride` still beats the whole table — [Budget (B-1)]
-- `bdmMiscodeFlag()` / `bdmRateDriftFlag()` / `bdmDayDriftFlag()` /
-  `bdmUnmappedDaysFlag()` — **the four information-only markers** (AY-a added the last
-  two). None changes a value and none excludes a line from any total; all four are
-  computed on every read and never stored, so each clears itself the moment its
-  condition stops holding.
-  - ⚑ the line's code differs from its section's expectedCode — "Coded CIN, sits in Travel"
-  - ≠ a crew-linked line whose stored rate differs — "Crew rate is now £X"
-  - ↻ a crew-linked line whose SCHEDULED days differ from Production — "Production has
-    this person on 6 shoot days; this line is budgeted at 5". ⚠️ It compares
-    `m.scheduled`, never `m.daysTotal`: overtime is not a shoot day and must not make a
-    correctly-scheduled line look divergent
-  - ⚠ a crew-linked line whose section has no Shoot column to map Production's days
-    onto (a post phaseSet) while the person does have shoot days — the buckets are
-    left at zero and the LINE is flagged rather than guessed at
-  — [Budget (B-1), Crew]
-
-### Crew linking, line types and overtime (Phase AY-a)
-
-⚠️ **This is the first phase in the AU→AY sequence that WRITES to `db:crew`.** It was
-read-only and byte-identical through five passes. AY-a's write surface is deliberately
-two actions and nothing else: **editing a linked line's NAME**, and **creating a person
-from the Budget**. Linking, unlinking, day auto-fill, overtime and line-type changes
-never touch `db:crew`.
-
-- `bdmInferLineType()` / `bdmIsService()` / `bdmServiceQtyKey()` — **the two line types
-  and the migration.** `lineType` is stored, `'crew'` or `'service'`.
-  - **crew** — a person. Phase days, may link to a crew record, days may follow Production.
-  - **service** — a buyout, supplier, venue or fee. Carries a QUANTITY, not days:
-    nothing about it is scheduled, so it never syncs with Production and its phase
-    columns collapse into one **Qty** cell.
-  - Both can carry overtime.
-  - ⚠️ **The migration.** A pre-AY-a line has no `lineType`, so one is inferred once in
-    `bdmNormalizeRecord()` and lands on that budget's next save (the "normalise on read,
-    write on next save" idiom G19 used for `dayTotal` — not a migration script). The
-    rule: everything in the **Buyout** bucket, or nothing at all, is a service; anything
-    carrying a PreProd/Shoot/Strike day is crew. That is what the Buyout column has
-    always meant on these sheets — bought outright rather than worked. **Measured on
-    ROW's real 82 lines: 32 service / 50 crew**, and all 32 read correctly as a
-    supplier, venue, buyout or fee — including all four the brief names (Greenkit,
-    Organ Factory, Travel Buyout, Per Diems). No person-day line is caught by it.
-  - ⚠️ It is a DEFAULT, not a verdict — `lineType` is editable per line, and a kit
-    rental billed by the day (ROW's "A Cam", "Sound Kit") legitimately lands on crew.
-  - ⚠️ **Inference reads `days` and never writes it**, and `setBudgetDemoQty()` only
-    rewrites the day map when the field is actually edited — which is why migrating
-    ROW moved no figure. `bdmServiceQtyKey()` is likewise read-only: the sole occupied
-    bucket when there is exactly one (true of every ROW service line), else `Buyout` —
-    [Budget (B-1)]
-- `overtime` / `setBudgetDemoOvertime()` — **a stored per-line field, in DAYS,
-  fractions allowed** (0.5 = a half-day surcharge). ⚠️ Kept OUT of the phase buckets:
-  it costs at the line's own rate through `daysTotal`, but it is not a scheduled day,
-  never writes back to Production, and never implies a shoot day. `budgetDemoLineMath()`
-  now returns `scheduled` and `overtime` alongside `daysTotal` (= scheduled + overtime)
-  so the screen can show scheduled work and surcharge apart — the **Days / Qty** column
-  is the total and carries a tooltip splitting it, **OT** is its own column. Every
-  pre-AY-a line normalises to 0, so `daysTotal === scheduled` for all of them and no
-  existing total moved. **Verified on ROW**: 0.5 days on a £700 line moved the subtotal
-  by exactly £441.00 (0.5 × 700 × 1.2 VAT × 1.05 float), left `scheduled` at 6, left the
-  day map untouched and created no shoot day — [Budget (B-1)]
-- `bdmLineCrew()` / `bdmLineName()` — a linked line's name is **read through** to the
-  crew record; `l.name` is kept in step on every write purely as the fallback for an
-  unresolvable `crewId` (a person deleted from the database). It is never the authority
-  while the link resolves, so it cannot go stale the way a stored `dayTotal` did —
+- `bdmMiscodeFlag()` / `bdmRateDriftFlag()` — **the two information-only markers.**
+  Neither changes a value and neither excludes a line from any total. ⚑ = the line's
+  code differs from its section's expectedCode, tooltip "Coded CIN, sits in Travel".
+  ≠ = a crew-linked line whose stored rate differs, tooltip "Crew rate is now £X" —
   [Budget (B-1), Crew]
-- `bdmLinkLineToCrew()` / `bdmUnlinkLine()` / `bdmOnCrewPick()` — linking copies name,
-  position→item (only when the line hasn't been given one — it never overwrites typed
-  text), rate and VAT, then fills days from Production, and sets `lineType:'crew'`.
-  Unlinking keeps everything the line already holds — it is "stop tracking this person",
-  not "throw the content away" — [Budget (B-1), Crew]
-- `bdmCrewPickerHTML()` / `bdmFillCrewPicker()` — the per-line picker over the whole
-  crew database (not just this project's roster — a budget routinely books someone who
-  isn't on the Production crew yet, and picking them is how they get there). Built on
-  the app's existing `groupedCrewOptionsHTML()`, which gained an optional `selectedId`.
-  - ⚠️ **THE LINK IS OPTIONAL AND MUST STAY SO.** Roughly half of ROW's 82 lines have
-    nobody behind them; those keep `crewId` null forever and stay fully editable as
-    free text. "— no crew link —" is the first option and the free-text Name field is
-    still there.
-  - ⚠️ **The options are filled on first mousedown/focus, not on render.** 82 lines ×
-    88 records is 7,544 `<option>` nodes in one table. **Measured on the live ROW
-    budget**: eager ~1,207ms median per `renderMain()` and 979KB of HTML, versus
-    ~93ms/472KB lazy, on a screen that re-renders on every section collapse, lens
-    switch, VAT toggle, code/section/BBC change and line add or delete. Caching the
-    option *string* was tried and barely moved it — the cost is parsing the nodes. A
-    resting picker holds exactly one option: whoever the line is linked to, which is
-    all a closed `<select>` ever shows — [Budget (B-1), Crew]
-- `bdmProductionDayCount()` / `bdmShootPhaseFor()` / `bdmFillDaysFromProduction()` /
-  `bdmResyncLineDays()` — **auto-fill days from Production.** ⚠️ Production stores day
-  assignments as `d.positions` on each shoot day, and "is this person on this day" is
-  `(d.positions||[]).some(pos=>pos[0]===crewId)` — the app's ONE on-day signal, the same
-  one `buildTransportSummary()`, Days-on-site and `buildBudgetData()` use. Don't invent
-  a second.
-  - Only the **Shoot** bucket is ever written. PreProd/Strike/Buyout are budget
-    decisions Production knows nothing about and are left exactly as they are.
-  - Where the mapping is not unambiguous — a section on the **post** phaseSet, which has
-    no column meaning "a day on set" — nothing is filled and the line is flagged
-    (`bdmUnmappedDaysFlag()`), per the brief: leave the buckets at zero rather than guess.
-  - ⚠️ Days are then EDITABLE and do NOT re-sync on their own. `bdmResyncLineDays()` is
-    a deliberate per-line click, next to the ↻ marker — [Budget (B-1), Crew, Shoot Days]
-- `openBdmAddPersonDialog()` / `bdmAddPersonDialogHTML()` / `setBdmAddPersonField()` /
-  `confirmBdmAddPerson()` / `bdmAddPerson` — **adding a person from the Budget.**
-  ⚠️ **ADD SYNCS BOTH WAYS.** A person added here becomes a crew record AND joins this
-  project's Production crew, through `addNewCrewFromProposal()` — the same commit path
-  AI Scan's accept and Overview's Quick add already use, not a second one. The other
-  direction needs no code: the picker reads `crewDB`, so anyone added in Production is
-  already there.
-  - ⚠️ **A NAME IS THE MINIMUM.** A line with no name stays budget-only and unlinked
-    rather than creating a half-formed crew record — which is why this is a dialog and
-    not an inline "type a name and we'll make one". Department and role are required for
-    the same reason `saveCrew()` requires them (since Phase R every crew member has at
-    least one saved role, and role IS department); a typed role is registered into
-    `ROLES_BY_DEPT` first, exactly as `confirmAddRoleDialog()` does.
-  - `bdmAddPerson` is held **outside the DOM** for the reason `aiScanDraftText`
-    documents — changing department re-renders the dialog's role list.
-  - ⚠️ `addNewCrewFromProposal()` gained an optional 4th argument, `proj`. Its two
-    existing callers pass nothing and are unchanged; B-1 passes the record it is
-    actually rendering, because `bdmCurrentProjectId()` can differ from
-    `currentProjectId` in the one edge case that function exists to cover —
-    [Budget (B-1), Crew, Overview]
-- `deleteBudgetDemoLine()` — ⚠️ an UNLINKED line deletes exactly as it always did (one
-  row, autosaved, no confirm). A LINKED line is removing a PERSON from something, so it
-  opens the shared two-option dialog instead — see **Removing a person from a project**
-  — [Budget (B-1)]
 - `budgetDemoGroups()` — Departments lens groups by **section** and totals
   `totalWithFloat`; BBC lens groups by derived category and totals `total` **ex-float**,
   because in that lens the float is pooled into P and must not also be spread through
@@ -1218,51 +1018,6 @@ and its Item column widened. No budget figure, calculation or VAT logic touched.
 | 375px | ✓ view switcher wraps below the title (`.page-head`'s `flex-wrap`) rather than overflowing; no page-level horizontal overflow on Production or Budget |
 | design-system pass over the new/changed CSS | ✓ no new colours or fonts — `.page-head-titles`/`.view-switcher` are layout-only wrappers, the switcher reuses `.tabs`/`.tab`/`.tab.active` verbatim, the Item/Notes/pill-select width changes are the same "width or alignment" territory the rest of B-1's CSS already occupies |
 
-### Verified (Phase AY-a), driven through the live page against the real Supabase
-
-**The first phase in this sequence that writes to `db:crew`.** A backup was taken
-before any other work: `db:crew_backup_pre_AY_2026-08-08`, 88 records, md5
-`8e1989859a1a5153ff03ba137e11be28` — identical to the live row, whose `updated_at` was
-unmoved by the backup. `budget:id_msc4nv2c0g178_backup_pre_AY` was taken too, before
-the live linking tests.
-
-| check | result |
-|---|---|
-| backup key exists, 88 records, before anything else | ✓ md5 identical to `db:crew`, source `updated_at` unmoved |
-| inline script extracts and parses | ✓ `node --check` clean |
-| CSS brace balance | ✓ 480 open / 480 close (was 466 at Gate 1; AY-a added 14 pairs) |
-| orphan sweep over all 32 new identifiers | ✓ every one has a call site outside its own definition |
-| new CSS classes | ✓ all 13 have both a rule and a render site; none defined-but-unused, none used-but-unstyled |
-| **`db:crew` changed ONLY in these ways** | ✓ SQL-diffed backup vs live: **2 added** (both deliberately added by the tests below), **0 removed**, **0 existing records changed**, **37 distinct field names before and after** — no field added, removed or renamed |
-| record count | 88 → 90 (two test people deliberately added) → **restored to 88**, md5 back to `8e1989859a1a5153ff03ba137e11be28`, the exact hash carried since AV |
-| `db:projects` after testing | ✓ ROW back to 66 `crewIds`, **0 dangling crew references** across all four projects |
-| ROW 2026 totals, Inc. VAT, before any linking | ✓ £318,668.31 / £31,866.83 / £350,535.14, VAT £26,354.20 |
-| all eight department totals, before any linking | ✓ SET £96,996.90 / PROD £64,829.10 / CIN £45,355.35 / CAT/TRA £33,425.34 / GRIP £24,987.69 / EQUIP £23,520.42 / AUD £16,419.06 / HMU £13,134.45 — unchanged |
-| Ex. VAT basis, and 4 consecutive toggle flips | ✓ £291,178.58 / £29,117.86 / £320,296.44, VAT £26,354.20; no drift across flips |
-| both lenses still total identically | ✓ Departments £318,668.31 = BBC A–P £318,668.31 |
-| **`lineType` migration on ROW** | ✓ 32 service / 50 crew; all 32 read correctly as supplier/venue/buyout/fee, including all four the brief names; **`days` preserved verbatim on all 82 lines** |
-| overtime absent on every existing line | ✓ normalises to 0 on all 82, so `daysTotal === scheduled` throughout |
-| **link one ROW line to its crew record** (row5 "Field Producer on Set" → Matt Wells) | ✓ rate copied **450 → 450, identical**; VAT copied **0.2 → 0.2, identical**; days auto-filled **Shoot 5 → 6** from his actual Production assignment; name reads through to the crew record |
-| **the total does not change if the rates already match** | ✓ the whole £540.00 move was the day auto-fill alone (1 × £450 × 1.2 VAT, this line carries 0% float). Setting the day back to 5 returned the subtotal to **exactly £318,668.31** — the rate/VAT copy contributed £0.00 |
-| **change that person's rate in the Crew database → the line must NOT move** | ✓ crew rate £450 → £700: line rate still 450, subtotal still £318,668.31, and ≠ appeared reading "Crew rate is now £700.00" |
-| day divergence marker | ✓ "Production has this person on 6 shoot days; this line is budgeted at 5"; the explicit per-line resync cleared it |
-| unmappable days (post phaseSet) | ✓ nothing guessed — buckets left `{}` and the line flagged ⚠ with both figures |
-| **add a person in Budget → appears in Production and in Crew** | ✓ `db:crew` 88 → 89, ROW roster 66 → 67, line linked, person visible in the project crew list and in the picker |
-| **add a person in Production → available in Budget** | ✓ created through the Production commit path, appears in the Budget picker immediately |
-| **remove from a project view** | ✓ dialog offers **exactly two** options and never mentions database deletion; says the crew record survives. "Production only": record survives, off roster, off every shoot day, **budget line kept**. "This project entirely" from the Budget: record survives, off roster, **budget lines gone** |
-| service line with no person and no days still totals | ✓ qty 0 → £0.00; qty 1 at £2,500 + 20% VAT + 5% float → £3,150.00, contributing exactly that to the subtotal |
-| **overtime of 0.5 days costs correctly and creates no shoot day** | ✓ £700 line: net £4,200 → £4,550 (700 × 6.5), subtotal moved by exactly £441.00 (0.5 × 700 × 1.2 × 1.05); `scheduled` stayed 6, the day map was untouched, and the project still had 6 shoot days |
-| every existing screen loads at 1188px with 64px margins | ✓ live-measured on all seven Production tabs, T-6's four sub-views, T-2's five grids, both databases, Settings and B-1 — `max-width:1188px`, `padding-left/right:64px`, **no page-level horizontal overflow anywhere**, zero window errors |
-| B-1 across every project | ✓ ROW £318,668.31; **Proper Corn £22,778.28 / £0.00 / £22,778.28 / VAT £1,015.60 — exactly AW/Gate 1's figures**, rendering its own 8 post-phase columns plus the new Type and OT columns; LMAOF and Fashion Files £0.00 with 5%/10% defaults and "+ Add section" reachable |
-| 375px | ✓ `scrollWidth === clientWidth` (375 === 375) on Budget, Overview and Crew — no page-level overflow; the wide line table scrolls inside its own `.tablewrap` (1636px table in a 926px wrap) |
-| **render cost, measured like-for-like against HEAD on the same machine and session** | pre-AY-a **239ms** median / 378KB → AY-a **303ms** / 471KB. **+27%**, the genuine cost of two extra columns per row. The eager picker measured **~1,207ms / 979KB** in the same session — see `bdmFillCrewPicker()` for why it is lazy |
-
-⚠️ **Not done, deliberately, and not to be inferred as missing:** bulk generation of
-budget lines from the Production crew and the candidate review screen are **AY-b**.
-Burn-in on database deletion, the Line Items / Top Sheets restructure, presentation
-override layers, pre-production and post views, and any change to the VAT basis or to
-an existing budget calculation were all out of scope and none was touched.
-
 ## Preview & Export
 
 - `togglePreviewBlock()` / `setAllPreviewBlocksCollapsed()` / `pvBlockHTML()` — collapse/expand and render the Preview tab's collapsible export blocks — [Preview & Export]
@@ -1339,22 +1094,7 @@ an existing budget calculation were all out of scope and none was touched.
 - `crewFormHTML()` / `toggleCarFields()` — render the add/edit crew form and react to "has car" toggling. No more free-text Role or manual Department field (Phase R item 1/follow-up): existing crew (`c.id` set) get the live saved-roles tag-list editor; a brand-new crew member gets `newCrewRolePickerHTML()` instead, required to save. Also has the new "Show as" text field. Since Phase AG, the Private section's Fee/rate row also carries a "Day rate (this project)" field next to it, when-and-only-when this form is opened from within a project for an existing crew member (`c.id` set AND `currentProject()` resolves — false on the standalone Crew database screen, which shares this same function but has no project) — same `p.crewRateOverrides`/`resolveCrewRate()`/`saveCrewRateOverride()` field as the Roles row and Budget's Per Person view, with its own `crewRateSaveIconHTML()` Save icon (context `'e'`), not a second copy of the override — [Crew]
 - `refreshCrewScreen()` / `toggleCrewForm()` / `closeCrewForm()` / `editCrew()` / `toggleCrewView()` / `crewViewHTML()` — manage opening/closing/viewing the crew form and read-only crew detail view. `toggleCrewForm()`/`closeCrewForm()` reset `pendingNewCrewRole` when the new-crew form opens/closes. Since Phase AS (**G18**) `toggleCrewForm()` also scrolls `#crewFormWrap` into view on open — the form was never missing, it opened ~600px below the fold because the button is the last element on a 12,400px page. `#crewFormWrap` is shared by both render sites (crew database and the project Crew tab); only one is in the DOM at a time, same precedent as `#locFormWrap`. ⚠️ It picks `behavior` rather than hard-coding `'smooth'` like `editLocation()`/`startNewLocationFromSearch()` do: **under `prefers-reduced-motion: reduce` this browser does not scroll at all with `behavior:'smooth'`** (measured — scrollY never moved over 3.6s, while `'auto'` landed the form correctly). The two Locations call sites still hard-code `'smooth'` and carry the same latent hole — logged, not fixed here — [Crew]
 - `saveCrew()` — persist a crew record. Refuses to create a brand-new crew member without `pendingNewCrewRole` set ("every crew member needs at least one saved role"); for a new record, role/department/`roles` are derived entirely from that pick. For an existing record, role/department/`roles` are left untouched (they're managed live by `addRoleToCrew`/`setActiveRole` elsewhere, not by this form) — [Crew]
-- `deleteCrew()` / `crewUsageSummary()` (**Phase AY-a**) — delete a crew record. ⚠️ The
-  warning now **states exactly what is affected, with counts** — "Alishia Shaw is used
-  in 3 projects (…) and 4 budget lines" — before the confirm. This is the one place in
-  the app that deletes a person from the shared database, and "this may affect budgets"
-  is not something anybody can act on. `crewUsageSummary()` loads every project's budget
-  record to count, because `budget:<projectId>` keys are on-demand and normally absent
-  on this screen; that is a handful of reads at the moment of a deliberate destructive
-  action, not on render. It builds ONE list so the count and the names it prints can't
-  disagree — a project can hold someone in Production, in its budget, or both, and a
-  Production-only count would miss a project that carries only budget lines for them.
-  - ⚠️ **AY-a builds the WARNING ONLY.** What happens to those lines afterwards —
-    burning the person's details into them so the figures survive — is a later phase and
-    was explicitly out of scope. Today the lines keep their `crewId` and every reader
-    already copes: `bdmLineName()` falls back to the line's stored name, and
-    `bdmRateDriftFlag()`/`bdmDayDriftFlag()` return nothing when the record has gone. No
-    figure changes — [Crew, Budget (B-1)]
+- `deleteCrew()` — delete a crew record — [Crew]
 - `renderDeptAdminPanel()` / `toggleDeptAdminPanel()` — collapsible "Departments & sub-departments" panel on the Crew database screen: one block per department showing its sub-departments (add/rename/remove), its "Role seniority order" reorder list (Phase N item 2 — up/down via `moveRoleSeniority()`), and its roster, Heads of Department pinned to the top — [Crew]
 - `addSubDeptAdmin()` / `renameSubDeptAdmin()` / `removeSubDeptAdmin()` — add, rename (updates any crew already on it) and remove (clears it off any crew) a sub-department from the admin panel — [Crew]
 - `toggleHoD()` — toggles a crew member's `isHoD` flag (Head of Department), used to pin them to the top of their department's roster in the admin panel and, via `crewRolesRowHTML`/roster sorts, elsewhere — [Crew]
@@ -1503,10 +1243,8 @@ keys and for SECTIONS vs CODES, and **Sidebar & navigation — VIEWS** for the a
 | B-1.2 | · Project settings strip | Float % / Fee %, project-level, editable, live, autosaved — a line may carry its own float, including 0. Moved out of the content area in Phase AX so the Top sheet is the first thing under the header; VAT (B-1.4) stays a view control, not a project setting, and stays in the top sheet | `setBudgetDemoPercent()` |
 | B-1.3 | · Lens toggle | Departments ↔ BBC. Same lines, different grouping and totalling | `setBudgetDemoLens()` |
 | B-1.4 | · Top sheet | Rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total, plus the Inc./Ex. VAT toggle (Phase AW, `bdmVatToggle`) — same markup/pattern as T-6's own VAT toggle. ⚠️ Departments totals by CODE, while the line detail below groups by SECTION | `budgetDemoTopSheetHTML()` |
-| B-1.5 | · Line detail | Collapsible section per group, one editable row per line, carrying all four information-only markers: ⚑ miscode, ≠ rate drift, ↻ day drift and ⚠ unmappable days. Phase AY-a added the **Type** (Crew/Service) and **OT** columns, renamed Days to **Days / Qty**, and put a crew picker in the Name cell | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
+| B-1.5 | · Line detail | Collapsible section per group, one editable row per line, carrying the ⚑ miscode and ≠ rate-drift markers | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
 | B-1.6 | · Add section | Phase AV — name + expected code + phase set. The minimum that stops an empty budget being a dead end | `addBudgetDemoSection()` |
-| B-1.7 | · Crew link on a line | Phase AY-a — optional per-line picker over the whole crew database, plus "+ Add new person…". Linking copies name, position→item, rate and VAT and fills days from Production; the link stays optional forever for supplier/venue/buyout lines | `bdmCrewPickerHTML()` / `bdmLinkLineToCrew()` |
-| B-1.8 | · Add a person from the Budget | Phase AY-a — Name / Department / Role dialog. Creates the crew record AND adds them to the project's Production crew, through the existing `addNewCrewFromProposal()` commit path | `bdmAddPersonDialogHTML()` / `confirmBdmAddPerson()` |
 
 ## S — Settings
 
@@ -1533,7 +1271,6 @@ keys and for SECTIONS vs CODES, and **Sidebar & navigation — VIEWS** for the a
 | **G-6** | Grid keyboard navigation | Arrows / Home / End / Enter across checkbox grids | keydown handler, `GRID_ROW_SELECTOR` |
 | **G-7** | Undo toast | Phase R/R17 — ~10s "Undo" after a delete or bulk edit, restoring a pre-action snapshot | `finishUndo()` / `undoLastAction()` |
 | **G-8** | Autosave & "Saved" flash | The debounced per-key autosave behind Overview/cost fields, and the status flash every save path shares | `scheduleAutosave()` / `flashStatus()` |
-| **G-9** | Remove-from-project dialog | Phase AY-a — the two-option destructive-scope decision (this view only / this project entirely), shared by Production and Budget and rendered into `#globalOverlay`. **Never offers or mentions deleting the crew record** | `removePersonDialogHTML()` / `confirmRemovePerson()` |
 
 ## X — Server-side
 
