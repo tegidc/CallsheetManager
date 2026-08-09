@@ -2590,6 +2590,133 @@ print twice.
 - No code from `budget-v1-fail` was reused. No rate × days totals, aggregations or
   rollups were added.
 
+## Phase BC — shoot day entry selection audit (9 Aug 2026)
+
+Ships onto BD (`1c56578`), which sits on BF/BG/BE/AZ. **Audit-only — no code in
+`index.html` changed.** The brief asked for two things: (1) make every shoot-day/on-site
+crew picker list entries separately by name+role, and (2) audit every reader of
+`d.positions`/day-roster builder for double-counting since BF. Both were checked against
+the running code before writing anything, per the brief's own instruction to stop rather
+than re-derive if the premise didn't hold — and (1) didn't hold: it was already done.
+
+### (1) The selection UI already lists entries separately — a side effect of BF, not built here
+
+Two controls put a crew member into a day slot, on two different tabs:
+
+- **The shoot day position-assignment picker** — `refreshAddPosnPick()` / `addPosnToDay()`
+  / `removePosnRow()` (T-5.4, Shoot Days tab). `refreshAddPosnPick()` already sources its
+  option list from `projectCrewOptions()` → `projectEntryViews(p)` (entry views, not
+  people), filtered against already-assigned **entry** ids, rendered through
+  `groupedCrewOptionsHTML()`, which labels every option `Name (Role)`. The code comment at
+  the call site already says so: `// entry views — "Meurig — AC" and "Meurig — operator"
+  are two selectable things`.
+- **The on-site selection UI, a separate control from position assignment** — "Days on
+  site" (T-2.2, Crew tab), a checkbox matrix rather than a picker: `crewAssignRowHTML()` /
+  `toggleCrewOnDay()`. `renderProjectCrew()` already feeds this view `projectEntryViews(p)`
+  (entry-level, not `projectCrew()`), so `crewAssignRowHTML()` renders one row per entry,
+  each showing `crewIdentityHTML(c, {showAsOrRole:true, …})` — name, with role/Show-as as
+  a hint line underneath. `toggleCrewOnDay(entryId, dayId, checked)` already writes/reads
+  `d.positions` by entry id.
+
+Verified live (see Verification below): a person given a second entry with a different
+role immediately appears as two distinct, separately labelled, separately selectable rows
+in both controls, with no code change. This is BF's `projectEntryViews()` wiring — it
+already reached the picker and the on-site grid when it reached the Roles tab, because all
+three read the same function. There was no separate "list entries, not people" step left
+for this phase to do.
+
+### (2) Every `d.positions` reader / day-roster builder, re-audited independently of BF's own table
+
+Re-derived from a fresh `grep` of every `.positions` reference, not copied from BF's
+table, then cross-checked against it — nothing found that BF missed, nothing regressed by
+BD or BG (both left this code path untouched, confirmed by reading it, not just trusting
+their own "left alone" notes).
+
+| Builder / control | Reads | Category | Notes |
+|---|---|---|---|
+| `refreshAddPosnPick()` / `addPosnToDay()` / `removePosnRow()` (T-5.4 picker) | `d.positions`, entry id | (a) | Lists/adds/removes by entry id; two entries render as two options |
+| `crewAssignRowHTML()` / `toggleCrewOnDay()` (T-2.2 on-site grid) | `d.positions`, entry id | (a) | One row per entry, entry-id keyed toggle |
+| `renderPositionAssignments()` / `captureInProgressPositions()` / `saveShootDay()`'s positions rebuild | `d.positions`, entry id | (a) | Grouped by company/dept, one row per position; DOM `posn-crew` values are entry ids throughout |
+| `entryOnDay()` / `entryDayCount()` | `d.positions`, entry id | (a) | The entry-grain half of the pair; used correctly wherever a specific entry's own days matter (Roles/Days-on-site sort, filter) |
+| `crewOnDay()` / `crewDayCount()` | `d.positions`, folded via `entriesForCrew()` | (b) | The person-grain half; deduplicates a person's entries before testing presence |
+| `removeCrewEntries()` | `d.positions`, entry id | (a) | Filters positions by the killed entry ids only — a person's other entry is untouched (re-verified live, see below) |
+| `toggleAllForPerson('days', entryId)` | `d.positions`, entry id | (a) | Entry-scoped "All" toggle; the `'hotel'` branch of the same function is person-scoped by design (different id passed in by the caller) |
+| `buildTaskFlags()` — "No crew — Day N" | `(d.positions||[]).length` | N/A | Presence-only boolean, not a headcount; entry-vs-person grain doesn't apply |
+| `buildTaskFlags()` — "N crew with no day rate" | `projectEntries(p)` | (a) | Correct: rate is entry-level, so a no-rate *entry* is what needs fixing, not a no-rate *person* |
+| `buildBudgetData()` — `people` / per-day `dayPeople` | `d.positions`, entry id via `onDayIds` | (a) | One row per entry (rate/days are entry-level); confirmed `pp.id` matches entry ids from `d.positions`, not crew ids |
+| `buildBudgetData()` — `travelClaimed` / `travelClaimedToday` | `d.positions` via `crewDayCount()` | (b) | Travel charged once per person via a `Set` keyed by `crewId`, inside the same function that is (a) for rate — mixed correctly within one builder |
+| `personMatchesProjectDayFilter()` | `entryOnDay` or `crewOnDay`, branches on `c.crewId` | (a)/(b) | Correctly dual-mode: entry grain for the entry-level views, person grain when handed a person view |
+| `sortProjectCrewGroup('daysCount')` | same branch | (a)/(b) | Same dual-mode pattern |
+| `buildProjectCrewGroups('daysOnSite')` | same branch | (a)/(b) | Multi-bucket per entry in entry-level views, deduplicated in person-level views |
+| `cinematographyCrew()` | none directly (department, not day) — reads `projectCrew()` | (b) | Deduplicated on purpose: one camera letter per person, not per entry |
+| `buildTransportSummary()` | `d.positions` via `crewOnDay()` | (b) | AO's originally-flagged function; still deduplicated via `projectCrew()`, unchanged since BF |
+| `buildHotelSummary()` | `p.hotelNightBefore` / `d.hotelNights` (crewId-keyed) | (b) | No `d.positions` involvement at all; person-keyed by design, untouched |
+| `buildCateringSummaryGrid()` / `buildCateringExport()` | `d.cateringMeals` (crewId-keyed) | (b) | Same — no `d.positions` involvement, person-keyed by design |
+| `buildCrewSummary()` | `crewDB` directly (AI Scan payload) | N/A | Whole database projection, not a day roster |
+| `buildFullData()` (positions/clientPositions/talentPositions) | `d.positions`, one row per position | (a) | Call sheet output — two roles legitimately print twice, unchanged |
+| `positionsTableHTML()` / `pushPeopleLines()` (WhatsApp) / `pushPeopleRows()` (Excel) | `buildFullData()`'s resolved position lists | (a) | All three consume the same resolved list; one line/row per position, correctly not deduplicated |
+
+**Day-level roster headcount check.** The brief specifically flagged "12 crew on Day 3"-style
+displays as worth checking. Searched exhaustively (`grep` for count/headcount patterns
+across the whole file): **no such display exists anywhere in the app.** Position
+Assignments shows a per-company/department count next to each group header, but that is a
+count of position rows in that group (correctly a row count, not advertised as a person
+headcount), and Budget's Per Day view shows only cost totals, no headcount at all. Nothing
+to fix because nothing exists yet that could get this wrong.
+
+### Verification
+
+- Inline `<script>` extracted (2 blocks, same convention as BF/BD/BG — a 6-line Supabase
+  client init and the 7,847-line main block) — `node --check` clean on both. `<style>`
+  brace-balanced, **478/478** (unchanged from BD, since no CSS touched).
+- Orphan sweep: `resolveCrewRate`/`saveCrewRateOverride`/`crewRateOverrides`/
+  `HEADER_FONTS`/`clearBudgetDayFilter`/`resetAndReseed`/`copyWA`/`exportPanelHTML`/the
+  four removed amenity-lookup functions all confirmed still absent from live code — the
+  only hits are "do not look for this" comments and (for `crewRateOverrides`) the
+  migration function itself, which legitimately reads the old field once during
+  migration.
+- **Test fixture**, per the brief's requirement: `bc-fixture.html` built by a real script
+  file (`build-fixture.js`, refuses an already-stubbed source, requires each anchor to
+  match exactly once) into a directory containing no `index.html`. Confirmed the bare
+  root served a directory listing before any interaction; confirmed `location.href`, a
+  random per-session token (`window.__BC_FIXTURE__`), and that `saveDB`/`scheduleAutosave`
+  were the stub functions (not the real ones, which survive only as
+  `__fixture_unreachable_saveDB`) — all asserted before touching anything.
+- **Two-entry-same-day, live**: gave an existing ROW 2026 crew member (Justin Schoenrock,
+  previously one entry — Executive Producer) a second entry (Camera Operator,
+  Cinematography) via direct state manipulation (BA's "Add again as" UI doesn't exist yet,
+  so this is the only way to construct the scenario). Confirmed:
+  - Both entries appeared in the `addPosnPick` dropdown as `Justin Schoenrock (Executive
+    Producer)` under Production and `Justin Schoenrock (Camera Operator)` under
+    Cinematography — two distinct, separately selectable options.
+  - Both entries appeared as two separate rows on the Days on site grid, name + role hint
+    each, both toggleable independently.
+  - Added both to Day 1 via `addPosnToDay()`; both resolved with independent call times
+    (06:00 / 05:30) after editing and `captureInProgressPositions()`.
+  - Removed the Camera Operator entry's Day 1 position via `toggleCrewOnDay(…, false)`:
+    the Executive Producer entry's position (call time, own row) was untouched;
+    `crewOnDay()` (person-level) still correctly returned `true` for the person, since
+    their other entry still holds the day.
+  - Re-added, then removed the Executive Producer entry's position via `removePosnRow()`
+    (the Shoot Days tab's own removal control, the other of the two removal paths):
+    confirmed the Camera Operator entry's position was untouched.
+  - Zero console errors across the whole sequence.
+  - All 6 `saveDB()` calls the sequence triggered were intercepted by the fixture's stub
+    (`db:projects` / `db:shootdays` only) — the real `saveDB` was never reachable, so
+    production could not have been touched regardless of what was clicked.
+- No `index.html` edits were made — nothing to diff against a pre/post fingerprint. The
+  only file changes are this MAP.md entry.
+
+### Left alone, as instructed
+- No code changed in `index.html` — Section 1's UI change was already shipped by BF; there
+  was nothing left to build.
+- BA's roles menu and AZ's `.role-add-marker` remain unbuilt/unwired — not touched.
+- The AZ Edit-pencil deletion gap (chip ×) — still open.
+- `deleteCrew()` leaving positions dangling as "(removed crew)", `dayTotal` not
+  resyncing, "+ Add crew member" form visibility — all untouched, per the brief.
+- No rate × days totals, no aggregation, no rollup were added anywhere.
+- No code from `budget-v1-fail` was read or reused.
+
 ---
 
 ---
