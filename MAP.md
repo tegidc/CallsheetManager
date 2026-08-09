@@ -623,36 +623,11 @@ scope); the rule above is what a future linking action must obey.
   unions them, first set wins on order — [Budget (B-1)]
 - `bdmLineFloatPercent()` / `budgetDemoLineMath()` / `budgetDemoTotals()` — **every
   calculated field, in one place, never stored.** `daysTotal` = sum of the phase
-  buckets, `net` = rate × daysTotal, `vat` = net × vatRate, `total` = net + vat when
-  `bdmVatToggle` is on (Inc. VAT) or net alone when it's off (Ex. VAT), `float` =
-  **the current `total`** × **the line's own** float %, `totalWithFloat` = total +
-  float. ⚠️ **Float is per LINE** — a section or code total already includes it.
-  ⚠️ **The production fee is calculated on the float-INCLUSIVE subtotal**,
-  deliberately, on whichever basis is selected.
-  ⚠️ **Phase AW correction — VAT sits INSIDE the total by default, not outside it.**
-  AU and AV had this backwards: VAT was treated as a figure sitting outside every
-  total, excluded from department percentages and the grand total. Little Film's
-  budget sheets have always carried VAT INSIDE the line total, with the VAT column
-  showing the VAT portion OF that total, and the 5% float calculated on the
-  VAT-inclusive figure. AW fixed the formula and added the toggle below so both
-  bases can still be viewed — [Budget (B-1)]
-- `bdmVatToggle` / `toggleBdmVat()` (Phase AW) — **the Inc./Ex. VAT basis for the
-  whole B-1 screen.** Same markup/styling/state-handling pattern as T-6's own
-  `budgetVatToggle`/`toggleBudgetVat()` — a checkbox bound straight to the module
-  flag, reusing the exact `.budget-summary`/`.budget-stat`/`.budget-vat-toggle`
-  classes (safe: B-1 and T-6 are never on screen together) — labelled "Inc. VAT",
-  checked by default. Unlike T-6's toggle, which only picks a DISPLAY split
-  (itemized vs baked-in) over figures that don't change, this one changes the
-  arithmetic itself: `budgetDemoLineMath()`'s `total` (and hence every float,
-  department total, both lenses' top sheets, subtotal, fee and grand total) is
-  computed differently depending on it. `toggleBdmVat()` does a full `renderMain()`
-  for that reason — a targeted refresh wouldn't reach the line-detail tables.
-  Session state only, exactly like T-6's own toggle — **not persisted** across a
-  reload; a fresh load is always Inc. VAT, which is the basis Little Film's sheets
-  are quoted in and the basis the seeded ROW figures reconcile against. The current
-  basis is also spelled out in the top sheet itself (Subtotal/Grand total tile
-  labels, the Total column header, and the hint line) so an exported or
-  screenshotted total is never ambiguous about which one it is — [Budget (B-1)]
+  buckets, `total` = rate × daysTotal, `vat` = total × vatRate, `float` = total ×
+  **the line's own** float %, `totalWithFloat` = total + float. ⚠️ **Float is per LINE**
+  — a section or code total already includes it. ⚠️ **The production fee is calculated
+  on the float-INCLUSIVE subtotal**, deliberately. ⚠️ **VAT is excluded from every
+  percentage and from the grand total** and shown in its own column — [Budget (B-1)]
 - `budgetDemoBbcCategory(rec, l)` — ⚠️ **now data-driven, not a `switch`.** It walks the
   ordered `bbcRules` table in `db:budget_settings` and the **first match wins**. A rule
   matches when its `code` equals the line's code, its `phase` is `any` or equals the
@@ -781,34 +756,12 @@ scope); the rule above is what a future linking action must obey.
 | every existing screen still loads | ✓ Welcome, Crew db, Locations db, Settings, T-1…T-7, T-6's four views + VAT toggle + filter, T-2's five grids + filter, B-1 × 4 projects × 2 lenses — no window errors |
 | mobile 375px | ✓ no page-level horizontal overflow; the wide tables scroll inside their own `.tablewrap` |
 
-### Verified (Phase AW), driven through the live page against the real Supabase
-
-**The spec error this phase corrects:** AU and AV treated VAT as sitting OUTSIDE
-every total — excluded from department percentages and the grand total, shown only
-in its own column. That was wrong. Little Film's sheets carry VAT INSIDE the line
-total, with the 5% float calculated on the VAT-inclusive figure. AW fixed
-`budgetDemoLineMath()`/`budgetDemoTotals()` (see above) and added the `bdmVatToggle`
-Inc./Ex. VAT toggle so both bases are still reachable.
-
-| check | result |
-|---|---|
-| `budget-seed-row.json` filled in with the real ROW 2026 London data | ✓ 82 lines, 10 sections, floatPercent 5, feePercent 10, target `id_msc4nv2c0g178` |
-| Settings' "Seed ROW 2026 budget" action, run against the real project | ✓ no existing budget on that project, so no replace-confirm; wrote `budget:id_msc4nv2c0g178` — 82 lines / 10 sections / 5 / 10, confirmed straight off the table |
-| headline figures, Inc. VAT (default) basis | ✓ Subtotal £318,668.31 / Production fee £31,866.83 / Grand total £350,535.14 — exact match to the brief, itself ~£1 off the source sheet's own rounded display figures, not an error |
-| all eight department totals, Inc. VAT basis | ✓ SET £96,996.90 / PROD £64,829.10 / CIN £45,355.35 / CAT/TRA £33,425.34 / GRIP £24,987.69 / EQUIP £23,520.42 / AUD £16,419.06 / HMU £13,134.45 |
-| Ex. VAT basis, same data | ✓ Subtotal £291,178.58 / fee £29,117.86 / grand £320,296.44 — VAT reference figure unchanged at £26,354.20 either way, since `vat` itself is always net × vatRate regardless of the toggle |
-| toggle round-trip, repeated | ✓ 4 consecutive flips returned exactly `£318,668.31 / £291,178.58 / £318,668.31 / £291,178.58` — no drift, because every figure is recomputed fresh from the stored rate/day/vatRate data on every read, never from the previous derived value |
-| both lenses (Departments/BBC) total identically | ✓ on Inc. VAT: £318,668.31 = £318,668.31; on Ex. VAT: £291,178.58 = £291,178.58 |
-| per-line worked example from the brief (£8,000 net, 20% VAT, 5% float) | ✓ reads £8,400 ex-VAT and £10,080 inc-VAT — both bases stay internally consistent per line |
-| miscode flag (⚑), all 12 genuinely-miscoded lines including Premier Inn's "Hotel Crew" | ✓ raises "Coded CIN, sits in Travel"; 11 others also correctly flagged (4× Production coded SET, 4× Cinematography coded EQUIP, 3× Set/Venue coded EQUIP) |
-| Hotel Additional's back-solved rate (£1,142.86 × 1 day, 0% VAT, 5% float) | ✓ reconciles to an exact £1,200.00 total-with-float |
-| Proper Corn, Inc. VAT (the new default) | ✓ Subtotal £22,778.28 / fee £0.00 / grand £22,778.28 / VAT £1,015.60 — **changed from AU's £21,711.90**, because AU's figure assumed the old (wrong) VAT-outside model |
-| Proper Corn, Ex. VAT | ✓ Subtotal £21,711.90 / fee £0.00 / grand £21,711.90 / VAT £1,015.60 — **exactly AU's original figures**, confirming the old model was equivalent to what is now the Ex. VAT basis |
-| Proper Corn, both lenses, both bases | ✓ all four agree with the corresponding Departments/BBC figure above |
-| refresh — seeded budget and toggle state | ✓ 82 lines / 10 sections survive; VAT toggle resets to checked (Inc. VAT default) — session state only, not persisted, exactly like T-6's own toggle |
-| `db:crew` untouched throughout | ✓ 88 records, md5 `8e1989…be28`, `updated_at` unmoved, before and after seeding |
-| every existing screen still loads | ✓ Welcome, Crew db, Locations db, Settings, T-1…T-7 (T-6's four views + its own VAT toggle + filter, unchanged), T-2's five grids, B-1 × 5 projects (4 real + Proper Corn) × 2 lenses × 2 VAT bases — no console errors |
-| dead references to the removed VAT-outside handling | ✓ none — `grep` for "VAT is excluded"/"VAT sits outside"/"outside the arithmetic" in `index.html` returns nothing |
+⚠️ **NOT verified, because the data was never supplied:** ROW 2026 London's own budget
+and its three expected totals (subtotal £318,669 / fee £31,867 / total £350,536). The
+AV brief's paste placeholder for the ROW line data was never filled in, so
+`budget-seed-row.json` carries the schema, the target project and the 5%/10%
+percentages but **no sections and no lines**, and the Settings action correctly refuses
+to seed it. Paste the real data into that file and it works with no code change.
 
 ## Preview & Export
 
@@ -1028,7 +981,7 @@ storage** — it is no longer a demo, despite the `budgetDemo*` function names. 
 | B-1.1 | · Project selector | The real projects from `projectsDB`, plus Proper Corn (which lives only here). Defaults to the project you have open | `bdmProjectList()` / `setBudgetDemoProject()` |
 | B-1.2 | · Float % / Fee % | Project-level, editable, live, autosaved. A line may carry its own float, including 0 | `setBudgetDemoPercent()` |
 | B-1.3 | · Lens toggle | Departments ↔ BBC. Same lines, different grouping and totalling | `setBudgetDemoLens()` |
-| B-1.4 | · Top sheet | Rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total, plus the Inc./Ex. VAT toggle (Phase AW, `bdmVatToggle`) — same markup/pattern as T-6's own VAT toggle. ⚠️ Departments totals by CODE, while the line detail below groups by SECTION | `budgetDemoTopSheetHTML()` |
+| B-1.4 | · Top sheet | Rows + £ + % of subtotal + VAT, then Subtotal / Production fee / Grand total. ⚠️ Departments totals by CODE, while the line detail below groups by SECTION | `budgetDemoTopSheetHTML()` |
 | B-1.5 | · Line detail | Collapsible section per group, one editable row per line, carrying the ⚑ miscode and ≠ rate-drift markers | `budgetDemoSectionHTML()` / `budgetDemoLinesTableHTML()` |
 | B-1.6 | · Add section | Phase AV — name + expected code + phase set. The minimum that stops an empty budget being a dead end | `addBudgetDemoSection()` |
 
@@ -2214,17 +2167,11 @@ have been unreadable. The cost of a sidebar entry is that sidebar routes null
 keeps the open project lit while you're on it. Leave from Budget and you land back on
 the tab you left.
 
-**VAT sits INSIDE the arithmetic by default (Phase AW correction).** AU and AV had
-this backwards — they excluded VAT from every percentage and the grand total, on the
-theory that VAT was a figure sitting outside every total. It isn't: Little Film's
-budget sheets have always carried VAT INSIDE the line total, with the VAT column
-showing the VAT portion OF that total, and the 5% float calculated on the
-VAT-inclusive figure. AW fixed the formula (`total = net + vat` on the Inc. VAT
-basis) and added `bdmVatToggle` so the whole screen can still be viewed Ex. VAT
-(`total = net`) when that's what's wanted — see `budgetDemoLineMath()` above. Note
-this is still a *different* model from T-6's, where VAT follows the PERSON
-(`c.vatRegistered`). Here VAT is a property of the LINE (`vatRate`, 0 or 0.2), because
-a line is what gets invoiced. Don't unify them without deciding which model wins.
+**VAT sits outside the arithmetic.** It has its own column on every table and it is in
+none of the percentages and not in the grand total. Note this is a *different* model
+from T-6's, where VAT follows the PERSON (`c.vatRegistered`). Here VAT is a property of
+the LINE (`vatRate`, 0 or 0.2), because a line is what gets invoiced. Don't unify them
+without deciding which model wins.
 
 **The BBC lens shows its empty categories.** A, B, E, K, M, O at £0 with "— no lines"
 is information — it says what wasn't spent — and a top sheet with categories missing
