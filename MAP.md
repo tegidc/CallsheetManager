@@ -3207,3 +3207,98 @@ this is a report, not a judgement call.**
   day's `dayTotal` not resyncing — pre-existing, out of scope.
 - No code from `budget-v1-fail` was read or reused.
 - No rate × days totals, aggregation or rollup added anywhere.
+
+## Gate 1 — style/consistency review, AZ–BH stream (10 Aug 2026)
+
+**Audit only. Zero lines of `index.html` changed by this pass.** Scheduled Gate 1 check
+(same shape as Phase U / `refinement-review.html`'s R1–R18 — small obvious
+inconsistencies get fixed directly, anything implying a design decision gets written up
+as a numbered finding rather than built) over the nine phases never style-reviewed as a
+whole: `bfac972` (AZ) → `4d6f0a3` (BE) → `02d58c9` (BG) → `9ca9fdf` (BF) →
+`cde4567`/`ebe0114`/`1c56578` (BD) → `e5a3048` (BC) → `608affb` (BH) → `36183d7` (BA) →
+`8b635e4` (BB). Local `main` was one fast-forward behind origin (missing BA/BB) at the
+start of this session; pulled to `8b635e4` before anything else.
+
+**Result: no findings.** Every surface named in the brief was checked against the design
+system decisions recorded above (Phase Detail/Fonts/Style Review/Refinement) both by
+reading the code and by driving it live in a stubbed fixture, and all of it already
+matches:
+
+- **Role chip + "+" marker** (`roleBannerHTML()`, AZ+BE) — `.role-chip` reuses the
+  checkbox's own `1.5px solid` / `3px radius` literals exactly as documented; the marker's
+  weight (`--muted` faint / `--text` solid) was confirmed by computed style in a live
+  render, not just read off the CSS — a person with one saved role renders
+  `rgb(111,106,99)`, a person with two renders `rgb(17,10,8)`, matching
+  `hasOtherRoles = c.roles.length>1` exactly.
+- **The roles menu** (`openRolesMenu()`, BA+BB) — confirmed it reuses the existing
+  `.modal-overlay`/`.modal-box` dialog shell verbatim (same shell `addRoleDialogHTML()`
+  and `removeRoleDialogHTML()` use) rather than introducing a new popover pattern, and the
+  "Change to"/"Add again as" mode toggle reuses the existing `.tab`/`.tab.active` idiom
+  (`crewGridView`, `budgetView`) with no special-casing of either mode's weight. Exercised
+  live: opened from a two-entry person, both modes render correctly ("Camera Operator"
+  offered in "Change to", "No other saved roles." in "Add again as" since both saved
+  roles were already held) — verified on both desktop and a 375px mobile viewport, where
+  the dialog reflows to full-width cleanly.
+- **The Pre-production tab** (BD) — row layout, the bare rate/days fields (no headers, no
+  inline labels), and the date-mark calendar icon were all confirmed live rather than
+  assumed: setting 5 days and marking 1 date rendered the counter as
+  `"5 days booked · 1 date marked"` with **no warning styling** for the mismatch (per the
+  documented rule), and the calendar icon's weight flipped from `--muted` to `--text` on
+  marking a date, in the same computed-style check as the Roles-view marker. AZ's weight
+  convention was in fact followed, not just claimed.
+- **BH's role-deletion dialog** (`removeRoleDialogHTML()`) — confirmed it uses the same
+  `#globalOverlay` custom-dialog pattern as `addRoleDialogHTML()`, not a native
+  `confirm()` or a third shape. Triggered live against a role in use on 2 projects: the
+  dialog's `.primary` (filled, encouraged) "Leave in old call sheets", `.danger`
+  (text-only, not encouraged) "Delete from all projects", and plain "Cancel" all render
+  with the same button classes used everywhere else destructive/primary actions appear in
+  the app (`deleteProject()`, `deleteCrew()`, `confirmAddRoleDialog()`).
+- **BG's confirms** (`useCrewAsTemplate()`, `saveCrew()`'s duplicate-name warning) — both
+  read as plain `confirm(...)`, matching `deleteCrew()` and `removeSubDeptAdmin()`
+  exactly. No dialog-shell divergence.
+- **General drift** — no new bare `<h4>` (the six from Phase Refinement stayed fixed; the
+  only `<h4>`s left are the pre-existing, correctly-styled `.ki-item h4` ones in Preview &
+  Export's key-info blocks, untouched by this stream). The one inline `style=` override
+  worth naming — BH's `.toolbar` flipped to `flex-direction:column` for its three stacked
+  dialog buttons — is a genuine one-off (every other `.toolbar` inline style in the app
+  only adjusts margin) rather than a repeated duplicate crying out for a class, so it was
+  left as-is rather than "fixed" into a modifier nobody else needs yet. Diffed the full
+  `bfac972^..8b635e4` range for every added `*HTML()` function against this checklist —
+  nothing in scope was missed; the handful not covered above (`crewExpansionHTML()`,
+  `crewRateSaveIconHTML()`, `crewFormHTML()`) are BF's entry-id plumbing with no styling
+  changed, confirmed from the diff context rather than assumed.
+
+### Verification
+
+- `node --check` on both real inline `<script>` blocks (extracted from the unmodified
+  `index.html`, document order): clean.
+- CSS brace balance: 479/479 — unchanged from Phase BB, since no CSS was touched.
+- Orphan sweep on every function this pass actually exercised (`roleBannerHTML`,
+  `openRolesMenu`/`closeRolesMenu`/`rolesMenuHTML`/`rolesMenuListHTML`/
+  `rolesMenuAddRolePickerHTML`, `removeRoleDialogHTML`/`confirmRemoveRoleDialog`/
+  `commitRoleRemoval`/`roleUsageProjectIds`, `prepRowHTML`/`prepCalendarHTML`/
+  `prepCounterText`, `useCrewAsTemplate`/`duplicateCrew`): every one resolves to a
+  definition plus at least one real call site.
+- **Fixture**: built by a real script (`build-fixture.js`, refuses an already-stubbed
+  source, brace-counts each anchored function's body to find the true matching close
+  rather than searching for the next `{`), serving from a scratch directory containing
+  **no `index.html`** (confirmed: `/` on that server returns a directory listing).
+  `loadDB`/`saveDB` stubbed to read/write an in-memory seed and record array — no network,
+  no real Supabase project touched at any point. Exercised interactively: gave a seeded
+  crew member (Justin Schoenrock) a second saved role and a second entry via direct state
+  manipulation (the same technique BC's and BA's own verification used), then drove the
+  roles menu, the Pre-production calendar, and the BH deletion dialog through real
+  `computer`/`javascript_tool` interaction on both a desktop and a 375×812 mobile
+  viewport. No console errors at any point.
+- Confirmed via `git status`/`git diff --stat` that this pass made zero changes to
+  `index.html` before writing this entry — there is nothing to fingerprint against
+  production, because nothing changed.
+
+### Left alone, as instructed
+- No direct fixes were made — none were needed. No numbered findings list either: every
+  named surface already matched the documented design system.
+- All of AZ–BH's own "left alone" notes (the AZ/BF known gap, `deleteCrew()`'s dangling
+  positions, "+ Add crew member" form visibility, `dayTotal` not resyncing, BG's deferred
+  Solution B, BF's migrate-on-load divergence) — none of these are style issues and none
+  were touched, per the brief.
+- No code from `budget-v1-fail` was read or reused.
