@@ -102,7 +102,7 @@ Every screen needs the same handful of records. These are the single place that 
   - `personBlockSelectCbHTML()` / `personBlockDomId()` / `personBlockToggleHTML()` / `togglePersonBlockStack()` / `personBlockWrapHTML()` — the block's shared chrome. The checkbox is "bulk select means the person" expressed in the ONE currency `projectCrewSelected` has ever held (entry ids), routed through the existing `toggleCrewPersonSelected()` — no second selection model. `personBlockToggleHTML()` renders the chevron + muted "+N" and renders NOTHING when nothing is hidden. `personBlockWrapHTML()` takes the crew Edit/View expansion as a parameter rather than deriving it, so Pre-production can keep having no crew-record edit path of its own — [Crew]
   - ⚠️ **`togglePersonBlockStack()` is DOM-only, deliberately. BL keeps NO open/closed state anywhere** — not persisted, not on a record, not even a module-level Set — so every block opens closed on every render and this flips the rows in place rather than re-rendering. Same direct-DOM-instead-of-re-render idiom as `applyBlockState()`/`prepDragApply()`. **The one derived exception**: a Pre-production block renders open when `prepCalendarFor` points at a stacked-away entry, so an open calendar can't be hidden by its own re-render — derived from state that already exists, not new state. ⚠️ **Known consequence, flagged not worked around**: because nearly every field save re-renders the tab body, expanding a stack and editing a stacked-away entry collapses the block again. The edit saves and the fronting correctly does not move; the row just goes back behind the chevron. A module-level open-set would be exactly the "open/closed state anywhere" the brief rules out, so it was left — [Crew]
   - ⚠️ **REMOVED in Phase BM: `roleChipHTML()`** — BK's second, menu-less chip renderer for Days on site / Hotel / Travel / Catering. Do not look for it. Those four tabs now open the roles menu from their chip exactly as Roles and Pre-production always have, so **all six sub-tabs go through the ONE `roleBannerHTML()`** and there is no second chip renderer left to drift. See **Phase BM** — [Crew]
-- `crewRolesRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK, not an entry view** (the name is kept: it is still the Roles tab's row renderer). Renders one card per person in the same tidy `.roles-grid` columns (Phase S/Z): CONTROLS (block checkbox + Edit pencil) | Name | Show as, PLUS — ⚠️ **since Phase BN** — the FRONTED entry's Role (`roleBannerHTML()`, Phase AZ — one chip, which since Phase BM IS the roles-menu trigger; no separate "+" marker) | Rate, all rendered onto the SAME `.roles-grid.pb-head` div as the name — genuinely one row, not two divs each independently `display:grid` (see **Phase BN**). A stacked-away entry (2+ roles) still gets its own `.roles-grid.pb-role-row.pb-role-extra` div below, sharing the `roleCellsHTML()` helper the head cells are built from. Explicit `grid-column` placement throughout, so the Rate column reads straight down the page whether it's on the head row or a stacked-away one. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). Lead Company lives only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all. "Add a saved role" itself is no longer *only* there — Phase BB put a second surface on this exact row, behind the "+" marker's roles menu (see **Phase BA — the roles menu** / **Phase BB**) — but that surface reuses the identical canonical picker (`newRolePickerOptionsHTML()`), not a second implementation — [Crew, Budget]
+- `crewRolesRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK, not an entry view** (the name is kept: it is still the Roles tab's row renderer). Renders one card per person in the same tidy `.roles-grid` columns (Phase S/Z): CONTROLS (block checkbox + Edit pencil) | Name | Show as, PLUS — ⚠️ **since Phase BN** — the FRONTED entry's Role (`roleBannerHTML()`, Phase AZ — one chip, which since Phase BM IS the roles-menu trigger; no separate "+" marker) | Rate, all rendered onto the SAME `.roles-grid.pb-head` div as the name — genuinely one row, not two divs each independently `display:grid` (see **Phase BN**). A stacked-away entry (2+ roles) still gets its own `.roles-grid.pb-role-row.pb-role-extra` div below, sharing the `roleCellsHTML()` helper the head cells are built from. Explicit `grid-column` placement throughout, so the Rate column reads straight down the page whether it's on the head row or a stacked-away one. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). Lead Company lives only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all. "Add a saved role" itself is no longer *only* there — Phase BB put a second surface on this exact row, behind the "+" marker's roles menu (see **Phase BA — the roles menu** / **Phase BB**) — but that surface reuses the identical canonical picker (`newRolePickerOptionsHTML()`), not a second implementation. ⚠️ **Phase BO** widened Controls 56px→`var(--pb-controls-w)` and fixed Name/Role to `var(--pb-name-w)`/`var(--pb-role-w)` (were flexible) — same tokens now shared by `.crewgrid` and `.prep-grid`, so Controls/Name/Role start at the same x on all six Crew sub-tabs, not just this one — [Crew, Budget]
 - `roleBannerHTML()` (Phase AZ; restyled Phase BE; marker wired Phase BA; **marker REMOVED and the chip made the trigger in Phase BM**) — ⚠️ **the ONE role-chip renderer for all six Crew sub-tabs.** Renders exactly one chip — the role this row is currently using (`c.role`) — and **the chip itself is the roles-menu trigger**: `onclick="event.stopPropagation();openRolesMenu(c.id)"`. `c.id` is the ENTRY id in every caller, so a collapsed block opens the menu for its fronted entry and an expanded one for that specific row's entry, with no extra lookup. Called from all six row renderers — `crewRolesRowHTML()` (T-2.1), `prepRowHTML()` (T-2.9.1), `crewAssignRowHTML()` (T-2.2 + T-2.3), `crewCateringBlockHTML()` (T-2.5), `crewTravelRowHTML()` (T-2.4) — so every tab gets the menu from this one function, with none of those five renderers carrying chip logic of its own.
   - ⚠️ **Phase BM deleted AZ's separate `.role-add-marker` "+" and the `hasOtherRoles` weighting that fed it, and did NOT replace the signal.** That weighting said "this person has other saved roles worth checking"; BK/BL's chevron + muted "+N" on the block already says it, one level up. Adding a weighting back onto the chip would be the same signal twice — don't. See **Phase BM**
   - ⚠️ **An entry with no role renders a clickable muted "—" chip, not nothing.** `entry.role` is `''` when the crew record had no role (`addCrewEntry()`), and with the marker gone the chip is the ONLY way into the menu — so the degenerate case has to stay clickable. This is `roleChipHTML()`'s old `—` placeholder kept rather than a new idea; the Roles/Pre-production rows rendered nothing there before BM. Phase R makes a role required for new crew, so this should not occur in practice
@@ -146,7 +146,12 @@ Every screen needs the same handful of records. These are the single place that 
     stacked-away entry (2+ roles) still gets its own `.prep-grid.pb-role-row.pb-role-extra`
     row below, from the same helper. Reuses `roleBannerHTML()` exactly as `crewRolesRowHTML()`
     has it — since **Phase BM** that is one chip which IS the roles-menu trigger;
-    `.role-add-marker` is gone. ⚠️ It deliberately does NOT render `crewRateSaveIconHTML()`:
+    `.role-add-marker` is gone. ⚠️ **Phase BO** widened Controls 32px→`var(--pb-controls-w)`
+    (56px, matching the other five sub-tabs, since Pre-production's checkbox-only Controls
+    used to be narrower) and fixed Name/Role to the same shared `var(--pb-name-w)`/
+    `var(--pb-role-w)` tokens `.roles-grid`/`.crewgrid` use — no JS change needed here, since
+    Pre-production's column count/order was already Controls|Name|Role|fields|calendar|
+    trailing, just narrower. ⚠️ It deliberately does NOT render `crewRateSaveIconHTML()`:
     that icon is the app's one project→database write, and this tab makes no write to
     `db:crew`. ⚠️ Phase BL: a block here renders OPEN when `prepCalendarFor` points at one of
     its stacked-away entries, so an open calendar survives its own re-render — [Crew]
@@ -209,9 +214,11 @@ Every screen needs the same handful of records. These are the single place that 
     when something is. This was AZ's `.role-add-marker` convention reused rather than a second
     visual language for the same idea; **Phase BM deleted that element**, but the convention
     it set still governs here and on `.pb-toggle` — [Crew]
-- `crewAssignRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK.** Renders the Days on site (T-2.2) and Hotel (T-2.3) blocks. **The split between person-level and entry-level facts is exactly the split in the data**: HOTEL nights are keyed to `crewId` (`p.hotelNightBefore`/`d.hotelNights`, BF's "two roles is still one bed"), so the Pre + per-night checkboxes and the row "All" sit on the name line unconditionally. DAYS ON SITE positions are keyed to an ENTRY id (`d.positions[i][0]`), so the day checkboxes, the row "All" (`toggleAllForPerson(entryId,'days')`) and the remove trash belong to whichever entry they're rendered for. ⚠️ **Since Phase BN, the FRONTED entry's role chip AND its day checkboxes/remove render onto the SAME `.crewgrid.pb-head` div as the name** (the chip via `crewIdentityHTML()`'s `extraLine`, alongside the identity), not a second, independently-`display:grid` `.pb-role-row` — that second grid context is what let a single-role person's name and day cells land on two separate lines. A stacked-away entry (2+ roles) still gets its own `.crewgrid.pb-role-row.pb-role-extra` div below, built from the same `entryCellsHTML()`/`entryRightHTML()` helpers the head uses. Department badge and Lead Company pill still hidden (Phase S item 6); role is still display-only here (editing only ever happens on Roles, though Phase BM did put the roles-MENU on the chip everywhere — see **Phase BM**) — [Crew]
+- `crewAssignRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK.** Renders the Days on site (T-2.2) and Hotel (T-2.3) blocks. **The split between person-level and entry-level facts is exactly the split in the data**: HOTEL nights are keyed to `crewId` (`p.hotelNightBefore`/`d.hotelNights`, BF's "two roles is still one bed"), so the Pre + per-night checkboxes and the row "All" sit on the name line unconditionally. DAYS ON SITE positions are keyed to an ENTRY id (`d.positions[i][0]`), so the day checkboxes, the row "All" (`toggleAllForPerson(entryId,'days')`) and the remove trash belong to whichever entry they're rendered for. ⚠️ **Since Phase BN, the FRONTED entry's role chip AND its day checkboxes/remove render onto the SAME `.crewgrid.pb-head` div as the name** (the chip via `crewIdentityHTML()`'s `extraLine`, alongside the identity), not a second, independently-`display:grid` `.pb-role-row` — that second grid context is what let a single-role person's name and day cells land on two separate lines. A stacked-away entry (2+ roles) still gets its own `.crewgrid.pb-role-row.pb-role-extra` div below, built from the same `entryCellsHTML()`/`entryRightHTML()` helpers the head uses. Department badge and Lead Company pill still hidden (Phase S item 6); role is still display-only here (editing only ever happens on Roles, though Phase BM did put the roles-MENU on the chip everywhere — see **Phase BM**).
+  - ⚠️ **Phase BO superseded the `extraLine` role-chip placement above.** `.crewgrid` gained explicit Controls (`crewControlsHTML()`, via `crewIdentityHTML()`'s `opts.hideButtons`) and Role (`grid-column:3`) columns, shared with Roles/Pre-production via `--pb-controls-w`/`--pb-name-w`/`--pb-role-w`. The role chip is a real grid cell now, not text riding inside the identity block's flex row — do not look for `extraLine` carrying the chip on this renderer any more. `crewgrid-remove`'s column shifted `colCount+2`→`colCount+4` to make room for the two new leading columns — [Crew]
 - `toggleCrewOnDay()` — toggles a crew member's assignment to a given shoot day — [Crew]
-- `crewCateringBlockHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK.** Name line — ⚠️ **since Phase BN carrying the FRONTED entry's role chip too, via `crewIdentityHTML()`'s `extraLine`, on the SAME `.crewgrid.pb-head` div** rather than a second `.pb-role-row` — then any stacked-away entries as genuine separate `.pb-role-row.pb-role-extra` rows, then the three stacked per-day Breakfast/Lunch/Dinner checkbox rows (unaffected by BN — always their own `.crewgrid.meal-subrow` rows, never merged into the head). Meals are stored per PERSON per day (`d.cateringMeals[crewId]`) — two roles is still one lunch — so all three meal rows are person-level. Department/Lead Company hidden, role display-only (Phase S) — [Crew]
+- `crewCateringBlockHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK.** Name line — ⚠️ **since Phase BN carrying the FRONTED entry's role chip too, via `crewIdentityHTML()`'s `extraLine`, on the SAME `.crewgrid.pb-head` div** rather than a second `.pb-role-row` — then any stacked-away entries as genuine separate `.pb-role-row.pb-role-extra` rows, then the three stacked per-day Breakfast/Lunch/Dinner checkbox rows (unaffected by BN/BO — always their own `.crewgrid.meal-subrow` rows, never merged into the head; their label now spans `grid-column:1/4` to clear the new Controls+Name+Role columns above them). Meals are stored per PERSON per day (`d.cateringMeals[crewId]`) — two roles is still one lunch — so all three meal rows are person-level. Department/Lead Company hidden, role display-only (Phase S).
+  - ⚠️ **Phase BO superseded the `extraLine` role-chip placement above**, exactly as it did for `crewAssignRowHTML()` — the chip is now a real `grid-column:3` cell (Controls via `crewControlsHTML()`), not text inside the identity block's flex row — [Crew]
 - `getCateringMeals()` / `toggleMeal()` — read/write which meals a crew member is down for on a given day — [Crew]
 - `toggleAllMealForPerson()` — toggles one meal type on/off across every day for a person — [Crew]
 - `buildCateringExport()` / `renderCateringExport()` / `copyCateringExport()` — build, render and copy a per-day catering headcount + dietary-notes list. Lives only in Preview & Export (T-7.5), left as-is by Phase P2 — [Crew, Preview & Export]
@@ -220,7 +227,8 @@ Every screen needs the same handful of records. These are the single place that 
 - `cateringSummaryGridBodyHTML()` / `renderCateringSummaryGridSection()` (Phase P2) — render the grid (rows=meals+Daily cost, columns=days) into `#csmGridWrap`, re-rendered on cost-field input without touching the cost inputs themselves (same targeted-refresh pattern as `renderTechSpecsRoundup()`) — [Crew]
 - `cateringSummaryOpen` / `toggleCateringSummaryBlock()` / `cateringSummaryHTML()` / `copyCateringSummaryGrid()` (Phase P2) — the collapsible "Catering summary" block on the Catering sub-tab (T-2.5): cost fields (Est. cost per Breakfast/Lunch/Dinner, Delivery cost) above the grid. Collapsed by default, positioned below "Crew on this project", same pattern as the Hotel summary block — [Crew]
 - `jumpToCateringSummary()` (Phase P3) — the "Summary" jump-link next to Expand all/Collapse all on the Catering sub-tab: expands `cateringSummaryOpen` if collapsed, then scrolls `#cateringSummarySection` into view — [Crew]
-- `crewTravelRowHTML()` / `setTravelMethod()` — ⚠️ **`crewTravelRowHTML()` takes a PERSON BLOCK since Phase BK.** Travel method is one choice per person per project (`p.travelMethods[crewId]`) — not per role, not per day — so the `<select>` and the car-details hint sit on the name line. ⚠️ **Since Phase BN the FRONTED entry's role chip joins them there too** (`crewIdentityHTML()`'s `extraLine`, concatenated with the existing car-info hint — both are plain flex items in the same `nowrap` identity row), on the SAME `.crewgrid.pb-head` div rather than a second `.pb-role-row`. A stacked-away entry (2+ roles) still gets its own `.crewgrid.pb-role-row.pb-role-extra` row below. Department/Lead Company hidden, role display-only (Phase S) — [Crew]
+- `crewTravelRowHTML()` / `setTravelMethod()` — ⚠️ **`crewTravelRowHTML()` takes a PERSON BLOCK since Phase BK.** Travel method is one choice per person per project (`p.travelMethods[crewId]`) — not per role, not per day — so the `<select>` and the car-details hint sit on the name line. ⚠️ **Since Phase BN the FRONTED entry's role chip joins them there too** (`crewIdentityHTML()`'s `extraLine`, concatenated with the existing car-info hint — both are plain flex items in the same `nowrap` identity row), on the SAME `.crewgrid.pb-head` div rather than a second `.pb-role-row`. A stacked-away entry (2+ roles) still gets its own `.crewgrid.pb-role-row.pb-role-extra` row below. Department/Lead Company hidden, role display-only (Phase S).
+  - ⚠️ **Phase BO** moved the role chip out of `extraLine` into its own `grid-column:3` cell (Controls via `crewControlsHTML()`, `opts.hideButtons`) — `extraLine` now carries `carInfo` alone, same slot Travel always used, just no longer sharing it with the chip — [Crew]
 - `getTransportCosts()` / `saveTransportCosts()` (Phase W) — read/persist the project's transport cost inputs (`p.transportCosts.{publicPerDay,mileage}`): a flat daily rate for public transport and a single general mileage rate for people using their own car (one rate overall, not per-person) — [Crew]
 - `buildTransportSummary()` (Phase W; **deduplicated by Phase BF**) — the Travel tab's own summary data: since travel method (`p.travelMethods`) is stored once per person per PROJECT, not per day, the per-day breakdown is derived by crossing each person's method with the days they're actually on site. ⚠️ **It now iterates `projectCrew()` (distinct people) and tests `crewOnDay()`, not the roster × positions.** This is the exact function Phase AO flagged: it asks "is anyone on site that day", and a person holding two entries that both cover Day 3 would satisfy that twice. Counts every method actually in use per day, plus a computed Daily cost (Own car count × mileage rate + Public transport count × daily rate — the only two methods that carry a cost; Train/Flying/Production transport/custom methods are counted but not costed) — [Crew]
 - `transportSummaryGridBodyHTML()` / `renderTransportSummaryGridSection()` (Phase W) — render the grid (rows=methods in use+Daily cost, columns=days) into `#tsmGridWrap`, re-rendered on cost-field input without touching the cost inputs themselves (same targeted-refresh pattern as `renderCateringSummaryGridSection()`) — [Crew]
@@ -244,7 +252,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `renderProjectLocations()` — renders the project Locations tab: the assigned-locations day grid, then the ONE "Add location" entry point — [Locations]
 - `locAddOpen` / `locAddQuery` / `toggleLocAdd()` / `onLocAddInput()` / `locAddResultsHTML()` / `startNewLocationFromSearch()` (Phase Q) — **the unified add-location flow.** One button opens a search field over `locationsDB` (already-assigned locations filtered out, capped at 8 results), and the "create new location" option is the last row of that same result list, prefilled with whatever was typed. `onLocAddInput()` re-renders `#locAddResults` ONLY — re-rendering the tab would steal focus mid-word, the same reason `crewSearchQuery` lives outside the DOM. `startNewLocationFromSearch()` sets `locFormContext` to the project id itself, which is what makes `saveLocation()` attach the new record to `p.locationIds`. Replaces the old two-button arrangement (a database `<select>` + a separate "Add a new location" form). **Phase Quick Add renders this same widget — same functions, same `#locAddSearch`/`#locAddResults`/`#locFormWrap` ids — inside Overview's Quick add box**, so changing any of it changes both places; that's intended, and safe only because the two are on different tabs of the same body element and never coexist — [Locations, Overview]
 - `locDayGridHTML()` — renders the per-location "which days is this used" checkbox grid — [Locations]
-- `locRowHTML()` — renders one location row within a project — [Locations]
+- `locRowHTML()` — renders one location row within a project. ⚠️ **Shares `.crewgrid` with the Crew tab's Days on site/Hotel/Travel/Catering** — Phase BO's shared Controls/Name/Role leading columns landed on this class too, so both this row's name cell and `locDayGridHTML()`'s header corner cell now explicitly span `grid-column:1/4` (there's no checkbox or role here, so the name just spans all three leading tracks) rather than relying on auto-placement into what used to be a single wide Name column — [Locations]
 - `toggleLocOnDay()` — toggles a location's assignment to a given shoot day — [Locations]
 - `addLocToProject(id)` / `removeLocFromProject()` — add/remove a location from the current project. Takes the id as an argument since Phase Q; the old no-arg form read a `#addLocPick` `<select>` that no longer exists. Three callers since Phase Quick Add (Locations tab search, AI Scan matched-accept, Overview Quick add), and it calls `resetQuickAdd()` for the third — [Locations, Overview]
 - `renderLocationsDatabase()` / `renderLocationsList()` — render the standalone locations database screen and its list — [Locations]
@@ -684,7 +692,8 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `useCrewAsTemplate()` / `duplicateCrew()` (Phase BG renamed the control and added the first of these) — **"Use as template"**, the D-1 crew-card action that clones a record as the starting point for a DIFFERENT PERSON (same company, agent and rate; new name). Never a second role for the same person — that's BA's "Add again as" once it ships. `useCrewAsTemplate()` is a confirm step and nothing else; `duplicateCrew()` below it is unchanged and still does the actual clone (new `uid()`, `_copyOriginalRole` stamp, `saveDB('db:crew')`). ⚠️ **The guard sits BEFORE the write, not at save**: `duplicateCrew()` writes to `db:crew` on click, so there is no pending record and no save step to gate — cancelling has to mean "don't create it", which only exists as a choice up front. Cancel writes nothing at all. Uses native `confirm()`, matching `deleteCrew()`/`removeSubDeptAdmin()` on this same screen; D-1.5's `addRoleDialogHTML()` is a picker, not a confirmation, so it isn't the pattern to copy — [Crew, Shared/utility functions]
   - The control was labelled **"Duplicate"** before Phase BG (never "Duplicate crew member", despite how it gets referred to). Its `title` and both `copy`-badge tooltips were reworded off "duplicate" at the same time; the badges themselves and `_copyOriginalRole` keep their existing purpose, since the copy really does exist and they still describe something true — [Crew]
 - `coProPillSelect()` / `quickSetCoPro()` / `coProCompaniesList` — render and update a crew member's co-production company assignment — [Shared/utility functions]
-- `crewIdentityHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). ⚠️ **`opts.selectCbHTML` (Phase BK) REPLACED `opts.bulkSelect`** — do not look for the old one: every Crew list is one person BLOCK per person now, and the ids a block's checkbox must toggle are that person's currently VISIBLE entries, which only the block knows (a partial-match filter can hide some). The old branch built the checkbox from `c` alone and had no way to express that. `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab) — [Shared/utility functions]
+- `crewIdentityHTML()` / `crewControlsHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). ⚠️ **`opts.selectCbHTML` (Phase BK) REPLACED `opts.bulkSelect`** — do not look for the old one: every Crew list is one person BLOCK per person now, and the ids a block's checkbox must toggle are that person's currently VISIBLE entries, which only the block knows (a partial-match filter can hide some). The old branch built the checkbox from `c` alone and had no way to express that. `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab).
+  - ⚠️ **Phase BO split the checkbox+Edit-pencil pair out into `crewControlsHTML(c, opts)`.** `crewIdentityHTML()` still calls it internally and renders the pair inline by default (unchanged for its one other caller, the Crew database's `crewCardHTML()`) — but `opts.hideButtons:true` suppresses that inline rendering so a caller can render `crewControlsHTML()` itself in a separate grid cell instead. Days on site/Hotel/Travel/Catering do exactly this now: their Controls column is explicit (`--pb-controls-w`, shared with Roles/Pre-production), not embedded inside the identity block's own flex row, which is what makes the checkbox/pencil start at the same x on every one of the six Crew sub-tabs. The checkbox+pencil markup/behaviour itself is byte-for-byte what it always was — only where it renders moved — [Shared/utility functions]
 - `appSettings` / `SETTINGS_DEFAULTS` / `FONT_CHOICES` (**renamed from `HEADER_FONTS` in Phase R/R15** — it now feeds all three font roles, not just headings) / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, plus (Phase Tasks) the three Overview auto-flag rule toggles (`flagNoLocation`/`flagNoCrew`/`flagNoDayRate`) — same object, same persistence, just not all of it is styling. Persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
 - `renderSettings()` / `goSettings()` (Phase Q) — the Settings screen (S-1), reached from the sidebar. A full screen, not a floating cog panel: the app's one existing pattern for a project-independent thing you go and look at is the sidebar screen (Crew database, Locations database), and a modal would have been a second pattern for no gain — [Shared/utility functions]
 - `renderSide()` — renders the left sidebar (project list, nav) — [Shared/utility functions]
@@ -4066,3 +4075,169 @@ by construction — inspectable in the template literal, not an accident of layo
   "+ Add crew member" not visually showing its form, a shoot day's `dayTotal` not
   resyncing when a new day is added, the BL stacked-away-entry-collapses-on-save friction)
   — none touched, none fixed.
+
+## Phase BO — shared Controls/Name/Role columns + row-height rhythm (10 Aug 2026)
+
+Ships onto `1c0098d` (Phase BN), which sits on `05f8e87` (BM) on `c35dade` (BK+BL).
+
+### The ask
+
+User feedback on Phase BN's screenshots: "Placement of names and roles and line height
+is still different between Roles, [Pre-]Production & Days on site. Selector, Edit, Name
+and Role at least should all sit in tidy columns. And there should be an agreed median
+height to the rows."
+
+### Diagnosis
+
+`.roles-grid` had a 56px Controls column (checkbox + Edit pencil); `.prep-grid` had a
+32px Controls column (checkbox only, no pencil by design); `.crewgrid` (Days on
+site/Hotel/Travel/Catering) had **no separate Controls column at all** — the checkbox
+(and, after Phase BN, the role chip too) were embedded inside `crewIdentityHTML()`'s own
+flex row, so their x-position depended on that row's content width rather than a fixed
+column. Three different starting points for "Name" — nothing could line up. Row height
+was likewise whatever each tab's content happened to need: Travel's `<select>` made it
+the tallest (33px) of the five single-line tabs, Catering's bare head (23px, no day
+cells on the head row) the shortest.
+
+Two decisions were confirmed with the user before landing anything, since both change
+how invasive the fix is: **(1)** give the four `.crewgrid` tabs a real, explicit Role
+column too (not just Controls/Name), so the chip aligns everywhere, not only the
+checkbox — accepted, more invasive but genuinely correct; **(2)** "median row height"
+means normalising the five single-line tabs to one height among themselves, leaving
+Pre-production's genuinely taller rows (rate + days fields + a counter line) alone
+rather than forcing everything to match it — accepted.
+
+### The fix
+
+**Three shared tokens**, declared once in `:root` and referenced by all three grids:
+`--pb-controls-w` (56px), `--pb-name-w` (220px, fixed — was flexible on Roles, which is
+exactly what let Role drift depending on name length), `--pb-role-w` (150px, fixed; long
+role names ellipsis-truncate, full text still in the chip's `title`).
+
+- `.roles-grid` / `.prep-grid` — grid-template-columns swapped their old
+  literal/flexible Controls/Name/Role widths for the three tokens. **No JS changed for
+  either** — both already had Controls/Name/Role as genuine, separately-columned cells
+  (Roles since Phase Z, Pre-production since Phase BD); only the CSS widths moved.
+- `.crewgrid` — gained TWO new explicit leading columns it never had (Controls, Role),
+  ahead of the day-checkbox columns. This needed real restructuring in
+  `crewAssignRowHTML()`, `crewCateringBlockHTML()`, `crewTravelRowHTML()`:
+  - **Controls**: `crewIdentityHTML()`'s checkbox+Edit-pencil pair (which, per the live
+    code — NOT per Phase BN's brief, which believed these four tabs had no pencil — was
+    already rendering unconditionally; Phase BO didn't add or remove that capability,
+    only relocated it) was split out into `crewControlsHTML(c, opts)`, called directly by
+    each renderer into its own new `.crewgrid-controls` cell. `crewIdentityHTML()` keeps
+    calling it internally by default (`opts.hideButtons` opts out) — its one other
+    caller, the Crew database's `crewCardHTML()`, is untouched.
+  - **Role**: the chip Phase BN had put into `crewIdentityHTML()`'s `extraLine` slot
+    moved into a genuine `grid-column:3` cell instead — `extraLine` on Travel now carries
+    only the pre-existing car-info hint, as it did before BN touched it.
+  - `crewgrid-remove`'s explicit column shifted `colCount+2` → `colCount+4` to make room;
+    the day-checkbox cells themselves stayed auto-placed and correctly continue from
+    column 4 (verified — see below), no explicit column needed on them.
+  - The header rows (`dayHeaderRow`, `travelHeaderRow` in `renderProjectCrew()`) and
+    Catering's `meal-subrow` label all gained `grid-column:1/4` on their leading cell so
+    they span the new three-column width instead of landing in just the first (56px)
+    track.
+- **`column-gap` unified to 10px.** `.crewgrid` had used 6px; after the leading columns
+  landed exactly right, Role (and everything after it) was still 4–8px off across tabs
+  purely from that gap difference. Matching Roles'/Pre-production's 10px closed it
+  completely — verified pixel-exact below.
+- **Row height**: `.pb-head:not(.prep-grid), .pb-role-row:not(.prep-grid){min-height:33px}`
+  — 33px is Travel's own pre-existing natural height (the tallest of the five), so
+  Travel is visually unchanged and the other four just grow enough to meet it.
+  Pre-production is excluded by the selector, per the confirmed decision.
+- **`.pb-role-cell`'s old 20px indent was dropped.** It made sense when Role was inside a
+  wide, flexible cell (BK/BL era); now that Role is a fixed, explicitly-columned track
+  shared across all six tabs, the padding just ate into an already-tight 150px budget for
+  no remaining purpose — a stacked-away row already reads as "belonging to the block
+  above" from its blank Controls/Name cells.
+- **⚠️ A real overflow bug found and fixed while wiring this up, not part of the
+  original ask**: `.roles-inline` (the flex wrapper around a chip + the `pb-toggle`
+  chevron/"+N") is `display:inline-flex` and shrink-wraps its content by default. Once
+  Role became a fixed 150px column, a long role name's chip (up to ~191px natural width)
+  overflowed straight past the column edge into the day-checkbox area, because nothing
+  told `.roles-inline` itself to respect the column's width — `max-width:100%` on the
+  chip alone did nothing, since the chip's *containing block* (`.roles-inline`) hadn't
+  been constrained either. Fixed with `.pb-role-cell .roles-inline{flex-wrap:nowrap;
+  min-width:0; max-width:100%;}` plus `min-width:0` added to the chip's own truncation
+  rule — consolidated from the old Pre-production-only `.prep-cell .role-chip{…}`/
+  `.prep-cell .roles-inline{flex-wrap:nowrap;}` pair into one shared `.pb-role-cell`
+  rule, since the same fix is now needed on all six tabs, not just Pre-production.
+- **⚠️ `.crewgrid` is also the Locations tab's day-checkbox grid** (`locRowHTML()` /
+  `locDayGridHTML()`, unrelated to Crew person blocks) — caught before it broke:
+  Locations has no checkbox or role concept, so its name cell and header corner cell
+  both got `grid-column:1/4` to span the three new leading tracks as one block, rather
+  than the location name silently landing in the narrow 56px Controls track while day
+  checkboxes and the remove button drifted into the wrong columns.
+
+### Verification
+
+- `node --check` on both extracted script blocks: clean. CSS brace balance: **487/487**
+  (up from BN's 485 — the new `.crewgrid-controls`/`.crewgrid-role-cell`/consolidated
+  `.pb-role-cell` rules, net of the removed `.prep-cell`-specific ones).
+- Orphan sweep: `crewControlsHTML` — 1 definition + 4 call sites + 2 doc-comment
+  mentions, all accounted for; no leftover reference to the old `.prep-cell .role-chip`/
+  `.prep-cell .roles-inline` pair.
+- **Pixel-exact alignment, all six sub-tabs, desktop (1280×900), measured live via
+  `getBoundingClientRect()` on a real multi-role person (the same Justin Schoenrock
+  seed BN used)**: Controls-checkbox x = **355px** on Roles, Pre-production, Days on
+  site, Hotel, Travel and Catering — identical across every one. Name x = **421px** on
+  all six. Role-chip x = **651px** on all six. (Before the column-gap fix these last two
+  were 417/643 on the four `.crewgrid` tabs — a 4–8px drift — confirming the gap, not the
+  column widths, was the remaining cause.)
+- **Truncation, re-verified after the `.roles-inline` fix**: "Strategic Media Team -
+  Director" and "Line Producer / Production Manager" (both real roles in the seed data)
+  now ellipsis-truncate cleanly inside the 150px Role column on Days on site — screenshot
+  confirmed no overflow into the day-checkbox columns, where before the fix they visibly
+  spilled across 2–3 day columns.
+- **Row height, measured live**: Roles/Days on site/Hotel/Travel/Catering all render
+  their `.pb-head` at exactly **33px** — Pre-production's stayed at **49px**, untouched,
+  confirming the exclusion selector works as intended.
+- **Locations tab re-checked live** (not just reasoned about) after the shared-class
+  discovery: name + address render correctly, D1–D6 checkboxes align under their header
+  columns, remove button in the right place — screenshot confirmed clean, no regression
+  from sharing `.crewgrid` with Crew.
+- **Regressions re-driven live, not assumed**: roles-menu chip click still opens the
+  menu and does not toggle the block (re-checked on Catering, a tab with no roles menu
+  before Phase BM); a person block's own checkbox still selects both of a two-entry
+  person's entries via the existing `entryIdsCSV` mechanism; the Edit pencil (now in the
+  new Controls cell) still opens `crewFormHTML()` in the `.pb-editform` expansion;
+  editing the fronted entry's Rate field on the merged head row still writes through
+  `saveEntryRate()`; the Crew database's own `crewCardHTML()` (the other
+  `crewIdentityHTML()` caller, untouched by the `hideButtons` option) still renders its
+  View/Edit buttons correctly. All 5 group-by values × all six sub-tabs re-rendered with
+  no error.
+- **Totals/exports unaffected, by construction and confirmed live**: none of the touched
+  renderers is called from any Budget/export function (unchanged from BN's finding —
+  Phase BO only restructured cells *within* those same five renderers, no new call
+  sites). `buildBudgetData()` ran live against the seeded two-entry person: both roles
+  present as separate rows, correct rates.
+- **Mobile, 375×812, re-checked after every structural change**: `.pb-head`/
+  `.pb-role-row`'s desktop `min-height` has no visible effect once they're `display:block`
+  stacked cards (mobile content already exceeds 33px easily); the new `.crewgrid-controls`/
+  `.crewgrid-role-cell` cells stack cleanly with the rest, no `data-label` needed since
+  Days on site/Hotel/Travel/Catering never used that convention (only Roles/Pre-production
+  do); long role names show in full on mobile (fixed-width truncation is a desktop-grid-
+  only concern, correctly inert once `.crewgrid` reverts to block layout).
+- Zero console errors throughout beyond the fixture's own deliberate, expected
+  `sb`-Proxy-throw bootstrap errors (same pattern documented in Phase BN's fixture note).
+- **TEST FIXTURE**: same `build-fixture.js` and conventions as Phase BN (refuses an
+  already-stubbed or non-landmark source, no CDN script, `sb` replaced with a throwing
+  Proxy, `loadDB`/`saveDB`/`saveInBackground`/`scheduleAutosave` stubbed to in-memory
+  arrays behind a random per-session token, served from a directory with no
+  `index.html`, confirmed via curl). Rebuilt fresh three times over the course of this
+  phase as fixes landed (role-chip overflow, column-gap), each time re-verifying from a
+  clean reload rather than trusting the previous in-memory state.
+
+### Left alone, as instructed
+
+- Pre-production's row height — genuinely taller, left alone per the confirmed decision,
+  not touched by the `:not(.prep-grid)` selector.
+- BK/BL/BN's fronting, collapse and merged-head logic — untouched; this phase only moved
+  *where* cells render (which grid column), never *which* entry's cells render or when.
+- No data shown on any sub-tab changed, only how it's laid out.
+- The known pre-existing issues this stream carries (`deleteCrew()` leaving positions
+  dangling as "(removed crew)", the project-screen route to `removeRoleFromCrew()`,
+  "+ Add crew member" not visually showing its form, a shoot day's `dayTotal` not
+  resyncing when a new day is added, the BL stacked-away-entry-collapses-on-save
+  friction) — none touched, none fixed.

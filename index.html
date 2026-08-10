@@ -58,6 +58,19 @@
        the separate "tighter inputs" decision, and belongs to form controls only. */
     --fs-name:14px; --fs-field:13px; --fs-meta:12px; --fs-ctl:11px;
     --field-label-w:112px;   /* label column for inline fields — keeps rows aligned */
+    /* Phase BO — the three leading person-block columns, shared by .roles-grid,
+       .crewgrid and .prep-grid so Controls/Name/Role start at the same x on every
+       Crew sub-tab. Each grid keeps its own columns after Role (Rate/Show as on
+       Roles, rate+days fields on Pre-production, day checkboxes on the other four) —
+       only the shared leading columns needed to agree. */
+    --pb-controls-w:56px;    /* fits a checkbox + Edit pencil (Roles); the other five
+                                 tabs' checkbox-only controls just sit in the same
+                                 width, left-aligned */
+    --pb-name-w:220px;       /* fixed, not flexible — a flexible Name column is what
+                                 let Role drift depending on how long a name was */
+    --pb-role-w:150px;       /* fixed; role chips longer than this ellipsis-truncate
+                                 (.pb-role-cell .role-chip below) — the full name is
+                                 still in the chip's title tooltip */
     --sidew:230px;
     --side-bg:#110A08; --side-text:#FFFFF5; --side-line:rgba(255,255,245,.14); --side-hover:rgba(255,255,245,.08);
   }
@@ -488,7 +501,7 @@
   .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   /* Roles tab (Phase S, reordered Phase Z) — proper tidy columns instead of one
      packed inline row. Controls | Name | Role | Rate | Show as. */
-  .roles-grid{display:grid; grid-template-columns:56px minmax(140px,1fr) minmax(160px,1.3fr) 118px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  .roles-grid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 118px minmax(120px,1fr); align-items:center; column-gap:10px;}
   .roles-grid-rate{white-space:nowrap;}
   .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .roles-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
@@ -512,15 +525,8 @@
      "5 days booked · 7 dates marked" wrapped onto a second line and made rows with
      both figures taller than rows with one. */
   .prep-grid{display:grid; align-items:start; column-gap:10px;
-    grid-template-columns:32px minmax(160px,280px) minmax(175px,1.2fr) 200px 32px minmax(0,1fr);}
+    grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 200px 32px minmax(0,1fr);}
   .prep-controls{display:flex; align-items:center;}
-  /* the chip and the block's chevron/"+N" are one unit — scoped to this grid rather than
-     changing the shared .roles-inline, which the Roles view also uses. Without it a long
-     role ("Executive Producer") wrapped the trailing glyph onto its own line and made
-     that row taller than its neighbours. (Originally written for AZ's "+" marker, which
-     Phase BM removed; the wrapping problem is the same for what still sits there.) */
-  .prep-cell .roles-inline{flex-wrap:nowrap;}
-  .prep-cell .role-chip{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .prep-cell{min-width:0;}
   /* names match every other list in the app: Jost 600 14px (Phase Style Review) */
   .prep-name{font-family:var(--body); font-weight:600; font-size:var(--fs-name);
@@ -612,16 +618,26 @@
     text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   select.pill-select.copro{color:var(--text);}
   select.pill-select.copro.empty{color:var(--muted);}
-  /* The name column was minmax(200px,1fr) and swallowed all spare width — 342px at
-     seven day-columns but 562px at two, stranding the checkboxes at the right edge.
-     Capped at 340px (what a six-day project already gave it, so nothing regresses)
-     with a trailing flexible column so the slack lands after the row instead. */
-  .crewgrid{display:grid; grid-template-columns:minmax(200px,340px) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px minmax(0,1fr);
-    align-items:center; column-gap:6px;}
+  /* The name column used to be minmax(200px,1fr)/minmax(200px,340px) and carried the
+     checkbox and role chip embedded inside it (Phase Detail, then Phase BN). Phase BO
+     gave Days on site/Hotel/Travel/Catering the same Controls/Name/Role leading
+     columns Roles/Pre-production already had — --pb-controls-w/--pb-name-w/
+     --pb-role-w, shared tokens so all six sub-tabs' Controls/Name/Role start at the
+     same x — with a trailing flexible column so spare width still lands after the
+     row rather than stranding the day checkboxes at the right edge. */
+  /* ⚠️ Phase BO: column-gap raised from 6px to 10px to match .roles-grid/.prep-grid
+     exactly — a 4px/gap difference was enough to put Role (and therefore every day
+     column after it) a few px out of line with the other five sub-tabs. The day
+     columns themselves stay 38px; this only widens the gutters between them a
+     little, not the columns. */
+  .crewgrid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px minmax(0,1fr);
+    align-items:center; column-gap:10px;}
   .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .crewgrid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
   /* No rule between people — the department heading does the dividing (Fonts Review) */
   .crewgrid-row{padding:8px 0;}
+  .crewgrid-controls{display:flex; align-items:center;}
+  .crewgrid-role-cell{min-width:0;}
   .crewgrid-row-name{min-width:0;}
   .crewgrid-row-name .icon-btn{margin-left:0; margin-right:2px;}
   .crewgrid-check{display:flex; justify-content:center;}
@@ -662,9 +678,33 @@
   .person-block{padding:6px 0;}
   .person-block-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .person-block .pb-head{padding:0;}
+  /* Phase BO — a shared row height for the five single-line sub-tabs (Roles, Days
+     on site, Hotel, Travel, Catering): 33px is Travel's own natural height (driven
+     by its <select>, the tallest of the five before this), so Travel is unchanged
+     and the other four just grow enough to match it — align-items:center (already
+     set on .roles-grid/.crewgrid) centres their shorter content in the taller row.
+     Pre-production is deliberately excluded: it genuinely carries more content per
+     row (rate + days fields + a counter line), and forcing it down to match would
+     mean cramming that content or hiding the counter, not a real fix. */
+  .pb-head:not(.prep-grid), .pb-role-row:not(.prep-grid){min-height:33px;}
   .pb-role-row{padding:2px 0;}
-  /* the stack reads as belonging to the name above it */
-  .pb-role-cell{padding-left:20px;}
+  /* ⚠️ Phase BO: dropped the 20px indent this used to carry. Role is now its own
+     explicit shared column (--pb-role-w) across all six sub-tabs, so a stacked-away
+     row already reads as "belonging to the name above" from its blank Controls/Name
+     cells — an extra left-padding would just eat into an already-fixed-width column
+     and misalign the chip from the head row's own. */
+  .pb-role-cell{min-width:0;}
+  /* the chip and the block's chevron/"+N" are one unit that must not wrap onto a
+     second line (a long role name used to wrap the trailing glyph and make that
+     row taller than its neighbours — originally AZ's marker, Phase BM removed the
+     marker but the wrapping problem is the same for what still sits there) — AND
+     .roles-inline is an inline-flex box that shrink-wraps its content by default,
+     so without min-width/max-width here it grows past the fixed-width role column
+     rather than being clipped by it. */
+  .pb-role-cell .roles-inline{flex-wrap:nowrap; min-width:0; max-width:100%;}
+  /* the role chip itself ellipsis-truncates inside that now-bounded box rather
+     than stretching the row or overflowing; full text is still in the chip's title */
+  .pb-role-cell .role-chip{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; min-width:0;}
   /* the collapsed line's chevron + muted "+N". WEIGHT is the whole signal, the same
      convention as .prep-cal-btn — not a second visual language. Renders at all only
      when something is actually hidden.
@@ -1024,7 +1064,6 @@
     .person-block .crewgrid, .person-block .roles-grid, .person-block .prep-grid{
       border:none; border-radius:0; padding:0; margin-bottom:0; background:none;}
     .person-block .pb-role-row{margin-top:6px;}
-    .pb-role-cell{padding-left:0;}
     .person-block .pb-editform{margin-top:10px;}
 
     /* --- position assignment rows (stacking handled by the shared rule above) --- */
@@ -1748,8 +1787,18 @@ async function quickSetCoPro(crewId, selectEl){
    opts.hideLeadPill  — suppress the inline Lead Company quick-pick (Crew-on-project main row: Lead Company only lives in the edit expansion / bulk edit now)
    opts.showAsOrRole  — display c.showAs||c.role instead of the raw role (Phase S item 8: Days on site/Hotel/Travel/Catering are display-only for role — editing only ever happens on the Roles tab)
    opts.showPhone     — show phone on the sub-line
-   opts.oneLine       — compact single-row layout */
-function crewIdentityHTML(c, opts){
+   opts.oneLine       — compact single-row layout
+   opts.hideButtons   (Phase BO) — suppress the checkbox/pencil pair entirely; the
+                      caller is rendering crewControlsHTML() itself in its own grid
+                      cell instead (the four crewgrid Crew sub-tabs, since their
+                      Controls column is now explicit rather than embedded here) */
+/* the view-or-select checkbox + Edit pencil pair, split out of crewIdentityHTML
+   (Phase BO) so a caller can render it in its own grid cell — the Controls column
+   shared across all six Crew sub-tabs — rather than only ever embedded inline
+   inside the identity block's own flex row. crewIdentityHTML still calls this
+   internally by default; pass opts.hideButtons to it when rendering this
+   separately instead. */
+function crewControlsHTML(c, opts){
   opts = opts||{};
   const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
   /* opts.selectCbHTML (Phase BK) — the caller supplies the bulk-select checkbox
@@ -1760,9 +1809,13 @@ function crewIdentityHTML(c, opts){
      checkbox from `c` alone and had no way to express that. */
   const viewOrSelect = opts.selectCbHTML ? opts.selectCbHTML
     : `<button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>`;
-  const buttons = `
+  return `
     ${viewOrSelect}
     <button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
+}
+function crewIdentityHTML(c, opts){
+  opts = opts||{};
+  const buttons = opts.hideButtons ? '' : crewControlsHTML(c, opts);
   const roleText = opts.showRole===false ? null : (opts.showAsOrRole ? (c.showAs||c.role) : c.role);
   const bits = [roleText, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
   // quiet "copy" badge: shows only until the duplicate's role is actually changed
@@ -5140,7 +5193,7 @@ function renderProjectCrew(body){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
       const travelHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:1; --daycolwidth:210px;">
-          <div class="crewgrid-header crewgrid-corner"></div>
+          <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;"></div>
           <div class="crewgrid-header" style="text-align:left;">Travel method</div>
           <div class="crewgrid-header"></div>
         </div>`;
@@ -5153,7 +5206,7 @@ function renderProjectCrew(body){
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const dayHeaderRow = days.length ? `
         <div class="crewgrid crewgrid-header-row" style="--daycols:${colCount};">
-          <div class="crewgrid-header crewgrid-corner"></div>
+          <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;"></div>
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
           ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
           <div class="crewgrid-header"></div>
@@ -5315,18 +5368,24 @@ function crewAssignRowHTML(block, days){
     `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
      <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
   const roleChipHTML = (e, toggleHTML) => `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
-  const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true,
-                     selectCbHTML:personBlockSelectCbHTML(block),
-                     extraLine:roleChipHTML(fronted, personBlockToggleHTML(block, rest.length, false))};
+  /* Phase BO — Controls and Role are now their own explicit columns (shared with
+     Roles/Pre-production via --pb-controls-w/--pb-role-w), not embedded inside the
+     name cell's own flex row. That's what makes the checkbox/pencil and the role
+     chip start at the same x on every sub-tab instead of drifting with content
+     width. crewControlsHTML() is the exact same checkbox+pencil pair
+     crewIdentityHTML used to render inline — moved, not changed. */
+  const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true};
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${colCount};">
+    <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
     <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}</div>
+    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(fronted, personBlockToggleHTML(block, rest.length, false))}</div>
     ${isHotel ? headCells : entryCellsHTML(fronted)}
-    <div class="crewgrid-remove" style="grid-column:${colCount+2};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
+    <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
   </div>`;
   const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${colCount};display:none;">
-      <div class="crewgrid-row-name pb-role-cell">${roleChipHTML(e, '')}</div>
+      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(e, '')}</div>
       ${isHotel ? '' : entryCellsHTML(e)}
-      <div class="crewgrid-remove" style="grid-column:${colCount+2};">${isHotel ? '' : entryRightHTML(e)}</div>
+      <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? '' : entryRightHTML(e)}</div>
     </div>`).join('');
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
@@ -5349,25 +5408,27 @@ function crewCateringBlockHTML(block, days){
       return `<div class="crewgrid-check meal-cell" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${mealKey}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}"></div>`;
     }).join('');
     return `<div class="crewgrid meal-subrow" style="--daycols:${days.length};">
-      <div class="meal-row-label-wrap">
+      <div class="meal-row-label-wrap" style="grid-column:1/4;">
         <span class="meal-row-label">${label}</span>
       </div>
       ${cells}
-      <div class="crewgrid-remove" style="grid-column:${days.length+2};"><span class="meal-row-all" onclick="toggleAllMealForPerson('${crewId}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
+      <div class="crewgrid-remove" style="grid-column:${days.length+4};"><span class="meal-row-all" onclick="toggleAllMealForPerson('${crewId}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
     </div>`;
   };
-  /* Phase BN — the fronted entry's chip renders straight into the SAME .crewgrid
-     div as the name (via crewIdentityHTML's extraLine), not a second,
-     independently-gridded .pb-role-row — that second grid context is what let a
-     single-role person's name and role land on two separate lines. Stacked-away
-     (extra) entries still get their own .pb-role-row below, genuinely a new row. */
+  /* Phase BN — the fronted entry's chip renders onto the SAME .crewgrid div as the
+     name, not a second, independently-gridded .pb-role-row. Phase BO moved the
+     chip out of crewIdentityHTML's extraLine into its own explicit Role column
+     (--pb-role-w, shared with Roles/Pre-production and the other crewgrid tabs) —
+     the meal rows below are unaffected, always their own rows regardless of role
+     count, so their label spans the same Controls+Name+Role width the head's
+     three leading cells occupy. */
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${days.length};">
-      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true,
-        selectCbHTML:personBlockSelectCbHTML(block),
-        extraLine:`<span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span>`})}</div>
+      <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}</div>
+      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span></div>
     </div>`;
   const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${days.length};display:none;">
-      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
     </div>`).join('');
   return personBlockWrapHTML(block,
     head + stack + mealRow('b','Breakfast') + mealRow('l','Lunch') + mealRow('d','Dinner'),
@@ -5725,18 +5786,20 @@ function crewTravelRowHTML(block, p){
   const isEditing = editingCrewId===block.id;
   const fronted = frontedEntryOfBlock(block, p, projectDays());
   const rest = block.entries.filter(e=>e.id!==fronted.id);
-  /* Phase BN — the fronted entry's chip renders straight into the SAME .crewgrid
-     div as the name (via crewIdentityHTML's extraLine, alongside the existing car
-     info), not a second, independently-gridded .pb-role-row — that second grid
-     context is what let a single-role person's name and role land on two separate
-     lines. Stacked-away (extra) entries still get their own .pb-role-row below. */
-  const roleChip = `<span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span>`;
+  /* Phase BN — the fronted entry's chip renders onto the SAME .crewgrid div as the
+     name, not a second, independently-gridded .pb-role-row. Phase BO moved the
+     chip out of crewIdentityHTML's extraLine (carInfo keeps that slot to itself
+     now) into its own explicit Role column, shared with Roles/Pre-production and
+     the other crewgrid tabs. Stacked-away (extra) entries still get their own
+     .pb-role-row below. */
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:1; --daycolwidth:210px;">
-    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:roleChip+carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+    <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}</div>
+    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span></div>
     <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
   </div>`;
   const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:1; --daycolwidth:210px;display:none;">
-      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
     </div>`).join('');
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
@@ -6447,7 +6510,7 @@ function prepRowHTML(block){
     const days = prepDaysOf(e.id, p);
     const marks = prepDatesOf(e.id, p);
     const calOpen = prepCalendarFor===e.id;
-    return { calOpen, html: `<div class="prep-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
+    return { calOpen, html: `<div class="prep-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
       <div class="prep-cell prep-fields" style="grid-column:4;">
         <div class="prep-fields-row">
           <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
@@ -6571,12 +6634,16 @@ function locDayGridHTML(assigned, days){
       </div>`).join('') + `<div class="hint" style="margin-top:8px;">Add shoot days first, then tick which days each location is used.</div>`;
   }
   const dayHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length};">
-      <div class="crewgrid-header crewgrid-corner"></div>
+      <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;"></div>
       ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
       <div class="crewgrid-header"></div>
     </div>`;
   return `<div class="tablewrap">${dayHeaderRow}${assigned.map(l=>locRowHTML(l, days)).join('')}</div>`;
 }
+/* ⚠️ Shares .crewgrid with the Crew tab's Days on site/Hotel/Travel/Catering, so
+   Phase BO's shared Controls/Name/Role leading columns apply here too even though
+   this row has neither a checkbox nor a role — the name cell spans all three
+   (grid-column:1/4) rather than landing in the narrow Controls track alone. */
 function locRowHTML(l, days){
   const dayCells = days.map(d=>{
     const isPrimary = d.locationId===l.id;
@@ -6585,7 +6652,7 @@ function locRowHTML(l, days){
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleLocOnDay('${l.id}','${d.id}',this.checked)" title="${isPrimary?'Primary location — ':''}Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
   return `<div class="crewgrid crewgrid-row" style="--daycols:${days.length};">
-    <div class="crewgrid-row-name"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
+    <div class="crewgrid-row-name" style="grid-column:1/4;"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
     ${dayCells}
     <div class="crewgrid-remove"><button class="icon-btn danger-ic" onclick="removeLocFromProject('${l.id}')" title="Remove ${esc(l.name)} from this project" aria-label="Remove from project">${icon('trash')}</button></div>
   </div>`;
