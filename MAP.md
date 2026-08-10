@@ -101,9 +101,12 @@ Every screen needs the same handful of records. These are the single place that 
   - `visibleEntriesForPerson()` / `bulkTargetEntryId()` (Phase BL) — the entry a bulk edit may write to for a person who is NOT the row being edited. ⚠️ **Picked from the entries that are BOTH selected AND currently matching the filter, never from the cache alone.** Caught in testing: `projectCrewSelected` and the fronted cache both survive a filter change, so a person selected while unfiltered — or simply rendered earlier under a different filter — could otherwise have a bulk edit land on an entry no longer on screen, which is exactly what BL forbids. The cached choice is honoured only when it is still in that pool, so the on-screen row and the edit target are the same thing by construction — [Crew]
   - `personBlockSelectCbHTML()` / `personBlockDomId()` / `personBlockToggleHTML()` / `togglePersonBlockStack()` / `personBlockWrapHTML()` — the block's shared chrome. The checkbox is "bulk select means the person" expressed in the ONE currency `projectCrewSelected` has ever held (entry ids), routed through the existing `toggleCrewPersonSelected()` — no second selection model. `personBlockToggleHTML()` renders the chevron + muted "+N" and renders NOTHING when nothing is hidden. `personBlockWrapHTML()` takes the crew Edit/View expansion as a parameter rather than deriving it, so Pre-production can keep having no crew-record edit path of its own — [Crew]
   - ⚠️ **`togglePersonBlockStack()` is DOM-only, deliberately. BL keeps NO open/closed state anywhere** — not persisted, not on a record, not even a module-level Set — so every block opens closed on every render and this flips the rows in place rather than re-rendering. Same direct-DOM-instead-of-re-render idiom as `applyBlockState()`/`prepDragApply()`. **The one derived exception**: a Pre-production block renders open when `prepCalendarFor` points at a stacked-away entry, so an open calendar can't be hidden by its own re-render — derived from state that already exists, not new state. ⚠️ **Known consequence, flagged not worked around**: because nearly every field save re-renders the tab body, expanding a stack and editing a stacked-away entry collapses the block again. The edit saves and the fronting correctly does not move; the row just goes back behind the chevron. A module-level open-set would be exactly the "open/closed state anywhere" the brief rules out, so it was left — [Crew]
-  - `roleChipHTML()` — the role chip alone, no "+" marker. Days on site / Hotel / Travel / Catering never carried the roles menu and BK does not hand it to them (that is BM's territory); Roles and Pre-production keep `roleBannerHTML()` (chip + AZ's marker) exactly as they already had it — [Crew]
-- `crewRolesRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK, not an entry view** (the name is kept: it is still the Roles tab's row renderer). Renders one card per person in the same tidy `.roles-grid` columns (Phase S/Z): the NAME LINE is CONTROLS (block checkbox + Edit pencil) | Name | Show as (person-level — `showAs` lives on the crew record, one person one display name), and beneath it one ROLE ROW per entry carrying Role (`roleBannerHTML()`, Phase AZ — one read-only chip plus AZ's "+" marker) | Rate. Both use explicit `grid-column` placement in the same grid as the header row, so the Rate column still reads straight down the page exactly as it did when the list was flat. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). Lead Company lives only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all. "Add a saved role" itself is no longer *only* there — Phase BB put a second surface on this exact row, behind the "+" marker's roles menu (see **Phase BA — the roles menu** / **Phase BB**) — but that surface reuses the identical canonical picker (`newRolePickerOptionsHTML()`), not a second implementation — [Crew, Budget]
-- `roleBannerHTML()` (Phase AZ; restyled Phase BE; marker wired Phase BA) — the Roles-view row's Role cell. Renders exactly one chip — the role this row is currently using (`c.role`) — plus a "+" marker to its right, weight-only (solid when `c.roles.length>1`, i.e. the person has other saved roles to offer, faint otherwise; renders for every row including zero-saved-role people) but no longer inert: its click opens `openRolesMenu(entryId)` — see **Phase BA — the roles menu**. Called from both `crewRolesRowHTML()` (T-2.1) and Pre-production's `prepRowHTML()` (T-2.9.1, was T-8.1 before Phase BJ), so both tabs got the live menu from this one change, with neither of those two functions itself touched. Replaces a direct call to `rolesTagListHTML()` in this one spot — that function used to render **every** saved role as a clickable-to-activate, ×-to-delete chip directly in the row, which was a live path from the project Crew tab to `removeRoleFromCrew()` (a shared crew-database mutation) with no confirmation. `rolesTagListHTML()` itself is unchanged and still the multi-role editor, now reached only through the Edit-pencil expansion (`crewFormHTML()`, alongside `roleAddPickerHTML()`) — [Crew]
+  - ⚠️ **REMOVED in Phase BM: `roleChipHTML()`** — BK's second, menu-less chip renderer for Days on site / Hotel / Travel / Catering. Do not look for it. Those four tabs now open the roles menu from their chip exactly as Roles and Pre-production always have, so **all six sub-tabs go through the ONE `roleBannerHTML()`** and there is no second chip renderer left to drift. See **Phase BM** — [Crew]
+- `crewRolesRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK, not an entry view** (the name is kept: it is still the Roles tab's row renderer). Renders one card per person in the same tidy `.roles-grid` columns (Phase S/Z): the NAME LINE is CONTROLS (block checkbox + Edit pencil) | Name | Show as (person-level — `showAs` lives on the crew record, one person one display name), and beneath it one ROLE ROW per entry carrying Role (`roleBannerHTML()`, Phase AZ — one chip, which since Phase BM IS the roles-menu trigger; no separate "+" marker) | Rate. Both use explicit `grid-column` placement in the same grid as the header row, so the Rate column still reads straight down the page exactly as it did when the list was flat. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). Lead Company lives only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all. "Add a saved role" itself is no longer *only* there — Phase BB put a second surface on this exact row, behind the "+" marker's roles menu (see **Phase BA — the roles menu** / **Phase BB**) — but that surface reuses the identical canonical picker (`newRolePickerOptionsHTML()`), not a second implementation — [Crew, Budget]
+- `roleBannerHTML()` (Phase AZ; restyled Phase BE; marker wired Phase BA; **marker REMOVED and the chip made the trigger in Phase BM**) — ⚠️ **the ONE role-chip renderer for all six Crew sub-tabs.** Renders exactly one chip — the role this row is currently using (`c.role`) — and **the chip itself is the roles-menu trigger**: `onclick="event.stopPropagation();openRolesMenu(c.id)"`. `c.id` is the ENTRY id in every caller, so a collapsed block opens the menu for its fronted entry and an expanded one for that specific row's entry, with no extra lookup. Called from all six row renderers — `crewRolesRowHTML()` (T-2.1), `prepRowHTML()` (T-2.9.1), `crewAssignRowHTML()` (T-2.2 + T-2.3), `crewCateringBlockHTML()` (T-2.5), `crewTravelRowHTML()` (T-2.4) — so every tab gets the menu from this one function, with none of those five renderers carrying chip logic of its own.
+  - ⚠️ **Phase BM deleted AZ's separate `.role-add-marker` "+" and the `hasOtherRoles` weighting that fed it, and did NOT replace the signal.** That weighting said "this person has other saved roles worth checking"; BK/BL's chevron + muted "+N" on the block already says it, one level up. Adding a weighting back onto the chip would be the same signal twice — don't. See **Phase BM**
+  - ⚠️ **An entry with no role renders a clickable muted "—" chip, not nothing.** `entry.role` is `''` when the crew record had no role (`addCrewEntry()`), and with the marker gone the chip is the ONLY way into the menu — so the degenerate case has to stay clickable. This is `roleChipHTML()`'s old `—` placeholder kept rather than a new idea; the Roles/Pre-production rows rendered nothing there before BM. Phase R makes a role required for new crew, so this should not occur in practice
+  - Replaces a direct call to `rolesTagListHTML()` in this one spot — that function used to render **every** saved role as a clickable-to-activate, ×-to-delete chip directly in the row, which was a live path from the project Crew tab to `removeRoleFromCrew()` (a shared crew-database mutation) with no confirmation. `rolesTagListHTML()` itself is unchanged and still the multi-role editor, now reached only through the Edit-pencil expansion (`crewFormHTML()`, alongside `roleAddPickerHTML()`) — [Crew]
   - Phase BE gave the chip its own class, `.role-chip` (`active` modifier for the currently-active one) — see **The design system, as decided (Phase Detail)** below for why this is a new class rather than a restyled `.pill.dept`
   - ⚠️ **Known gap, narrowed by Phase BF, made safer (not closed) by Phase BH.** The Edit-pencil expansion (`crewExpansionHTML()`→`crewFormHTML()`) is shared, unscoped state (`editingCrewId`) reachable from **every** project Crew tab view (Roles, Days/Hotel, Catering, Travel) as well as the standalone Crew Database screen. **BF closed the role-SWITCHING half of it** — clicking a chip from a project screen now calls `setEntryRole()` and touches only that project (verified: the crew record and the same person's entry on another project both unchanged). **The × still calls `removeRoleFromCrew()`, a shared crew-database mutation, from any project crew view — so "no path from any project screen deletes a saved role" is still NOT true.** What BH changed: that shared mutation is now behind an in-use warning dialog with an undoable cascade option, fired identically (same function, same one call site — see `rolesTagListHTML()`) whether reached from D-1 or from a project screen. It is safer than before, not scoped away — a project screen can still trigger a crew-database-wide role deletion, deliberately left open since separating it would be a new behaviour change, not this phase's job. See **Phase BH** — [Crew]
 - `showAsQuickEditHTML()` / `saveQuickShowAs()` — inline "Show as" quick-edit, used on the Roles row. Renders via the same `.icon-btn` pencil button as every other edit affordance in the row (Phase S item 2) rather than a separately-styled control — [Crew]
@@ -137,8 +140,9 @@ Every screen needs the same handful of records. These are the single place that 
     own. Prep days, the entry rate and the date marks are ALL entry-level
     (`p.prepSchedule` is keyed by entry id), so every one of them sits on a ROLE ROW:
     Role | the two bare number fields | the marks indicator, per entry. Reuses
-    `roleBannerHTML()` exactly as `crewRolesRowHTML()` has it, **AZ's `.role-add-marker`
-    included**. ⚠️ It deliberately does NOT render `crewRateSaveIconHTML()`: that icon is
+    `roleBannerHTML()` exactly as `crewRolesRowHTML()` has it — since **Phase BM** that
+    is one chip which IS the roles-menu trigger; `.role-add-marker` is gone.
+    ⚠️ It deliberately does NOT render `crewRateSaveIconHTML()`: that icon is
     the app's one project→database write, and this tab makes no write to `db:crew`.
     ⚠️ Phase BL: a block here renders OPEN when `prepCalendarFor` points at one of its
     stacked-away entries, so an open calendar survives its own re-render — [Crew]
@@ -198,8 +202,9 @@ Every screen needs the same handful of records. These are the single place that 
     than "0 days booked" when there is nothing to say — [Crew]
   - `.prep-cal-btn` / `.prep-cal-btn.has-marks` — the calendar icon doubles as the marks
     indicator, carrying its state as **weight**: `--muted` when nothing is marked, `--text`
-    when something is. This is AZ's `.role-add-marker` convention reused rather than a second
-    visual language for the same idea — [Crew]
+    when something is. This was AZ's `.role-add-marker` convention reused rather than a second
+    visual language for the same idea; **Phase BM deleted that element**, but the convention
+    it set still governs here and on `.pb-toggle` — [Crew]
 - `crewAssignRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK.** Renders the Days on site (T-2.2) and Hotel (T-2.3) blocks. **The split between name line and role rows is exactly the split in the data**: HOTEL nights are keyed to `crewId` (`p.hotelNightBefore`/`d.hotelNights`, BF's "two roles is still one bed"), so the Pre + per-night checkboxes and the row "All" sit on the NAME LINE — the home a flat per-entry list never had for them — and the role rows carry chips only. DAYS ON SITE positions are keyed to an ENTRY id (`d.positions[i][0]`), so the day checkboxes, the row "All" (`toggleAllForPerson(entryId,'days')`) and the remove trash sit on the ROLE ROWS, one set per entry, behaving exactly as before BK. Department badge and Lead Company pill still hidden (Phase S item 6); role is still display-only here (editing only ever happens on Roles) — note the role now shows as a `roleChipHTML()` chip rather than the old `showAsOrRole` sub-line text — [Crew]
 - `toggleCrewOnDay()` — toggles a crew member's assignment to a given shoot day — [Crew]
 - `crewCateringBlockHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK.** Name line, then the role rows, then the three stacked per-day Breakfast/Lunch/Dinner checkbox rows. Meals are stored per PERSON per day (`d.cateringMeals[crewId]`) — two roles is still one lunch — so all three meal rows are person-level and the role rows above them carry chips only. Department/Lead Company hidden, role display-only (Phase S) — [Crew]
@@ -771,6 +776,7 @@ coarse information first, finest detail last.
 | T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
 | T-2.1 | · Roles | ONE CARD PER PERSON (Phase BK): name line = checkbox / Edit / Name / Show as; role rows beneath = Role / Rate, one per entry, in the same columns | `crewRolesRowHTML()` |
+| **T-2.0.2** | · · Role chip | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
 | **T-2.0** | · Person block | Phase BK/BL — the shared card every one of the six sub-tabs renders: person-level facts on the name line, ENTRY-level ones on the role rows stacked beneath, columns aligned across every block. Collapses to the fronted entry + a muted "+N"; no chevron when one entry is visible. Nothing persists — no open/closed state anywhere, no per-person total ever | `buildPersonBlocks()` / `personBlockWrapHTML()` |
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
 | T-2.2 | · Days on site | Person block; day checkboxes + row All + remove sit on the ROLE ROWS (a position is keyed to an entry) | `crewAssignRowHTML()` |
@@ -781,7 +787,7 @@ coarse information first, finest detail last.
 | T-2.7 | · Bulk select & actions | Select all (filtered), bulk remove, bulk edit lead company. Phase BK: a block's checkbox selects the PERSON (its visible entry ids). Phase BL: entry-level bulk fields (rate, days, role) hit only the fronted/visible entry; person-level ones (hotel, travel, catering, Show as) still cover the whole person | `bulkActionBarHTML()` / `bulkEditPanelHTML()` |
 | T-2.8 | · Add from crew database | Department-grouped picker | `addCrewToProject()` |
 | **T-2.9** | · Pre-production | Prep days and optional date marks per crew ENTRY, plus the entry's shared rate, positioned between Roles and Days on site in the view-switcher (Phase BJ moved it here from the retired **T-8**; codes are stable handles allocated when a section is built, not tied to on-screen position, so this is a NEW code rather than a renumbered T-8). Inherits Crew's shared toolbar, filter/sort/group-by, expand/collapse and bulk-select — no chrome of its own. ⚠️ No totals of any kind | `renderProjectCrew()` (`crewGridView==='preprod'`) |
-| T-2.9.1 | · · Entry row | Since Phase BK a ROLE ROW inside the person block: Role (`roleBannerHTML()`, "+" marker opens the same roles menu as the Roles tab) / two bare number fields — rate and days, no column headers, no inline labels / the marks indicator. The block checkbox and the Name are on the name line above | `prepRowHTML()` |
+| T-2.9.1 | · · Entry row | Since Phase BK a ROLE ROW inside the person block: Role (`roleBannerHTML()`; since Phase BM the chip itself opens the roles menu, same as every other sub-tab) / two bare number fields — rate and days, no column headers, no inline labels / the marks indicator. The block checkbox and the Name are on the name line above | `prepRowHTML()` |
 | T-2.9.2 | · · Date marks calendar | Per-entry, one open at a time; click or drag to mark. Stored as a flat array of dates — the drag is selection only, never a stored range | `prepCalendarHTML()` |
 | T-2.9.3 | · · Soft counter | "5 days booked · 6 dates marked", muted, no emphasis when the two differ — a mismatch is valid and is never flagged | `prepCounterText()` |
 | **T-3** | **Locations** | Where the project shoots | `renderProjectLocations()` |
@@ -2051,6 +2057,14 @@ switches to on `:checked` — with `var(--muted)` for the non-active state in th
 tag-list editor (the banner chip is always `.active`, since it's the one role in use).
 Deliberate consequence, not compensated for: this removes green from the crew row
 entirely — brand presence on that row now falls back to buttons and headers.
+
+⚠️ **Phase BM made the chip a control.** It now carries `cursor:pointer` and an
+`onclick` opening the roles menu, on all six Crew sub-tabs. Deliberately **no new
+hover/active rule was added** — `rolesTagListHTML()`'s chips have been clickable with
+nothing but `cursor:pointer` since before BE, and matching that precedent was preferred
+to inventing a hover treatment for one control. `.role-chip`/`.role-chip.active` are
+otherwise untouched; the non-`.active` muted state now also does duty as the "no role
+set" `—` placeholder.
 
 ## Detail review page (Phase Detail)
 
@@ -3667,5 +3681,176 @@ on-screen row and the edit target are now the same thing by construction.
   dangling as "(removed crew)", the project-screen route to `removeRoleFromCrew()`,
   "+ Add crew member" not visually showing its form, a shoot day's `dayTotal` not
   resyncing when a day is added) — none touched, none fixed.
+- No code from `budget-v1-fail` was read or reused. No rate × days totals, aggregations or
+  rollups added anywhere.
+
+## Phase BM — the roles menu moves onto the chip, "+" removed (10 Aug 2026)
+
+Ships onto `c35dade` (BK+BL), which sits on `87497dc` (BJ) on `0098c05` (Gate 1).
+
+### ⚠️ The brief's premise was wrong, and the scope was widened on an explicit decision
+
+The brief stated `roleBannerHTML()` was "the ONE shared renderer … reused UNCHANGED by
+every sub-tab that shows a role chip", and instructed a STOP-AND-REPORT if any sub-tab
+did not go through it. **Four of the six did not.** Phase BK had introduced a second
+renderer, `roleChipHTML()`, for Days on site / Hotel / Travel / Catering — deliberately
+menu-less, with its own comment saying so ("that is BM's territory"), matching BK's own
+MAP.md note.
+
+So the brief's §4 ("confirm the roles menu opens from the chip on all six sub-tabs")
+could only be satisfied by *also* extending the menu to four tabs that had never had it —
+a scope decision BK had explicitly deferred to this phase, and one §0 forbade resolving
+unilaterally. **Work was stopped with `index.html` untouched, the mismatch reported, and
+the decision taken by the user: all six.** Recorded here because the alternative reading
+(two tabs only) was live and defensible, and a later session should know this was chosen,
+not assumed.
+
+⚠️ **Consequence worth naming: this reverses Phase S item 8 for Hotel/Travel/Catering.**
+"Role is display-only on those four tabs; editing only ever happens on Roles" is no
+longer true — a chip on any of the six now opens "Change to" / "Add again as" / "Add a
+new role…". That is the point of the phase as scoped, not an oversight.
+
+### What changed
+
+Three functional edits. Nothing else in `index.html` was touched.
+
+- `roleBannerHTML(c)` — rewritten. Was chip + a separate `.role-add-marker` "+" whose
+  `onclick` opened the menu; is now ONE chip which carries the `onclick` itself
+  (`event.stopPropagation();openRolesMenu('${c.id}')`). The `hasOtherRoles`
+  (`c.roles.length>1`) solid/faint weighting that fed the marker is **deleted and not
+  replaced** — BK/BL's chevron + muted "+N" already carries "this person has more going
+  on than what's shown", one level up on the block, and duplicating it on the chip was
+  explicitly ruled out. The chip's `title` absorbs the marker's ("Camera Operator —
+  change or add a role"), keeping the full role name that `.prep-cell .role-chip`'s
+  ellipsis truncation needs.
+- `roleChipHTML()` — **deleted**, its three call sites (four tabs: `crewAssignRowHTML()`
+  serves both Days on site and Hotel) repointed at `roleBannerHTML()`. A "do not look for
+  this" note is left in its place. There is now exactly one chip renderer in the app.
+- `.role-add-marker` / `.has-roles` / `:hover` — **deleted** from the stylesheet. No CSS
+  was added: the chip reuses `.role-chip`/`.role-chip.active` verbatim plus an inline
+  `cursor:pointer`, matching `rolesTagListHTML()`'s long-standing clickable-chip
+  precedent rather than inventing a hover treatment.
+
+**`openRolesMenu()` and everything under it is untouched.** "Change to", "Add again as",
+the `c.roles`-sourced list, the exclusion sets, `applyRoleToEntryByMode()`, BB's footer
+picker and its `addRoleDialogThen` continuation — not one line changed. Only the trigger
+moved.
+
+### Judgement call, flagged rather than buried: the no-role chip
+
+`entry.role` is `''` when the crew record had no role (`addCrewEntry()`'s
+`(c&&c.role)||''`). Before BM the two renderers disagreed about that case — `roleChipHTML()`
+drew a muted `—`, `roleBannerHTML()` drew nothing at all (and relied on the marker, which
+rendered for every row including zero-role people, to keep the menu reachable). With the
+marker gone, drawing nothing would have left such a row with **no way into the menu at
+all** — a capability regression on Roles/Pre-production.
+
+So the unified renderer draws a clickable, muted, non-`.active` `—` chip. That keeps the
+four tabs' existing placeholder exactly as it was and strictly improves the other two.
+The brief asserted Phase R makes this case impossible ("every crew member must have at
+least one saved role"), and for crew created through `saveCrew()` that holds — but the
+`''` branch is real code in `addCrewEntry()`, so it was covered rather than assumed away.
+This is the one place BM's output differs visually from either predecessor.
+
+### Verification
+
+- `node --check` on both real inline `<script>` blocks (the 7-line Supabase-client one and
+  the ~8,330-line main one, extracted from `index.html` in document order): clean.
+- CSS brace balance: **485 / 485** — exactly BK/BL's 488/488 minus the three deleted
+  `.role-add-marker` rules. No CSS added.
+- Orphan sweep: `roleChipHTML`, `.role-add-marker` and `hasOtherRoles` all have **zero
+  live references** — only the deliberate "REMOVED / do not look for this" notes and the
+  historical phase write-ups survive. Every stale comment that described the marker as
+  present was found and corrected rather than left describing a state that no longer holds
+  (`.prep-cell`'s wrapping note, `.prep-cal-btn`, `.pb-toggle`, the `calendar` icon, the
+  Phase BA header comment, `prepRowHTML()`'s doc comment).
+- **All six sub-tabs, in the live fixture**: zero `.role-add-marker` elements in the DOM,
+  no `+` glyph on any chip, 68 chips per tab and **68 of 68 wired to `openRolesMenu`** on
+  every one — Roles, Pre-production, Days on site, Hotel, Travel, Catering.
+- **Collapsed vs expanded, on all six**: clicking the fronted (only visible) chip on a
+  collapsed block opened the menu for the **fronted entry**; expanding via the chevron and
+  clicking the previously-hidden row's chip opened it for **that row's own entry**. Correct
+  on Pre-production too, where the fronting is inverted by design (Director fronts on
+  prep days, Camera Operator everywhere else) — BL's fronting logic verified untouched.
+- **The chip click does not toggle the block** — confirmed on all six, and again under a
+  genuine pointer click (`computer left_click` on the chip's real screen coordinates, not
+  a dispatched event): the menu opened for the fronted entry and `data-open` stayed `0`.
+  `event.stopPropagation()` is doing its job at pointer level, not just in synthetic events.
+- **Clicking elsewhere on the row behaves exactly as before**: the Rate field (no menu, no
+  toggle), the Pre-production days field (no menu, no toggle), the chevron (no menu,
+  toggles the block). Days-on-site day checkboxes still present and unaffected.
+- **The three menu actions, driven through the real UI, all still work and none was
+  touched**: "Change to" → entry count 2→2, edited entry's role changed, the person's other
+  entry byte-identical, one `db:projects` save, menu closed. "Add again as" → 2→3, new entry
+  carries the picked role, one `db:projects` save. BB's footer picker → role pushed onto
+  `c.roles`, `db:crew` + `db:projects` saved, applied to the entry. BB's "+ Add new role…"
+  escape hatch → real `addRoleDialogHTML()` opened with its continuation bound, a typed
+  novel role registered into `ROLES_BY_DEPT`, saves `db:roles`/`db:crew`/`db:projects`,
+  applied to the entry. **The last two were driven from the Catering sub-tab** — a tab with
+  no roles menu whatsoever before this phase.
+- **The no-role `—` chip**: renders muted (`rgb(111,106,99)` = `--muted`), not `.active`,
+  wired, and opens the menu for its own entry.
+- **Exports, budget and every summary UNCHANGED — traced, not asserted.** Two fixtures
+  built by the same script with a **deterministic `uid()`** (a counter, so both builds
+  auto-seed byte-identical data), one from `git show HEAD:index.html` (pre-BM) and one from
+  the working tree, each then given the same seeded two-role person with a stacked-away
+  entry. A **254,964-character whole-output fingerprint** — `buildFullData()` for all 7
+  shoot days across both projects, `buildWAText()`, `techSpecsLines()`, `exportOutputText()`
+  in both formats, `buildBudgetData()`, `budgetExportRows()` for all four views and under
+  both VAT footings, `buildHotelSummary()`/`hotelSummaryLines()`,
+  `buildCateringSummaryGrid()`/`buildCateringExport()`/`cateringOrderLines()`,
+  `buildTransportSummary()`/`transportSummaryLines()`, `buildTaskFlags()`,
+  `cinematographyCrew()`, `projectEntryViews()` and `buildPersonBlocks()` — is **SHA-256
+  identical**: `a83e951b22db5f32bd623d165b7e6e543a9c76dcc7e3c435ef45186a792f5baa`. The two
+  builds were confirmed genuinely different first (pre: `roleChipHTML` defined and the
+  `.role-add-marker` rule present; post: both absent).
+- 35 renders driven across both projects × every project tab × all six Crew sub-tabs × all
+  four Budget views × the Crew database. **Zero console errors** throughout.
+- Re-checked at a **375×812 mobile viewport**: chip sized and on-screen, menu opens and the
+  dialog fits the viewport, no horizontal overflow — on all six sub-tabs.
+- **Fixture**: `bm-fixture.html` (plus `bm-pre.html`/`bm-post.html` for the fingerprint),
+  built by a real script file (`build-fixture.js` — refuses an already-stubbed source,
+  refuses a source missing the real app's landmark functions, brace-counts each anchored
+  function's body with template-literal `${}` nesting handled, requires each anchor to match
+  exactly once, prints the bytes it wrote), served from a scratch directory containing **no
+  `index.html`** — confirmed by `curl`: `/` returns a directory listing and `/index.html`
+  **404s**. Random per-session token (`window.__BM_FIXTURE__`), asserted alongside stub
+  identity and `location.href` **before any interaction**. `loadDB`/`saveDB`/
+  `saveInBackground`/`scheduleAutosave` all stubbed to in-memory arrays (the real bodies
+  parked under `__fixture_unreachable_*` and never called), the real `sb` client replaced
+  with a Proxy that **throws** if touched, and the supabase-js CDN `<script src>` removed
+  outright — the page has no network dependency at all.
+- **Production database confirmed untouched.** `app_data`'s newest write is `db:projects` at
+  `2026-08-10 15:23:42+00`, which is **three minutes before this session's first edit to
+  `index.html`** (16:26:47 BST = 15:26:47 UTC) and four and a half minutes before any fixture
+  existed — and is attributable to another session's dev server, flagged by the harness at
+  the start of this one. Nothing this phase did reached it.
+
+### Known limitation of the visual check, stated plainly
+
+`computer{action:"screenshot"}` returned a blank white PNG for this page throughout the
+session, at both viewports, including with a modal up. Everything visual above was
+therefore verified through `read_page`'s rendered accessibility tree, computed styles read
+off live elements, and geometry from real `getBoundingClientRect()` — not from a screenshot.
+Real pointer clicks landed correctly on the elements those measurements identified, so the
+page was rendering; only the capture failed. Worth knowing before trusting a screenshot as
+evidence on this page next time. ⚠️ Note for the next session: `computer` coordinates are in
+**screenshot-pixel** space (800×450 here), not CSS pixels (1280×720) — a click passed in CSS
+pixels lands elsewhere and silently does nothing.
+
+### Left alone, as instructed
+
+- `openRolesMenu()` and the whole BA/BB menu — trigger moved, internals untouched.
+- BK/BL's grouping, fronting and collapse logic — untouched; the fingerprint above covers
+  `buildPersonBlocks()` and the fronting was re-verified live on all six tabs.
+- No schema changes. `p.crewEntries`, `p.prepSchedule`, `d.positions`, `d.hotelNights`,
+  `d.cateringMeals`, `p.travelMethods` — none touched. Display/interaction layer only.
+- The AZ/BF known gap (project screen → crew-database-wide role deletion via the
+  Edit-pencil expansion's chip `×`) — still open, untouched.
+- The BL stacked-away-entry-collapses-on-save friction — accepted, not worked around.
+- The known pre-existing issues this stream carries (`deleteCrew()` leaving positions
+  dangling as "(removed crew)", the project-screen route to `removeRoleFromCrew()`,
+  "+ Add crew member" not visually showing its form, a shoot day's `dayTotal` not resyncing
+  when a day is added) — none touched, none fixed.
 - No code from `budget-v1-fail` was read or reused. No rate × days totals, aggregations or
   rollups added anywhere.
