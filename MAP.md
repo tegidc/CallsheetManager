@@ -4110,9 +4110,10 @@ rather than forcing everything to match it — accepted.
 ### The fix
 
 **Three shared tokens**, declared once in `:root` and referenced by all three grids:
-`--pb-controls-w` (56px), `--pb-name-w` (220px, fixed — was flexible on Roles, which is
-exactly what let Role drift depending on name length), `--pb-role-w` (150px, fixed; long
-role names ellipsis-truncate, full text still in the chip's `title`).
+`--pb-controls-w` (56px), `--pb-name-w` (⚠️ **170px as of the same-day follow-up below —
+originally shipped at 220px**, fixed either way, not flexible — a flexible Name column is
+what let Role drift depending on name length), `--pb-role-w` (150px, fixed; long role
+names ellipsis-truncate, full text still in the chip's `title`).
 
 - `.roles-grid` / `.prep-grid` — grid-template-columns swapped their old
   literal/flexible Controls/Name/Role widths for the three tokens. **No JS changed for
@@ -4142,10 +4143,11 @@ role names ellipsis-truncate, full text still in the chip's `title`).
   landed exactly right, Role (and everything after it) was still 4–8px off across tabs
   purely from that gap difference. Matching Roles'/Pre-production's 10px closed it
   completely — verified pixel-exact below.
-- **Row height**: `.pb-head:not(.prep-grid), .pb-role-row:not(.prep-grid){min-height:33px}`
-  — 33px is Travel's own pre-existing natural height (the tallest of the five), so
-  Travel is visually unchanged and the other four just grow enough to meet it.
-  Pre-production is excluded by the selector, per the confirmed decision.
+- **Row height**: `.pb-head, .pb-role-row{min-height:33px}` — 33px is Travel's own
+  pre-existing natural height, so Travel is visually unchanged and the others grow
+  enough to meet it. ⚠️ **Originally `:not(.prep-grid)` — Pre-production was deliberately
+  excluded here, per the confirmed decision at the time.** Superseded the same day — see
+  the follow-up below. Do not re-add the exclusion; the selector today is unqualified.
 - **`.pb-role-cell`'s old 20px indent was dropped.** It made sense when Role was inside a
   wide, flexible cell (BK/BL era); now that Role is a fixed, explicitly-columned track
   shared across all six tabs, the padding just ate into an already-tight 150px budget for
@@ -4191,8 +4193,9 @@ role names ellipsis-truncate, full text still in the chip's `title`).
   confirmed no overflow into the day-checkbox columns, where before the fix they visibly
   spilled across 2–3 day columns.
 - **Row height, measured live**: Roles/Days on site/Hotel/Travel/Catering all render
-  their `.pb-head` at exactly **33px** — Pre-production's stayed at **49px**, untouched,
-  confirming the exclusion selector works as intended.
+  their `.pb-head` at exactly **33px** — Pre-production's stayed at **49px** at the time
+  (the deliberate exclusion). ⚠️ **This is what the user's same-day follow-up asked to
+  change — see below; Pre-production now also lands on 33px by default.**
 - **Locations tab re-checked live** (not just reasoned about) after the shared-class
   discovery: name + address render correctly, D1–D6 checkboxes align under their header
   columns, remove button in the right place — screenshot confirmed clean, no regression
@@ -4229,10 +4232,50 @@ role names ellipsis-truncate, full text still in the chip's `title`).
   phase as fixes landed (role-chip overflow, column-gap), each time re-verifying from a
   clean reload rather than trusting the previous in-memory state.
 
+### Same-day follow-up — Pre-production included after all, Name column narrowed
+
+Two more rounds of feedback landed the same day, both refinements to what's above rather
+than new territory:
+
+**"Pre-production should be the same height and only extend out when [there's something
+to show]."** The original decision (Pre-production excluded from the shared 33px floor)
+turned out to be solving the wrong problem — the row wasn't taller because it genuinely
+needed to be, it was taller because `.prep-counter` **always reserved its line's height**
+(`min-height:15px`), even when `prepCounterText()` returned an empty string (nothing
+booked or marked). A `.prep-counter:empty{min-height:0; margin-top:0;}` rule already
+existed — but **only inside the mobile media query**, so desktop never got the benefit.
+Promoting it to the shared/desktop rule (and deleting the now-redundant mobile copy) means
+an entry with nothing on it collapses to the same 33px everyone else gets, and the
+`:not(.prep-grid)` exclusion on the row-height rule came out entirely — `.pb-head,
+.pb-role-row{min-height:33px}` now applies unqualified. A row only grows past 33px when
+`prepCounterText()` actually has something to say (rate+days set, or dates marked) **or**
+the chevron reveals a stacked-away second role — both genuine content-driven reasons, not
+a blanket per-tab reservation. Verified live: a fresh entry (no prep days/marks) renders
+at 33px on Pre-production, identically to the other five tabs; the same entry after
+`setPrepDays(id,'5')` grows to 49px with "5 days booked" visible — confirmed this is
+content pushing the row taller, not a leftover bug, by checking the row height moved
+`33→49` in lockstep with the counter text appearing.
+
+**"Less distance between name and role column."** `--pb-name-w` dropped 220px→170px.
+Comfortably fits every name in the sample data (`Justin Schoenrock`, the longest, at 14px
+Jost 600); a genuinely longer name just sits closer to the chip rather than leaving a
+visibly empty stretch of column — same overflow handling (`white-space:nowrap`) as
+before, nothing new to break. Re-verified the full column-alignment measurement afterward:
+Controls/Name/Role still land at identical x-coordinates across all six sub-tabs, just at
+tighter absolute values (Role now starts 60px earlier than it did right after the
+original Phase BO landed).
+
+Re-verified after both changes, live: all six sub-tabs' `.pb-head` at 33px for an
+unremarkable entry; the roles-menu chip, bulk-select, and rate-editing regressions
+re-checked exactly as in the original Phase BO pass; mobile 375×812 re-screenshotted (the
+`:empty` collapse behaves identically there — it already worked on mobile before this
+follow-up, just not on desktop); zero new console errors beyond the fixture's own
+expected bootstrap noise. `node --check` clean, CSS still balanced (487/487 — the two
+`:empty` rules net to the same count, one promoted out of the media query, one deleted
+from it).
+
 ### Left alone, as instructed
 
-- Pre-production's row height — genuinely taller, left alone per the confirmed decision,
-  not touched by the `:not(.prep-grid)` selector.
 - BK/BL/BN's fronting, collapse and merged-head logic — untouched; this phase only moved
   *where* cells render (which grid column), never *which* entry's cells render or when.
 - No data shown on any sub-tab changed, only how it's laid out.

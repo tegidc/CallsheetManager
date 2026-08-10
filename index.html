@@ -66,8 +66,13 @@
     --pb-controls-w:56px;    /* fits a checkbox + Edit pencil (Roles); the other five
                                  tabs' checkbox-only controls just sit in the same
                                  width, left-aligned */
-    --pb-name-w:220px;       /* fixed, not flexible — a flexible Name column is what
-                                 let Role drift depending on how long a name was */
+    --pb-name-w:170px;       /* fixed, not flexible — a flexible Name column is what
+                                 let Role drift depending on how long a name was.
+                                 170px (was 220px, Phase BO follow-up — narrowed to
+                                 close up the gap before Role) comfortably fits every
+                                 name in the sample data at 14px Jost 600; a longer
+                                 one just sits closer to the chip, same overflow
+                                 handling as everywhere else in the app */
     --pb-role-w:150px;       /* fixed; role chips longer than this ellipsis-truncate
                                  (.pb-role-cell .role-chip below) — the full name is
                                  still in the chip's title tooltip */
@@ -535,8 +540,14 @@
   .prep-fields .budget-rate-input{width:60px;}
   /* the soft counter. Muted, --fs-meta, NEVER emphasised or recoloured when the two
      figures differ — a mismatch is a valid state, not a warning. It sits under the
-     fields and reserves its line so a row does not jump height as it is filled in. */
+     fields and reserves its line so a row does not jump height as it is filled in
+     — but only once it actually has something to say: :empty drops the reservation
+     (Phase BO follow-up), which is what lets a row with nothing booked/marked match
+     the other five sub-tabs' shared row height instead of always carrying this
+     line's height whether or not there's anything on it. Was mobile-only; promoted
+     here since the same reasoning holds at every width. */
   .prep-counter{font-size:var(--fs-meta); color:var(--muted); margin-top:3px; min-height:15px; line-height:15px;}
+  .prep-counter:empty{min-height:0; margin-top:0;}
   /* the marks indicator. WEIGHT is the whole signal (muted = nothing marked, ink =
      marked) rather than a second visual language for the same idea — the same
      convention .pb-toggle uses. (It was AZ's .role-add-marker convention originally;
@@ -678,15 +689,18 @@
   .person-block{padding:6px 0;}
   .person-block-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .person-block .pb-head{padding:0;}
-  /* Phase BO — a shared row height for the five single-line sub-tabs (Roles, Days
-     on site, Hotel, Travel, Catering): 33px is Travel's own natural height (driven
-     by its <select>, the tallest of the five before this), so Travel is unchanged
-     and the other four just grow enough to match it — align-items:center (already
-     set on .roles-grid/.crewgrid) centres their shorter content in the taller row.
-     Pre-production is deliberately excluded: it genuinely carries more content per
-     row (rate + days fields + a counter line), and forcing it down to match would
-     mean cramming that content or hiding the counter, not a real fix. */
-  .pb-head:not(.prep-grid), .pb-role-row:not(.prep-grid){min-height:33px;}
+  /* Phase BO, revised in the follow-up — a shared BASELINE row height across all
+     six sub-tabs, not five: 33px is Travel's own natural height (driven by its
+     <select>), so Travel is unchanged and the others just grow enough to match it
+     — align-items:center (already set on .roles-grid/.crewgrid/.prep-grid) centres
+     shorter content in the taller row. Pre-production reaches the SAME 33px floor
+     as everyone else once its counter line collapses to nothing when empty (see
+     .prep-counter:empty above) — a row only extends past 33px when there's
+     actually a rate/days/marks counter to show, or when the chevron reveals a
+     stacked-away second role, never as a blanket reservation. Originally excluded
+     Pre-production entirely; that was wrong — the fix was the counter, not opting
+     the whole tab out of the shared height. */
+  .pb-head, .pb-role-row{min-height:33px;}
   .pb-role-row{padding:2px 0;}
   /* ⚠️ Phase BO: dropped the 20px indent this used to carry. Role is now its own
      explicit shared column (--pb-role-w) across all six sub-tabs, so a stacked-away
@@ -1046,10 +1060,6 @@
     }
     .prep-cell{margin-bottom:8px;}
     .prep-cell:last-child{margin-bottom:0;}
-    /* the counter reserves a line on desktop so rows in a shared grid keep a common
-       height. Stacked into a card there is no neighbouring row to stay level with,
-       so an empty one is just dead space. */
-    .prep-counter:empty{min-height:0; margin-top:0;}
     .prep-calcell{justify-content:flex-start;}
     .prep-cal{max-width:100%;}
     .prep-cal-day{height:34px;}
