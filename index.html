@@ -5217,19 +5217,24 @@ function crewRolesRowHTML(block){
   const isEditing = editingCrewId===block.id;
   const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${block.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
   const copyBadge = (block._copyOriginalRole!==undefined && block.role===block._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
+  /* Phase BN — Role/Rate belong to whichever entry is fronted. Rendering them
+     straight onto the SAME .roles-grid div as the name (rather than a second,
+     independently-gridded .pb-role-row) is what makes a single-role person read as
+     one line: two sibling divs each declaring their own display:grid can never
+     share a row, however few entries either one holds. A stacked-away (extra) entry
+     still gets its own .pb-role-row below, genuinely a separate row. */
+  const roleCellsHTML = (e, toggleHTML) => {
+    const rate = resolveEntryRate(e.id, p);
+    return `<div class="roles-grid-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
+      <div class="roles-grid-cell roles-grid-rate" data-label="Rate" style="grid-column:4;"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>`;
+  };
   const head = `<div class="roles-grid pb-head">
     <div class="roles-grid-controls">${personBlockSelectCbHTML(block)}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}${copyBadge}</div>
+    ${roleCellsHTML(fronted, personBlockToggleHTML(block, rest.length, false))}
     <div class="roles-grid-cell" data-label="Show as" style="grid-column:5;">${showAsQuickEditHTML(block)}</div>
   </div>`;
-  const roleRow = (e, extra) => {
-    const rate = resolveEntryRate(e.id, p);
-    return `<div class="roles-grid pb-role-row${extra?' pb-role-extra':''}"${extra?' style="display:none;"':''}>
-      <div class="roles-grid-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
-      <div class="roles-grid-cell roles-grid-rate" data-label="Rate" style="grid-column:4;"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>
-    </div>`;
-  };
-  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  const stack = rest.map(e=>`<div class="roles-grid pb-role-row pb-role-extra" style="display:none;">${roleCellsHTML(e, '')}</div>`).join('');
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
@@ -5286,8 +5291,6 @@ function crewAssignRowHTML(block, days){
   const fronted = frontedEntryOfBlock(block, currentProject(), days);
   const rest = block.entries.filter(e=>e.id!==fronted.id);
   const isEditing = editingCrewId===block.id;
-  const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true,
-                     selectCbHTML:personBlockSelectCbHTML(block)};
   let headCells = '', headRight = '';
   if(isHotel && days.length){
     const inPre = (p.hotelNightBefore||[]).includes(block.crewId);
@@ -5298,25 +5301,33 @@ function crewAssignRowHTML(block, days){
         }).join('');
     headRight = `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${block.crewId}','hotel')" title="Toggle all on/off for this person">All</button>`;
   }
+  /* Phase BN — DAYS ON SITE's checkboxes/All/trash are entry-level (a position is
+     keyed to an entry id), so whichever entry fronts the block carries its own set,
+     rendered straight onto the SAME .crewgrid div as the name — not a second,
+     independently-gridded .pb-role-row, which is what let a single-role person's
+     name and day cells land on two separate lines regardless of role count. Hotel's
+     Pre/night checkboxes stay on the name line unconditionally above (person-level,
+     keyed to crewId, not to an entry) and are untouched by this. */
+  const entryCellsHTML = e => isHotel ? '' : days.map(d=>
+    `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${entryOnDay(e.id, d)?'checked':''} onchange="toggleCrewOnDay('${e.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`
+  ).join('');
+  const entryRightHTML = e => isHotel ? '' :
+    `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
+     <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
+  const roleChipHTML = (e, toggleHTML) => `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
+  const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true,
+                     selectCbHTML:personBlockSelectCbHTML(block),
+                     extraLine:roleChipHTML(fronted, personBlockToggleHTML(block, rest.length, false))};
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${colCount};">
     <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}</div>
-    ${headCells}
-    <div class="crewgrid-remove" style="grid-column:${colCount+2};">${headRight}</div>
+    ${isHotel ? headCells : entryCellsHTML(fronted)}
+    <div class="crewgrid-remove" style="grid-column:${colCount+2};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
   </div>`;
-  const roleRow = (e, extra) => {
-    const cells = isHotel ? '' : days.map(d=>
-      `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${entryOnDay(e.id, d)?'checked':''} onchange="toggleCrewOnDay('${e.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`
-    ).join('');
-    const right = isHotel ? '' :
-      `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
-       <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
-    return `<div class="crewgrid pb-role-row${extra?' pb-role-extra':''}" style="--daycols:${colCount};${extra?'display:none;':''}">
-      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
-      ${cells}
-      <div class="crewgrid-remove" style="grid-column:${colCount+2};">${right}</div>
-    </div>`;
-  };
-  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${colCount};display:none;">
+      <div class="crewgrid-row-name pb-role-cell">${roleChipHTML(e, '')}</div>
+      ${isHotel ? '' : entryCellsHTML(e)}
+      <div class="crewgrid-remove" style="grid-column:${colCount+2};">${isHotel ? '' : entryRightHTML(e)}</div>
+    </div>`).join('');
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
@@ -5345,13 +5356,19 @@ function crewCateringBlockHTML(block, days){
       <div class="crewgrid-remove" style="grid-column:${days.length+2};"><span class="meal-row-all" onclick="toggleAllMealForPerson('${crewId}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
     </div>`;
   };
-  const roleRow = (e, extra) => `<div class="crewgrid pb-role-row${extra?' pb-role-extra':''}" style="--daycols:${days.length};${extra?'display:none;':''}">
-      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
-    </div>`;
+  /* Phase BN — the fronted entry's chip renders straight into the SAME .crewgrid
+     div as the name (via crewIdentityHTML's extraLine), not a second,
+     independently-gridded .pb-role-row — that second grid context is what let a
+     single-role person's name and role land on two separate lines. Stacked-away
+     (extra) entries still get their own .pb-role-row below, genuinely a new row. */
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${days.length};">
-      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true,
+        selectCbHTML:personBlockSelectCbHTML(block),
+        extraLine:`<span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span>`})}</div>
     </div>`;
-  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${days.length};display:none;">
+      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+    </div>`).join('');
   return personBlockWrapHTML(block,
     head + stack + mealRow('b','Breakfast') + mealRow('l','Lunch') + mealRow('d','Dinner'),
     { editing:isEditing, open:false, extraClass:'crewgrid-catering-person',
@@ -5708,14 +5725,19 @@ function crewTravelRowHTML(block, p){
   const isEditing = editingCrewId===block.id;
   const fronted = frontedEntryOfBlock(block, p, projectDays());
   const rest = block.entries.filter(e=>e.id!==fronted.id);
+  /* Phase BN — the fronted entry's chip renders straight into the SAME .crewgrid
+     div as the name (via crewIdentityHTML's extraLine, alongside the existing car
+     info), not a second, independently-gridded .pb-role-row — that second grid
+     context is what let a single-role person's name and role land on two separate
+     lines. Stacked-away (extra) entries still get their own .pb-role-row below. */
+  const roleChip = `<span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span>`;
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:1; --daycolwidth:210px;">
-    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:roleChip+carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, selectCbHTML:personBlockSelectCbHTML(block)})}</div>
     <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
   </div>`;
-  const roleRow = (e, extra) => `<div class="crewgrid pb-role-row${extra?' pb-role-extra':''}" style="--daycols:1; --daycolwidth:210px;${extra?'display:none;':''}">
-      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
-    </div>`;
-  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:1; --daycolwidth:210px;display:none;">
+      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+    </div>`).join('');
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
@@ -6415,17 +6437,17 @@ function prepRowHTML(block){
   // screen, so the block renders open in that one case — derived from prepCalendarFor,
   // which already exists; NOT a new piece of open/closed state.
   const open = rest.some(e=>e.id===prepCalendarFor);
-  const head = `<div class="prep-grid pb-head">
-    <div class="prep-cell prep-controls">${personBlockSelectCbHTML(block)}</div>
-    <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
-  </div>`;
-  const roleRow = (e, extra) => {
+  /* Phase BN — the fronted entry's Role/fields/calendar cells render straight onto
+     the SAME .prep-grid div as the name (not a second, independently-gridded
+     .pb-role-row), which is what let a single-role person's name and prep fields
+     land on two separate lines. A stacked-away (extra) entry still gets its own
+     .pb-role-row below, genuinely a new row. */
+  const entryCellsHTML = (e, toggleHTML) => {
     const rate = resolveEntryRate(e.id, p);
     const days = prepDaysOf(e.id, p);
     const marks = prepDatesOf(e.id, p);
     const calOpen = prepCalendarFor===e.id;
-    return `<div class="prep-grid pb-role-row${extra?' pb-role-extra':''}${calOpen?' prep-grid-row-open':''}"${(extra&&!open)?' style="display:none;"':''}>
-      <div class="prep-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, open)}</span></div>
+    return { calOpen, html: `<div class="prep-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
       <div class="prep-cell prep-fields" style="grid-column:4;">
         <div class="prep-fields-row">
           <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
@@ -6443,10 +6465,18 @@ function prepRowHTML(block){
           title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
           aria-label="Date marks">${icon('calendar')}</button>
       </div>
-      ${calOpen ? `<div class="prep-calwrap">${prepCalendarHTML(e.id)}</div>` : ''}
-    </div>`;
+      ${calOpen ? `<div class="prep-calwrap">${prepCalendarHTML(e.id)}</div>` : ''}` };
   };
-  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  const frontedCells = entryCellsHTML(fronted, personBlockToggleHTML(block, rest.length, open));
+  const head = `<div class="prep-grid pb-head${frontedCells.calOpen?' prep-grid-row-open':''}">
+    <div class="prep-cell prep-controls">${personBlockSelectCbHTML(block)}</div>
+    <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
+    ${frontedCells.html}
+  </div>`;
+  const stack = rest.map(e=>{
+    const cells = entryCellsHTML(e, '');
+    return `<div class="prep-grid pb-role-row pb-role-extra${cells.calOpen?' prep-grid-row-open':''}"${open?'':' style="display:none;"'}>${cells.html}</div>`;
+  }).join('');
   // no expansion: Pre-production has no crew-record edit path of its own (Phase BJ)
   return personBlockWrapHTML(block, head + stack, { editing:false, open });
 }
