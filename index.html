@@ -499,17 +499,20 @@
   .roles-grid-cell{min-width:0;}
   .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
-  /* Phase BD — the Pre-production row (T-8). Same grid idiom as .roles-grid, one
-     column fewer: Name | Role | the two bare number fields | the calendar marker.
-     There is deliberately NO header row — rate and days carry no column headers and
-     no inline labels, magnitude alone distinguishes them. The name column is capped
-     the same way .crewgrid's is (Phase Detail), with a trailing minmax(0,1fr) so
-     spare width lands after the row rather than stranding the marker at the edge. */
+  /* Phase BD — the Pre-production row, since Phase BJ a Crew sub-tab (T-2.9). Same
+     grid idiom as .roles-grid: Controls (bulk-select only, no Edit pencil — this tab
+     has no crew-record edit path of its own) | Name | Role | the two bare number
+     fields | the calendar marker. There is deliberately NO header row — rate and days
+     carry no column headers and no inline labels, magnitude alone distinguishes them.
+     The name column is capped the same way .crewgrid's is (Phase Detail), with a
+     trailing minmax(0,1fr) so spare width lands after the row rather than stranding
+     the marker at the edge. */
   /* the fields column is sized to the COUNTER, not to the two 60px inputs — at 150px
      "5 days booked · 7 dates marked" wrapped onto a second line and made rows with
      both figures taller than rows with one. */
   .prep-grid{display:grid; align-items:start; column-gap:10px;
-    grid-template-columns:minmax(160px,280px) minmax(175px,1.2fr) 200px 32px minmax(0,1fr);}
+    grid-template-columns:32px minmax(160px,280px) minmax(175px,1.2fr) 200px 32px minmax(0,1fr);}
+  .prep-controls{display:flex; align-items:center;}
   /* the chip and AZ's "+" marker (live since Phase BA, wired to the roles menu here too
      since this row reuses roleBannerHTML() unchanged) are one unit — scoped to this grid
      rather than changing the shared .roles-inline, which the Roles view also uses.
@@ -3314,7 +3317,6 @@ function renderProject(m){
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
-      <div class="tab ${currentProjectTab==='preprod'?'active':''}" onclick="goProjectTab('preprod')">PRE-PRODUCTION</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS</div>
       <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
@@ -3329,7 +3331,6 @@ function renderProjectBody(){
   setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
-  if(currentProjectTab==='preprod') return renderProjectPreproduction(body);
   if(currentProjectTab==='locations') return renderProjectLocations(body);
   if(currentProjectTab==='tech') return renderProjectTech(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
@@ -4796,13 +4797,13 @@ function renderProjectCrew(body){
   // Hotel, Travel and Catering are PERSON-level and must show one row per human, so they
   // render the deduplicated projectCrew() list instead. With one entry per person the two
   // lists are identical, which is why this reads the same as it did before BF.
-  const entryLevel = crewGridView==='roles' || crewGridView==='days';
+  const entryLevel = crewGridView==='roles' || crewGridView==='days' || crewGridView==='preprod';
   const assigned = entryLevel ? projectEntryViews(p) : projectCrew(p);
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   const unassigned = crewDB.filter(c=>!onProject.has(c.id));
   const filtered = assigned.filter(personMatchesProjectFilter);
 
-  const viewLabels = {roles:'Roles', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
+  const viewLabels = {roles:'Roles', preprod:'Pre-production', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
@@ -4865,6 +4866,14 @@ function renderProjectCrew(body){
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewRolesRowHTML(c)).join('')}</div>`;
       }).join('');
       assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
+    } else if(crewGridView==='preprod'){
+      // same entry grain and grouping as Roles — no header row on this grid,
+      // rate/days carry no column labels (see prepRowHTML())
+      const groupsHTML = groups.map(g=>{
+        const collapsed = collapsedProjectDepts.has(g.key);
+        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>prepRowHTML(c)).join('')}</div>`;
+      }).join('');
+      assignedHTML = `<div class="tablewrap">${groupsHTML}</div>`;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
@@ -4901,6 +4910,7 @@ function renderProjectCrew(body){
     <div class="section">
       <h2>Crew on this project</h2>
       ${viewSwitcher}
+      ${crewGridView==='preprod' ? `<div class="hint" style="margin-bottom:10px;">Prep days are not shoot days — nothing here reaches a call sheet or an export. The rate is the same one the Roles view and Budget use.</div>` : ''}
       ${headerRow}
       ${bulkActionBarHTML()}
       ${assignedHTML}
@@ -5918,11 +5928,6 @@ async function removeCrewFromProject(id){
    is called from both entry-removal paths — see removeCrewEntries() and deleteCrew().
 */
 
-/* the open/closed state of the department groups on this tab. Deliberately its OWN
-   Set rather than the Crew tab's collapsedProjectDepts: collapsing a department here
-   is not a statement about the Crew tab, and sharing it would make two screens move
-   together for no reason the user asked for. */
-let collapsedPrepDepts = new Set();
 let prepCalendarFor = null;   // entry id whose calendar is open, or null — one at a time
 let prepCalMonth = null;      // 'YYYY-MM' the open calendar is currently showing
 
@@ -6089,7 +6094,9 @@ function prepRowHTML(c){
   const days = prepDaysOf(c.id, p);
   const marks = prepDatesOf(c.id, p);
   const open = prepCalendarFor===c.id;
+  const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
   return `<div class="prep-grid prep-grid-row${open?' prep-grid-row-open':''}">
+    <div class="prep-cell prep-controls">${selectCb}</div>
     <div class="prep-cell prep-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}</div>
     <div class="prep-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(c)}</span></div>
     <div class="prep-cell prep-fields">
@@ -6111,57 +6118,6 @@ function prepRowHTML(c){
     </div>
     ${open ? `<div class="prep-calwrap">${prepCalendarHTML(c.id)}</div>` : ''}
   </div>`;
-}
-
-function toggleProjectPrepDeptCollapse(dept){
-  if(collapsedPrepDepts.has(dept)) collapsedPrepDepts.delete(dept); else collapsedPrepDepts.add(dept);
-  renderProjectBody();
-}
-function toggleAllPrepDeptsCollapsed(csv){
-  const present = (csv||'').split(',').filter(Boolean);
-  const allCollapsed = present.length>0 && present.every(d=>collapsedPrepDepts.has(d));
-  collapsedPrepDepts = allCollapsed ? new Set() : new Set(present);
-  renderProjectBody();
-}
-
-function renderProjectPreproduction(body){
-  const p = currentProject();
-  /* EVERY entry on the project, with NO filtering. A filter is wanted later and is
-     explicitly not part of this phase — there is deliberately no filter here and no
-     hook for one, which is also why this does not reach for projectCrewFilter or
-     buildProjectCrewGroups(). Grouping is the canonical department order and nothing
-     more. */
-  const entries = projectEntryViews(p);
-  const buckets = {};
-  entries.forEach(c=>{ const k = deptBucketKey(c.department); (buckets[k]=buckets[k]||[]).push(c); });
-  const groups = DEPARTMENTS.filter(d=>buckets[d] && buckets[d].length)
-    .map(d=>({ key:d, label:d, code:DEPARTMENT_CODES[d]||'', items:sortHoDFirst(buckets[d]) }));
-
-  let listHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
-  let rightHeaderHTML = '';
-  if(groups.length){
-    const groupsCSV = groups.map(g=>g.key).join(',');
-    if(groups.length>1){
-      const allCollapsed = groups.every(g=>collapsedPrepDepts.has(g.key));
-      rightHeaderHTML = `<span class="crew-header-expandall" onclick="toggleAllPrepDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
-    }
-    listHTML = `<div class="tablewrap">${groups.map(g=>{
-      const collapsed = collapsedPrepDepts.has(g.key);
-      return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectPrepDeptCollapse('${g.key}')`, g.code)
-        + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(prepRowHTML).join('')}</div>`;
-    }).join('')}</div>`;
-  }
-
-  body.innerHTML = `
-    <div class="section">
-      <h2>Pre-production</h2>
-      <div class="hint" style="margin-bottom:10px;">Prep days are not shoot days — nothing here reaches a call sheet or an export. The rate is the same one the Roles view and Budget use.</div>
-      ${crewToolbarHTML('', '', rightHeaderHTML)}
-      ${listHTML}
-    </div>`;
-  // No body.oninput autosave here: both fields commit on `onchange` through their own
-  // save (saveEntryRate / setPrepDays), the same way the Roles view's Rate field does.
-  body.oninput = null;
 }
 
 /* ---------- Project Locations ---------- */
