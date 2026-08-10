@@ -492,13 +492,14 @@
   .roles-grid-rate{white-space:nowrap;}
   .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .roles-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
-  .roles-grid-row{padding:8px 0;}
-  .roles-grid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
+  /* ⚠️ REMOVED in Phase BK: .roles-grid-row / .roles-grid-row-editing / .roles-grid-editform.
+     The Roles list is person BLOCKS now — .person-block owns the spacing, the editing
+     tint (.person-block-editing) and the expansion box (.pb-editform), for all six
+     sub-tabs at once instead of one set of rules per tab. */
   .roles-grid-controls{display:flex; align-items:center; gap:0;}
   .roles-grid-name{min-width:0; font-family:var(--body); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .roles-grid-cell{min-width:0;}
   .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .roles-grid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
   /* Phase BD — the Pre-production row, since Phase BJ a Crew sub-tab (T-2.9). Same
      grid idiom as .roles-grid: Controls (bulk-select only, no Edit pencil — this tab
      has no crew-record edit path of its own) | Name | Role | the two bare number
@@ -520,7 +521,6 @@
      and made that row taller than its neighbours. */
   .prep-cell .roles-inline{flex-wrap:nowrap;}
   .prep-cell .role-chip{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .prep-grid-row{padding:8px 0;}
   .prep-cell{min-width:0;}
   /* names match every other list in the app: Jost 600 14px (Phase Style Review) */
   .prep-name{font-family:var(--body); font-weight:600; font-size:var(--fs-name);
@@ -625,7 +625,6 @@
   .crewgrid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
   /* No rule between people — the department heading does the dividing (Fonts Review) */
   .crewgrid-row{padding:8px 0;}
-  .crewgrid-row-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
   .crewgrid-row-name{min-width:0;}
   .crewgrid-row-name .icon-btn{margin-left:0; margin-right:2px;}
   .crewgrid-check{display:flex; justify-content:center;}
@@ -653,6 +652,34 @@
     cursor:pointer; text-align:right;}
   .all-toggle-btn:hover{color:var(--tape); border:none;}
   .crewgrid-editform{grid-column:1/-1; margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--panel);}
+
+  /* ---- Phase BK/BL — the person block ----
+     One card per person on every Crew sub-tab: a name line carrying that person's
+     PERSON-level facts, then their role entries stacked beneath it. Every row inside
+     is still the tab's own grid class (.roles-grid / .crewgrid / .prep-grid) with
+     explicit grid-column placement, so the columns still read straight down the page
+     exactly as they did when the list was flat — that alignment is the whole point.
+     Deliberately no border, no fill and no divider of its own on desktop: the
+     department heading already does the grouping (Fonts Review), and the Crew tab is
+     the one place in this app where drawn-on lines were measured as a problem. */
+  .person-block{padding:6px 0;}
+  .person-block-editing{background:var(--tint-2); border-radius:8px; padding:8px;}
+  .person-block .pb-head{padding:0;}
+  .pb-role-row{padding:2px 0;}
+  /* the stack reads as belonging to the name above it */
+  .pb-role-cell{padding-left:20px;}
+  /* the collapsed line's chevron + muted "+N". WEIGHT is the whole signal, the same
+     convention as .role-add-marker and .prep-cal-btn — not a second visual language.
+     Renders at all only when something is actually hidden. */
+  .pb-toggle{display:inline-flex; align-items:center; gap:3px; cursor:pointer; user-select:none;
+    color:var(--muted); font-family:var(--body); font-size:var(--fs-meta); line-height:1; flex:0 0 auto;}
+  .pb-toggle:hover{color:var(--tape);}
+  .pb-caret{font-size:9px;}
+  /* the crew Edit/View expansion, shared by all six sub-tabs' blocks. Same treatment as
+     the .roles-grid-editform / .crewgrid-editform it replaces, minus the grid-column —
+     it is a sibling of the rows now, not a cell inside one. */
+  .pb-editform{margin-top:8px; border:1px solid var(--tape); border-radius:var(--box-radius);
+    padding:var(--box-pad); background:var(--panel);}
 
   /* scrollable wrapper for wide preview tables */
   .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -2px;}
@@ -966,7 +993,6 @@
       font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:3px;
     }
     .roles-grid-showas{white-space:normal;}
-    .roles-grid-editform{margin-top:10px;}
     .tablewrap:has(.roles-grid){overflow-x:visible;}
     /* Phase BD — the Pre-production row stacks into a card the same way, and for the
        same reason: four columns do not survive a phone width. The fields keep their
@@ -989,6 +1015,16 @@
     .tablewrap:has(.prep-grid){overflow-x:visible;}
     /* the crew grid no longer needs to scroll sideways once it's stacked */
     .tablewrap:has(.crewgrid){overflow-x:visible;}
+    /* Phase BK — on mobile the PERSON BLOCK is the card, so the three grids inside it
+       drop the card treatment they each carry on their own above; otherwise every
+       block would render as a card full of cards. */
+    .person-block{border:1px solid var(--line); border-radius:10px; padding:12px;
+      margin-bottom:10px; background:var(--panel);}
+    .person-block .crewgrid, .person-block .roles-grid, .person-block .prep-grid{
+      border:none; border-radius:0; padding:0; margin-bottom:0; background:none;}
+    .person-block .pb-role-row{margin-top:6px;}
+    .pb-role-cell{padding-left:0;}
+    .person-block .pb-editform{margin-top:10px;}
 
     /* --- position assignment rows (stacking handled by the shared rule above) --- */
     .posn-dept-badge{justify-self:start; padding:5px 10px;}
@@ -1700,13 +1736,13 @@ async function quickSetCoPro(crewId, selectEl){
 function crewIdentityHTML(c, opts){
   opts = opts||{};
   const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
-  // bulk-select mode swaps the "view" toggle for a plain checkbox (Crew on this project)
-  // Phase BF — an entry view selects itself; a person view selects all of that
-  // person's entries at once (see crewIsSelected/toggleCrewPersonSelected).
-  const selCheckedAttr = c.crewId ? (projectCrewSelected.has(c.id)?'checked':'') : (crewIsSelected(c.id)?'checked':'');
-  const selToggle = c.crewId ? `toggleCrewSelected('${c.id}', this.checked)` : `toggleCrewPersonSelected('${c.id}', this.checked)`;
-  const viewOrSelect = opts.bulkSelect
-    ? `<input type="checkbox" class="bulk-select-cb" ${selCheckedAttr} onclick="event.stopPropagation()" onchange="${selToggle}" title="Select">`
+  /* opts.selectCbHTML (Phase BK) — the caller supplies the bulk-select checkbox
+     outright. ⚠️ This REPLACED opts.bulkSelect (do not look for it): every Crew-tab
+     list is one PERSON BLOCK per person now, and the ids a block's checkbox must
+     toggle are that person's currently VISIBLE entries — which only the block knows,
+     since a partial-match filter can hide some of them. The old branch built the
+     checkbox from `c` alone and had no way to express that. */
+  const viewOrSelect = opts.selectCbHTML ? opts.selectCbHTML
     : `<button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>`;
   const buttons = `
     ${viewOrSelect}
@@ -2384,7 +2420,11 @@ initApp();
      Enter    toggle (same as Space — Enter is what the hand reaches for in a list)
    Rows carrying no checkboxes (e.g. the name row above a person's catering meals)
    are skipped rather than swallowing the keypress and stranding focus. */
-const GRID_ROW_SELECTOR = '.crewgrid-row, .meal-subrow';
+/* Phase BK — `.pb-role-row` joined the list because Days on site's day checkboxes moved
+   onto the role rows (a position is keyed to an entry). Rows that carry none — a Hotel
+   or Travel role row, a Roles/Pre-production one — return an empty checkbox list and are
+   skipped by the same "label-only row" rule the catering name row already relied on. */
+const GRID_ROW_SELECTOR = '.crewgrid-row, .meal-subrow, .pb-role-row';
 /* ONLY the day/meal cells — scoping to .crewgrid-check matters because a row also
    contains the bulk-select checkbox in its name cell. Counting that one made Home
    land on it instead of the first day, and threw every column index off by one, so
@@ -4299,7 +4339,11 @@ function toggleAllProjectDeptsCollapsed(deptsCSV){
   const allCollapsed = deptsPresent.every(k=>collapsedProjectDepts.has(k));
   setAllProjectDeptsCollapsed(!allCollapsed, deptsCSV);
 }
-function setCrewGridView(view){ crewGridView = view; renderProjectBody(); }
+/* ⚠️ Phase BL — the tab switch is one of the only two moments the fronted entry is
+   allowed to be recomputed (the other is a fresh load). frontedCacheMap() would notice
+   the view change on its own; dropping it here as well makes the rule explicit at the
+   place the rule is about. */
+function setCrewGridView(view){ crewGridView = view; resetFrontedEntryCache(); renderProjectBody(); }
 
 /* ============ .filter-panel-foot — shared by all three filter panels ============
    Crew database (D-1.2), Crew on this project (T-2.6) and Budget (T-6.0) each
@@ -4423,14 +4467,24 @@ function sortProjectCrewGroup(list, p, days){
     case 'seniority': return list.slice().sort((a,b)=>roleSeniorityRank(a.department,a.role)-roleSeniorityRank(b.department,b.role)||byName(a,b));
     case 'company': return list.slice().sort((a,b)=>(a.coProductionCompany||'￿').localeCompare(b.coProductionCompany||'￿')||byName(a,b));
     case 'daysCount': {
-      // entry view → that entry's days; person view → the deduplicated union
+      // Phase BK — the list is PERSON BLOCKS now, so this is the deduplicated union of
+      // that person's entries' days (crewDayCount), never the sum of their entries.
+      // The two non-block branches are kept for any caller handing over plain entry or
+      // person views. ⚠️ Phase AO's grain trap: entryDayCount would double a two-role
+      // person who works both roles on the same day.
       const pj = currentProject();
-      const dayCount = c => c.crewId ? entryDayCount(c.id, days) : crewDayCount(c.id, days, pj);
+      const dayCount = c => c.isPersonBlock ? crewDayCount(personIdOf(c), days, pj)
+                          : c.crewId ? entryDayCount(c.id, days) : crewDayCount(c.id, days, pj);
       return list.slice().sort((a,b)=>dayCount(b)-dayCount(a)||byName(a,b));
     }
     case 'added': {
+      // Phase BK — a person joined the project when their FIRST entry did, not when
+      // their highest-seniority one did, so a block ranks on its earliest entry.
       const order = projectEntries(p).map(e=>e.id);
-      return list.slice().sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
+      const idx = c => c.isPersonBlock
+        ? Math.min(...c.entries.map(e=>order.indexOf(e.id)))
+        : order.indexOf(c.id);
+      return list.slice().sort((a,b)=>idx(a)-idx(b));
     }
     case 'dept':
     default: return sortHoDFirst(list);
@@ -4497,12 +4551,16 @@ function buildProjectCrewGroups(list, p, days){
       .map(key=>({key, label:key, code:DEPARTMENT_CODES[meta[key].dept]||'', items:bySort(meta[key].items)}));
   }
   if(gb==='daysOnSite'){
+    // Phase BK — a PERSON BLOCK is on a day if ANY of its entries is (crewOnDay, the
+    // person-level signal), so a two-role person lands in that day's bucket once.
+    const isOn = (c, d) => c.isPersonBlock ? crewOnDay(personIdOf(c), d, p)
+                         : c.crewId ? entryOnDay(c.id, d) : crewOnDay(c.id, d, p);
     const buckets = {};
     (days||[]).forEach(d=>{
-      const onDay = list.filter(c=>c.crewId ? entryOnDay(c.id, d) : crewOnDay(c.id, d, p));
+      const onDay = list.filter(c=>isOn(c, d));
       if(onDay.length) buckets[`Day ${d.dayNum||'?'}`] = onDay;
     });
-    const notOn = list.filter(c=>!(days||[]).some(d=>c.crewId ? entryOnDay(c.id, d) : crewOnDay(c.id, d, p)));
+    const notOn = list.filter(c=>!(days||[]).some(d=>isOn(c, d)));
     if(notOn.length) buckets['Not on any shoot day'] = notOn;
     const keys = (days||[]).map(d=>`Day ${d.dayNum||'?'}`).filter(k=>buckets[k]).concat(notOn.length?['Not on any shoot day']:[]);
     return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
@@ -4610,10 +4668,11 @@ function projectCrewFilterPanelHTML(assignedAll, days){
     })}
   </div>`;
 }
-function toggleCrewSelected(id, checked){
-  if(checked) projectCrewSelected.add(id); else projectCrewSelected.delete(id);
-  renderProjectBody();
-}
+/* ⚠️ REMOVED in Phase BK (do not look for it): toggleCrewSelected(entryId, checked),
+   the single-ENTRY select toggle. Every Crew-tab list is one PERSON BLOCK per person
+   now, so there is no single-entry checkbox left in the UI to call it —
+   toggleCrewPersonSelected() (with the block's visible entry ids) and
+   toggleSelectAllFilteredCrew() are the only two ways into projectCrewSelected. */
 /* Select all (Phase T item 2) — idsCSV is always exactly the currently-filtered/visible
    crew ids (see renderProjectCrew), never the full project roster, so this only ever
    selects what the active filter is showing right now. */
@@ -4633,9 +4692,25 @@ function clearCrewSelection(){ projectCrewSelected.clear(); bulkEditOpen = false
    phase. Callers still own their own field-specific mutation — this only answers
    "which ids", so a single loop + one save/render per call site covers every field
    without a per-field bulk-edit implementation. */
+/* ⚠️ Phase BL narrowed the fan-out. It used to return EVERY selected entry id; it now
+   returns the edited entry plus ONE entry per other selected PERSON — that person's
+   FRONTED entry, i.e. the one actually on screen. A collapsed multi-role person shows
+   one line, and a bulk rate/day edit must not silently rewrite a role the user cannot
+   see. Deliberately NARROWER than BK's person-level rule: the person-level fields
+   (hotel, travel, catering, Show as) still go through selectedCrewTargets() and still
+   cover the whole person, unchanged. */
 function selectedEditTargets(entryId){
-  if(projectCrewSelected.size>1 && projectCrewSelected.has(entryId)) return [...projectCrewSelected];
-  return [entryId];
+  if(!(projectCrewSelected.size>1 && projectCrewSelected.has(entryId))) return [entryId];
+  const p = currentProject(), days = projectDays();
+  const self = entryById(entryId, p);
+  const out = [entryId], seen = new Set(self ? [self.crewId] : []);
+  projectCrewSelected.forEach(id=>{
+    const e = entryById(id, p);
+    if(!e || seen.has(e.crewId)) return;
+    seen.add(e.crewId);
+    out.push(bulkTargetEntryId(e.crewId, e, p, days));
+  });
+  return out;
 }
 /* ---- Phase BF: one Set, two currencies ----
    projectCrewSelected always holds ENTRY ids — it is module-level and deliberately
@@ -4651,10 +4726,14 @@ function selectedEditTargets(entryId){
 function crewIsSelected(crewId){
   return entriesForCrew(crewId, currentProject()).some(e=>projectCrewSelected.has(e.id));
 }
-function toggleCrewPersonSelected(crewId, checked){
-  entriesForCrew(crewId, currentProject()).forEach(e=>{
-    if(checked) projectCrewSelected.add(e.id); else projectCrewSelected.delete(e.id);
-  });
+/* `entryIdsCSV` (Phase BK) — the person-block checkbox passes this person's VISIBLE
+   entry ids, so under a partial-match filter selecting a block selects exactly the rows
+   the block is showing. Called with no third argument (every pre-BK caller) it still
+   covers all of that person's entries, unchanged. */
+function toggleCrewPersonSelected(crewId, checked, entryIdsCSV){
+  const ids = entryIdsCSV ? entryIdsCSV.split(',').filter(Boolean)
+                          : entriesForCrew(crewId, currentProject()).map(e=>e.id);
+  ids.forEach(id=>{ if(checked) projectCrewSelected.add(id); else projectCrewSelected.delete(id); });
   renderProjectBody();
 }
 function selectedCrewTargets(crewId){
@@ -4667,6 +4746,169 @@ function selectedCrewTargets(crewId){
 }
 /* the person behind a row, whichever kind of view it is */
 const personIdOf = (c) => c.crewId || c.id;
+
+/* ============ Phase BK — person blocks ======================================
+   Every Crew sub-tab now renders ONE CARD PER PERSON: a name line carrying that
+   person's PERSON-level facts (hotel nights, travel method, meals, Show as — all of
+   them keyed to crewId, which is exactly why a flat per-entry list had nowhere
+   natural to put them), with that person's role ENTRIES stacked beneath it.
+
+   Display layer only. Nothing is written, nothing is stored, `p.crewEntries` is
+   untouched, and every consumer outside this tab's six row renderers — Budget, all
+   four exports, the call sheet, the WhatsApp text — still sees every entry.
+
+   The block object is itself shaped like the entry view of the person's
+   HIGHEST-SENIORITY role, with the (already filtered) entry list hung off it as
+   `.entries`. That is entryView()'s own trick one level up: every existing sort,
+   group and identity helper keeps reading `.id`/`.name`/`.role`/`.department`
+   unchanged and simply ranks the person by their top role — which is what BK asked
+   for, via the EXISTING roleSeniorityRank(), with no second seniority concept.
+   `.crewId` is the person, so personIdOf() still returns the crew id. */
+function seniorityRankOf(c){
+  const r = roleSeniorityRank(c.department, c.role);
+  return r===Infinity ? Number.MAX_SAFE_INTEGER : r;   // Infinity-Infinity is NaN
+}
+function topSeniorityEntry(entries){
+  return entries.slice().sort((a,b)=>seniorityRankOf(a)-seniorityRankOf(b))[0];
+}
+function buildPersonBlocks(entryViews){
+  const order = [], byPerson = new Map();
+  (entryViews||[]).forEach(v=>{
+    if(!byPerson.has(v.crewId)){ byPerson.set(v.crewId, []); order.push(v.crewId); }
+    byPerson.get(v.crewId).push(v);
+  });
+  return order.map(crewId=>{
+    const entries = byPerson.get(crewId);
+    return Object.assign({}, topSeniorityEntry(entries), { crewId, entries, isPersonBlock:true });
+  });
+}
+
+/* ============ Phase BL — the fronted entry ==================================
+   A multi-role person's stack collapses to ONE LINE showing ONE REAL ENTRY — never a
+   synthesised summary, so whatever rate/days that line shows are that entry's own
+   honest numbers.
+
+   Fronted = most days IN THE CURRENT PHASE (whichever crewGridView is active), ties
+   broken by ROLE_SENIORITY via roleSeniorityRank(), remaining ties by roster order
+   (Array#sort is stable). "Days in the current phase" is:
+     'preprod'      → prepDaysOf(entryId)  — that tab's own authoritative day count
+     everything else → entryDayCount()     — the shoot-day-worked signal
+                                             ((d.positions||[]).some(pos=>pos[0]===entryId))
+   ⚠️ ROLES resolves to that same shoot-day signal. Confirmed against the code rather
+   than assumed: the Roles grid is Name / Role / Rate / Show as and carries no day
+   dimension of its own at all, and entryOnDay()/d.positions is the ONLY per-entry
+   "days" that exists outside Pre-production's p.prepSchedule. So Roles fronts exactly
+   as Days on site does. ⚠️ entryDayCount(), never crewDayCount() — fronting is a
+   choice BETWEEN a person's entries, so the person-level union would rank them all
+   equal (the Phase AO grain trap, in the direction that silently does nothing).
+
+   ⚠️ RECOMPUTED ON LOAD AND TAB-SWITCH ONLY — NEVER ON AN EDIT. Almost every field on
+   these tabs re-renders the whole tab body on save (setPrepDays, saveEntryRate,
+   toggleCrewOnDay, toggleMeal…), so computing this inline would re-front — and
+   visibly re-order — the row the user just typed into. The choice is memoised per
+   person for as long as (crewGridView, project) hold; setCrewGridView() drops the
+   cache and a fresh load starts with none. A cached choice that is no longer among
+   the person's VISIBLE entries (a filter has hidden it) is re-picked, which is what
+   makes a partial-match filter front the right row. Nothing here touches a record. */
+let frontedEntryCache = { view:null, projectId:null, map:new Map() };
+function frontedCacheMap(){
+  if(frontedEntryCache.view!==crewGridView || frontedEntryCache.projectId!==currentProjectId){
+    frontedEntryCache = { view:crewGridView, projectId:currentProjectId, map:new Map() };
+  }
+  return frontedEntryCache.map;
+}
+function resetFrontedEntryCache(){ frontedEntryCache = { view:null, projectId:null, map:new Map() }; }
+function phaseDaysOfEntry(entryId, p, days){
+  if(crewGridView==='preprod') return prepDaysOf(entryId, p) || 0;
+  return entryDayCount(entryId, days);
+}
+/* works on entry views AND on raw p.crewEntries records — both carry id/role/department */
+function pickFrontedEntry(entries, p, days){
+  return entries.slice().sort((a,b)=>
+      (phaseDaysOfEntry(b.id, p, days) - phaseDaysOfEntry(a.id, p, days))
+   || (seniorityRankOf(a) - seniorityRankOf(b))
+  )[0];
+}
+/* the fronted entry of a block being rendered — memoised, re-picked if the cached
+   choice is not among this block's currently visible entries */
+function frontedEntryOfBlock(block, p, days){
+  const entries = block.entries;
+  if(entries.length<2) return entries[0];
+  const map = frontedCacheMap();
+  const cached = map.get(block.crewId);
+  if(cached){ const hit = entries.find(e=>e.id===cached); if(hit) return hit; }
+  const best = pickFrontedEntry(entries, p, days);
+  map.set(block.crewId, best.id);
+  return best;
+}
+/* a person's entries that are CURRENTLY ON SCREEN — the same entry-grain filter test
+   renderProjectCrew() builds the blocks from, so this can't drift from what is rendered. */
+function visibleEntriesForPerson(crewId, p){
+  return entriesForCrew(crewId, p).map(entryView).filter(Boolean).filter(personMatchesProjectFilter);
+}
+/* the entry a bulk edit may write to for a person who is NOT the row being edited.
+   ⚠️ It is picked from the entries that are BOTH selected AND currently visible, never
+   from the cache alone. Caught in testing: projectCrewSelected and the fronted-entry
+   cache both survive a filter change, so a person selected while unfiltered — or simply
+   rendered earlier under a different filter — could otherwise have a bulk edit land on
+   an entry that is no longer on screen, which is precisely what BL forbids. The cached
+   choice is honoured only when it is still in that pool, so the on-screen row and the
+   edit target are the same thing by construction. */
+function bulkTargetEntryId(crewId, fallbackEntry, p, days){
+  const pool = visibleEntriesForPerson(crewId, p).filter(v=>projectCrewSelected.has(v.id));
+  if(!pool.length) return fallbackEntry.id;
+  if(pool.length===1) return pool[0].id;
+  const cached = frontedCacheMap().get(crewId);
+  if(cached && pool.some(v=>v.id===cached)) return cached;
+  return pickFrontedEntry(pool, p, days).id;
+}
+
+/* ---- the block's shared chrome ---- */
+/* "Bulk select means the person" (BK) expressed in the ONE currency
+   projectCrewSelected has ever held — entry ids. Routes through the existing
+   toggleCrewPersonSelected(); no second selection model. Under a partial-match filter
+   it carries this person's VISIBLE entry ids only, which is what the block is showing. */
+function personBlockSelectCbHTML(block){
+  const ids = block.entries.map(e=>e.id);
+  const checked = ids.some(id=>projectCrewSelected.has(id));
+  return `<input type="checkbox" class="bulk-select-cb" ${checked?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewPersonSelected('${block.crewId}', this.checked, '${ids.join(',')}')" title="Select">`;
+}
+const personBlockDomId = (block) => `pb-${crewGridView}-${block.crewId}`;
+/* the collapsed line's chevron + muted "+N". Renders NOTHING when there is nothing
+   hidden — a genuine single-role person, and a two-role person a filter has reduced to
+   one visible entry, both get no chevron at all. */
+function personBlockToggleHTML(block, hiddenCount, open){
+  if(hiddenCount<1) return '';
+  return `<span class="pb-toggle" onclick="event.stopPropagation();togglePersonBlockStack('${personBlockDomId(block)}')" title="Show this person's other roles on this project"><span class="pb-caret">${open?'▾':'▸'}</span><span class="pb-more"${open?' style="display:none;"':''}>+${hiddenCount}</span></span>`;
+}
+/* ⚠️ DOM-only, deliberately: BL keeps NO open/closed state anywhere — not persisted,
+   not on a record, not even a module-level Set — so every block opens closed on every
+   render and this flips the rows in place rather than re-rendering. Same
+   direct-DOM-instead-of-re-render idiom applyBlockState()/prepDragApply() already use. */
+function togglePersonBlockStack(domId){
+  const wrap = document.getElementById(domId); if(!wrap) return;
+  const open = wrap.getAttribute('data-open')==='1';
+  wrap.setAttribute('data-open', open ? '0' : '1');
+  wrap.querySelectorAll('.pb-role-extra').forEach(el=>{ el.style.display = open ? 'none' : ''; });
+  const caret = wrap.querySelector('.pb-caret'); if(caret) caret.textContent = open ? '▸' : '▾';
+  const more  = wrap.querySelector('.pb-more');  if(more)  more.style.display = open ? '' : 'none';
+}
+/* the wrapper every one of the six sub-tabs' blocks ends in. `expansionHTML` is passed
+   rather than derived so Pre-production can keep having no crew-record edit path. */
+function personBlockWrapHTML(block, inner, opts){
+  opts = opts||{};
+  return `<div class="person-block${opts.editing?' person-block-editing':''}${opts.extraClass?' '+opts.extraClass:''}" id="${personBlockDomId(block)}" data-open="${opts.open?'1':'0'}">
+    ${inner}${opts.expansionHTML||''}
+  </div>`;
+}
+/* the role chip alone, no "+" marker. Days on site / Hotel / Travel / Catering never
+   carried the roles menu and BK does not hand it to them — that is BM's territory.
+   Roles and Pre-production keep roleBannerHTML() (chip + AZ's marker) exactly as they
+   already had it. */
+function roleChipHTML(c){
+  return c.role ? `<span class="role-chip active" title="${esc(c.role)}">${esc(c.role)}</span>`
+                : '<span class="hint">—</span>';
+}
 /* ⚠️ This clears BOTH the roster entries and every shoot day's `positions` (via
    removeCrewEntries(), Phase BF), the same two
    places removeCrewFromProject() has always cleared. Removing only the roster slot left a
@@ -4793,15 +5035,22 @@ function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='',
 function renderProjectCrew(body){
   const p = currentProject();
   const days = projectDays();
-  // Roles and Days on site are ENTRY-level (role, rate and days all live on an entry);
-  // Hotel, Travel and Catering are PERSON-level and must show one row per human, so they
-  // render the deduplicated projectCrew() list instead. With one entry per person the two
-  // lists are identical, which is why this reads the same as it did before BF.
-  const entryLevel = crewGridView==='roles' || crewGridView==='days' || crewGridView==='preprod';
-  const assigned = entryLevel ? projectEntryViews(p) : projectCrew(p);
+  /* ⚠️ Phase BK replaced BF's `entryLevel` split (do not look for it). Every view is
+     now built the same way: filter at ENTRY grain — the grain the roster actually has,
+     and the grain every filter criterion (department, role, company, days) is really
+     about — then group the survivors into ONE BLOCK PER PERSON. Roles/Pre-production/
+     Days on site keep exactly the rows they had; Hotel/Travel/Catering stop needing
+     the deduplicated projectCrew() list, because the block IS the deduplication and it
+     carries the person's entries with it instead of throwing them away.
+
+     Partial-match filtering falls out of this for free (decided 10 Aug 2026): a block
+     shows ONLY the entries that matched, non-matching ones are genuinely absent, and a
+     person with no matching entry has no block at all. Person-level facts on the name
+     line are unaffected — they are keyed to crewId and never filtered by role. */
+  const assigned = projectEntryViews(p);
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   const unassigned = crewDB.filter(c=>!onProject.has(c.id));
-  const filtered = assigned.filter(personMatchesProjectFilter);
+  const filtered = buildPersonBlocks(assigned.filter(personMatchesProjectFilter));
 
   const viewLabels = {roles:'Roles', preprod:'Pre-production', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
@@ -4827,11 +5076,11 @@ function renderProjectCrew(body){
     const groupsCSV = groups.map(g=>g.key).join(',');
     // Select all (item 2) only ever acts on `filtered` — whatever the active filter
     // is currently showing, never every crew member on the project.
-    // Phase BF — the selection Set is always entry ids, so a person-level view expands
-    // each visible human back to their entries before offering "Select all".
-    const filteredEntryIds = entryLevel
-      ? filtered.map(c=>c.id)
-      : filtered.flatMap(c=>entriesForCrew(c.id, p).map(e=>e.id));
+    // Phase BF — the selection Set is always entry ids. Phase BK — every view is one
+    // block per person now, so "what is visible" is simply each block's own entries;
+    // under a partial-match filter that is deliberately the VISIBLE ones, not all of
+    // a person's, so Select all can never select a row that isn't on screen.
+    const filteredEntryIds = filtered.flatMap(b=>b.entries.map(e=>e.id));
     const filteredIdsCSV = filteredEntryIds.join(',');
     const allFilteredSelected = filteredEntryIds.length>0 && filteredEntryIds.every(id=>projectCrewSelected.has(id));
     selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
@@ -4937,25 +5186,39 @@ function renderProjectCrew(body){
     ? () => scheduleAutosave('hotelCosts', () => saveHotelCosts())
     : null;
 }
-/* Roles tab row (Phase S, reordered Phase Z) — tidy grid columns: CONTROLS | Name | Role | Rate | Show as.
-   Department was dropped in Phase Z (redundant with the group headers); Rate is the same
-   per-entry day rate as Budget's Per Person view (resolveEntryRate/saveEntryRate).
-   "Add a saved role" and Lead Company both live only in the Edit/pencil expansion (crewFormHTML)
-   or the bulk-edit panel — neither appears on this main row. Phone is not shown here either. */
-function crewRolesRowHTML(c){
-  const isEditing = editingCrewId===c.id;
-  const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
-  const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
-  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
-  const rate = resolveEntryRate(c.id, currentProject());
-  return `<div class="roles-grid roles-grid-row ${isEditing?'roles-grid-row-editing':''}">
-    <div class="roles-grid-controls">${selectCb}${editBtn}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}${copyBadge}</div>
-    <div class="roles-grid-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(c)}</span></div>
-    <div class="roles-grid-cell roles-grid-rate" data-label="Rate"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${c.id}', this.value)">${crewRateSaveIconHTML(c.id, 'r')}</span></div>
-    <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(c)}</div>
-    ${crewExpansionHTML(c, 'roles-grid-editform')}
+/* Roles tab PERSON BLOCK (Phase S/Z columns; regrouped Phase BK, collapsible Phase BL).
+   ⚠️ Takes a PERSON BLOCK now, not a single entry view — one card per person.
+     name line  — controls (block checkbox + Edit pencil) | Name | Show as (person-level:
+                  showAs lives on the crew record, one person one display name)
+     role rows  — Role | Rate, one per ENTRY, in the SAME .roles-grid columns as the
+                  name line and the header row, so the Rate column still reads straight
+                  down the page exactly as it did when the list was flat.
+   Rate is still the per-entry day rate Budget's Per Person view uses
+   (resolveEntryRate/saveEntryRate). "Add a saved role" and Lead Company still live only
+   in the Edit/pencil expansion or the bulk-edit panel. There is deliberately NO
+   per-person total: no rate × days, no roll-up, nothing summed. */
+function crewRolesRowHTML(block){
+  const p = currentProject(), days = projectDays();
+  const fronted = frontedEntryOfBlock(block, p, days);
+  const rest = block.entries.filter(e=>e.id!==fronted.id);
+  const isEditing = editingCrewId===block.id;
+  const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${block.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
+  const copyBadge = (block._copyOriginalRole!==undefined && block.role===block._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
+  const head = `<div class="roles-grid pb-head">
+    <div class="roles-grid-controls">${personBlockSelectCbHTML(block)}${editBtn}</div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}${copyBadge}</div>
+    <div class="roles-grid-cell" data-label="Show as" style="grid-column:5;">${showAsQuickEditHTML(block)}</div>
   </div>`;
+  const roleRow = (e, extra) => {
+    const rate = resolveEntryRate(e.id, p);
+    return `<div class="roles-grid pb-role-row${extra?' pb-role-extra':''}"${extra?' style="display:none;"':''}>
+      <div class="roles-grid-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
+      <div class="roles-grid-cell roles-grid-rate" data-label="Rate" style="grid-column:4;"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>
+    </div>`;
+  };
+  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  return personBlockWrapHTML(block, head + stack,
+    { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
 /* "Show as" — a purely cosmetic override shown on the call sheet instead of the role
    label. The saved role/department stay untouched.
@@ -4991,67 +5254,95 @@ function groupedCrewOptionsHTML(list){
     `<optgroup label="${esc(d)}">${buckets[d].map(c=>`<option value="${c.id}">${esc(c.name)}${c.role?' ('+esc(c.role)+')':''}</option>`).join('')}</optgroup>`
   ).join('');
 }
-function crewAssignRowHTML(c, days){
-  const isEditing = editingCrewId===c.id;
-  let preCell = '';
-  if(crewGridView==='hotel' && days.length){
-    const p = currentProject() || {};
-    const inPre = (p.hotelNightBefore||[]).includes(c.id);
-    preCell = `<div class="crewgrid-check" data-day="Pre"><input type="checkbox" ${inPre?'checked':''} onchange="toggleHotelPre('${c.id}',this.checked)" title="Night before Day 1"></div>`;
+/* Days on site (T-2.2) and Hotel (T-2.3) PERSON BLOCK (Phase BK; collapsible Phase BL).
+   ⚠️ Takes a PERSON BLOCK, not a row.
+   The split between the two rows is exactly the split in the data:
+     HOTEL — nights are keyed to crewId (p.hotelNightBefore / d.hotelNights), a person
+       fact, and BF's "two roles is still one bed" rule is why. They sit on the NAME
+       LINE, which is the home a flat per-entry list never had for them. The role rows
+       carry the chips only.
+     DAYS ON SITE — a position is keyed to an ENTRY id (d.positions[i][0]), so the day
+       checkboxes, the row "All" and the remove trash all sit on the ROLE ROWS, one set
+       per entry, exactly as they behaved before BK.
+   Phase S items 6–8 still hold: no dept badge, no lead-company chooser, and role is
+   display-only here — editing role/department/Show as only ever happens on Roles. */
+function crewAssignRowHTML(block, days){
+  const p = currentProject() || {};
+  const isHotel = crewGridView==='hotel';
+  const colCount = isHotel ? days.length+1 : days.length;
+  const fronted = frontedEntryOfBlock(block, currentProject(), days);
+  const rest = block.entries.filter(e=>e.id!==fronted.id);
+  const isEditing = editingCrewId===block.id;
+  const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true,
+                     selectCbHTML:personBlockSelectCbHTML(block)};
+  let headCells = '', headRight = '';
+  if(isHotel && days.length){
+    const inPre = (p.hotelNightBefore||[]).includes(block.crewId);
+    headCells = `<div class="crewgrid-check" data-day="Pre"><input type="checkbox" ${inPre?'checked':''} onchange="toggleHotelPre('${block.crewId}',this.checked)" title="Night before Day 1"></div>`
+      + days.map(d=>{
+          const inHotel = (d.hotelNights||[]).includes(block.crewId);
+          return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${block.crewId}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
+        }).join('');
+    headRight = `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${block.crewId}','hotel')" title="Toggle all on/off for this person">All</button>`;
   }
-  const dayCells = days.map(d=>{
-    if(crewGridView==='hotel'){
-      const inHotel = (d.hotelNights||[]).includes(c.id);
-      return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
-    }
-    // default: 'days' — c is an ENTRY view here, so this is the entry's own day
-    const onDay = entryOnDay(c.id, d);
-    return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${onDay?'checked':''} onchange="toggleCrewOnDay('${c.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
-  }).join('');
-  const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
-  // Phase S item 6-8: no dept/lead-company chooser here, and role is display-only
-  // (Show-as-or-role) — editing role/department/Show-as only ever happens on the Roles tab.
-  const identOpts = {oneLine:true, showPhone:false, bulkSelect:true, hideDept:true, hideLeadPill:true, showAsOrRole:true};
-  return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${colCount};">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, identOpts)}</div>
-    ${preCell}${dayCells}
-    <div class="crewgrid-remove">
-      ${(crewGridView==='hotel'||crewGridView==='days') ? `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${c.id}','${crewGridView}')" title="Toggle all on/off for this person">All</button>` : ''}
-      ${crewGridView==='days' ? `<button class="icon-btn danger-ic" onclick="removeCrewFromProject('${c.id}')" title="Remove ${esc(c.name)} from this project" aria-label="Remove from project">${icon('trash')}</button>` : ''}
-    </div>
-    ${crewExpansionHTML(c, 'crewgrid-editform')}
+  const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${colCount};">
+    <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}</div>
+    ${headCells}
+    <div class="crewgrid-remove" style="grid-column:${colCount+2};">${headRight}</div>
   </div>`;
+  const roleRow = (e, extra) => {
+    const cells = isHotel ? '' : days.map(d=>
+      `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${entryOnDay(e.id, d)?'checked':''} onchange="toggleCrewOnDay('${e.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`
+    ).join('');
+    const right = isHotel ? '' :
+      `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
+       <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
+    return `<div class="crewgrid pb-role-row${extra?' pb-role-extra':''}" style="--daycols:${colCount};${extra?'display:none;':''}">
+      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleChipHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
+      ${cells}
+      <div class="crewgrid-remove" style="grid-column:${colCount+2};">${right}</div>
+    </div>`;
+  };
+  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  return personBlockWrapHTML(block, head + stack,
+    { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
-/* Catering: three stacked rows per person (Breakfast / Lunch / Dinner), each a
-   full day-by-day checkbox row at the same size as Days on site / Hotel — not
-   squeezed into one cell. */
-function crewCateringBlockHTML(c, days){
-  const isEditing = editingCrewId===c.id;
+/* Catering (T-2.5) PERSON BLOCK (Phase BK; collapsible Phase BL).
+   ⚠️ Takes a PERSON BLOCK. Meals are stored per PERSON per day
+   (d.cateringMeals[crewId]) — two roles is still one lunch — so the three stacked
+   Breakfast/Lunch/Dinner rows are person-level facts belonging to the name line, and
+   the role rows above them carry chips only. Each meal row is still a full day-by-day
+   checkbox row at the same size as Days on site / Hotel, not squeezed into one cell. */
+function crewCateringBlockHTML(block, days){
+  const isEditing = editingCrewId===block.id;
+  const crewId = block.crewId;
+  const fronted = frontedEntryOfBlock(block, currentProject(), days);
+  const rest = block.entries.filter(e=>e.id!==fronted.id);
   const mealRow = (mealKey, label) => {
     const cells = days.map(d=>{
-      const meals = getCateringMeals(d.id, c.id);
+      const meals = getCateringMeals(d.id, crewId);
       const checked = !!meals[mealKey];
-      return `<div class="crewgrid-check meal-cell" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleMeal('${c.id}','${d.id}','${mealKey}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}"></div>`;
+      return `<div class="crewgrid-check meal-cell" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${mealKey}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}"></div>`;
     }).join('');
     return `<div class="crewgrid meal-subrow" style="--daycols:${days.length};">
       <div class="meal-row-label-wrap">
         <span class="meal-row-label">${label}</span>
       </div>
       ${cells}
-      <div class="crewgrid-remove"><span class="meal-row-all" onclick="toggleAllMealForPerson('${c.id}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
+      <div class="crewgrid-remove" style="grid-column:${days.length+2};"><span class="meal-row-all" onclick="toggleAllMealForPerson('${crewId}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
     </div>`;
   };
-  return `<div class="crewgrid-catering-person">
-    <div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:${days.length};">
-      <div class="crewgrid-row-name">${crewIdentityHTML(c, {oneLine:true, showPhone:false, bulkSelect:true, hideDept:true, hideLeadPill:true, showAsOrRole:true})}</div>
-      ${days.map(()=>'<div></div>').join('')}
-      <div class="crewgrid-remove"></div>
-    </div>
-    ${mealRow('b','Breakfast')}
-    ${mealRow('l','Lunch')}
-    ${mealRow('d','Dinner')}
-    ${crewExpansionHTML(c, 'crewgrid-editform')}
-  </div>`;
+  const roleRow = (e, extra) => `<div class="crewgrid pb-role-row${extra?' pb-role-extra':''}" style="--daycols:${days.length};${extra?'display:none;':''}">
+      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleChipHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
+    </div>`;
+  const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${days.length};">
+      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+    </div>`;
+  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  return personBlockWrapHTML(block,
+    head + stack + mealRow('b','Breakfast') + mealRow('l','Lunch') + mealRow('d','Dinner'),
+    { editing:isEditing, open:false, extraClass:'crewgrid-catering-person',
+      expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
 async function toggleHotelNight(crewId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
@@ -5391,19 +5682,29 @@ function copyCateringSummaryGrid(){
   lines.push('', `Total catering cost: ${fmt(data.totalCost)}`);
   copyText(lines.join('\n'), 'Copied!');
 }
-function crewTravelRowHTML(c, p){
-  const current = (p.travelMethods||{})[c.id] || '';
+/* Travel (T-2.4) PERSON BLOCK (Phase BK; collapsible Phase BL).
+   ⚠️ Takes a PERSON BLOCK. Travel method is one choice per person per project
+   (p.travelMethods[crewId]) — not per role and not per day — so it sits on the name
+   line alongside the car details, and the role rows carry chips only. */
+function crewTravelRowHTML(block, p){
+  const current = (p.travelMethods||{})[block.crewId] || '';
   const opts = ['<option value="">—</option>']
     .concat(travelMethodsList.map(m=>`<option value="${esc(m)}" ${current===m?'selected':''}>${esc(m)}</option>`))
     .concat(['<option value="__add__">+ Add option…</option>']).join('');
-  const carInfo = (c.drives==='Yes' && (c.carMakeModel||c.carReg)) ? `<div class="hint">${icon('car')} ${esc([c.carMakeModel,c.carReg].filter(Boolean).join(' — '))}</div>` : '';
-  const isEditing = editingCrewId===c.id;
-  return `<div class="crewgrid crewgrid-row ${isEditing?'crewgrid-row-editing':''}" style="--daycols:1; --daycolwidth:210px;">
-    <div class="crewgrid-row-name">${crewIdentityHTML(c, {extraLine:carInfo, oneLine:true, showPhone:false, bulkSelect:true, hideDept:true, hideLeadPill:true, showAsOrRole:true})}</div>
-    <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${c.id}',this)">${opts}</select></div>
-    <div class="crewgrid-remove"></div>
-    ${crewExpansionHTML(c, 'crewgrid-editform')}
+  const carInfo = (block.drives==='Yes' && (block.carMakeModel||block.carReg)) ? `<div class="hint">${icon('car')} ${esc([block.carMakeModel,block.carReg].filter(Boolean).join(' — '))}</div>` : '';
+  const isEditing = editingCrewId===block.id;
+  const fronted = frontedEntryOfBlock(block, p, projectDays());
+  const rest = block.entries.filter(e=>e.id!==fronted.id);
+  const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:1; --daycolwidth:210px;">
+    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, selectCbHTML:personBlockSelectCbHTML(block)})}</div>
+    <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
   </div>`;
+  const roleRow = (e, extra) => `<div class="crewgrid pb-role-row${extra?' pb-role-extra':''}" style="--daycols:1; --daycolwidth:210px;${extra?'display:none;':''}">
+      <div class="crewgrid-row-name pb-role-cell"><span class="roles-inline">${roleChipHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, false)}</span></div>
+    </div>`;
+  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  return personBlockWrapHTML(block, head + stack,
+    { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
 async function setTravelMethod(crewId, selectEl){
   const value = selectEl.value;
@@ -6083,41 +6384,58 @@ function prepCounterText(days, markCount){
   return parts.join(' · ');
 }
 
-/* One ENTRY's row. Rate and days sit as two bare number fields with NO column headers
-   and NO inline labels — the decision was that magnitude alone distinguishes them.
-   Do not add labels back. The role cell reuses roleBannerHTML() exactly as the Roles
-   view has it — including the "+" marker, live since Phase BA opened the same roles
-   menu from here too, for free, since this row never had its own copy of that markup. */
-function prepRowHTML(c){
-  const p = currentProject();
-  const rate = resolveEntryRate(c.id, p);
-  const days = prepDaysOf(c.id, p);
-  const marks = prepDatesOf(c.id, p);
-  const open = prepCalendarFor===c.id;
-  const selectCb = `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewSelected('${c.id}', this.checked)" title="Select">`;
-  return `<div class="prep-grid prep-grid-row${open?' prep-grid-row-open':''}">
-    <div class="prep-cell prep-controls">${selectCb}</div>
-    <div class="prep-cell prep-name" data-label="Name" title="${esc(c.name)}">${esc(c.name)}</div>
-    <div class="prep-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(c)}</span></div>
-    <div class="prep-cell prep-fields">
-      <div class="prep-fields-row">
-        <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
-          title="Day rate — the same rate as the Roles view and Budget"
-          onclick="event.stopPropagation()" onchange="saveEntryRate('${c.id}', this.value)">
-        <input type="text" inputmode="numeric" class="budget-rate-input prep-days-input" value="${days!=null?days:''}" placeholder="—"
-          title="Pre-production days"
-          onclick="event.stopPropagation()" onchange="setPrepDays('${c.id}', this.value)">
-      </div>
-      <div class="prep-counter">${esc(prepCounterText(days, marks.length))}</div>
-    </div>
-    <div class="prep-cell prep-calcell">
-      <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
-        onclick="togglePrepCalendar('${c.id}')"
-        title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
-        aria-label="Date marks">${icon('calendar')}</button>
-    </div>
-    ${open ? `<div class="prep-calwrap">${prepCalendarHTML(c.id)}</div>` : ''}
+/* Pre-production (T-2.9) PERSON BLOCK (Phase BK; collapsible Phase BL).
+   ⚠️ Takes a PERSON BLOCK. Prep days, the entry rate and the date marks are ALL
+   entry-level (p.prepSchedule is keyed by entry id), so every one of them sits on a
+   ROLE ROW — the name line here carries nothing but the person, because this tab has
+   no person-level fact of its own. Rate and days are still two bare number fields with
+   NO column headers and NO inline labels: magnitude alone distinguishes them. Do not
+   add labels back. ⚠️ Still no totals of any kind on this screen — nothing here sums,
+   rolls up or multiplies anything, and BK/BL added none.
+   The role cell reuses roleBannerHTML() exactly as the Roles view has it, "+" marker
+   and all (live since Phase BA). */
+function prepRowHTML(block){
+  const p = currentProject(), shootDays = projectDays();
+  const fronted = frontedEntryOfBlock(block, p, shootDays);
+  const rest = block.entries.filter(e=>e.id!==fronted.id);
+  // an open date-marks calendar belonging to a stacked-away entry has to stay on
+  // screen, so the block renders open in that one case — derived from prepCalendarFor,
+  // which already exists; NOT a new piece of open/closed state.
+  const open = rest.some(e=>e.id===prepCalendarFor);
+  const head = `<div class="prep-grid pb-head">
+    <div class="prep-cell prep-controls">${personBlockSelectCbHTML(block)}</div>
+    <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
   </div>`;
+  const roleRow = (e, extra) => {
+    const rate = resolveEntryRate(e.id, p);
+    const days = prepDaysOf(e.id, p);
+    const marks = prepDatesOf(e.id, p);
+    const calOpen = prepCalendarFor===e.id;
+    return `<div class="prep-grid pb-role-row${extra?' pb-role-extra':''}${calOpen?' prep-grid-row-open':''}"${(extra&&!open)?' style="display:none;"':''}>
+      <div class="prep-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${extra?'':personBlockToggleHTML(block, rest.length, open)}</span></div>
+      <div class="prep-cell prep-fields" style="grid-column:4;">
+        <div class="prep-fields-row">
+          <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
+            title="Day rate — the same rate as the Roles view and Budget"
+            onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">
+          <input type="text" inputmode="numeric" class="budget-rate-input prep-days-input" value="${days!=null?days:''}" placeholder="—"
+            title="Pre-production days"
+            onclick="event.stopPropagation()" onchange="setPrepDays('${e.id}', this.value)">
+        </div>
+        <div class="prep-counter">${esc(prepCounterText(days, marks.length))}</div>
+      </div>
+      <div class="prep-cell prep-calcell" style="grid-column:5;">
+        <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
+          onclick="togglePrepCalendar('${e.id}')"
+          title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
+          aria-label="Date marks">${icon('calendar')}</button>
+      </div>
+      ${calOpen ? `<div class="prep-calwrap">${prepCalendarHTML(e.id)}</div>` : ''}
+    </div>`;
+  };
+  const stack = roleRow(fronted, false) + rest.map(e=>roleRow(e, true)).join('');
+  // no expansion: Pre-production has no crew-record edit path of its own (Phase BJ)
+  return personBlockWrapHTML(block, head + stack, { editing:false, open });
 }
 
 /* ---------- Project Locations ---------- */
