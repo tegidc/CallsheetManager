@@ -508,8 +508,17 @@
      packed inline row. Controls | Name | Role | Rate | Show as. */
   .roles-grid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 118px minmax(120px,1fr); align-items:center; column-gap:10px;}
   .roles-grid-rate{white-space:nowrap;}
-  .roles-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
-  .roles-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
+  .roles-grid-header-row, .prep-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
+  .roles-grid-header, .prep-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
+  /* Phase BR — RATE and DAYS over Pre-production's two bare number fields. One header
+     CELL (column 4 holds both inputs), laid out on the same flex row and the same field
+     width as .prep-fields-row below it so each label lands over its own input. */
+  .prep-header-fields{display:flex; align-items:center; gap:10px;}
+  .prep-header-fields span{width:60px; flex:0 0 auto;}
+  /* Phase BR — Name/Role are column headings on every sub-tab now, so they left-align
+     even inside .crewgrid-header, which centres its day labels. Placed after both header
+     rules deliberately: same specificity, later source wins. */
+  .pb-head-name, .pb-head-role{text-align:left;}
   /* ⚠️ REMOVED in Phase BK: .roles-grid-row / .roles-grid-row-editing / .roles-grid-editform.
      The Roles list is person BLOCKS now — .person-block owns the spacing, the editing
      tint (.person-block-editing) and the expansion box (.pb-editform), for all six
@@ -1027,23 +1036,24 @@
        cells show through above and below it. And .crewgrid-controls is widened to
        60px — 10px past its own 50px track — so the column gap behind it is covered
        too, rather than leaving a 10px slot of scrolling content between the two. */
-    .crewgrid-controls, .roles-grid-controls, .prep-controls,
-    .roles-grid-header-row .roles-grid-header:first-child{
+    .crewgrid-controls, .roles-grid-controls, .prep-controls, .pb-head-blank{
       position:sticky; left:0; z-index:2; background:var(--bg);
       align-self:stretch; width:60px;
     }
-    .crewgrid-row-name, .roles-grid-name, .prep-name,
-    .roles-grid-header-row .roles-grid-header:nth-child(2){
+    .crewgrid-row-name, .roles-grid-name, .prep-name, .pb-head-name{
       position:sticky; left:60px; z-index:2; background:var(--bg);
       align-self:stretch; display:flex; align-items:center;
       padding-right:6px; box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
     }
     /* Rows with no Controls/Name cells of their own still need the same mask, or
-       their day cells slide out into the pinned strip: the crewgrid header's corner
-       and Catering's meal-row label both SPAN the three leading columns, so they get
-       an explicit --pb-pin-w width rather than their natural 326px span; a stacked
+       their day cells slide out into the pinned strip: Catering's meal-row label and
+       the Locations day-grid header's corner both SPAN the three leading columns, so
+       they get an explicit --pb-pin-w width rather than their natural span; a stacked
        extra-role row has nothing there at all, so it grows a mask from ::before
-       (a grid container's pseudo-element is a grid item like any other). */
+       (a grid container's pseudo-element is a grid item like any other).
+       ⚠️ Since Phase BR the six Crew sub-tabs' header rows no longer use
+       .crewgrid-corner — they carry real .pb-head-blank/.pb-head-name cells that pin
+       on the rules above. Locations is the last caller of the spanning corner. */
     .crewgrid-header-row .crewgrid-corner, .meal-row-label-wrap, .pb-role-row::before{
       position:sticky; left:0; z-index:2; background:var(--bg);
       align-self:stretch; width:var(--pb-pin-w);
@@ -1082,6 +1092,7 @@
        clipping "450" to "45" in the Budget tables. */
     input.budget-rate-input{width:76px; padding:6px 7px; min-height:34px;}
     .prep-fields input.budget-rate-input{width:76px;}
+    .prep-header-fields span{width:76px;}   /* follows .prep-fields' mobile width */
     .prep-calcell{justify-content:flex-start;}
     .prep-cal{max-width:100%;}
     .prep-cal-day{height:34px;}
@@ -1321,6 +1332,22 @@ function deptBucketKey(dept){ return DEPARTMENTS.includes(dept) ? dept : 'Other'
    sharing it means the caret, code, label and count can't drift apart. `code` is
    optional — the project Crew tab can group by hotel rather than department, and
    those groups have no department code to show. */
+/* Phase BR — the three leading header cells: blank Controls | NAME | ROLE.
+   Phase BO made Controls/Name/Role the same three columns on every Crew sub-tab; this
+   makes them carry the same two labels too. Before it, Roles was the only tab that named
+   them and the other five rendered a single blank `.crewgrid-corner` spanning all three,
+   so the same column was headed on one tab and anonymous on the next.
+   ⚠️ The `cellClass` argument is the OWNING GRID's own header-cell class
+   (`roles-grid-header` / `crewgrid-header` / `prep-grid-header`) — those differ only in
+   default text-align, and `.pb-head-name`/`.pb-head-role` re-left-align the centred one.
+   ⚠️ `.pb-head-blank`/`.pb-head-name` are also the mobile pin hooks (they sit at the same
+   left offsets as `.crewgrid-controls`/`.crewgrid-row-name`), so a header row built any
+   other way will scroll out of step with its own rows. */
+function pbHeadLeadCellsHTML(cellClass){
+  return `<div class="${cellClass} pb-head-blank"></div>
+    <div class="${cellClass} pb-head-name">Name</div>
+    <div class="${cellClass} pb-head-role">Role</div>`;
+}
 function deptHeaderHTML(label, count, collapsed, onclickJS, code){
   const c = code===undefined ? (DEPARTMENT_CODES[label]||'') : code;
   return `<div class="subhead dept-toggle" onclick="${onclickJS}">
@@ -5211,9 +5238,7 @@ function renderProjectCrew(body){
     if(crewGridView==='roles'){
       // tidy columns (Phase S): CONTROLS | Name | Role | Department (reference) | Show as — one row per person, no day columns
       const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
-          <div class="roles-grid-header"></div>
-          <div class="roles-grid-header">Name</div>
-          <div class="roles-grid-header">Role</div>
+          ${pbHeadLeadCellsHTML('roles-grid-header')}
           <div class="roles-grid-header">Rate</div>
           <div class="roles-grid-header">Show as</div>
         </div>`;
@@ -5223,18 +5248,26 @@ function renderProjectCrew(body){
       }).join('');
       assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
     } else if(crewGridView==='preprod'){
-      // same entry grain and grouping as Roles — no header row on this grid,
-      // rate/days carry no column labels (see prepRowHTML())
+      /* Same entry grain and grouping as Roles. ⚠️ Phase BR added this header row —
+         Phase BD's "no header row, magnitude alone distinguishes the two numbers" was
+         overruled: an unlabelled pair of bare numbers is a guess, not a reading. RATE and
+         DAYS sit in one cell over column 4, laid out on the same flex row and the same
+         field widths as `.prep-fields-row` below it, so each label lands over its own
+         input. Column 5 (the date-marks calendar) stays unlabelled — the icon says it. */
+      const prepHeaderRow = `<div class="prep-grid prep-grid-header-row">
+          ${pbHeadLeadCellsHTML('prep-grid-header')}
+          <div class="prep-grid-header prep-header-fields"><span>Rate</span><span>Days</span></div>
+        </div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>prepRowHTML(c)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${prepHeaderRow}${groupsHTML}</div>`;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
       const travelHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:1; --daycolwidth:210px;">
-          <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;"></div>
+          ${pbHeadLeadCellsHTML('crewgrid-header')}
           <div class="crewgrid-header" style="text-align:left;">Travel method</div>
           <div class="crewgrid-header"></div>
         </div>`;
@@ -5247,7 +5280,7 @@ function renderProjectCrew(body){
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const dayHeaderRow = days.length ? `
         <div class="crewgrid crewgrid-header-row" style="--daycols:${colCount};">
-          <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;"></div>
+          ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
           ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
           <div class="crewgrid-header"></div>

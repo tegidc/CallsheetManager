@@ -155,11 +155,16 @@ Every screen needs the same handful of records. These are the single place that 
     that icon is the app's one project→database write, and this tab makes no write to
     `db:crew`. ⚠️ Phase BL: a block here renders OPEN when `prepCalendarFor` points at one of
     its stacked-away entries, so an open calendar survives its own re-render — [Crew]
-  - ⚠️ **FIELD LABELLING: rate and days are two bare number fields with NO column headers
-    and NO inline labels** — the decision was that magnitude alone distinguishes them. There
-    is no header row on this grid at all (unlike Roles', which Phase BJ's shared chrome does
-    NOT add here — the toolbar row above the grid is shared, the grid's own column headers
-    are not). Do not add them back — [Crew]
+  - ⚠️ **FIELD LABELLING — REVERSED in Phase BR (11 Aug 2026).** The original decision was
+    that rate and days are two bare number fields with NO column headers and no inline
+    labels, "magnitude alone distinguishes them", and this grid had no header row at all.
+    Overruled: an unlabelled pair of numbers is a guess, not a reading. Pre-production now
+    renders a `.prep-grid-header-row` (NAME | ROLE | RATE DAYS) like every other sub-tab.
+    RATE and DAYS share ONE header cell over column 4 — the column holds both inputs — laid
+    out by `.prep-header-fields` on the same flex row and field width as `.prep-fields-row`
+    beneath it, so each label sits over its own input at both widths. There are still no
+    INLINE labels on the fields themselves, and column 5 (the date-marks calendar) is still
+    unlabelled — the icon says it — [Crew]
   - `p.prepSchedule` — the storage. A **PARALLEL** per-project structure **keyed by ENTRY
     id**: `{ [entryId]: {days, dates[]} }`. ⚠️ Deliberately NOT a field on `p.crewEntries` —
     Phase BF settled that shape and this is a parallel, not an extension. The cost of that
@@ -4467,3 +4472,54 @@ the media query plus three caps on the overshooting controls.
   Everything in part 2 is inside the media query; part 1's pencil is the only change
   visible on desktop.
 - Zero console errors; `node --check` clean; CSS braces balanced 478/478.
+
+## Phase BR — column headers: NAME/ROLE everywhere, RATE/DAYS on Pre-production (11 Aug 2026)
+
+**"Add labels to Pre-Production 'Rate' 'Days' in the same style as on the other sub-tabs in
+this section. For consistency — add 'Name' and 'Role' to the sub-tabs that don't have it."**
+
+Phase BO made Controls/Name/Role the same three columns on all six Crew sub-tabs. Their
+HEADERS never caught up: Roles named them, and the other five rendered a single blank
+`.crewgrid-header crewgrid-corner` spanning all three, so the same column was headed on one
+tab and anonymous on the next. Pre-production had no header row at all.
+
+- `pbHeadLeadCellsHTML(cellClass)` — **new, and the only way a Crew header row should build
+  its leading cells**: blank Controls | NAME | ROLE, three real grid cells instead of one
+  spanning corner. Called by all four header rows (Roles, Pre-production, Travel, and the
+  shared day header that Days on site / Hotel / Catering use). The argument is the owning
+  grid's own header-cell class (`roles-grid-header` / `crewgrid-header` /
+  `prep-grid-header`) — those differ only in default text-align, and `.pb-head-name` /
+  `.pb-head-role` re-left-align the centred one (placed after both header rules in source:
+  same specificity, later wins) — [Crew]
+  - ⚠️ **`.pb-head-blank` / `.pb-head-name` are also the mobile pin hooks.** They sit at the
+    same left offsets (0 and 60px) as `.crewgrid-controls` / `.crewgrid-row-name`, which is
+    what keeps a scrolled header in step with its own rows. Phase BP's two `:first-child` /
+    `:nth-child(2)` selectors on `.roles-grid-header-row` are gone, replaced by these
+    classes. A header row built any other way will scroll out of step.
+  - ⚠️ `.crewgrid-corner` still exists but the six Crew sub-tabs no longer use it — the
+    **Locations day grid is its last caller** (its rows have no Controls cell; the name
+    spans all three leading columns via `.crewgrid-name-span`). The mobile `--pb-pin-w`
+    mask rule that lists it is there for Locations and Catering's meal-row label.
+- `prepHeaderRow` in `renderProjectCrew()` — Pre-production's first header row, reversing
+  Phase BD's "no header row, magnitude alone distinguishes the two numbers". RATE and DAYS
+  share ONE cell over column 4 (that column holds both inputs), laid out by
+  `.prep-header-fields` — same flex row, gap and field width as `.prep-fields-row` below,
+  so each label lands over its own input. `.prep-grid-header-row` / `.prep-grid-header` are
+  added to the existing `.roles-grid-header-row` / `.roles-grid-header` rules rather than
+  duplicated. Column 5 (the calendar) stays unlabelled — [Crew]
+
+### Verified
+
+- Header contents, all six: Roles `· Name Role Rate Show as`; Pre-production
+  `· Name Role Rate+Days`; Days on site `· Name Role D1–D6 ·`; Hotel `· Name Role Pre D1–D6 ·`;
+  Travel `· Name Role "Travel method" ·`; Catering `· Name Role D1–D6 ·`.
+- Alignment measured, not eyeballed: header cells and row cells share identical x on all six
+  sub-tabs at 1280 (355 / 421 / 601) and at 375 (20 / 80 / 201), and Pre-production's RATE
+  and DAYS labels sit at exactly the same x as the two inputs beneath them (761/831 desktop,
+  334/420 mobile).
+- Mobile scrolled to `scrollLeft:250` on Days on site: NAME pins in the header exactly as
+  the names pin in the rows, D4/D5/D6 land on their own cells, and D1–D3 hide behind the pin
+  in header and rows alike.
+- Row heights unchanged — 33px desktop, 40px mobile, all six. Locations day grid re-checked
+  (still the spanning corner, still masking correctly). Zero console errors; `node --check`
+  clean; CSS braces balanced 482/482.
