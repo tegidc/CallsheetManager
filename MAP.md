@@ -3408,10 +3408,14 @@ No second toolbar was built.
   tab") — now it is one, and that's what "becomes a Crew sub-tab" means. Verified both
   directions live: collapsing Cinematography on Pre-production collapses it on Roles, and
   the reverse.
-- The one piece of Pre-production-specific copy that survived — the hint line ("Prep days
-  are not shoot days — nothing here reaches a call sheet or an export…") — is not chrome,
-  it's content, so it stays, rendered conditionally on `crewGridView==='preprod'` right
-  below the view-switcher and above the shared toolbar row.
+- ⚠️ **REMOVED in Phase BQ follow-up (11 Aug 2026).** The one piece of Pre-production-
+  specific copy that survived this phase — the hint line ("Prep days are not shoot days —
+  nothing here reaches a call sheet or an export…"), rendered conditionally on
+  `crewGridView==='preprod'` between the view-switcher and the shared toolbar row — is
+  gone on request. The judgement here ("not chrome, it's content, so it stays") was
+  overruled: it is a standing note about a tab you look at every day, and the tab now
+  reads the same as its five siblings, with no conditional copy above the toolbar. Do not
+  reinstate it; the facts it stated are still true and still recorded in this map.
 - **Bulk-select is new on this tab** — the old standalone screen had no bulk-action bar to
   select into. `prepRowHTML()` gained a `.prep-controls` checkbox cell (identical pattern
   to `crewRolesRowHTML()`'s `selectCb`, writing into the same `projectCrewSelected` Set of
