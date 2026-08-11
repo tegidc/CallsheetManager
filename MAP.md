@@ -4284,3 +4284,111 @@ from it).
   "+ Add crew member" not visually showing its form, a shoot day's `dayTotal` not
   resyncing when a new day is added, the BL stacked-away-entry-collapses-on-save
   friction) — none touched, none fixed.
+
+## Phase BP — mobile stops stacking: every row stays a row (11 Aug 2026)
+
+**"Currently all the mobile views are stacked rather than single rows. Make them single
+rows. Ability to scroll horizontally to get to information off screen. E.g. in Budget
+view."**
+
+Every list in the app that is a ROW on desktop was being rebuilt as a stacked CARD under
+`@media(max-width:900px)` — the six Crew sub-tabs (`.crewgrid` / `.roles-grid` /
+`.prep-grid` inside `.person-block`), the Locations day grid, the shoot day's schedule
+rows, additional-location rows and position-assignment rows. The Crew cards even reflowed
+the day matrix into a wrapping row of labelled D1/D2/… chips and switched
+`.tablewrap`'s `overflow-x` off, on the reasoning that horizontal scrolling on a phone was
+worse than a long vertical one. Reversed on request: the cards broke the one thing the
+Crew tab is for (reading down a column to compare people), and a 13-person department
+became a very long scroll. **The Budget tables were the model** — they were already the
+one place that kept its columns and scrolled sideways, and they were the example given.
+
+### What changed — all CSS inside the existing `@media(max-width:900px)` block
+
+- **The stacked-card rules are gone**, not disabled: `.crewgrid`/`.roles-grid`/`.prep-grid`
+  no longer flip to `display:block` with a border/fill, `.person-block` no longer becomes
+  the card, the `.crewgrid-header-row.crewgrid-header-row{display:none}` and
+  `.roles-grid.roles-grid-header-row{display:none}` header suppressions are gone (with
+  their two specificity-tie comments — the tie they were solving no longer exists), and the
+  three `.tablewrap:has(…){overflow-x:visible}` overrides are gone so `.tablewrap` scrolls
+  at every width like it always did on desktop. The `.crewgrid-check` labelled-chip
+  treatment (`::before{content:attr(data-day)}`, solid-fill checked state, wrapping
+  margins) is gone too — the restored header row carries the day label once.
+- **`width:max-content; min-width:100%`** on the grids, `.person-block` and `.dept-group`
+  inside `.tablewrap`. Without it a row's box stops at the viewport edge while its fixed
+  columns overflow past it, so borders and the editing tint end mid-row. The trailing
+  `minmax(0,1fr)` column collapsing to 0 under `max-content` is wanted, not a side effect.
+- **Pinned leading columns.** Controls + Name are `position:sticky` (`left:0` and
+  `left:60px`), so you always know whose row you are ticking. Role is deliberately not
+  pinned. `--pb-pin-w:186px` is the shared right edge of that strip, used by the three
+  places that have no Controls/Name cell of their own and would otherwise leak content
+  into it: the crewgrid header's `.crewgrid-corner` and Catering's `.meal-row-label-wrap`
+  (both SPAN the three leading columns, so they get an explicit width instead of their
+  natural 326px), and a stacked extra-role row, which grows a mask from `.pb-role-row::before`
+  — a grid container's pseudo-element is a grid item like any other.
+  - ⚠️ Pinned cells need `align-self:stretch` and an opaque `background`. Centred grid
+    items are only as tall as their content, so the fill left day cells showing through
+    above and below it. `.crewgrid-controls` is also widened to 60px — 10px past its own
+    50px track — so the column gap behind it is covered rather than leaving a slot of
+    scrolling content between the two pinned cells.
+  - The `.person-block-editing` tint is re-composited over that opaque fill with
+    `background-image:linear-gradient(var(--tint-2),var(--tint-2))`, or an open row would
+    punch a white hole in itself.
+- **`--pb-controls-w`/`--pb-name-w`/`--pb-role-w` are re-declared inside the media query**
+  (50/126/104 vs the desktop 56/170/150). Same three Phase BO tokens, so Controls/Name/Role
+  still land at identical x across all six sub-tabs — just tighter. ⚠️ The values are not
+  arbitrary: they sum (with gaps) to **310px**, so on a 375px phone the first day column
+  pokes ~25px into view at rest. That partial cell IS the scroll cue. Push the total to 335
+  or beyond and a Days-on-site row looks like it simply has no day columns at all.
+- **The day cell IS the checkbox now** (`.crewgrid-check input{width:100%; height:34px}`),
+  a ~38x34 touch target instead of desktop's 16px box. Deliberately still the app's own
+  checkbox language (bordered box, "×" when ticked), NOT the solid-fill chip the stacked
+  layout invented — six days across thirteen people is a wall of filled blocks and much
+  harder to read down a column than a wall of ×s.
+- **`.pb-editform`/`.crewgrid-editform` are the one thing that must NOT inherit the row
+  width** — they are forms, not rows, and at ~700px every field would scroll sideways.
+  `.tablewrap` gets `container-type:inline-size` and the form gets `width:100cqw` +
+  `position:sticky; left:0`, so it is exactly the scrollport's width and stays in view
+  wherever the rows are scrolled to.
+- **`.crewgrid-name-span`** — new class, added in `locRowHTML()` (the only JS/markup change
+  in this phase). The Locations day grid's name cell has no Controls cell beside it and
+  spans all three leading columns; left alone it pinned 326px wide and swallowed the
+  screen. It pins from 0 at the same `--pb-pin-w` edge, stays `display:block` (it stacks a
+  name over an address rather than holding one flex line) and clips its address to one
+  ellipsised line.
+- **Shoot Days**: `.rows-sched`, `.rows-add` and `#rows-posn` each become their own
+  `overflow-x:auto` scrollport, rows keep desktop's columns at touch-sized widths, and the
+  schedule's label row (Time/Duration/Description) is shown again rather than hidden. The
+  reorder arrows go back to a stacked pair at 30x21 rather than a 44x44 side-by-side strip.
+  `.sched-insert-hint` stays permanently visible (touch has no hover, same reasoning as
+  before) but moved to the far left, centred on the dashed divider it acts on — always-on
+  in its desktop position, it sat on top of every Time field.
+- **`input.budget-rate-input`, not `.budget-rate-input`** — the global `input[type=text]`
+  rule outranks a bare class (0,1,1 vs 0,1,0), which is why the rate fields were rendering
+  at `width:100%` of whatever cell held them and clipping "450" to "45" in the Budget
+  tables. Pre-existing; fixed here because this phase needed those fields to hold a fixed
+  width in a scrolling row.
+
+### Deliberately left stacked
+
+**Forms.** `.grid.g2`/`.grid.g3` collapsing to one column, and the inline label columns
+going back to label-above-control, are unchanged. A form has no "information off screen" to
+scroll to — one column per field is the right answer on a phone, and turning a form into a
+horizontally-scrolling row would be a regression, not the requested change. The same goes
+for `.list-card` lists (Crew/Locations databases), which are cards on desktop too.
+
+### Verified
+
+- Live at 375x812 on all six Crew sub-tabs (Roles / Pre-production / Days on site / Hotel /
+  Travel / Catering), the Locations day grid, Shoot Days (schedule, additional locations,
+  position assignments), all four Budget views, and both databases. Header labels measured
+  against their cells (at `scrollLeft:300`, `D1..D6` at 30/78/126/174/222/270 in both the
+  header row and the data row — identical), pinned strip confirmed masking correctly,
+  a day checkbox confirmed to toggle and revert through the enlarged cell, and the edit form
+  confirmed at 335px (scrollport width) inside a 724px-wide block.
+- `document.documentElement.scrollWidth === innerWidth` on every tab — the rows scroll
+  inside their own scrollports, the page itself never does.
+- Desktop 1280x900 re-checked: `.crewgrid`/`.rows-sched` computed columns byte-identical to
+  before (`24px 30px 100px 90px 478px 34px`, insert hint still `absolute / -10px / 50px /
+  opacity 0`), Crew matrix and Shoot Days form unchanged. Everything in this phase is inside
+  the media query except the one added class name.
+- Zero console errors; `node --check` clean; CSS braces balanced 474/474.

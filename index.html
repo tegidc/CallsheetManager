@@ -915,50 +915,41 @@
     /* .ts-grid already flows and wraps; nothing to override on mobile */
     .cam-row{grid-template-columns:1fr; gap:8px;}
 
-    /* --- schedule / location / crew rows become stacked cards --- */
+    /* --- Phase BP: schedule / location / position rows stay ROWS ---
+       These used to become stacked cards (one field per line, a control strip along
+       the top). A row that is a row on desktop is now a row on a phone too: the
+       columns keep their desktop meaning and the list scrolls sideways to reach the
+       ones that don't fit, exactly the way Budget's tables already behaved. Each
+       list gets its own scrollport (.rows-sched / .rows-add / #rows-posn), and the
+       rows inside get width:max-content so their own borders and fills span the
+       whole row rather than stopping at the viewport edge. */
+    .rows-sched, .rows-add, #rows-posn{
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+    }
+    /* the insert-a-row hint hangs above its row and would be clipped by the
+       scrollport, so the schedule reserves a little padding for it */
+    .rows-sched{padding-top:8px;}
     .rows-sched .row, .rows-add .row, .crewrow-select{
-      grid-template-columns:1fr; gap:9px;
-      border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:10px;
-      background:var(--panel-2);
+      width:max-content; min-width:100%;
     }
-    /* Desktop squeezes the reorder arrows into a stacked 20x14 pair; 14px tall is
-       unusable on touch. Rather than just stacking everything (which made each row
-       nearly a full screen tall), the card uses explicit grid areas: one compact
-       control strip along the top, then the three fields. */
-    .rows-sched .row{
-      display:grid;
-      grid-template-columns:auto auto 1fr auto auto;
-      grid-template-areas:
-        "ins  move .    rm   sel"
-        "time time time time time"
-        "dur  dur  dur  dur  dur"
-        "desc desc desc desc desc";
-      gap:9px; align-items:center;
-      border-bottom:1px solid var(--line);
-    }
-    .rows-sched .row .sched-insert-hint{grid-area:ins;}
-    .rows-sched .row .sc-move{grid-area:move;}
-    .rows-sched .row .sc-select{grid-area:sel;}
-    .rows-sched .row .sc-time{grid-area:time;}
-    .rows-sched .row .sc-dur{grid-area:dur;}
-    .rows-sched .row .sc-desc{grid-area:desc;}
-    .sc-move{flex-direction:row; gap:8px;}
-    .sc-move .icon-btn{width:44px; height:44px; border:1px solid var(--line); background:var(--panel);}
-    .sc-move .ic{width:16px; height:16px;}
-    .rows-sched .row .sc-select{width:24px; height:24px; justify-self:end; margin:0;}
-    /* "insert a row here" is hover-revealed on desktop, which touch can never do —
-       so on mobile it becomes a permanently visible button in the control strip
-       rather than being dropped. Keeps mid-schedule insertion available on a phone. */
-    .sched-insert-hint{position:static; opacity:1; width:44px; height:44px;}
-    .sched-insert-hint span{width:26px; height:26px; font-size:17px;}
+    /* Slightly wider than desktop so 16px form text (the iOS no-zoom size) fits,
+       and the reorder arrows get a real tap target instead of a 20x14 sliver. */
+    .rows-sched .row{grid-template-columns:26px 34px 132px 104px 220px 42px; align-items:center;}
+    .rows-sched .row input[type=text]{padding:9px 8px; min-height:42px;}
+    .rows-sched .row .sc-select{width:20px; height:20px;}
+    .sc-move .icon-btn{width:30px; height:21px;}
+    .sc-move .ic{width:13px; height:13px;}
+    /* "insert a row here" is hover-revealed on desktop, which touch can never do,
+       so on mobile it is permanently visible. Moved out to the far left and centred
+       on the dashed divider it acts on, rather than desktop's position over the Time
+       column — always-on, it would otherwise sit on top of every time field. */
+    .sched-insert-hint{opacity:1; top:-18px; left:1px; width:20px; height:20px;}
+    .sched-insert-hint span{width:20px; height:20px; font-size:13px;}
     .sched-shift{flex-wrap:wrap; width:100%; justify-content:flex-start;}
-    /* the schedule header row of labels is meaningless once stacked */
-    .rows-sched .row:first-child{display:none;}
-    .rows-add .row .rm, .crewrow-select .rm{
-      grid-column:1/-1; justify-self:stretch; width:100%;
-    }
-    /* the schedule delete button rides in the control strip, not as a full-width bar */
-    .rows-sched .row .rm{grid-area:rm; justify-self:end; width:auto; min-width:44px; padding:10px 12px;}
+    .rows-sched .row .rm{width:42px; min-width:0; padding:0 6px;}
+    .rows-add .row{grid-template-columns:220px 220px 42px;}
+    .rows-add .row .rm, .crewrow-select .rm{width:42px; min-width:0; padding:0 6px;}
+    .crewrow-select{grid-template-columns:46px 230px 120px 42px;}
 
     /* --- tabs scroll horizontally rather than wrapping into stacks --- */
     /* The scrollbar is hidden, so without a cue a cut-off tab just looks clipped.
@@ -986,99 +977,118 @@
     .page-head{margin-bottom:14px;}
 
 
-    /* --- crew day-grid becomes stacked cards with labelled day chips on mobile ---
-       The desktop layout is a wide matrix (one column per shoot day). On a phone that
-       forces horizontal scrolling through tiny unlabelled checkboxes, so instead each
-       person becomes a card and the day cells reflow into a labelled chip row. */
-    /* the header strip carries BOTH .crewgrid and .crewgrid-header-row, so a plain
-       .crewgrid-header-row{display:none} ties on specificity with the .crewgrid rule
-       below and loses on source order — leaving a stray stack of D1/D2/D3… chips
-       above the cards. Doubling the class wins the tie without an !important. */
-    .crewgrid-header-row.crewgrid-header-row{display:none;}
-    .crewgrid{
-      display:block; border:1px solid var(--line); border-radius:10px;
-      padding:12px; margin-bottom:10px; background:var(--panel);
+    /* --- Phase BP: the six Crew sub-tabs stay a MATRIX on mobile ---
+       ⚠️ This replaces the stacked-card treatment every one of these grids used to
+       get (each person a bordered card, day cells reflowed into a wrapping row of
+       labelled D1/D2/… chips, header rows hidden, .tablewrap's overflow switched
+       off). The cards read fine in isolation but broke the one thing the Crew tab
+       is for — comparing people down a column — and made a 13-person department a
+       very long scroll. Rows now keep their desktop columns at every width and the
+       list scrolls SIDEWAYS to reach what doesn't fit, the same behaviour Budget's
+       tables already had. Header rows come back for the same reason: once the day
+       label is a column heading, it doesn't need repeating in every cell.
+
+       The leading columns tighten so more of a row is on screen before you have to
+       scroll — same three shared tokens, smaller values, so Controls/Name/Role still
+       line up across all six sub-tabs exactly as Phase BO set them. The sizes are
+       picked so the leading columns end at 310px on a 375px phone: the FIRST day
+       column then pokes ~25px into view at rest, which is the whole scroll cue.
+       Sum them to 335 or more and the row looks like it simply has no day columns. */
+    :root{--pb-controls-w:50px; --pb-name-w:126px; --pb-role-w:104px;}
+    /* width:max-content (not the scrollport's width) is what lets a row's own
+       border/fill span the WHOLE row instead of stopping at the viewport edge;
+       min-width:100% keeps a short row filling the width when it fits. The
+       trailing minmax(0,1fr) column collapses to 0 under max-content, which is
+       what we want here — spare width belongs at the end of a scrolling row. */
+    .tablewrap .crewgrid, .tablewrap .roles-grid, .tablewrap .prep-grid,
+    .tablewrap .person-block, .tablewrap .dept-group{width:max-content; min-width:100%;}
+    /* …with one exception: the edit form a person block expands into is a FORM, not
+       a row. Left to inherit the block's max-content width it would be ~700px of
+       sideways-scrolling text fields. 100cqw is the scrollport's own width (hence
+       container-type on .tablewrap), and sticky left:0 keeps the form in view
+       wherever the rows happen to be scrolled to. */
+    .tablewrap{container-type:inline-size;}
+    .pb-editform, .crewgrid-editform{position:sticky; left:0; width:100cqw;}
+    /* The department heading is narrower than the rows it labels, so it pins to the
+       left edge of the scrollport rather than sliding away as you scroll across.
+       (Its class is .subhead.dept-toggle — there is no .dept-head.) */
+    .tablewrap > .dept-toggle{position:sticky; left:0; width:calc(100% - 2px);}
+    /* THE CONTROLS + NAME COLUMNS PIN. Without this the whole point of the matrix
+       goes: you scroll right to reach D4 and no longer know whose row you are
+       ticking, or how to select/edit them. Role is NOT pinned — pinning all three
+       leading columns would leave 9px of day column on a 375px screen.
+       --pb-pin-w is exactly Controls + gap + Name, so every row-level mask below
+       lands on the same edge whatever the sub-tab. */
+    :root{--pb-pin-w:186px;}   /* 50 + 10 + 126 */
+    /* Pinned cells need an opaque fill, because rows are transparent — hence --bg,
+       with the editing tint re-composited on top via background-image so an open
+       row doesn't punch a white hole in itself. align-self:stretch, not the grid's
+       default centring: the fill has to cover the row's FULL height or the day
+       cells show through above and below it. And .crewgrid-controls is widened to
+       60px — 10px past its own 50px track — so the column gap behind it is covered
+       too, rather than leaving a 10px slot of scrolling content between the two. */
+    .crewgrid-controls, .roles-grid-controls, .prep-controls,
+    .roles-grid-header-row .roles-grid-header:first-child{
+      position:sticky; left:0; z-index:2; background:var(--bg);
+      align-self:stretch; width:60px;
     }
-    .crewgrid-row-name{margin-bottom:8px;}
-    /* The whole chip IS the toggle: the native checkbox is stretched invisibly over
-       it (still focusable, still fires change), and state is read from the chip's
-       own fill. That removes the redundant box-next-to-a-label. Sized (and squared
-       off, no border-radius) to fit up to 7 same-row chips on a phone-width screen
-       without wrapping — a full week's D1–D7 row (Phase Bulk Edit). */
-    .crewgrid-check{
-      position:relative; display:inline-flex; align-items:center; justify-content:center;
-      border:1px solid var(--line); border-radius:0; padding:0 7px;
-      margin:0 4px 4px 0; background:#fff; min-height:32px; min-width:30px;
-      transition:background-color .12s ease, border-color .12s ease;
+    .crewgrid-row-name, .roles-grid-name, .prep-name,
+    .roles-grid-header-row .roles-grid-header:nth-child(2){
+      position:sticky; left:60px; z-index:2; background:var(--bg);
+      align-self:stretch; display:flex; align-items:center;
+      padding-right:6px; box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
     }
-    .crewgrid-check::before{
-      content:attr(data-day); font-family:var(--label); font-size:11px;
-      font-weight:500; letter-spacing:.3px; color:var(--muted);
+    /* Rows with no Controls/Name cells of their own still need the same mask, or
+       their day cells slide out into the pinned strip: the crewgrid header's corner
+       and Catering's meal-row label both SPAN the three leading columns, so they get
+       an explicit --pb-pin-w width rather than their natural 326px span; a stacked
+       extra-role row has nothing there at all, so it grows a mask from ::before
+       (a grid container's pseudo-element is a grid item like any other). */
+    .crewgrid-header-row .crewgrid-corner, .meal-row-label-wrap, .pb-role-row::before{
+      position:sticky; left:0; z-index:2; background:var(--bg);
+      align-self:stretch; width:var(--pb-pin-w);
+      box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
     }
-    /* Checked state is ONE signal, not two: a filled dark chip. Earlier this also
-       drew an "×" mark alongside the darker outline, which was redundant with the
-       fill — removed (Phase Bulk Edit). */
-    .crewgrid-check:has(input:checked){background:var(--text); border-color:var(--text);}
-    .crewgrid-check:has(input:checked)::before{color:#fff; font-weight:600;}
-    /* inset:-1px, not 0 — absolute children position against the PADDING box, so
-       inset:0 would leave the chip's 1px border ring untappable */
-    .crewgrid-check input{
-      position:absolute; inset:-1px; width:auto; height:auto; margin:0;
-      opacity:0; cursor:pointer; appearance:none; -webkit-appearance:none;
+    .pb-role-row::before{content:''; grid-column:1/3;}
+    /* .crewgrid-name-span is the Locations day-grid's name cell, which has no
+       Controls cell beside it and spans all three leading columns (grid-column:1/4).
+       Left alone it would pin 326px wide and swallow the screen, so it pins from 0
+       at the same --pb-pin-w edge as everything else — and stays display:block,
+       since it stacks a name over an address rather than holding one flex line. */
+    .crewgrid-name-span{left:0; width:var(--pb-pin-w); display:block; overflow:hidden;
+      padding:2px 6px 2px 0;}
+    .crewgrid-name-span .hint{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .person-block-editing :is(.crewgrid-controls, .roles-grid-controls, .prep-controls,
+      .crewgrid-row-name, .roles-grid-name, .prep-name, .meal-row-label-wrap),
+    .person-block-editing .pb-role-row::before{
+      background-image:linear-gradient(var(--tint-2), var(--tint-2));
     }
-    .crewgrid-check:has(input:focus-visible){outline:2px solid var(--tape); outline-offset:2px;}
-    /* once the row is a card, the per-person actions belong on the left under the
-       day chips, not floated to the right edge of an empty row */
-    .crewgrid-remove{justify-content:flex-start; gap:8px; margin-top:8px;
-      padding-top:8px; border-top:1px solid var(--line);}
-    .crewgrid-remove:empty{display:none;}
-    .crewgrid-editform{margin-top:10px;}
-    /* Roles tab grid collapses the same way — stacked cards, labelled fields.
-       Two classes (not one) so this reliably beats .roles-grid's display:block
-       regardless of source order — same specificity-tie trap as .crewgrid-header-row. */
-    .roles-grid.roles-grid-header-row{display:none;}
-    .roles-grid{
-      display:block; border:1px solid var(--line); border-radius:10px;
-      padding:12px; margin-bottom:10px; background:var(--panel);
-    }
-    .roles-grid-controls{margin-bottom:6px;}
-    .roles-grid-cell{margin-bottom:8px;}
-    .roles-grid-cell::before{
-      content:attr(data-label); display:block; font-family:var(--label); font-size:10.5px;
-      font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:3px;
-    }
-    .roles-grid-showas{white-space:normal;}
-    .tablewrap:has(.roles-grid){overflow-x:visible;}
-    /* Phase BD — the Pre-production row stacks into a card the same way, and for the
-       same reason: four columns do not survive a phone width. The fields keep their
-       side-by-side pairing inside the card, since "two bare numbers" only reads
-       correctly next to each other. Still no labels on them (the data-label ::before
-       trick the Roles grid uses is deliberately NOT applied to .prep-fields). */
-    .prep-grid{
-      display:block; border:1px solid var(--line); border-radius:10px;
-      padding:12px; margin-bottom:10px; background:var(--panel);
-    }
-    .prep-cell{margin-bottom:8px;}
-    .prep-cell:last-child{margin-bottom:0;}
+    /* Bigger day cells: the desktop 16px checkbox is nowhere near a touch target,
+       so the checkbox GROWS to fill its column — the whole ~38x34 cell is the
+       control. Deliberately still the app's own checkbox (bordered box, "×" when
+       ticked), not the solid-fill chip the old stacked layout invented: six days
+       across thirteen people is a lot of rows, and a wall of filled blocks is much
+       harder to read down a column than a wall of ×s. No data-day label on the cell
+       any more either — the restored header row carries it once, at the top. */
+    .crewgrid-check input{width:100%; height:34px; border-radius:4px;}
+    .crewgrid-check input::after{font-size:22px;}
+    .meal-subrow .meal-cell input{width:100%; height:26px;}
+    .meal-subrow .meal-cell input::after{font-size:17px;}
+    /* The in-row number fields keep the 16px iOS-no-zoom size but not the 46px
+       form-control padding, which would blow a 118px Rate column wide open.
+       ⚠️ Written as input.budget-rate-input, not .budget-rate-input — the global
+       input[type=text] rule outranks a bare class (0,1,1 vs 0,1,0), which is why
+       these fields were rendering at width:100% of whatever cell held them and
+       clipping "450" to "45" in the Budget tables. */
+    input.budget-rate-input{width:76px; padding:6px 7px; min-height:34px;}
+    .prep-fields input.budget-rate-input{width:76px;}
     .prep-calcell{justify-content:flex-start;}
     .prep-cal{max-width:100%;}
     .prep-cal-day{height:34px;}
-    .tablewrap:has(.prep-grid){overflow-x:visible;}
-    /* the crew grid no longer needs to scroll sideways once it's stacked */
-    .tablewrap:has(.crewgrid){overflow-x:visible;}
-    /* Phase BK — on mobile the PERSON BLOCK is the card, so the three grids inside it
-       drop the card treatment they each carry on their own above; otherwise every
-       block would render as a card full of cards. */
-    .person-block{border:1px solid var(--line); border-radius:10px; padding:12px;
-      margin-bottom:10px; background:var(--panel);}
-    .person-block .crewgrid, .person-block .roles-grid, .person-block .prep-grid{
-      border:none; border-radius:0; padding:0; margin-bottom:0; background:none;}
-    .person-block .pb-role-row{margin-top:6px;}
-    .person-block .pb-editform{margin-top:10px;}
 
-    /* --- position assignment rows (stacking handled by the shared rule above) --- */
+    /* --- position assignment rows --- */
     .posn-dept-badge{justify-self:start; padding:5px 10px;}
-    .posn-row .posn-call{max-width:160px;}
+    .posn-row .posn-call{max-width:none;}
 
     /* --- crew identity pills wrap instead of squashing --- */
     .crew-ident-pills{gap:5px;}
@@ -6662,7 +6672,7 @@ function locRowHTML(l, days){
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleLocOnDay('${l.id}','${d.id}',this.checked)" title="${isPrimary?'Primary location — ':''}Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
   return `<div class="crewgrid crewgrid-row" style="--daycols:${days.length};">
-    <div class="crewgrid-row-name" style="grid-column:1/4;"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
+    <div class="crewgrid-row-name crewgrid-name-span" style="grid-column:1/4;"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
     ${dayCells}
     <div class="crewgrid-remove"><button class="icon-btn danger-ic" onclick="removeLocFromProject('${l.id}')" title="Remove ${esc(l.name)} from this project" aria-label="Remove from project">${icon('trash')}</button></div>
   </div>`;
