@@ -4392,3 +4392,74 @@ for `.list-card` lists (Crew/Locations databases), which are cards on desktop to
   opacity 0`), Crew matrix and Shoot Days form unchanged. Everything in this phase is inside
   the media query except the one added class name.
 - Zero console errors; `node --check` clean; CSS braces balanced 474/474.
+
+## Phase BQ — Pre-production gets the Edit pencil; one row height on mobile (11 Aug 2026)
+
+**"Add the 'edit' pencil option to Pre-production (same as Roles and Days on site) and
+match the style height of text across Roles, Pre and Days on site."**
+
+### 1. The pencil
+
+Pre-production was the one Crew sub-tab whose Controls column held a bulk-select checkbox
+and nothing else — Phase BJ's original line was "no crew-record edit path of its own", so
+the pencil was never added. In practice that read as a missing control, not a deliberate
+one: the column is the same width on all six tabs (`--pb-controls-w`), so Pre-production
+just showed a gap where every sibling tab has a pencil.
+
+`prepRowHTML()` now uses the **same pair every other sub-tab uses** —
+`crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})` for the controls
+cell and `crewExpansionHTML(block, 'pb-editform')` for the expansion, with
+`editing:editingCrewId===block.id` on the wrapper. No new edit path, no second form: it
+opens the same `crewFormHTML()` against the same crew RECORD that Roles and Days on site
+open. ⚠️ Nothing about prep days or date marks goes through it — `setPrepDays()` /
+`togglePrepCalendar()` are untouched, and the pencil does not reach them, exactly as on
+the other tabs where the pencil doesn't reach the day checkboxes.
+
+- Removed: the `// no expansion: Pre-production has no crew-record edit path of its own
+  (Phase BJ)` comment and the `{ editing:false, open }` wrapper opts. Do not reinstate them.
+- Re-checked afterwards: bulk-select still raises the bulk action bar, the date-marks
+  calendar still opens and closes, and the pencil toggles Edit → Close like its siblings.
+
+### 2. One row height on mobile
+
+Phase BO settled all six sub-tabs onto a shared **33px** row on desktop. Phase BP
+reinstated real rows on mobile but let each tab's own tallest control set the height, so
+they drifted apart again — measured at 375x812 before this phase:
+
+| tab | height | what was driving it |
+|---|---|---|
+| Roles | 46px | the "Show as" field taking the generic 46px mobile form-control height |
+| Travel | 48px | its `<select>`, same rule |
+| Days on site / Hotel | 44px | the "All" button picking up `button.small`'s 44px floor |
+| Pre-production / Catering | 40px | a 40px `.icon-btn` |
+
+Now **40px on every one of the six**, via `.pb-head, .pb-role-row{min-height:40px}` inside
+the media query plus three caps on the overshooting controls.
+
+- ⚠️ **40px, not desktop's 33px.** The 40px `.icon-btn` is the one thing in these rows
+  that must not shrink — it is the tap target for the pencil, the trash and the calendar
+  button. So the icon button sets the floor and everything that was overshooting it comes
+  back to 34px (still a comfortable touch height for a field).
+- ⚠️ All three caps are written to out-specify a **type or attribute** selector, not just
+  a bare class — the same specificity trap Phase BP hit with `.budget-rate-input`:
+  `.roles-grid-showas input[type=text]`, `.crewgrid select, .prep-grid select,
+  .roles-grid select`, and `button.small.all-toggle-btn`.
+- It is a **floor, not a cap**: a row still grows past 40px for genuine content — a
+  `.prep-counter` with something to say, or a chevron-revealed second role — exactly as
+  Phase BO's follow-up decided. Verified: the first three rows of every sub-tab measure
+  40px, and a Pre-production row with "15 days booked" still grows.
+- The name text itself was already identical everywhere and was not touched — 14px Jost
+  600 on `.roles-grid-name`, `.prep-name` and Days on site's `.crew-ident.one-line strong`
+  alike (confirmed by computed style, all three: `14px / 600 / Jost`). The mismatch was
+  purely the row box around it.
+
+### Verified
+
+- 375x812: all six sub-tabs measure 40px for their first three rows; Pre-production's
+  pencil opens the shared crew form at 335px (the scrollport width, per Phase BP's
+  `100cqw` rule) and closes again.
+- 1280x900: all six still 33px, and Controls/Name/Role still start at identical x across
+  Roles / Pre-production / Days on site (355 / 421 / 601) — Phase BO's alignment intact.
+  Everything in part 2 is inside the media query; part 1's pencil is the only change
+  visible on desktop.
+- Zero console errors; `node --check` clean; CSS braces balanced 478/478.

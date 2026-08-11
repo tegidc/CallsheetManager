@@ -1086,6 +1086,27 @@
     .prep-cal{max-width:100%;}
     .prep-cal-day{height:34px;}
 
+    /* --- Phase BQ: ONE row height across all six sub-tabs, on mobile too ---
+       Phase BO settled the six sub-tabs onto a shared 33px row on desktop. Phase BP
+       reinstated the rows on mobile but let each tab's own tallest control set the
+       height, so they drifted apart again: Roles 46px (the "Show as" field taking the
+       generic 46px mobile form-control height), Travel 48px (its <select>, same
+       reason), Days/Hotel 44px (the "All" button picking up button.small's 44px
+       floor), Pre-production and Catering 40px (a 40px .icon-btn).
+
+       40px is the floor here rather than desktop's 33px because a 40px .icon-btn is
+       the one thing in these rows that must NOT shrink — it is the tap target for
+       the pencil, the trash and the calendar. Everything that was overshooting it is
+       brought back to 34px, which is still a comfortable touch height for a field.
+       Rows still grow past 40px for genuine content (a prep counter, a wrapped role
+       chip) exactly as Phase BO's follow-up decided — this is a floor, not a cap. */
+    .pb-head, .pb-role-row{min-height:40px;}
+    /* the three that were overshooting. All written to out-specify a type-or-
+       attribute selector (input[type=text] / button.small), not just a bare class. */
+    .roles-grid-showas input[type=text]{min-height:34px; padding:6px 7px;}
+    .crewgrid select, .prep-grid select, .roles-grid select{min-height:34px; padding:6px 20px 6px 8px;}
+    button.small.all-toggle-btn{min-height:0; padding:0 4px;}
+
     /* --- position assignment rows --- */
     .posn-dept-badge{justify-self:start; padding:5px 10px;}
     .posn-row .posn-call{max-width:none;}
@@ -6551,8 +6572,9 @@ function prepRowHTML(block){
       ${calOpen ? `<div class="prep-calwrap">${prepCalendarHTML(e.id)}</div>` : ''}` };
   };
   const frontedCells = entryCellsHTML(fronted, personBlockToggleHTML(block, rest.length, open));
+  const isEditing = editingCrewId===block.id;
   const head = `<div class="prep-grid pb-head${frontedCells.calOpen?' prep-grid-row-open':''}">
-    <div class="prep-cell prep-controls">${personBlockSelectCbHTML(block)}</div>
+    <div class="prep-cell prep-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
     <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
     ${frontedCells.html}
   </div>`;
@@ -6560,8 +6582,14 @@ function prepRowHTML(block){
     const cells = entryCellsHTML(e, '');
     return `<div class="prep-grid pb-role-row pb-role-extra${cells.calOpen?' prep-grid-row-open':''}"${open?'':' style="display:none;"'}>${cells.html}</div>`;
   }).join('');
-  // no expansion: Pre-production has no crew-record edit path of its own (Phase BJ)
-  return personBlockWrapHTML(block, head + stack, { editing:false, open });
+  /* Phase BQ — Pre-production carries the Edit pencil and its expansion like Roles and
+     Days on site. It was the one sub-tab without one (Phase BJ: "no crew-record edit
+     path of its own"), which meant the Controls column rendered a checkbox and a gap
+     where every other tab has a pencil. Same crewControlsHTML/crewExpansionHTML pair
+     the other five use — no second edit path, and nothing about prep days/marks
+     changes; this only reaches the crew RECORD, exactly as the pencil does elsewhere. */
+  return personBlockWrapHTML(block, head + stack,
+    { editing:isEditing, open, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
 
 /* ---------- Project Locations ---------- */
