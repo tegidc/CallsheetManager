@@ -4523,3 +4523,92 @@ tab and anonymous on the next. Pre-production had no header row at all.
 - Row heights unchanged — 33px desktop, 40px mobile, all six. Locations day grid re-checked
   (still the spanning corner, still masking correctly). Zero console errors; `node --check`
   clean; CSS braces balanced 482/482.
+
+## Phase BS — Pre-production enters the Budget, behind two scope toggles (11 Aug 2026)
+
+**"Include Pre-Production into the budget. In Budget create toggle alongside 'itemise VAT'
+— Production (totalising everything in Production), Pre-Production (totalising
+Pre-Production in the tabs). Initial default state is both are toggled on giving complete
+total."**
+
+Pre-production has held booked prep days per entry since Phase BD (`p.prepSchedule`,
+`prepDaysOf()`) and has always shared the Budget's own rate (`resolveEntryRate` — one
+rate, three screens). Budget simply never read them. It does now, and the two halves of
+the shoot each get a switch.
+
+- `budgetScope = { production:true, preproduction:true }` / `toggleBudgetScope()` /
+  `budgetScopeLabel()` — **both default ON**, so the figure you land on is the complete
+  one. Session state like `budgetView` / `budgetVatToggle` / the filters, deliberately NOT
+  persisted to the project: it's "what am I looking at", not a property of the shoot.
+  Turning both off is allowed (£0.00 plus a note in the summary bar) rather than refusing
+  the click — [Budget]
+  - **production** = everything Budget costed before this phase: day rate × days on site,
+    plus the catering / travel / hotel / location extras.
+  - **preproduction** = prep days × the same entry rate. No separate prep rate exists and
+    this phase did not invent one.
+- ⚠️ **`prodOn` / `prepOn` are 1/0 FACTORS, not `if`s**, and every production figure in
+  `buildBudgetData()` is multiplied by `prodOn` exactly once. That includes the per-day
+  halves of each extra (`dayCatering`/`dayTravel`/`dayHotel`/`dayLocation`) and
+  `dayTravelRate()`/`dayRate` inside `perDay` — gating only the project-wide totals left
+  Per Day still showing catering and travel with Production switched off, which is exactly
+  the bug the factor form is meant to make hard. Do not reintroduce a branch here — [Budget]
+- ⚠️ **A person's VAT is now split in two along the same seam as the money**: `prodVat`
+  (day rate + travel) and `prepVat`, with `pp.vat` still their sum. They reconcile against
+  different things — `prodVat` against the Per Day view's VAT column, `prepVat` against the
+  Pre-production block that view now carries — and merging them would break whichever one
+  you didn't test — [Budget]
+- `prepDepartments` / `prepExVat` / `prepVat` / `prepDaysTotal` / `prepPeopleCount` on the
+  returned data. ⚠️ **Already counted inside `people[].subtotal` → `departments` →
+  `crewTotalExVat` → `totalExVat`.** They are the same money sliced a second way so the
+  views can talk about it, never a second thing to add on. Anything that adds `prepExVat`
+  to `totalExVat` is double-counting — [Budget]
+- ⚠️ **Prep is NOT filtered by the shoot-day filter.** A prep day is not a shoot day and
+  can't be attributed to one, so filtering to "Day 2" leaves prep whole; the
+  Pre-production toggle is how you take it out. Said on screen in both Per Day and Per
+  Person rather than left to be discovered. The DEPARTMENT filter does apply, because that
+  filters the people list itself — [Budget]
+
+### What each view does with it
+
+| view | treatment |
+|---|---|
+| Per Department | prep folds into each department's own row (a prep day is that department's cost). A hint under the table says how much of the total is prep, rather than adding a "Pre-production" pseudo-department that would double-count against the rows above it |
+| Per Day | a **Pre-production block above the shoot days** — not one of them: `budgetDayBlocks` is keyed by day id and `syncBudgetDayBlocks()` prunes anything that isn't, so this block sits outside that plumbing and is always open. Without it the day rows would stop summing to the total, which is the one thing this view must be able to do |
+| Per Person | a **Prep** column beside Days. Each count column appears only when its scope is on, so Subtotal is always explicable from the columns beside it — with Production off, Days goes rather than sitting there uncosted |
+| Copy / Excel | a `Costing:` line always stated (not only when non-default — a budget sent to someone else has to say which halves it covers), the Prep column, and a leading Pre-production row in the day shape |
+
+- `budgetDeptExtrasTableHTML()` gained `o.hideExtras`, used only by the Pre-production
+  block: there is no catering, travel, hotel or location on a prep day, and four £0.00 rows
+  under an "extras" heading read as missing data rather than absent-by-definition. It
+  suppresses the extras block and its trailing note only — same columns, same total row.
+
+### Verified — arithmetic first, pixels second
+
+Every reconciliation invariant re-checked in **all four scope states** (both / production
+only / pre-production only / neither), against the live ROW 2026 London data:
+
+- `departments(exVat) + extras === totalExVat` ✓ in all four
+- `perDay(exVat) + prepExVat === totalExVat` ✓ and `perDay(vat) + prepVat === vatTotal` ✓
+  in all four — this is what the Pre-production block exists to keep true
+- **Production-only reproduces the pre-phase budget exactly**: £64,660.00 / £3,517.00 /
+  £68,177.00, the same three figures Budget showed before this phase existed
+- both = production-only + pre-production-only, to the penny (£82,660.00 = £64,660.00 +
+  £18,000.00; VAT £5,767.00 = £3,517.00 + £2,250.00)
+- Day filter + prep together: filtered to Day 1, `dayEx 6,520 + prep 18,000 === total
+  24,520` ✓ — prep stays whole, as documented
+- Spot-checked two people against their own rows: Matt Wells 0 days + 25 prep × £450 =
+  £11,250; Sabrina Goreeba 6 days + 15 prep × £450 = £9,450
+
+Toggles exercised by clicking, not by setting state: unticking Pre-production drops the
+Prep column and returns the pre-phase totals; unticking both shows £0.00 with the
+both-off note and drops both count columns; re-ticking restores £88,427.00. Export rows
+checked for all of it. Desktop 1280x900 and mobile 375x812 (three toggles wrap as one
+cluster). Zero console errors; `node --check` clean; CSS braces balanced 483/483.
+
+### Left alone
+
+- No prep rate of its own, no prep VAT rate of its own, no editing of prep days from
+  Budget — the Pre-production tab stays the one place they're entered, and it still has no
+  totals on it.
+- Locations, catering, hotel and travel are still production-only by definition; nothing
+  about the "VAT follows the person" rule (Phase AO) changed.

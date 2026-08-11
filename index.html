@@ -763,7 +763,11 @@
   .budget-stat .num{font-family:var(--label); font-weight:700; font-size:26px; letter-spacing:.4px; color:var(--text);}
   .budget-stat .lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape); margin-top:2px;}
-  .budget-vat-toggle{margin-left:auto; align-self:center;}
+  /* Phase BS — three toggles now, not one: Production | Pre-production | Itemize VAT.
+     Still one cluster pushed to the right of the summary bar; flex so they wrap
+     together rather than the last one dropping on its own. */
+  .budget-vat-toggle{margin-left:auto; align-self:center; display:flex; align-items:center; gap:16px; flex-wrap:wrap;}
+  .budget-scope-note{flex:1 0 100%; margin:0;}
   .budget-vat-toggle label{display:flex; align-items:center; gap:7px; margin:0;
     font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer;}
@@ -7075,6 +7079,30 @@ function toggleBudgetOutputPanel(){ budgetOutputOpen = !budgetOutputOpen; render
 // whole job — see budgetPersonDisplay().
 let budgetVatToggle = true;
 function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(); }
+/* Phase BS — WHAT is being costed, sitting alongside Itemize VAT (which is HOW).
+     production    — the shoot itself: day rate × days on site, plus the
+                     catering / travel / hotel / location extras. Everything Budget
+                     costed before this phase.
+     preproduction — the Pre-production sub-tab's prep days × the SAME entry rate
+                     (resolveEntryRate — one rate, shared by Roles, Pre-production and
+                     here; there is no separate prep rate and this phase didn't add one).
+   ⚠️ BOTH DEFAULT ON, so the out-of-the-box figure is the complete one. Turning both
+   off is allowed — it reads £0.00 with a note — rather than silently refusing the
+   click; nothing about that state is dangerous, just empty.
+   ⚠️ Session state, like budgetView / budgetVatToggle / the filters. Deliberately NOT
+   persisted to the project: this is "what am I looking at right now", not a property
+   of the shoot. */
+let budgetScope = { production:true, preproduction:true };
+function toggleBudgetScope(key, on){ budgetScope[key] = on; renderProjectBody(); }
+/* One phrase for what's being costed, used by the summary-bar note and the export
+   header so the two can't describe the same state differently. */
+function budgetScopeLabel(){
+  const {production:pr, preproduction:pp} = budgetScope;
+  return pr && pp ? 'Production + Pre-production'
+    : pr ? 'Production only'
+    : pp ? 'Pre-production only'
+    : 'Nothing (both scopes off)';
+}
 // {dayId: true/false}, same shared plumbing (toggleBlock/setAllBlocksCollapsed
 // /applyBlockState) as the sd/tt/pv collapsible blocks. Unlike those, the
 // day list is dynamic per project, so syncBudgetDayBlocks() keeps its keys in
@@ -7264,23 +7292,45 @@ function buildBudgetData(){
      over days (see firstEntryOnDay in perDay below) it still equals each person's own
      figure. Charging it per entry would double a two-role person's travel AND the VAT
      on it, since AO's VAT base is (day rate + travel). */
+  /* Phase BS — the two scopes. `prodOn` gates every figure that belongs to the shoot
+     (day rate × days on site, and the catering/travel/hotel/location extras below);
+     `prepOn` gates prep days × the same entry rate. Written as a 1/0 factor rather
+     than sprinkled `if`s so a scope can never be applied in one place and forgotten
+     in another — every production figure in this function is multiplied by it once. */
+  const prodOn = budgetScope.production ? 1 : 0;
+  const prepOn = budgetScope.preproduction ? 1 : 0;
   const travelClaimed = new Set();
   const people = crewInScope.map(c=>{
     const {rate, hasRate, isOverride} = resolveEntryRate(c.id, p);
     const daysWorked = entryDayCount(c.id, days);
-    const subtotal = rate * daysWorked;
+    /* Prep days are per ENTRY, like the rate and the days worked — p.prepSchedule is
+       keyed by entry id (see prepDaysOf). ⚠️ They are NOT filtered by the day filter:
+       a prep day is not a shoot day and can't be attributed to one, so filtering to
+       "Day 2" leaves prep whole. The Pre-production toggle is how you take it out. */
+    const prepDays = prepDaysOf(c.id, p) || 0;
+    const prodSubtotal = rate * daysWorked * prodOn;
+    const prepSubtotal = rate * prepDays * prepOn;
+    const subtotal = prodSubtotal + prepSubtotal;
     const claimsTravel = !travelClaimed.has(c.crewId);
     if(claimsTravel) travelClaimed.add(c.crewId);
-    const travelRate = claimsTravel ? travelRateFor(c.crewId) : 0;
+    const travelRate = (claimsTravel ? travelRateFor(c.crewId) : 0) * prodOn;
     const travelCost = travelRate * crewDayCount(c.crewId, days, p);
     const vatRegistered = c.vatRegistered==='Yes';
-    // AO — the VAT base is day rate AND travel, both invoiced by this person.
-    // travelCost itself is NOT added to `subtotal`/`display`: it's already counted
-    // once in the Travel extras row, and counting it here too would double it.
-    const vat = vatRegistered ? (subtotal + travelCost) * VAT_RATE : 0;
+    /* AO — the VAT base is day rate AND travel, both invoiced by this person.
+       travelCost itself is NOT added to `subtotal`/`display`: it's already counted
+       once in the Travel extras row, and counting it here too would double it.
+       ⚠️ Phase BS splits the VAT in two along the same seam as the money, because the
+       two halves reconcile against different things: prodVat has to sum back to the
+       Per Day view's VAT column (prep has no shoot day to land on), and prepVat to
+       the Pre-production block that view now carries. pp.vat is still their sum, so
+       every project-wide figure is unchanged when both scopes are on. */
+    const prodVat = vatRegistered ? (prodSubtotal + travelCost) * VAT_RATE : 0;
+    const prepVat = vatRegistered ? prepSubtotal * VAT_RATE : 0;
+    const vat = prodVat + prepVat;
     return {
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
-      rate, hasRate, isOverride, daysWorked, subtotal, travelRate, travelCost, vatRegistered, vat,
+      rate, hasRate, isOverride, daysWorked, prepDays, subtotal, prodSubtotal, prepSubtotal,
+      travelRate, travelCost, vatRegistered, vat, prodVat, prepVat,
       display: budgetPersonDisplay(subtotal, vat)
     };
   });
@@ -7306,6 +7356,27 @@ function buildBudgetData(){
     ({dept:d, code:DEPARTMENT_CODES[d]||'', total:deptTotals[d]||0,
       exVat:deptExVat[d]||0, vat:deptVat[d]||0, incVat:(deptExVat[d]||0)+(deptVat[d]||0)}));
 
+  /* Phase BS — the SAME department roll-up again, over prep money only. Not a second
+     source of truth: it reads pp.prepSubtotal/pp.prepVat, the same per-person figures
+     already folded into `departments` above. It exists because Per Day needs somewhere
+     honest to put prep — a prep day has no shoot day to sit on — and because Per
+     Department's hint has to be able to say how much of the total is prep. */
+  const prepDeptExVat = {}, prepDeptVat = {}, prepDeptCounts = {};
+  people.forEach(pp=>{
+    if(!pp.prepSubtotal && !pp.prepDays) return;
+    prepDeptExVat[pp.department] = (prepDeptExVat[pp.department]||0) + pp.prepSubtotal;
+    prepDeptVat[pp.department]   = (prepDeptVat[pp.department]||0) + pp.prepVat;
+    prepDeptCounts[pp.department] = (prepDeptCounts[pp.department]||0) + 1;
+  });
+  const prepDepartments = DEPARTMENTS.filter(d=>prepDeptCounts[d]).map(d=>
+    ({dept:d, code:DEPARTMENT_CODES[d]||'', exVat:prepDeptExVat[d]||0, vat:prepDeptVat[d]||0,
+      incVat:(prepDeptExVat[d]||0)+(prepDeptVat[d]||0),
+      total: budgetPersonDisplay(prepDeptExVat[d]||0, prepDeptVat[d]||0)}));
+  const prepExVat = people.reduce((s,pp)=>s+pp.prepSubtotal, 0);
+  const prepVatTotal = people.reduce((s,pp)=>s+pp.prepVat, 0);
+  const prepDaysTotal = people.reduce((s,pp)=>s+(pp.prepDays||0), 0);
+  const prepPeopleCount = people.filter(pp=>pp.prepDays>0).length;
+
   /* R2 — location fees. A fee is entered once on the location record, then spread
      evenly across the shoot days that location is actually used on, so Per Day and
      the day filter stay honest rather than a lump landing arbitrarily on Day 1.
@@ -7326,7 +7397,8 @@ function buildBudgetData(){
     const perDay = fee / totalDaysUsed;
     return sum + perDay * dayList.filter(d=>usesLocation(d, locId)).length;
   }, 0);
-  const locationTotal = locationFeeForDays(days);
+  // Phase BS — every extra below belongs to the shoot, so they all follow prodOn.
+  const locationTotal = locationFeeForDays(days) * prodOn;
 
   const cateringGrid = buildCateringSummaryGrid();
   const transportSummary = buildTransportSummary();
@@ -7346,8 +7418,8 @@ function buildBudgetData(){
   const dayIdsInScope = new Set(days.map(d=>d.id));
   const sumDailyCost = g => g ? g.cols.filter(c=>dayIdsInScope.has(c.dayId))
                                       .reduce((s,c)=>s+c.dailyCost, 0) : 0;
-  const cateringTotal = sumDailyCost(cateringGrid);
-  const travelTotal = sumDailyCost(transportSummary);
+  const cateringTotal = sumDailyCost(cateringGrid) * prodOn;
+  const travelTotal = sumDailyCost(transportSummary) * prodOn;
   // Room-nights counted directly off the day records rather than via
   // buildHotelSummary(), which filters down to "active" nights only and would
   // need label-matching to recover one specific day's figure — this way, the
@@ -7359,7 +7431,7 @@ function buildBudgetData(){
   const preNightRooms = (firstProjectDay && days.some(d=>d.id===firstProjectDay.id))
     ? (p.hotelNightBefore||[]).length : 0;
   const dayHotelRooms = days.map(d=>(d.hotelNights||[]).length);
-  const hotelTotal = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
+  const hotelTotal = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight * prodOn;
 
   /* ⚠️ AO — Catering, Hotel and Locations carry NO per-person VAT, and that is
      DELIBERATE, not an oversight: they are paid direct to a supplier (caterer,
@@ -7383,17 +7455,21 @@ function buildBudgetData(){
     const dayTravelRate = pp => {
       if(travelClaimedToday.has(pp.crewId)) return 0;
       travelClaimedToday.add(pp.crewId);
-      return travelRateFor(pp.crewId);
+      return travelRateFor(pp.crewId) * prodOn;
     };
     const dayDeptTotals = {}, dayDeptCounts = {}, dayDeptExVat = {}, dayDeptVat = {};
     dayPeople.forEach(pp=>{
-      // AO — one day's share of this person's VAT base: their day rate plus that
-      // day's travel (travelRate is per on-site day by construction). Summed over
-      // every day they work this gives back pp.vat exactly.
-      const dayVat = pp.vatRegistered ? (pp.rate + dayTravelRate(pp))*VAT_RATE : 0;
-      dayDeptTotals[pp.department] = (dayDeptTotals[pp.department]||0) + budgetPersonDisplay(pp.rate, dayVat);
+      /* AO — one day's share of this person's VAT base: their day rate plus that
+         day's travel (travelRate is per on-site day by construction). Summed over
+         every day they work this gives back pp.prodVat exactly.
+         ⚠️ Phase BS — pp.prodVat, not pp.vat: a shoot day carries no share of prep,
+         so prep's VAT lives in the Pre-production block instead. `dayRate` follows
+         prodOn for the same reason every other production figure does. */
+      const dayRate = pp.rate * prodOn;
+      const dayVat = pp.vatRegistered ? (dayRate + dayTravelRate(pp))*VAT_RATE : 0;
+      dayDeptTotals[pp.department] = (dayDeptTotals[pp.department]||0) + budgetPersonDisplay(dayRate, dayVat);
       dayDeptCounts[pp.department] = (dayDeptCounts[pp.department]||0) + 1;
-      dayDeptExVat[pp.department] = (dayDeptExVat[pp.department]||0) + pp.rate;
+      dayDeptExVat[pp.department] = (dayDeptExVat[pp.department]||0) + dayRate;
       dayDeptVat[pp.department]   = (dayDeptVat[pp.department]||0) + dayVat;
     });
     const dayDepartments = DEPARTMENTS.filter(dd=>dayDeptCounts[dd]).map(dd=>
@@ -7401,12 +7477,15 @@ function buildBudgetData(){
         exVat:dayDeptExVat[dd]||0, vat:dayDeptVat[dd]||0, incVat:(dayDeptExVat[dd]||0)+(dayDeptVat[dd]||0)}));
     const cateringCol = cateringGrid ? cateringGrid.cols.find(c=>c.dayId===d.id) : null;
     const travelCol = transportSummary ? transportSummary.cols.find(c=>c.dayId===d.id) : null;
-    const dayCatering = cateringCol ? cateringCol.dailyCost : 0;
-    const dayTravel = travelCol ? travelCol.dailyCost : 0;
+    // Phase BS — each of these is the per-day half of a project-wide extra that
+    // already follows prodOn above; gate them here too or Per Day keeps showing
+    // catering/travel/hotel/location after Production has been switched off.
+    const dayCatering = (cateringCol ? cateringCol.dailyCost : 0) * prodOn;
+    const dayTravel = (travelCol ? travelCol.dailyCost : 0) * prodOn;
     // the night before Day 1 has no shoot-day row of its own — folds into Day 1
     const rooms = dayHotelRooms[i] + (i===0 ? preNightRooms : 0);
-    const dayHotel = rooms * hotelCosts.perRoomNight;
-    const dayLocation = locationFeeForDays([d]);
+    const dayHotel = rooms * hotelCosts.perRoomNight * prodOn;
+    const dayLocation = locationFeeForDays([d]) * prodOn;
     const crewDisplay = dayDepartments.reduce((s,dd)=>s+dd.total, 0);
     const loc = d.locationId ? locById(d.locationId) : null;
     // AO — the day's own ex-VAT / VAT / inc-VAT, same shape as the project-wide
@@ -7426,6 +7505,13 @@ function buildBudgetData(){
   return {
     people, departments, cateringTotal, travelTotal, hotelTotal, locationTotal, extrasTotal,
     crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
+    // Phase BS — the pre-production slice, already counted inside the figures above
+    // (people[].subtotal → departments → crewTotalExVat → totalExVat). Carried
+    // separately so Per Day can show it as its own block and Per Department can say
+    // how much of itself is prep, never as a second thing to add on.
+    prepDepartments, prepExVat, prepVat: prepVatTotal, prepIncVat: prepExVat + prepVatTotal,
+    prepDaysTotal, prepPeopleCount,
+    prepOn: !!prepOn, prodOn: !!prodOn,
     hasCrew: crewInScope.length>0, hasDays: days.length>0
   };
 }
@@ -7435,9 +7521,19 @@ function budgetSummaryBarHTML(data){
   const stats = budgetVatToggle
     ? [['Total (ex-VAT)', data.totalExVat], ['VAT', data.vatTotal], ['Total (inc-VAT)', data.totalIncVat]]
     : [['Total', data.totalIncVat]];
+  /* Phase BS — the two scope toggles sit in the same cluster as Itemize VAT, and in
+     that reading order: WHAT is being costed, then HOW it's shown. Both start ticked,
+     so the number you land on is the complete one. */
+  const scopeBox = (key, label) => `<label><input type="checkbox" ${budgetScope[key]?'checked':''} onchange="toggleBudgetScope('${key}', this.checked)"> ${label}</label>`;
+  const nothingOn = !budgetScope.production && !budgetScope.preproduction;
   return `<div class="budget-summary">
     ${stats.map(([lbl,v])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}</div></div>`).join('')}
-    <div class="budget-vat-toggle"><label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label></div>
+    <div class="budget-vat-toggle">
+      ${scopeBox('production','Production')}
+      ${scopeBox('preproduction','Pre-production')}
+      <label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label>
+    </div>
+    ${nothingOn ? `<div class="budget-scope-note hint">Both scopes are off, so nothing is being costed. Tick Production, Pre-production, or both.</div>` : ''}
   </div>`;
 }
 
@@ -7456,9 +7552,14 @@ function budgetSummaryBarHTML(data){
    £0.00 VAT deliberately — catering/hotel/location are supplier-paid so no person's
    vatRegistered attaches to them, and travel's VAT is charged by the crew member who
    travelled, so it sits in THEIR department's row, not here. */
+/* ⚠️ Phase BS added `o.hideExtras` — the Pre-production block (Per Day) is crew cost
+   and nothing else: there is no catering, travel, hotel or location on a prep day, and
+   four £0.00 rows under an "extras" heading would read as missing data rather than as
+   absent-by-definition. It suppresses the extras block and its trailing note only; the
+   department rows and the total keep exactly the same shape and columns. */
 function budgetDeptExtrasTableHTML(o){
   const fmt = budgetFmt;
-  const {departments, catering, travel, hotel, location, extrasLabel} = o;
+  const {departments, catering, travel, hotel, location, extrasLabel, hideExtras} = o;
   if(!departments.length && !catering && !travel && !hotel && !location){
     return '<div class="empty-note">Nothing to cost yet.</div>';
   }
@@ -7467,11 +7568,11 @@ function budgetDeptExtrasTableHTML(o){
     return `<div class="tablewrap"><table>
       <tr><th>Department</th><th>Cost</th></tr>
       ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.total)}</td></tr>`).join('')}
-      <tr class="budget-extras-row"><td colspan="2"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
+      ${hideExtras ? '' : `<tr class="budget-extras-row"><td colspan="2"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
       <tr><td>Catering</td><td>${fmt(catering)}</td></tr>
       <tr><td>Travel</td><td>${fmt(travel)}</td></tr>
       <tr><td>Hotels</td><td>${fmt(hotel)}</td></tr>
-      <tr><td>Locations</td><td>${fmt(location)}</td></tr>
+      <tr><td>Locations</td><td>${fmt(location)}</td></tr>`}
       <tr class="budget-total-row"><td>Total</td><td>${fmt(o.total)}</td></tr>
     </table></div>`;
   }
@@ -7480,14 +7581,14 @@ function budgetDeptExtrasTableHTML(o){
   return `<div class="tablewrap"><table>
     <tr><th>Department</th><th>Ex-VAT</th><th>VAT</th><th>Inc-VAT</th></tr>
     ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.exVat)}</td><td>${fmt(d.vat)}</td><td>${fmt(d.incVat)}</td></tr>`).join('')}
-    <tr class="budget-extras-row"><td colspan="4"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
+    ${hideExtras ? '' : `<tr class="budget-extras-row"><td colspan="4"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
     ${extraRow('Catering', catering)}
     ${extraRow('Travel', travel)}
     ${extraRow('Hotels', hotel)}
-    ${extraRow('Locations', location)}
+    ${extraRow('Locations', location)}`}
     <tr class="budget-total-row"><td>Total</td><td>${fmt(o.exVat)}</td><td>${fmt(o.vat)}</td><td>${fmt(o.incVat)}</td></tr>
   </table></div>
-  <div class="hint" style="margin-top:8px;">A department's VAT is summed from the people in it who are actually VAT-registered — not 20% of its total.${anyTravelVat?' It includes VAT on their travel, which is itself shown ex-VAT in the Travel row above.':''} Catering, Hotels and Locations are paid direct to a supplier, so no crew member's VAT attaches to them.</div>`;
+  ${hideExtras ? '' : `<div class="hint" style="margin-top:8px;">A department's VAT is summed from the people in it who are actually VAT-registered — not 20% of its total.${anyTravelVat?' It includes VAT on their travel, which is itself shown ex-VAT in the Travel row above.':''} Catering, Hotels and Locations are paid direct to a supplier, so no crew member's VAT attaches to them.</div>`}`;
 }
 
 function budgetDepartmentViewHTML(data){
@@ -7495,11 +7596,16 @@ function budgetDepartmentViewHTML(data){
     return '<div class="empty-note">No crew assigned to this project yet.</div>';
   }
   const displayTotal = budgetVatToggle ? data.totalExVat : data.totalIncVat;
+  /* Phase BS — prep money is folded INTO each department's row (a prep day is that
+     department's cost), so the only thing missing was a way to see how much of the
+     total it is. This note says it rather than adding a "Pre-production" pseudo-
+     department, which would double-count against the rows above it. */
+  const prepNote = data.prepOn && data.prepExVat ? `<div class="hint" style="margin-top:8px;">Department totals include ${budgetFmt(budgetVatToggle ? data.prepExVat : data.prepIncVat)} of pre-production — ${data.prepDaysTotal} prep day${data.prepDaysTotal===1?'':'s'} across ${data.prepPeopleCount} crew member${data.prepPeopleCount===1?'':'s'}, at the same day rate. Untick Pre-production above for the shoot on its own.</div>` : '';
   return budgetDeptExtrasTableHTML({
     departments: data.departments, catering: data.cateringTotal, travel: data.travelTotal,
     hotel: data.hotelTotal, location: data.locationTotal, extrasLabel: 'Project-wide extras',
     total: displayTotal, exVat: data.totalExVat, vat: data.vatTotal, incVat: data.totalIncVat
-  });
+  }) + prepNote;
 }
 
 function budgetPersonViewHTML(data){
@@ -7522,18 +7628,25 @@ function budgetPersonViewHTML(data){
       ? ` title="Includes ${budgetFmt(pp.travelCost*VAT_RATE)} VAT on ${budgetFmt(pp.travelCost)} of travel"` : '';
     return `<td${travelNote}>${pp.vat ? fmt(pp.vat) : '<span class="budget-noRate">—</span>'}</td>`;
   };
+  /* Phase BS — a count column appears only when its scope is being costed, so the
+     Subtotal is always explicable from the columns beside it. With both on you see
+     Days AND Prep and the subtotal is rate × (days + prep); with Production off the
+     Days column goes rather than sitting there uncosted next to a smaller number. */
+  const showDays = data.prodOn, showPrep = data.prepOn;
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th><th style="text-align:center;">Days</th>${budgetVatToggle?'<th>VAT</th>':''}<th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th>${showDays?'<th style="text-align:center;">Days</th>':''}${showPrep?'<th style="text-align:center;" title="Pre-production days">Prep</th>':''}${budgetVatToggle?'<th>VAT</th>':''}<th>Subtotal</th></tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
       <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
       <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
-      <td style="text-align:center;">${pp.daysWorked}</td>
+      ${showDays?`<td style="text-align:center;">${pp.daysWorked}</td>`:''}
+      ${showPrep?`<td style="text-align:center;">${pp.prepDays || '<span class="budget-noRate">—</span>'}</td>`:''}
       ${budgetVatToggle?vatCell(pp):''}
       <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
     </tr>`).join('')}
   </table></div>
+  ${showPrep && data.prepDaysTotal ? `<div class="hint" style="margin-top:8px;">Prep is the Pre-production tab's booked days, at the same day rate — it is not filtered by the shoot-day filter, because a prep day isn't a shoot day.</div>` : ''}
   ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}
   ${anyTravel ? `<div class="hint" style="margin-top:8px;">A VAT-registered crew member's travel carries VAT too — it's charged back through them — so their VAT covers day rate ${budgetVatToggle?'and travel':'and travel, baked into the Subtotal'}. The travel cost itself is counted once, in the Travel line of Per Department.</div>` : ''}
   <div class="hint" style="margin-top:8px;">Ticking VAT here doesn't save on its own — it's saved to the crew database together with the day rate, the next time that row's Save icon is clicked.</div>`;
@@ -7544,6 +7657,26 @@ function budgetDayViewHTML(data){
   syncBudgetDayBlocks(data.perDay.map(d=>d.dayId));
   const fmt = budgetFmt;
   const toggleRow = data.perDay.length>1 ? expandCollapseAllHTML('toggleAllBudgetDayBlocks()', undefined, allBlocksCollapsed(budgetDayBlocks), 'bd') : '';
+  /* Phase BS — Pre-production gets a block of its own ABOVE the shoot days, and it is
+     not one of them: `budgetDayBlocks` is keyed by day id and syncBudgetDayBlocks()
+     prunes anything that isn't, so this block is deliberately outside that plumbing
+     and always open. Without it the day rows would no longer sum to the total the
+     summary bar shows, which is the one thing this view has to be able to do. */
+  const prepBlock = (data.prepOn && data.prepExVat) ? `<div class="sd-block">
+      <div class="sd-block-head" style="margin:0 0 0;">
+        <span style="flex:1;">Pre-production <span class="dept-count">(${data.prepDaysTotal} day${data.prepDaysTotal===1?'':'s'} · ${data.prepPeopleCount} crew)</span></span>
+        <strong>${fmt(budgetVatToggle ? data.prepExVat : data.prepIncVat)}</strong>
+      </div>
+      <div style="margin-top:10px;">
+        ${budgetDeptExtrasTableHTML({
+          departments: data.prepDepartments, catering:0, travel:0, hotel:0, location:0,
+          hideExtras: true,
+          total: budgetVatToggle ? data.prepExVat : data.prepIncVat,
+          exVat: data.prepExVat, vat: data.prepVat, incVat: data.prepIncVat
+        })}
+        <div class="hint" style="margin-top:8px;">Prep days belong to the project, not to any one shoot day, so they sit here rather than on a day row — and the shoot-day filter leaves them alone.</div>
+      </div>
+    </div>` : '';
   const rows = data.perDay.map(d=>{
     const open = budgetDayBlocks[d.dayId];
     const title = `Day ${esc(d.dayNum||'?')}${d.locationLabel?' — '+esc(d.locationLabel):''}`;
@@ -7563,7 +7696,7 @@ function budgetDayViewHTML(data){
       </div>
     </div>`;
   }).join('');
-  return toggleRow + rows;
+  return toggleRow + prepBlock + rows;
 }
 
 /* AF: Budget's own "Costs" tab. Deliberately holds no state of its own — every field
@@ -7658,7 +7791,10 @@ function budgetExportRows(data, view){
   const rows = [];
   const scope = budgetScopeParts();
   if(budgetDeptFilter.size)  scope.push([...budgetDeptFilter].join(', '));
-  if(scope.length) rows.push(['Filtered to', scope.join(' · ')], []);
+  if(scope.length) rows.push(['Filtered to', scope.join(' · ')]);
+  // Phase BS — always stated, not only when it's non-default: a budget sent to
+  // someone else has to say which halves of the shoot it covers.
+  rows.push(['Costing', budgetScopeLabel()], []);
   budgetVatToggle
     ? rows.push(['Total (ex-VAT)', fmt(data.totalExVat)], ['VAT', fmt(data.vatTotal)], ['Total (inc-VAT)', fmt(data.totalIncVat)])
     : rows.push(['Total', fmt(data.totalIncVat)]);
@@ -7666,16 +7802,24 @@ function budgetExportRows(data, view){
   // AO — the itemized shapes mirror the screen column-for-column: Per Person gains
   // the VAT amount, Per Department/Per Day the ex-VAT/VAT/inc-VAT breakdown.
   if(view==='person'){
-    rows.push(budgetVatToggle
-      ? ['Name','Role','Day rate','VAT reg.','Days','VAT','Subtotal']
-      : ['Name','Role','Day rate','VAT reg.','Days','Subtotal']);
+    // Phase BS — the count columns follow the scopes, exactly as on screen.
+    rows.push(['Name','Role','Day rate','VAT reg.',
+      ...(data.prodOn ? ['Days'] : []), ...(data.prepOn ? ['Prep'] : []),
+      ...(budgetVatToggle ? ['VAT'] : []), 'Subtotal']);
     budgetOrderedPeople(data).forEach(pp=>rows.push([
       pp.name, pp.role||'', pp.hasRate?fmt(pp.rate):'no rate on file',
-      pp.vatRegistered?'Yes':'No', pp.daysWorked,
+      pp.vatRegistered?'Yes':'No',
+      ...(data.prodOn ? [pp.daysWorked] : []),
+      ...(data.prepOn ? [pp.prepDays||0] : []),
       ...(budgetVatToggle ? [pp.vat?fmt(pp.vat):'—'] : []),
       pp.hasRate?fmt(pp.display):'—']));
   } else if(view==='day'){
     rows.push(budgetVatToggle ? ['Day','Location','Ex-VAT','VAT','Inc-VAT'] : ['Day','Location','Total']);
+    // Phase BS — the prep row leads, same as the block does on screen, so the rows
+    // still add up to the total printed above them.
+    if(data.prepOn && data.prepExVat) rows.push(budgetVatToggle
+      ? ['Pre-production', `${data.prepDaysTotal} day${data.prepDaysTotal===1?'':'s'}`, fmt(data.prepExVat), fmt(data.prepVat), fmt(data.prepIncVat)]
+      : ['Pre-production', `${data.prepDaysTotal} day${data.prepDaysTotal===1?'':'s'}`, fmt(data.prepIncVat)]);
     data.perDay.forEach(d=>rows.push(budgetVatToggle
       ? [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.exVat), fmt(d.vat), fmt(d.incVat)]
       : [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.total)]));
