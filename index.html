@@ -5294,8 +5294,6 @@ function projectCrewActiveFilterCount(){
 function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
   const activeCount = projectCrewActiveFilterCount();   // gates the shared foot's Clear link
-  const companies = [...new Set(assignedAll.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const hasBlankCompany = assignedAll.some(c=>!c.coProductionCompany);
   const rolesInUse = [...new Set(assignedAll.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
   const deptChecks = DEPARTMENTS.filter(d=>assignedAll.some(c=>deptBucketKey(c.department)===d))
     .map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleProjectFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
@@ -5306,27 +5304,22 @@ function projectCrewFilterPanelHTML(assignedAll, days){
   const dayChecks = (days||[]).length ? (days||[]).map(d=>
       `<label><input type="checkbox" ${f.days.has(d.id)?'checked':''} onchange="toggleProjectFilterDay('${d.id}', this.checked)"> Day ${esc(d.dayNum||'?')}</label>`
     ).join('') : '<span class="hint">No shoot days yet.</span>';
+  /* ⚠️ SHAPE, then SCOPE. Group and Sort sit at the top because they decide what the
+     list LOOKS like, and you reach for them before you start narrowing; the checkbox
+     sections below all answer "who is in it". Group before Sort, in that order: grouping
+     is the coarser decision and sorting happens inside whatever it produced.
+     ⚠️ The Lead company SELECT is gone from here. It filtered the list down to one
+     company, which the Crew Database's Other companies tab and the Exclude other
+     companies box both already do — three controls for one question. f.company is still
+     honoured by the filter predicate, so anything that sets it keeps working; there is
+     just no longer a control here that sets it. `companies`/`hasBlankCompany` went with
+     it. Grouping BY company also went: "Department & company" covers the same ground and
+     was the one people actually used. */
   return `<div class="filter-panel">
-    <div><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks||'<span class="hint">—</span>'}</div></div>
-    <div class="grid g3" style="margin-top:10px;">
-      <div><label>Lead company</label><select onchange="setProjectFilterField('company', this.value)">
-        <option value="">All companies</option>
-        ${companies.map(co=>`<option value="${esc(co)}" ${f.company===co?'selected':''}>${esc(co)}</option>`).join('')}
-        ${hasBlankCompany ? `<option value="__blank__" ${f.company==='__blank__'?'selected':''}>Blank</option>` : ''}
-      </select></div>
-      <div><label>Sort</label><select onchange="setProjectFilterField('sort', this.value)">
-        <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
-        <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
-        <option value="role" ${f.sort==='role'?'selected':''}>By role</option>
-        <option value="seniority" ${f.sort==='seniority'?'selected':''}>By seniority</option>
-        <option value="company" ${f.sort==='company'?'selected':''}>By company</option>
-        <option value="daysCount" ${f.sort==='daysCount'?'selected':''}>By days on site (most first)</option>
-        <option value="added" ${f.sort==='added'?'selected':''}>By date added to project</option>
-      </select></div>
+    <div class="grid g2">
       <div><label>Group by</label><select onchange="setProjectFilterField('groupBy', this.value)">
         <option value="dept" ${f.groupBy==='dept'?'selected':''}>Department</option>
         <option value="deptCompany" ${f.groupBy==='deptCompany'?'selected':''}>Department &amp; company</option>
-        <option value="company" ${f.groupBy==='company'?'selected':''}>Lead company</option>
         <option value="role" ${f.groupBy==='role'?'selected':''}>Role</option>
         <option value="personType" ${f.groupBy==='personType'?'selected':''}>Crew / Talent / Client</option>
         <option value="hotel" ${f.groupBy==='hotel'?'selected':''}>Has hotel / No hotel</option>
@@ -5337,7 +5330,17 @@ function projectCrewFilterPanelHTML(assignedAll, days){
         <option value="daysOnSite" ${f.groupBy==='daysOnSite'?'selected':''}>Shoot day on site</option>
         <option value="none" ${f.groupBy==='none'?'selected':''}>None (flat list)</option>
       </select></div>
+      <div><label>Sort</label><select onchange="setProjectFilterField('sort', this.value)">
+        <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
+        <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
+        <option value="role" ${f.sort==='role'?'selected':''}>By role</option>
+        <option value="seniority" ${f.sort==='seniority'?'selected':''}>By seniority</option>
+        <option value="company" ${f.sort==='company'?'selected':''}>By company</option>
+        <option value="daysCount" ${f.sort==='daysCount'?'selected':''}>By days on site (most first)</option>
+        <option value="added" ${f.sort==='added'?'selected':''}>By date added to project</option>
+      </select></div>
     </div>
+    <div style="margin-top:14px;"><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks||'<span class="hint">—</span>'}</div></div>
     <div style="margin-top:10px;">
       <div class="hint" style="margin-bottom:4px;cursor:pointer;" onclick="toggleProjectFilterRolesSection()"><span class="dept-caret">${projectCrewFilterRolesOpen?'▾':'▸'}</span> Roles${f.roles.size?` (${f.roles.size} selected)`:''}</div>
       ${projectCrewFilterRolesOpen ? `<div class="filter-chips">${roleChecks}</div>` : ''}
