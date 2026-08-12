@@ -868,6 +868,20 @@
   .budget-total-row td{padding-top:10px; border-top:1.5px solid var(--field-line);
     font-weight:600;}
   .budget-noRate{color:var(--muted); font-style:italic;}
+  /* ---- catering summary ----
+     The total leads the block: it's the number you came for, and it used to sit under a
+     six-column grid, below the fold. */
+  .csm-total{font-size:var(--fs-meta); color:var(--muted); margin-bottom:10px;}
+  .csm-total strong{font-family:var(--body); font-size:18px; color:var(--text); margin-left:6px;}
+  /* the cost column is inputs, so it needs a real width where the day columns can stay
+     as narrow as their numbers */
+  .csm-cost-head{width:96px;}
+  .csm-cost-cell{width:96px;}
+  .csm-cost-cell input{width:80px; text-align:left;}
+  /* Dietaries / Specials are sub-tables INSIDE the summary block, so they take a quieter
+     heading than the block's own — the same label type as a column header, not an h2 */
+  .csm-subhead{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
+    letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:18px 0 4px;}
 
   /* AI Scan (Phase AI Scan) — the first chat UI in the app. Deliberately NOT
      rounded chat bubbles: this app's whole visual language is ruled lines and
@@ -5566,7 +5580,7 @@ function renderProjectCrew(body){
       ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
   body.oninput = crewGridView==='catering'
-    ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); renderCateringSummaryGridSection(); })
+    ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); refreshCateringSummaryFigures(); })
     : crewGridView==='travel'
     ? () => scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); })
     : crewGridView==='hotel'
@@ -6048,49 +6062,141 @@ function buildCateringSummaryGrid(){
        shoot day. dayNum stays for the column HEADING only: it is free text the user
        types, non-unique, routinely blank and mixed-type, so it identifies a day to a
        reader but must never identify one to code. */
-    return { dayId:d.id, dayNum:d.dayNum, label, b, l, d:dd, dailyCost };
+    return { dayId:d.id, dayNum:d.dayNum, label, b, l, d:dd, deliveryFee, dailyCost };
   });
   const totalCost = cols.reduce((sum,c)=>sum+c.dailyCost, 0);
-  return { costs, cols, totalCost };
+  /* ---- what the caterer actually cooks ----
+     Head count per day by dietary requirement, then the named exceptions. Both are
+     scoped to people BEING FED on this project — a crew member with no meal ticked on
+     any day is not the caterer's problem — and both read the crew record, never a
+     second copy of it.
+     ⚠️ GROUPED BY THE STORED VALUE, VERBATIM. The Dietary (general) field is a select
+     offering only '' / Vegetarian / Vegan / Pescatarian, but real records also hold
+     free text from earlier imports — "Meat & Fish", "Meat/Fish", "Veggie", "Meat/Veg".
+     Those are deliberately NOT normalised into each other: a mapping would be guesswork
+     and would hide the inconsistency instead of showing it. Tidy the records and the
+     rows merge on their own. Blank is the select's own default and means omnivore. */
+  const OMNI = 'Omnivore / eats everything';
+  const dietOf = c => (c && c.dietaryGeneral) ? c.dietaryGeneral : OMNI;
+  const fedPerDay = days.map(d=>Object.entries(d.cateringMeals||{})
+    .filter(([,m])=>m && (m.b||m.l||m.d))
+    .map(([crewId])=>crewById(crewId))
+    .filter(Boolean));
+  const dietLabels = [...new Set(fedPerDay.flat().map(dietOf))]
+    .sort((a,b)=> a===OMNI ? -1 : b===OMNI ? 1 : a.localeCompare(b));   // omnivores first, the rest alphabetical
+  const diets = dietLabels.map(label=>({
+    label,
+    perDay: fedPerDay.map(list=>list.filter(c=>dietOf(c)===label).length),
+    peak: Math.max(0, ...fedPerDay.map(list=>list.filter(c=>dietOf(c)===label).length))
+  }));
+  /* Specials: everyone fed who has ANYTHING recorded — a diet, a note, or both. Someone
+     with both fields empty is an omnivore with no requirements and is left out, which is
+     the "don't include people who are blank" rule. */
+  const fedOnce = [...new Map(fedPerDay.flat().map(c=>[c.id,c])).values()]
+    .filter(c=>c.dietaryGeneral || c.dietarySpecific)
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const specials = fedOnce.map(c=>({ name:c.name||'', general:c.dietaryGeneral||'', specific:c.dietarySpecific||'' }));
+  return { costs, cols, totalCost, diets, specials, fedPeak: Math.max(0, ...fedPerDay.map(l=>l.length)) };
 }
+/* ---- the catering summary, as something you can send a caterer ----
+   THE COST-PER-MEAL INPUTS LIVE IN THE TABLE, in a column of their own beside the meal
+   they price, so the arithmetic reads across: cost each × head count per day = the
+   Daily cost underneath. Delivery is a fourth row on the same footing, its own input
+   and its own per-day figure.
+   ⚠️ Those inputs are INSIDE #csmGridWrap, which is why nothing re-renders this block
+   while you type in them — see refreshCateringSummaryFigures(). Replacing the innerHTML
+   on every keystroke would take the focused input with it.
+   The total moved ABOVE the table: it is the number you came for, and it was sitting
+   below the fold under a six-column grid. */
 function cateringSummaryGridBodyHTML(){
   const data = buildCateringSummaryGrid();
   if(!data) return '<div class="empty-note">Add shoot days first, then fill in catering on the grid above.</div>';
-  const fmt = budgetFmt; // Gate 1 / G7 — was a local (n||0).toFixed(2), no £, no thousands separator
-  return `<div class="tablewrap">
+  const fmt = budgetFmt;
+  const cost = (id, v) => `<td class="csm-cost-cell"><input type="text" inputmode="decimal" id="${id}" value="${v||''}" placeholder="0.00"></td>`;
+  const mealRow = (label, id, costVal, pick) =>
+    `<tr><td>${label}</td>${cost(id, costVal)}${data.cols.map(c=>`<td>${pick(c)}</td>`).join('')}</tr>`;
+  return `<div class="csm-total">Total catering cost <strong id="csmTotal">${fmt(data.totalCost)}</strong></div>
+  <div class="tablewrap">
     <table>
-      <tr><th></th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
-      <tr><td>Breakfast</td>${data.cols.map(c=>`<td>${c.b}</td>`).join('')}</tr>
-      <tr><td>Lunch</td>${data.cols.map(c=>`<td>${c.l}</td>`).join('')}</tr>
-      <tr><td>Dinner</td>${data.cols.map(c=>`<td>${c.d}</td>`).join('')}</tr>
-      <tr><td><strong>Daily cost</strong></td>${data.cols.map(c=>`<td><strong>${fmt(c.dailyCost)}</strong></td>`).join('')}</tr>
+      <tr><th></th><th class="csm-cost-head">Cost each</th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
+      ${mealRow('Breakfast', 'ccCostB', data.costs.b, c=>c.b)}
+      ${mealRow('Lunch', 'ccCostL', data.costs.l, c=>c.l)}
+      ${mealRow('Dinner', 'ccCostD', data.costs.d, c=>c.d)}
+      <tr><td>Delivery</td>${cost('ccCostDelivery', data.costs.delivery)}${data.cols.map((c,i)=>`<td id="csmDel${i}">${fmt(c.deliveryFee)}</td>`).join('')}</tr>
+      <tr><td><strong>Daily cost</strong></td><td></td>${data.cols.map((c,i)=>`<td><strong id="csmDay${i}">${fmt(c.dailyCost)}</strong></td>`).join('')}</tr>
     </table>
   </div>
-  <div class="hint" style="margin-top:8px;">Total catering cost: ${fmt(data.totalCost)}</div>`;
+  <div class="hint" style="margin-top:6px;">Delivery is charged once per meal occasion per day, and only on days that meal is actually running.</div>
+  ${cateringDietTableHTML(data)}
+  ${cateringSpecialsHTML(data)}`;
 }
-function renderCateringSummaryGridSection(){
-  const el = document.getElementById('csmGridWrap'); if(!el) return;
-  el.innerHTML = cateringSummaryGridBodyHTML();
+/* Head count per day by dietary requirement — what the caterer has to cook, as opposed
+   to the meal counts above, which are how many covers. The two reconcile only on a day
+   where everyone fed takes the same meal; they answer different questions. */
+function cateringDietTableHTML(data){
+  if(!data.diets.length) return '';
+  return `<div class="csm-subhead">Dietaries</div>
+  <div class="hint" style="margin-bottom:6px;">People being fed each day, by requirement. Anyone with nothing recorded counts as an omnivore.</div>
+  <div class="tablewrap">
+    <table>
+      <tr><th></th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
+      ${data.diets.map(r=>`<tr><td>${esc(r.label)}</td>${r.perDay.map(n=>`<td>${n}</td>`).join('')}</tr>`).join('')}
+    </table>
+  </div>`;
+}
+/* The named exceptions. Everyone fed who has a diet or a note recorded — blanks are
+   omnivores with nothing to say and are left out. */
+function cateringSpecialsHTML(data){
+  if(!data.specials.length) return '';
+  return `<div class="csm-subhead">Specials</div>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Name</th><th>Dietary</th><th>Notes</th></tr>
+      ${data.specials.map(s=>`<tr>
+        <td>${esc(s.name)}</td>
+        <td>${s.general ? esc(s.general) : '<span class="budget-noRate">—</span>'}</td>
+        <td>${s.specific ? esc(s.specific) : '<span class="budget-noRate">—</span>'}</td>
+      </tr>`).join('')}
+    </table>
+  </div>`;
+}
+/* ⚠️ IN-PLACE, not a re-render. The cost inputs are inside this block now, so replacing
+   its innerHTML while someone types would destroy the element they are typing into —
+   and coerce their half-finished "15." back to "15" on the way. Only the figures the
+   costs actually change are rewritten; head counts and dietaries don't move when a
+   price does, and a meal being ticked re-renders the whole body through
+   renderProjectBody() anyway. */
+function refreshCateringSummaryFigures(){
+  const data = buildCateringSummaryGrid(); if(!data) return;
+  const fmt = budgetFmt;
+  const total = document.getElementById('csmTotal');
+  if(total) total.textContent = fmt(data.totalCost);
+  data.cols.forEach((c,i)=>{
+    const del = document.getElementById('csmDel'+i); if(del) del.textContent = fmt(c.deliveryFee);
+    const day = document.getElementById('csmDay'+i); if(day) day.textContent = fmt(c.dailyCost);
+  });
 }
 function cateringSummaryHTML(){
-  const p = currentProject();
-  const costs = getCateringCosts(p);
-  const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
-      ${costFieldHTML('ccCostB', 'Est. cost per Breakfast', costs.b)}
-      ${costFieldHTML('ccCostL', 'Est. cost per Lunch', costs.l)}
-      ${costFieldHTML('ccCostD', 'Est. cost per Dinner', costs.d)}
-      ${costFieldHTML('ccCostDelivery', 'Delivery cost', costs.delivery)}
-    </div>`;
-  const inner = `${fieldsHTML}<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
+  const inner = `<div id="csmGridWrap">${cateringSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyCateringSummaryGrid()">${icon('copy')} Copy catering summary</button></div>`;
   return summaryBlockHTML('catering', inner);
 }
+/* The whole thing as text, because emailing this to a caterer is the point of it —
+   covers, then what to cook, then who needs what. */
 function copyCateringSummaryGrid(){
   const data = buildCateringSummaryGrid(); if(!data) return;
-  const fmt = budgetFmt; // Gate 1 / G7 — was a local (n||0).toFixed(2), no £, no thousands separator
-  const lines = ['CATERING SUMMARY', ''];
-  data.cols.forEach(c=>lines.push(`${c.label}: Breakfast ${c.b}, Lunch ${c.l}, Dinner ${c.d} — Daily cost ${fmt(c.dailyCost)}`));
-  lines.push('', `Total catering cost: ${fmt(data.totalCost)}`);
+  const fmt = budgetFmt;
+  const lines = ['CATERING SUMMARY', '', `Total catering cost: ${fmt(data.totalCost)}`, ''];
+  lines.push(`Cost each — Breakfast ${fmt(data.costs.b)}, Lunch ${fmt(data.costs.l)}, Dinner ${fmt(data.costs.d)}, Delivery ${fmt(data.costs.delivery)}`, '');
+  data.cols.forEach(c=>lines.push(`${c.label}: Breakfast ${c.b}, Lunch ${c.l}, Dinner ${c.d} — Delivery ${fmt(c.deliveryFee)} — Daily cost ${fmt(c.dailyCost)}`));
+  if(data.diets.length){
+    lines.push('', 'DIETARIES (people fed per day)');
+    data.diets.forEach(r=>lines.push(`${r.label}: ${data.cols.map((c,i)=>`D${c.dayNum||'?'} ${r.perDay[i]}`).join(', ')}`));
+  }
+  if(data.specials.length){
+    lines.push('', 'SPECIALS');
+    data.specials.forEach(sp=>lines.push(`${sp.name} — ${[sp.general, sp.specific].filter(Boolean).join(' · ')}`));
+  }
   copyText(lines.join('\n'), 'Copied!');
 }
 /* Travel (T-2.4) PERSON BLOCK (Phase BK; collapsible Phase BL).
@@ -8181,7 +8287,7 @@ function budgetCostsViewHTML(){
 }
 /* Targeted refresh of just the summary bar after a Costs-tab cost field autosaves —
    same "don't blow away the field the user is still typing in" rule as
-   renderCateringSummaryGridSection()/renderTransportSummaryGridSection() (Phase P2/W). */
+   refreshCateringSummaryFigures()/renderTransportSummaryGridSection() (Phase P2/W). */
 function renderBudgetSummaryBar(){
   const el = document.getElementById('budgetSummaryBarWrap'); if(!el) return;
   el.innerHTML = budgetSummaryBarHTML(buildBudgetData());
