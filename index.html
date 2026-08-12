@@ -577,6 +577,17 @@
   .role-dupe-star{color:var(--tape); font-weight:700; margin-left:3px; cursor:help;}
   /* ---- "Also on this project as" ---- */
   .also-listed{margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:12px;}
+  /* ---- Swap for ---- */
+  .swap-pane label{display:block;}
+  .swap-keep{margin-top:14px; border-top:1px solid var(--line); padding-top:12px;}
+  .swap-keep-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
+    letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
+  /* every carried item on its own line: these are decisions, and a wrapped row of
+     checkboxes reads as a tag cloud rather than as a list of things to weigh */
+  .swap-keep label{display:flex; align-items:center; gap:8px; margin:0 0 6px;
+    font-family:var(--body); font-size:var(--fs-meta); font-weight:400; letter-spacing:0;
+    text-transform:none; color:var(--text); cursor:pointer;}
+  .swap-pane button.primary[disabled]{opacity:.45; cursor:not-allowed;}
   .also-listed-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
     letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   .also-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer;
@@ -1835,14 +1846,19 @@ let rolesMenuMode = 'change'; // 'change' | 'add' — resets to 'change' every t
 function openRolesMenu(entryId){
   rolesMenuFor = entryId;
   rolesMenuMode = 'change';
+  swapPickId = ''; swapKeep = null;
   renderGlobalOverlay();
 }
 function closeRolesMenu(){
   rolesMenuFor = null;
   rolesMenuMode = 'change';
+  swapPickId = ''; swapKeep = null;
   renderGlobalOverlay();
 }
 function setRolesMenuMode(mode){
+  // a part-built swap doesn't survive leaving the tab — coming back to a pre-selected
+  // replacement you'd forgotten choosing is how the wrong person gets swapped in
+  if(mode!=='swap'){ swapPickId=''; swapKeep=null; }
   rolesMenuMode = mode;
   renderGlobalOverlay();
 }
@@ -1940,14 +1956,126 @@ function rolesMenuHTML(){
       <div class="tabs" style="margin-bottom:12px;">
         <div class="tab ${rolesMenuMode==='change'?'active':''}" onclick="setRolesMenuMode('change')">Change to</div>
         <div class="tab ${rolesMenuMode==='add'?'active':''}" onclick="setRolesMenuMode('add')">Add again as</div>
+        <div class="tab ${rolesMenuMode==='swap'?'active':''}" onclick="setRolesMenuMode('swap')">Swap for</div>
       </div>
-      ${rolesMenuListHTML(entryId, e.crewId, c)}
-      <div style="margin-top:10px;">${rolesMenuAddRolePickerHTML(entryId, e.crewId, c)}</div>
+      ${rolesMenuMode==='swap' ? rolesMenuSwapHTML(entryId, e.crewId, p) : `
+        ${rolesMenuListHTML(entryId, e.crewId, c)}
+        <div style="margin-top:10px;">${rolesMenuAddRolePickerHTML(entryId, e.crewId, c)}</div>`}
       <div class="toolbar" style="margin-top:14px;">
         <button onclick="closeRolesMenu()">Close</button>
       </div>
     </div>
   </div>`;
+}
+/* ============================ SWAP FOR ======================================
+   Replace the PERSON on this booking, keeping the booking.
+
+   ⚠️ WHY THIS IS SMALL: the entry IS the booking. Role, department, rate, buyout,
+   show-as, prep days, edit days and every shoot-day position are keyed by ENTRY id, so
+   pointing e.crewId at someone else carries all of it across with nothing to copy. Only
+   the three PERSON-keyed logistics — hotel nights, catering meals, travel method — are
+   filed under crewId and have to be moved by hand. That split is the whole design; know
+   which side a thing is on before adding to either.
+
+   ⚠️ THE OLD PERSON MAY STILL BE ON THE JOB. If they hold another entry, their bed,
+   lunches and lift belong to that one and must NOT be cleared — the swap only takes the
+   logistics away when this was their LAST entry, and that is decided BEFORE the swap or
+   the answer changes underneath us.
+   ⚠️ THE NEW PERSON MAY ALREADY BE ON THE JOB. Their own hotel/catering/travel is never
+   overwritten; copying only fills what they do not already have, so swapping someone
+   into a second role cannot quietly rewrite their first.
+   ⚠️ Only offers a toggle for something that EXISTS — a booking with no prep days
+   shouldn't ask about prep days. */
+let swapPickId = '';
+let swapKeep = null;      // null = not yet initialised for this entry
+function swapOptionsFor(entryId, p){
+  const e = entryById(entryId, p); if(!e) return [];
+  const days = projectDays();
+  const prep = phaseDaysOf('preprod', entryId, p);
+  const post = phaseDaysOf('post', entryId, p);
+  const shoot = entryOnShoot(entryId, p) ? entryDayCount(entryId, days) : 0;
+  const rate = resolveEntryRate(entryId, p);
+  const hotelNights = days.filter(d=>(d.hotelNights||[]).includes(e.crewId)).length
+                    + ((p.hotelNightBefore||[]).includes(e.crewId) ? 1 : 0);
+  const meals = days.filter(d=>(d.cateringMeals||{})[e.crewId]).length;
+  const travel = (p.travelMethods||{})[e.crewId] || '';
+  const opts = [];
+  if(rate.hasRate) opts.push({key:'rate',    label:`Day rate — ${budgetFmt(rate.rate)}${entryIsBuyout(entryId)?' (buyout)':''}`});
+  if(prep)         opts.push({key:'prep',    label:`Prep days — ${prep}`});
+  if(shoot)        opts.push({key:'shoot',   label:`Shoot days — ${shoot}`});
+  if(post)         opts.push({key:'post',    label:`Post days — ${post}`});
+  if(hotelNights)  opts.push({key:'hotel',   label:`Hotel — ${hotelNights} night${hotelNights===1?'':'s'}`});
+  if(travel)       opts.push({key:'travel',  label:`Travel — ${travel}`});
+  if(meals)        opts.push({key:'catering',label:`Catering — ${meals} day${meals===1?'':'s'} of meals`});
+  return opts;
+}
+function rolesMenuSwapHTML(entryId, crewId, p){
+  const opts = swapOptionsFor(entryId, p);
+  if(swapKeep===null){ swapKeep = {}; opts.forEach(o=>swapKeep[o.key]=true); }   // like-for-like by default
+  const others = crewDB.filter(c=>c.id!==crewId).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  return `<div class="swap-pane">
+    <label for="swapPick">Replace with</label>
+    <select id="swapPick" onchange="setSwapPick(this.value)">
+      <option value="">— Choose a crew member —</option>
+      ${groupedCrewOptionsHTML(others)}
+      <option value="__new__">+ Add someone new…</option>
+    </select>
+    ${opts.length ? `<div class="swap-keep">
+      <div class="swap-keep-head">Carry over</div>
+      ${opts.map(o=>`<label><input type="checkbox" ${swapKeep[o.key]?'checked':''} onchange="setSwapKeep('${o.key}', this.checked)"> ${esc(o.label)}</label>`).join('')}
+    </div>` : '<div class="hint" style="margin-top:10px;">Nothing booked on this role yet — the swap just changes who holds it.</div>'}
+    <div class="toolbar" style="margin-top:14px;">
+      <button class="primary" ${swapPickId?'':'disabled'} onclick="confirmSwap('${entryId}')">Swap</button>
+    </div>
+    <div class="hint">The role, and anything left ticked, stays on this booking. ${esc((crewById(crewId)||{}).name||'They')} keeps everything on their other roles.</div>
+  </div>`;
+}
+function setSwapPick(v){
+  if(v==='__new__'){ swapPickId=''; closeRolesMenu(); toggleCrewForm(); return; }
+  swapPickId = v; renderGlobalOverlay();
+}
+function setSwapKeep(k, on){ swapKeep = Object.assign({}, swapKeep, {[k]:on}); renderGlobalOverlay(); }
+async function confirmSwap(entryId){
+  const p = currentProject(); if(!p || !swapPickId) return;
+  const e = entryById(entryId, p); if(!e) return;
+  const oldId = e.crewId, newId = swapPickId;
+  const oldName = (crewById(oldId)||{}).name || 'them', newName = (crewById(newId)||{}).name || 'them';
+  const keep = swapKeep || {};
+  const days = projectDays();
+  const wasLastEntry = entriesForCrew(oldId, p).length === 1;
+  if(!confirm(`Swap ${oldName} for ${newName} on ${e.role||'this role'}?`)) return;
+  const snaps = beginUndo(['db:projects','db:shootdays']);
+  // ---- the booking: ONE field, because everything else is keyed to the entry ----
+  e.crewId = newId;
+  if(!keep.rate){ delete e.rate; delete e.buyout; }
+  if(!keep.prep && p.prepSchedule) delete p.prepSchedule[entryId];
+  if(!keep.post && p.postSchedule) delete p.postSchedule[entryId];
+  if(!keep.shoot){
+    p.onShoot = (p.onShoot||[]).filter(id=>id!==entryId);
+    days.forEach(d=>{ if(Array.isArray(d.positions)) d.positions = d.positions.filter(pos=>pos[0]!==entryId); });
+  }
+  // ---- person-keyed logistics: moved by hand, never over the new person's own ----
+  days.forEach(d=>{
+    if(keep.hotel && (d.hotelNights||[]).includes(oldId) && !d.hotelNights.includes(newId)) d.hotelNights.push(newId);
+    if(keep.catering && (d.cateringMeals||{})[oldId] && !(d.cateringMeals||{})[newId]){
+      d.cateringMeals[newId] = Object.assign({}, d.cateringMeals[oldId]);
+    }
+    if(wasLastEntry){
+      if(Array.isArray(d.hotelNights)) d.hotelNights = d.hotelNights.filter(id=>id!==oldId);
+      if(d.cateringMeals) delete d.cateringMeals[oldId];
+    }
+  });
+  if(keep.hotel && (p.hotelNightBefore||[]).includes(oldId) && !p.hotelNightBefore.includes(newId)) p.hotelNightBefore.push(newId);
+  if(wasLastEntry && Array.isArray(p.hotelNightBefore)) p.hotelNightBefore = p.hotelNightBefore.filter(id=>id!==oldId);
+  p.travelMethods = p.travelMethods || {};
+  if(keep.travel && p.travelMethods[oldId] && !p.travelMethods[newId]) p.travelMethods[newId] = p.travelMethods[oldId];
+  if(wasLastEntry) delete p.travelMethods[oldId];
+  await saveDB('db:projects', projectsDB);
+  await saveDB('db:shootdays', shootDaysDB);
+  swapPickId = ''; swapKeep = null;
+  closeRolesMenu();
+  renderProjectBody();
+  finishUndo(`${oldName} swapped for ${newName}`, snaps);
 }
 /* ---- "Also on this project as" ----
    The menu used to open on a two-role person and say "No other saved roles", which is
