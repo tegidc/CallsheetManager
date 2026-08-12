@@ -5227,15 +5227,19 @@ function renderProjectCrew(body){
      right in the order the job actually happens: prep, the shoot, then the edit.
      Hotel/Travel/Catering follow as the logistics of the shoot they always were. Same
      order as the Budget's scope toggles, deliberately.
-     ⚠️ THE ONE SOURCE OF SUB-TAB LABELS. The three phase tabs are Pre-Prod | Shoot |
-     Post — short, parallel, and named for the phase rather than for what the grid
-     happens to contain ("Days on site" described its checkboxes, not the phase, and
-     sat oddly beside a one-word Post). Anything elsewhere that tells a user to go to
-     a tab must quote these strings — see countCols in the Budget, which names two of
-     them in a hint. The KEYS are unchanged and are still what everything else stores,
-     switches and persists ('preprod' / 'days' / 'post'); renaming a label must never
-     become renaming a key. */
-  const viewLabels = {roles:'Roles', preprod:'Pre-Prod', days:'Shoot', post:'Post', hotel:'Hotel', travel:'Travel', catering:'Catering'};
+     ⚠️ THE ONE SOURCE OF SUB-TAB LABELS. The three phase tabs are Pre-Prod |
+     Production | Post — named for the phase, not for what the grid happens to contain
+     ("Days on site" described its checkboxes, not the phase, and sat oddly beside a
+     one-word Post). Production is deliberately the SAME word as the Budget's middle
+     scope toggle, so the two screens name the shoot identically. ⚠️ It is also the name
+     of a DEPARTMENT (code PROD), whose heading can appear directly under this tab strip
+     — they are different things that read alike, so don't shorten either one on the
+     assumption the other will disambiguate it. Anything elsewhere that tells a user to
+     go to a tab must quote these strings — see countCols in the Budget, which names two
+     of them in a hint. The KEYS are unchanged and are still what everything else
+     stores, switches and persists ('preprod' / 'days' / 'post'); renaming a label must
+     never become renaming a key. */
+  const viewLabels = {roles:'Roles', preprod:'Pre-Prod', days:'Production', post:'Post', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
@@ -7779,11 +7783,12 @@ function budgetPersonViewHTML(data){
     /* ⚠️ `tab` is quoted straight into the note below as a place to GO ("…are the
        Pre-Prod and Post tabs' booked days"), so these are the Crew sub-tab labels
        verbatim, not prose names for the phases — they have to track viewLabels or the
-       note sends people to a tab that isn't there. The Budget's own scope toggles
-       deliberately keep the longer Pre-production/Production/Post wording; those are
-       scopes, not tabs, and nothing tells you to click them. */
-    {on:data.prepOn, head:'Prep', title:'Pre-Prod days',  tab:'Pre-Prod', value:pp=>pp.prepDays},
-    {on:data.prodOn, head:'Days', title:'Shoot days',     tab:null,       value:pp=>pp.daysWorked},
+       note sends people to a tab that isn't there. The Budget's own scope toggles keep
+       the longer "Pre-production" for the first scope — that one is a costing scope,
+       not a tab, and nothing tells you to click it; the middle scope and the middle tab
+       are both "Production" and now agree word for word. */
+    {on:data.prepOn, head:'Prep', title:'Pre-Prod days',    tab:'Pre-Prod', value:pp=>pp.prepDays},
+    {on:data.prodOn, head:'Days', title:'Production days',  tab:null,       value:pp=>pp.daysWorked},
     {on:data.postOn, head:'Edit', title:'Edit days booked on the Post tab', tab:'Post', value:pp=>pp.postDays}
   ].filter(c=>c.on);
   /* The one note covering whichever non-shoot columns are showing — two near-identical
