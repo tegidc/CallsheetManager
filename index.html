@@ -76,6 +76,10 @@
     --pb-role-w:150px;       /* fixed; role chips longer than this ellipsis-truncate
                                  (.pb-role-cell .role-chip below) — the full name is
                                  still in the chip's title tooltip */
+    --pb-phase-fields-w:130px; /* Pre-production/Post only: the rate+days column, sized
+                                 to the two inputs (60 + 10 gap + 60). Was a flat 200px
+                                 sized to the removed "N days booked" counter. Retuned
+                                 for mobile below, where the inputs themselves grow. */
     --sidew:230px;
     --side-bg:#110A08; --side-text:#FFFFF5; --side-line:rgba(255,255,245,.14); --side-hover:rgba(255,255,245,.08);
   }
@@ -543,20 +547,26 @@
      The name column is capped the same way .crewgrid's is (Phase Detail), with a
      trailing minmax(0,1fr) so spare width lands after the row rather than stranding
      the marker at the edge. */
-  /* the fields column is sized to the COUNTER, not to the two 60px inputs — at 150px
-     "5 days booked · 7 dates marked" wrapped onto a second line and made rows with
-     both figures taller than rows with one. */
+  /* the fields column. Was a flat 200px, sized to the COUNTER rather than to the inputs
+     ("5 days booked · 7 dates marked" wrapped at 150px). With the counter gone the only
+     thing in this column is the two inputs, so the track is now exactly what they need
+     — and it has to be a token, because it is the one leading-column width that CHANGES
+     on mobile: the inputs grow 60px→76px there (.prep-fields below), so a hardcoded
+     desktop value would clip them. Header labels follow the same widths, so RATE/DAYS
+     stay over their own inputs at both sizes. (Token lives in :root with the other
+     --pb-* leading-column widths; mobile overrides it in the same :root block that
+     retunes them.) */
   /* ⚠️ Phase BT — align-items:CENTER, not `start`. Phase BO's note two blocks down
      already claimed all three grids centred; .prep-grid alone still said `start`, and
      that mismatch WAS the "Pre-production is spaced differently" complaint: in the
      shared 33px row a 28px input/name sat hard against the top with the slack all
      below it, while Roles and the four .crewgrid tabs centred theirs. Mobile never
      had the bug (.prep-name is align-self:stretch + flex-centred there), which is why
-     it only ever showed up on desktop. When a row IS genuinely taller — a counter
-     line, a stacked role — Name/Role now centre against the whole fields group
-     instead of hanging off its first line. Same grid used by both phase sub-tabs. */
+     it only ever showed up on desktop. Still centre now the counter is gone: a row can
+     be taller than 33px for a stacked role or an open calendar, and Name/Role should
+     centre against the whole group. Same grid used by both phase sub-tabs. */
   .prep-grid{display:grid; align-items:center; column-gap:10px;
-    grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 200px 32px minmax(0,1fr);}
+    grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) var(--pb-phase-fields-w) 32px minmax(0,1fr);}
   .prep-controls{display:flex; align-items:center;}
   .prep-cell{min-width:0;}
   /* names match every other list in the app: Jost 600 14px (Phase Style Review) */
@@ -564,16 +574,10 @@
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .prep-fields-row{display:flex; align-items:center; gap:10px;}
   .prep-fields .budget-rate-input{width:60px;}
-  /* the soft counter. Muted, --fs-meta, NEVER emphasised or recoloured when the two
-     figures differ — a mismatch is a valid state, not a warning. It sits under the
-     fields and reserves its line so a row does not jump height as it is filled in
-     — but only once it actually has something to say: :empty drops the reservation
-     (Phase BO follow-up), which is what lets a row with nothing booked/marked match
-     the other five sub-tabs' shared row height instead of always carrying this
-     line's height whether or not there's anything on it. Was mobile-only; promoted
-     here since the same reasoning holds at every width. */
-  .prep-counter{font-size:var(--fs-meta); color:var(--muted); margin-top:3px; min-height:15px; line-height:15px;}
-  .prep-counter:empty{min-height:0; margin-top:0;}
+  /* ⚠️ REMOVED with the counter itself: .prep-counter / .prep-counter:empty. Their whole
+     job was keeping a row that HAD counter text from being taller than one that didn't;
+     with no second line under the fields at all, every phase row is now the bare
+     .prep-fields-row and sits at the shared 33px floor unconditionally. */
   /* the marks indicator. WEIGHT is the whole signal (muted = nothing marked, ink =
      marked) rather than a second visual language for the same idea — the same
      convention .pb-toggle uses. (It was AZ's .role-add-marker convention originally;
@@ -719,13 +723,14 @@
      six sub-tabs, not five: 33px is Travel's own natural height (driven by its
      <select>), so Travel is unchanged and the others just grow enough to match it
      — align-items:center (already set on .roles-grid/.crewgrid/.prep-grid) centres
-     shorter content in the taller row. Pre-production reaches the SAME 33px floor
-     as everyone else once its counter line collapses to nothing when empty (see
-     .prep-counter:empty above) — a row only extends past 33px when there's
-     actually a rate/days/marks counter to show, or when the chevron reveals a
-     stacked-away second role, never as a blanket reservation. Originally excluded
-     Pre-production entirely; that was wrong — the fix was the counter, not opting
-     the whole tab out of the shared height. */
+     shorter content in the taller row. Pre-production/Post sit at the SAME 33px floor
+     unconditionally now: this used to depend on their counter line collapsing when
+     empty (:empty on the since-removed .prep-counter), so a row grew the moment it had
+     a rate or a mark to report. With the counter gone there is no second line under
+     the fields at all, and a phase row only exceeds 33px when the chevron reveals a
+     stacked-away second role or the date calendar is open. Phase BO originally
+     excluded Pre-production from the shared height entirely; that was wrong then, and
+     nothing needs excluding now. */
   .pb-head, .pb-role-row{min-height:33px;}
   .pb-role-row{padding:2px 0;}
   /* ⚠️ Phase BO: dropped the 20px indent this used to carry. Role is now its own
@@ -1114,6 +1119,9 @@
     input.budget-rate-input{width:76px; padding:6px 7px; min-height:34px;}
     .prep-fields input.budget-rate-input{width:76px;}
     .prep-header-fields span{width:76px;}   /* follows .prep-fields' mobile width */
+    /* …and the column that holds them has to grow by the same amount, or the second
+       input is clipped by its own track. 76 + 10 gap + 76. Desktop value is 130px. */
+    :root{--pb-phase-fields-w:162px;}
     .prep-calcell{justify-content:flex-start;}
     .prep-cal{max-width:100%;}
     .prep-cal-day{height:34px;}
@@ -6634,15 +6642,12 @@ function phaseCalendarHTML(phase, entryId){
     </div>`;
 }
 
-/* The soft counter. Muted, no emphasis and no colour change when the two differ —
-   a mismatch is a valid state, not a warning. Renders empty (not "0 days booked")
-   when there is nothing to say, so an untouched row reads as genuinely empty. */
-function prepCounterText(days, markCount){
-  const parts = [];
-  if(days!=null) parts.push(`${days} day${days===1?'':'s'} booked`);
-  if(markCount) parts.push(`${markCount} date${markCount===1?'':'s'} marked`);
-  return parts.join(' · ');
-}
+/* ⚠️ REMOVED — the soft counter ("5 days booked · 7 dates marked") that rendered under
+   the rate/days inputs on Pre-production and Post, along with prepCounterText() and the
+   .prep-counter rules. It restated the days input sitting directly above it and the
+   calendar button's own marks state beside it, so every row said the same thing three
+   times over. The two figures still read from the inputs and the marker; nothing else
+   consumed this text. Do not reintroduce it as a "summary" — the row IS the summary. */
 
 /* Pre-production (T-2.9) and Post (Phase BT) PERSON BLOCK (Phase BK; collapsible BL).
    ⚠️ Takes a PERSON BLOCK and the phase. Booked days, the entry rate and the date marks
@@ -6680,7 +6685,6 @@ function phaseRowHTML(block, phase){
             title="${esc(PHASE_TABS[phase].daysTitle)}"
             onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)">
         </div>
-        <div class="prep-counter">${esc(prepCounterText(days, marks.length))}</div>
       </div>
       <div class="prep-cell prep-calcell" style="grid-column:5;">
         <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
