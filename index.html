@@ -516,9 +516,17 @@
   .prep-header-fields{display:flex; align-items:center; gap:10px;}
   .prep-header-fields span{width:60px; flex:0 0 auto;}
   /* Phase BR — Name/Role are column headings on every sub-tab now, so they left-align
-     even inside .crewgrid-header, which centres its day labels. Placed after both header
-     rules deliberately: same specificity, later source wins. */
-  .pb-head-name, .pb-head-role{text-align:left;}
+     even inside .crewgrid-header, which centres its day labels.
+     ⚠️ This used to be a bare `.pb-head-name, .pb-head-role` rule relying on source order
+     ("same specificity, later source wins"). It only beat .roles-grid-header /
+     .prep-grid-header, which are declared just above; .crewgrid-header is declared ~130
+     lines LATER, so its text-align:center won on Days on site / Hotel / Travel / Catering
+     and Name/Role drifted to the middle of their columns while Roles and Pre-production
+     kept them left — the same heading in two different places depending on the sub-tab.
+     Now (0,2,0) via :is(), so it beats any single-class header rule wherever that rule is
+     declared. Add new grid header classes to the :is() list, don't reorder the file. */
+  :is(.roles-grid-header, .prep-grid-header, .crewgrid-header).pb-head-name,
+  :is(.roles-grid-header, .prep-grid-header, .crewgrid-header).pb-head-role{text-align:left;}
   /* ⚠️ REMOVED in Phase BK: .roles-grid-row / .roles-grid-row-editing / .roles-grid-editform.
      The Roles list is person BLOCKS now — .person-block owns the spacing, the editing
      tint (.person-block-editing) and the expansion box (.pb-editform), for all six
