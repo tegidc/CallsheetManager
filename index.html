@@ -376,8 +376,8 @@
      fill, no border — a label shape from a different design language than the rest
      of the app, which is rounded-rectangle-with-a-border throughout. Given a
      dedicated class rather than restyling .pill.dept itself, since that class is
-     shared with deptLabelHTML()'s department badge and the department-admin
-     sub-department tags — neither of which this phase touches. Reuses the
+     shared with deptLabelHTML()'s department badge — which this phase does not
+     touch. Reuses the
      checkbox's own border/radius literals verbatim (Phase Fonts: 1.5px solid,
      3px radius, no fill) rather than a new nearby-but-different number, and
      var(--text) for "primary text colour" — the same variable the checkbox
@@ -1298,15 +1298,15 @@ const DEPARTMENT_CODES = {
   'Grip':'GRIP', 'Equipment':'EQUIP', 'Set':'SET', 'Vanities':'HMUC', 'Catering & Travel':'CAT/TRA',
   'Post Production':'POST', 'Other':'—'
 };
-/* common sub-departments — free text on the crew record, these are just suggestions */
-/* sub-departments mapped to their parent department (extensible at runtime, persisted to db:subdepartments) */
-let SUBDEPARTMENTS_BY_DEPT = {
-  'Production':      ['Runner','Marshall','Support'],
-  'Cinematography':  ['1st AC','2nd AC','Loader'],
-  'Audio':           ['Boom Op'],
-  'Grip':            ['Best Boy'],
-  'Post Production': ['Colourist'],
-};
+/* ⚠️ SUB-DEPARTMENTS ARE GONE (see migrateDropSubDepartments). SUBDEPARTMENTS_BY_DEPT,
+   subDeptsFor(), db:subdepartments, the c.subDepartment field on crew records, the
+   matching field on project entries and day overrides, the crew-form input, the
+   Group by → Sub-department option and the day-override picker's nested options were
+   all removed together. A department plus a role's seniority rank is the whole
+   structure now. Most of what sub-departments were used for ("Runner", "1st AC",
+   "Boom Op", "Colourist") are ROLES, and exist as roles — which is why nothing needed
+   re-homing. Don't reintroduce a second level here without deciding what it means that
+   roles don't already cover. */
 /* canonical roles a person can be booked as, grouped per department (extensible at
    runtime, persisted to db:roles) — a crew member can hold several of these at once
    (c.roles, folder-path strings like "Cinematography/DOP"); c.role stays the single
@@ -1411,9 +1411,6 @@ function allBlocksCollapsed(state){ return Object.values(state).every(v=>!v); }
 function deptRank(dept){ const i = DEPARTMENTS.indexOf(deptBucketKey(dept)); return i===-1 ? DEPARTMENTS.length : i; }
 /* Heads of Department (c.isHoD) pinned to the top of any department roster, then alphabetical */
 function sortHoDFirst(list){ return list.slice().sort((a,b)=> (b.isHoD?1:0)-(a.isHoD?1:0) || (a.name||'').localeCompare(b.name||'')); }
-function subDeptsFor(dept){
-  return SUBDEPARTMENTS_BY_DEPT[dept] || [];
-}
 /* ---- saved roles (multiple per person) ----
    c.roles is a list of "Department/Role" folder-path strings — the roles this person
    is booked as across projects. c.role (singular, free text) is still what's actually
@@ -1593,7 +1590,7 @@ async function setActiveRole(crewId, rolePath, skipSave){
   const dept = departmentForRolePath(rolePath);
   const roleName = rolePath.includes('/') ? rolePath.split('/').slice(1).join('/') : rolePath;
   c.role = roleName;
-  if(dept){ c.department = dept; c.subDepartment = ''; }
+  if(dept){ c.department = dept; }
   if(!skipSave){ await saveDB('db:crew', crewDB); refreshCrewScreen(); }
 }
 /* setEntryRole() — the project-scoped one: writes role/department onto the ENTRY and
@@ -1608,7 +1605,7 @@ async function setEntryRole(entryId, rolePath){
   selectedEditTargets(entryId).forEach(id=>{
     const e = entryById(id, p); if(!e) return;
     e.role = roleName;
-    if(dept){ e.department = dept; e.subDepartment = ''; }
+    if(dept){ e.department = dept; }
   });
   await saveDB('db:projects', projectsDB);
   refreshCrewScreen();
@@ -1941,8 +1938,7 @@ function crewIdentityHTML(c, opts){
 /* read-only department badge, for screens where the pickers are deliberately hidden */
 function deptLabelHTML(c){
   if(!c.department) return '';
-  const path = c.subDepartment ? `${c.department} / ${c.subDepartment}` : c.department;
-  return `<span class="pill dept" title="${esc(path)}">${esc(DEPARTMENT_CODES[deptBucketKey(c.department)]||c.department)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`;
+  return `<span class="pill dept" title="${esc(c.department)}">${esc(DEPARTMENT_CODES[deptBucketKey(c.department)]||c.department)}</span>`;
 }
 /* Position Assignments identity line — at-a-glance info (role, phone) with a day-scoped
    edit pencil. No department pickers here by design: this screen is for call times. */
@@ -2022,7 +2018,7 @@ const projectDays = (projectId) => shootDaysDB
 /* ============================================================ CREW ENTRIES (Phase BF)
    THE SCHEMA, in one place. A project's roster is a list of ENTRIES, not of people:
 
-     p.crewEntries = [{ id, crewId, role, department, subDepartment, rate? }, …]
+     p.crewEntries = [{ id, crewId, role, department, rate? }, …]
 
    `id` is the entry's own id; `crewId` points back at the shared crew record. One
    person can hold several entries on one project (Meurig as AC *and* as operator),
@@ -2060,7 +2056,7 @@ function entryView(e){
   if(!c) return null;
   return Object.assign({}, c, {
     id: e.id, crewId: e.crewId, role: e.role||'',
-    department: e.department||'', subDepartment: e.subDepartment||''
+    department: e.department||''
   });
 }
 const projectEntryViews = (p) => projectEntries(p).map(entryView).filter(Boolean);
@@ -2076,7 +2072,7 @@ function projectCrew(p){
     seen.add(e.crewId);
     const c = crewById(e.crewId); if(!c) return;
     out.push(Object.assign({}, c, {
-      id: c.id, role: e.role||'', department: e.department||'', subDepartment: e.subDepartment||''
+      id: c.id, role: e.role||'', department: e.department||''
     }));
   });
   return out;
@@ -2113,7 +2109,7 @@ function addCrewEntry(p, crewId, force){
   }
   const c = crewById(crewId);
   const e = { id: uid(), crewId,
-    role: (c&&c.role)||'', department: (c&&c.department)||'', subDepartment: (c&&c.subDepartment)||'' };
+    role: (c&&c.role)||'', department: (c&&c.department)||'' };
   p.crewEntries.push(e);
   return e;
 }
@@ -2172,7 +2168,7 @@ async function migrateCrewEntries(){
     p.crewEntries = (p.crewIds||[]).map(crewId=>{
       const c = crewById(crewId);
       const e = { id: uid(), crewId,
-        role: (c&&c.role)||'', department: (c&&c.department)||'', subDepartment: (c&&c.subDepartment)||'' };
+        role: (c&&c.role)||'', department: (c&&c.department)||'' };
       const ov = (p.crewRateOverrides||{})[crewId];
       if(ov!==undefined && ov!==null && !isNaN(Number(ov))){ e.rate = Number(ov); report.rates++; }
       map[crewId] = e.id;
@@ -2207,6 +2203,48 @@ async function migrateCrewEntries(){
   await saveDB('db:projects', projectsDB);
   await saveDB('db:shootdays', shootDaysDB);
   console.info('[BF] crew entries migration:', report);
+  return report;
+}
+/* Discard every stored sub-department value. Sub-departments are no longer part of the
+   data model (see the note where SUBDEPARTMENTS_BY_DEPT used to be); this is what
+   clears what earlier versions saved, so a record can't carry a field nothing reads.
+
+   Same contract as migrateCrewEntries() above, and the same reasons:
+   — SCANS FIRST, writes nothing when there is nothing to clear, so it is free to sit on
+     the load path forever and is idempotent across reloads.
+   — BACKS UP before the first write. Three collections, because the field was stored in
+     three places: crew records, project entries, and day overrides. A failed backup
+     aborts without touching anything.
+   Runs AFTER migrateCrewEntries() deliberately: that one CREATES entries (from the old
+   p.crewIds shape) and used to copy subDepartment onto them, so cleaning up first would
+   leave a first-ever migration re-introducing the field behind us. */
+async function migrateDropSubDepartments(){
+  const crewHits = crewDB.filter(c=>c.subDepartment!==undefined);
+  const projHits = projectsDB.filter(p=>(p.crewEntries||[]).some(e=>e.subDepartment!==undefined));
+  const dayHits  = shootDaysDB.filter(d=>Object.values(d.crewOverrides||{}).some(o=>o && o.subDepartment!==undefined));
+  if(!crewHits.length && !projHits.length && !dayHits.length) return null;
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const prefix = `backup_pre_SUBDEPT_${stamp}`;
+  for(const [key, value] of [['db:crew', crewDB], ['db:projects', projectsDB], ['db:shootdays', shootDaysDB]]){
+    const res = await saveDB(`${prefix}:${key}`, value);
+    if(res && res.ok===false){ console.error('[SUBDEPT] backup failed, migration aborted:', key, res); return {aborted:key}; }
+  }
+  const report = { backupPrefix:prefix, crew:0, entries:0, overrides:0, emptiedOverrides:0 };
+  crewHits.forEach(c=>{ delete c.subDepartment; report.crew++; });
+  projHits.forEach(p=>{ (p.crewEntries||[]).forEach(e=>{ if(e.subDepartment!==undefined){ delete e.subDepartment; report.entries++; } }); });
+  dayHits.forEach(d=>{
+    Object.keys(d.crewOverrides||{}).forEach(entryId=>{
+      const o = d.crewOverrides[entryId]; if(!o || o.subDepartment===undefined) return;
+      delete o.subDepartment; report.overrides++;
+      // an override that ONLY overrode the sub-department now overrides nothing —
+      // drop it, or the row reads as "overridden for this day" with nothing behind it
+      if(!Object.keys(o).length){ delete d.crewOverrides[entryId]; report.emptiedOverrides++; }
+    });
+  });
+  await saveDB('db:crew', crewDB);
+  await saveDB('db:projects', projectsDB);
+  await saveDB('db:shootdays', shootDaysDB);
+  console.info('[SUBDEPT] sub-departments dropped:', report);
   return report;
 }
 /* the location currently picked in the Shoot Day form's primary-location select */
@@ -2316,7 +2354,7 @@ function icon(name){ return `<span class="ic">${ICONS[name]||''}</span>`; }
    mergeDB()'s tolerance of an array as base, and the fact that a null stamp routes
    to a plain upsert rather than the merge path), so no data was lost — but it was
    harmless by luck in the one function that IS the storage contract. */
-const DB_OBJECT_KEYS = ['db:subdepartments','db:roleseniority','db:settings','db:roles'];
+const DB_OBJECT_KEYS = ['db:roleseniority','db:settings','db:roles'];
 const isObjDB = key => DB_OBJECT_KEYS.includes(key);
 let dbStamp = {};   // key -> updated_at last seen
 let dbBase  = {};   // key -> deep snapshot matching that stamp
@@ -2335,7 +2373,7 @@ async function loadDB(key){
 }
 
 /* Three-way merge of one collection. Arrays of {id:…} records merge per record;
-   plain objects (settings, sub-departments, role seniority) merge per key. Arrays
+   plain objects (settings, roles, role seniority) merge per key. Arrays
    of bare strings (travel methods, co-pro companies) have no identity to merge on,
    so ours simply wins — they're short config lists, not records. */
 function mergeDB(base, mine, theirs){
@@ -2486,7 +2524,7 @@ const DB_KEY_LABELS = {
   'db:crew':'the crew database', 'db:locations':'the locations database',
   'db:projects':'project details', 'db:shootdays':'shoot days',
   'db:settings':'settings', 'db:roles':'the roles list',
-  'db:roleseniority':'role seniority', 'db:subdepartments':'sub-departments',
+  'db:roleseniority':'role seniority',
   'db:travelmethods':'travel methods', 'db:coprocompanies':'production companies'
 };
 let saveFailure = null;   // {key, kind:'unsaved'|'discarded', detail, value, retrying}
@@ -2541,8 +2579,7 @@ function applyMergedDB(key, merged){
     const arr = live(); if(Array.isArray(arr)){ arr.splice(0, arr.length, ...merged); }
   } else if(key==='db:settings' && merged && typeof merged==='object'){
     appSettings = Object.assign({}, SETTINGS_DEFAULTS, merged); applyAppSettings();
-  } else if(key==='db:subdepartments' && merged) { SUBDEPARTMENTS_BY_DEPT = merged; }
-  else if(key==='db:roleseniority' && merged)    { ROLE_SENIORITY = merged; }
+  } else if(key==='db:roleseniority' && merged) { ROLE_SENIORITY = merged; }
   else if(key==='db:roles' && merged && !Array.isArray(merged)) { ROLES_BY_DEPT = merged; }
   if(typeof renderSide==='function') renderSide();
   if(typeof renderMain==='function') renderMain();
@@ -2555,8 +2592,6 @@ async function initApp(){
   shootDaysDB = await loadDB('db:shootdays');
   travelMethodsList = await loadDB('db:travelmethods');
   coProCompaniesList = await loadDB('db:coprocompanies');
-  const savedSubDepts = await loadDB('db:subdepartments');
-  if(savedSubDepts && !Array.isArray(savedSubDepts) && Object.keys(savedSubDepts).length) SUBDEPARTMENTS_BY_DEPT = savedSubDepts;
   const savedRoles = await loadDB('db:roles');
   if(savedRoles && !Array.isArray(savedRoles) && Object.keys(savedRoles).length) ROLES_BY_DEPT = savedRoles;
   const savedRoleSeniority = await loadDB('db:roleseniority');
@@ -2578,6 +2613,7 @@ async function initApp(){
      migration write. Placed after seedSampleData() so a first-ever load migrates the
      seed in the same pass rather than leaving it on the old shape. */
   await migrateCrewEntries();
+  await migrateDropSubDepartments();
   renderSide(); renderMain();
 }
 initApp();
@@ -2979,7 +3015,6 @@ async function seedSampleData(){
     // give the DP a couple of cameras + a tag so the equipment/skills fields have something to show
     if(name==='Tegid Cartwright'){ rec.camera1='Sony FX9'; rec.camera2='FX3'; rec.skills='DOP, drone, colourist'; rec.drives='Yes'; rec.carMakeModel='VW Transporter'; rec.carReg='LF21 XYZ'; rec.vatRegistered='Yes'; rec.rate='£600/day'; rec.coffeeOrder='Flat white, no sugar'; rec.previousProjects='ROW 2025, LMAOF S2'; rec.instagram='@tegidshoots'; }
     if(name==='Karim D Clarke'){ rec.camera1='Sony FX6'; rec.skills='Steadicam, gimbal'; rec.coffeeOrder='Americano, oat milk'; }
-    if(['Sam Charlton','Sid Ellisdon','Heather Bradley','Lewis Buchan','Jessica Phillips'].includes(name)){ rec.subDepartment='Support'; }
     // Strategic Media Team are an external outfit on this shoot — exercises the co-production grouping
     if(['Mark Bricker','Harrison Ferrante','Spenser Sease'].includes(name)){ rec.coProductionCompany='Strategic Media Team'; }
     if(name==='Emily Black'){ rec.dietaryGeneral='Vegetarian'; rec.coffeeOrder='Oat latte'; }
@@ -4114,7 +4149,7 @@ async function addNewCrewFromProposal(name, department, role){
   const p = currentProject(); if(!p || !name) return null;
   const rolePath = `${department}/${role}`;
   const rec = { id:uid(), name, roles:[rolePath], role, department,
-    subDepartment:'', showAs:'', coProductionCompany:'', phone:'', email:'', skills:'',
+    showAs:'', coProductionCompany:'', phone:'', email:'', skills:'',
     camera1:'', camera2:'', camera3:'', cameraExtras:'',
     dietaryGeneral:'', dietarySpecific:'', shoeSize:'', clothingSize:'',
     vatRegistered:'', drives:'', carMakeModel:'', carReg:'', homeAddress:'',
@@ -4683,7 +4718,7 @@ function buildProjectCrewGroups(list, p, days){
      boilerplate each. Two table-driven helpers now cover them:
        groupAlpha(rawKeyFn, blankLabel) — bucket by rawKeyFn(c), falling back to
          blankLabel for anyone with no value, sorted alphabetically with the
-         blank forced last (company, role, subDept, travel, catering).
+         blank forced last (company, role, travel, catering).
        groupFixed(keyFn, orderedKeys)   — bucket by keyFn(c), rendered in a fixed
          order with empty buckets dropped (hotel, personType, vat, seniority).
      deptCompany (composite key), daysOnSite (multi-bucket, a crew member can be
@@ -4701,7 +4736,6 @@ function buildProjectCrewGroups(list, p, days){
   const SIMPLE_GROUPERS = {
     company:  () => groupAlpha(c => c.coProductionCompany, 'No lead company'),
     role:     () => groupAlpha(c => c.role, 'No role set'),
-    subDept:  () => groupAlpha(c => c.subDepartment, 'No sub-department'),
     travel:   () => groupAlpha(c => ((p&&p.travelMethods)||{})[personIdOf(c)], 'Not set'),
     catering: () => groupAlpha(c => c.dietaryGeneral, 'Standard / not set'),
     hotel:      () => groupFixed(c => personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel', ['Has hotel','No hotel']),
@@ -4806,7 +4840,6 @@ function projectCrewFilterPanelHTML(assignedAll, days){
         <option value="deptCompany" ${f.groupBy==='deptCompany'?'selected':''}>Department &amp; company</option>
         <option value="company" ${f.groupBy==='company'?'selected':''}>Lead company</option>
         <option value="role" ${f.groupBy==='role'?'selected':''}>Role</option>
-        <option value="subDept" ${f.groupBy==='subDept'?'selected':''}>Sub-department</option>
         <option value="personType" ${f.groupBy==='personType'?'selected':''}>Crew / Talent / Client</option>
         <option value="hotel" ${f.groupBy==='hotel'?'selected':''}>Has hotel / No hotel</option>
         <option value="travel" ${f.groupBy==='travel'?'selected':''}>Travel method</option>
@@ -8387,9 +8420,9 @@ function toggleDeptAdminPanel(){ deptAdminOpen = !deptAdminOpen; refreshCrewData
    part of how this is run any more (one department, then seniority). Its "+ Add" is
    what survived, repointed at the thing the panel genuinely couldn't do: put a new role
    INTO a department. It now sits under the seniority list it adds to, rather than above
-   a heading for a different list. ⚠️ SUBDEPARTMENTS_BY_DEPT and c.subDepartment are
-   deliberately untouched — existing crew records still carry sub-department values and
-   the crew form still offers the field, so nothing here silently drops saved data. */
+   a heading for a different list. The rest of the concept — the store, the crew-record
+   field, the Group by option, the day-override picker's nested options and every saved
+   value — went in the follow-up; migrateDropSubDepartments() is what cleared the data. */
 function renderDeptAdminPanel(){
   return DEPARTMENTS.map(d=>{
     const roster = sortHoDFirst(crewDB.filter(c=>deptBucketKey(c.department)===d));
@@ -8415,7 +8448,7 @@ function renderDeptAdminPanel(){
         </div>
       </div>
       ${roster.length ? `<div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
-        ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:var(--tint-6);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`).join('')}
+        ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:var(--tint-6);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}</span>`).join('')}
       </div>` : '<div class="hint">No crew assigned to this department yet.</div>'}
     </div>`;
   }).join('');
@@ -8448,7 +8481,7 @@ async function toggleHoD(crewId){
   refreshCrewDatabase();
 }
 function crewSearchBlob(c){
-  return [c.name, c.role, c.showAs, c.department, c.subDepartment, c.coProductionCompany, c.skills, c.camera1, c.camera2, c.camera3, c.cameraExtras, c.dietary,
+  return [c.name, c.role, c.showAs, c.department, c.coProductionCompany, c.skills, c.camera1, c.camera2, c.camera3, c.cameraExtras, c.dietary,
           c.previousProjects, c.generalNotes, c.coffeeOrder, c.instagram, c.youtube, c.linkedin, c.email, c.phone, (c.roles||[]).join(' ')]
     .filter(Boolean).join(' ').toLowerCase();
 }
@@ -8566,11 +8599,10 @@ function crewFormHTML(c, entryId){
         <div><label class="req">Name</label><input type="text" id="ncName" value="${esc(c.name||'')}"></div>
         <div><label class="req">Role</label>${roleFieldHTML}<div class="hint">Determines department automatically — no separate department field needed.</div></div>
       </div>
-      <div class="grid g3" style="margin-bottom:10px;">
-        <div><label>Sub-department <span style="color:var(--muted)">(optional)</span></label>
-          <input type="text" id="ncSubDept" list="subDeptList" value="${esc(c.subDepartment||'')}" placeholder="e.g. Support, 1st AC">
-          <datalist id="subDeptList">${Object.values(SUBDEPARTMENTS_BY_DEPT).flat().map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
-        </div>
+      <!-- ⚠️ g2, not g3 — the Sub-department input that used to lead this row is gone
+           (sub-departments were dropped entirely; see migrateDropSubDepartments). Show
+           as and Co-Production company now share the row. -->
+      <div class="grid g2" style="margin-bottom:10px;">
         <div><label>Show as <span style="color:var(--muted)">(optional, cosmetic)</span></label>
           <input type="text" id="ncShowAs" value="${esc(c.showAs||'')}" placeholder="e.g. Talent Guest">
           <div class="hint">Shown on the call sheet instead of the role label. Searchable. The saved role/department stay unaffected.</div>
@@ -8663,7 +8695,7 @@ function toggleCarFields(){
 let addingCrewNew = false;
 let editingCrewId = null;
 let viewingCrewId = null;
-let deptAdminOpen = false;   // "Departments & sub-departments" panel, collapsed by default
+let deptAdminOpen = false;   // "Departments & roles" panel, collapsed by default
 function refreshCrewScreen(){
   if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
   else if(route.screen==='project' && currentProjectTab==='days'){ captureInProgressPositions(); renderPositionAssignments(); }
@@ -8718,7 +8750,7 @@ function toggleCrewView(id){
 function crewViewHTML(c){
   const rows = [];
   const add = (label, value) => { if(value) rows.push([label, value]); };
-  add('Role', c.role); add('Department', c.department); add('Sub-department', c.subDepartment);
+  add('Role', c.role); add('Department', c.department);
   add('Show as', c.showAs);
   add('Co-production company', c.coProductionCompany);
   add('Phone', c.phone); add('Email', c.email); add('Skills / tags', c.skills);
@@ -8781,7 +8813,7 @@ async function saveCrew(){
     }
   }
   const rec = { id: id||uid(), name,
-    subDepartment: val('ncSubDept'), showAs: val('ncShowAs'), coProductionCompany: val('ncCoPro'),
+    showAs: val('ncShowAs'), coProductionCompany: val('ncCoPro'),
     phone: val('ncPhone'), email: val('ncEmail'),
     skills: val('ncSkills'),
     camera1: val('ncCam1'), camera2: val('ncCam2'), camera3: val('ncCam3'), cameraExtras: val('ncCamExtras'),
@@ -9583,10 +9615,10 @@ function crewInfo(id){
   return {name:'(removed crew)',role:'',phone:''};
 }
 /* ---- per-day crew overrides ----
-   A shoot day may override someone's role / department / sub-department / lead company
+   A shoot day may override someone's role / department / lead company
    for that day only. Person-level facts (phone, email, dietary, sizes) always fall
    through to the crew database, so later database fixes propagate automatically. */
-const OVERRIDABLE_FIELDS = ['role','department','subDepartment','coProductionCompany'];
+const OVERRIDABLE_FIELDS = ['role','department','coProductionCompany'];
 /* Phase BF — takes an ENTRY id. The base record is the entry view (the crew record with
    the entry's own role/department layered on), so a person holding two entries resolves
    to their AC role on one position and their operator role on the other. An id that no
@@ -9613,18 +9645,15 @@ function dayOverrideFormHTML(entryId){
   const base = (e && entryView(e)) || {};
   const eff = resolveCrewForDay(entryId, day);
   const overridden = hasOverride(entryId, day);
-  const currentPath = eff.subDepartment ? `${eff.department}/${eff.subDepartment}` : (eff.department||'');
+  /* ⚠️ A FLAT department list. This used to nest each department's sub-departments
+     under it as indented options whose value was a "Dept/SubDept" path that
+     saveDayOverride() split back apart — which is why that split looks over-built for a
+     plain list. Sub-departments are gone; the value is just the department name now. */
+  const currentDept = eff.department||'';
   let deptOpts = '<option value="">— Department —</option>';
   DEPARTMENTS.forEach(d=>{
-    deptOpts += `<option value="${esc(d)}" ${currentPath===d?'selected':''}>${esc(d)}</option>`;
-    subDeptsFor(d).forEach(sd=>{
-      const path = `${d}/${sd}`;
-      deptOpts += `<option value="${esc(path)}" ${currentPath===path?'selected':''}>\u00A0\u00A0\u00A0${esc(sd)}</option>`;
-    });
+    deptOpts += `<option value="${esc(d)}" ${currentDept===d?'selected':''}>${esc(d)}</option>`;
   });
-  if(eff.subDepartment && !subDeptsFor(eff.department).includes(eff.subDepartment)){
-    deptOpts += `<option value="${esc(currentPath)}" selected>\u00A0\u00A0\u00A0${esc(eff.subDepartment)}</option>`;
-  }
   const inUse = crewDB.map(x=>x.coProductionCompany).filter(Boolean);
   const known = [...new Set(coProCompaniesList.concat(inUse))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
   const coOpts = ['<option value="">— Lead company —</option>']
@@ -9655,9 +9684,7 @@ async function saveDayOverride(entryId){
   const day = currentDay(); if(!day) return;
   const e = entryById(entryId, projById(day.projectId));
   const base = (e && entryView(e)) || {};
-  const pathVal = val('ovDept');
-  const [dept, ...rest] = pathVal.split('/');
-  const proposed = { role: val('ovRole'), department: dept||'', subDepartment: rest.join('/'), coProductionCompany: val('ovCoPro') };
+  const proposed = { role: val('ovRole'), department: val('ovDept'), coProductionCompany: val('ovCoPro') };
   // only store fields that actually differ from the database record
   const ov = {};
   OVERRIDABLE_FIELDS.forEach(f=>{ if((proposed[f]||'') !== (base[f]||'')) ov[f] = proposed[f]; });
@@ -9689,7 +9716,7 @@ function buildFullData(d){
   const p=projById(d.projectId)||{};
   const primary=locById(d.locationId);
   const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locById(id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
-  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',subDepartment:c.subDepartment||'',coProductionCompany:c.coProductionCompany||''};});
+  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',coProductionCompany:c.coProductionCompany||''};});
   const crewOnly = allPositions.filter(r=>!r.coProductionCompany);
   // Client and Talent stand apart from the crew departments (Phase N item 3) — pulled
   // out of the canonical-department-order crew list into their own dedicated blocks
