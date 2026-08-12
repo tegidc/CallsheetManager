@@ -823,8 +823,12 @@
      A grid, not a table, so the header cells and the body cells share one column
      definition and cannot drift; the role column takes the slack so the four number
      columns stay put down the list. */
-  .rate-rows{display:flex; flex-direction:column; gap:2px;}
-  .rate-row{display:grid; grid-template-columns:minmax(0,1fr) 74px 92px 74px 60px;
+  /* seven columns don't fit a narrow form, so the rows scroll sideways inside their own
+     box rather than squeezing the number columns to unreadable widths — same answer
+     .tablewrap gives every other wide table in this app */
+  .rate-rows-scroll{overflow-x:auto;}
+  .rate-rows{display:flex; flex-direction:column; gap:2px; min-width:560px;}
+  .rate-row{display:grid; grid-template-columns:minmax(0,1fr) 74px 92px 74px 60px 66px 72px;
     align-items:center; column-gap:10px; min-height:32px;}
   .rate-row-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
     letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);
@@ -837,13 +841,10 @@
   .rate-row .budget-rate-input{width:100%;}
   /* a disabled kit box still holds its column — it reads as "not split", not as missing */
   .rate-row .rr-kit:disabled{opacity:.4; cursor:not-allowed;}
-  /* derived, so it is TEXT and never looks typeable */
-  .rr-labour{font-size:var(--fs-meta); color:var(--muted);}
-  @media (max-width:900px){
-    /* the four number columns keep their widths and the row scrolls with the form
-       rather than collapsing into an unreadable stack of half-width boxes */
-    .rate-row{grid-template-columns:minmax(90px,1fr) 68px 88px 68px 54px; column-gap:8px;}
-  }
+  /* all three derived cells are TEXT, never inputs, so they can't look typeable */
+  .rr-labour, .rr-vat, .rr-inc{font-size:var(--fs-meta); color:var(--muted);}
+  /* the inc-VAT figure is the one you quote, so it carries the ink the others don't */
+  .rr-inc{color:var(--text);}
   /* AG: the Day Rate input + its "save to crew database" icon, wherever the pair appears
      (Roles tab, Budget Per Person, the crew Edit expansion) */
   .rate-with-save{display:inline-flex; align-items:center; gap:4px;}
@@ -1884,50 +1885,83 @@ function renderGlobalOverlay(){
    for why it is never stored. */
 function crewRatesSectionHTML(c){
   const roles = (c && c.roles) || [];
+  const vatReg = (c && c.vatRegistered)==='Yes';
   const rows = roles.map(rp=>{
     const rr = roleRateFor(c, rp) || {};
     const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
     const hasSplit = rr.kit!=null;
     const rate = rr.rate!=null ? rr.rate : '';
     const kit = rr.kit!=null ? rr.kit : '';
+    const n = Number(rate);
+    const hasRate = rate!=='' && !isNaN(n);
     return `<div class="rate-row" data-rolepath="${esc(rp)}">
       <span class="rate-row-role" title="${esc(rp)}">${esc(name)}</span>
       <input type="text" inputmode="decimal" class="budget-rate-input rr-rate" value="${esc(String(rate))}" placeholder="—" oninput="refreshRateRow(this)">
       <label class="rate-row-split"><input type="checkbox" class="rr-split" ${hasSplit?'checked':''} onchange="refreshRateRow(this)"> with Kit</label>
       <input type="text" inputmode="decimal" class="budget-rate-input rr-kit" value="${esc(String(kit))}" placeholder="—" ${hasSplit?'':'disabled'} oninput="refreshRateRow(this)">
       <span class="rr-labour">${hasSplit ? esc(String(labourOf(rate, kit))) : '—'}</span>
+      <span class="rr-vat">${(vatReg && hasRate) ? esc(fmtRateVat(n*VAT_RATE)) : '—'}</span>
+      <span class="rr-inc">${(vatReg && hasRate) ? esc(fmtRateVat(n*(1+VAT_RATE))) : '—'}</span>
     </div>`;
   }).join('');
   return `<details class="formgroup" open>
     <summary class="fg-title">Rates</summary>
-    <div style="margin-bottom:14px;">
-      <label>Invoices as <span style="color:var(--muted)">(optional)</span></label>
-      <input type="text" id="ncInvoicesAs" value="${esc((c&&c.invoicesAs)||'')}" placeholder="${esc((c&&c.name)||'Their own name')}">
-      <div class="hint">Blank means they invoice in their own name. Fill it in with a limited company or trading name — who the money is actually paid to.</div>
+    <div class="grid g2" style="margin-bottom:14px;">
+      <div>
+        <label>Invoices as <span style="color:var(--muted)">(optional)</span></label>
+        <input type="text" id="ncInvoicesAs" value="${esc((c&&c.invoicesAs)||'')}" placeholder="${esc((c&&c.name)||'Their own name')}">
+        <div class="hint">Blank means they invoice in their own name. Fill it in with a limited company or trading name — who the money is actually paid to.</div>
+      </div>
+      <div>
+        <label>VAT registered</label>
+        <select id="ncVat" onchange="refreshAllRateRows()">
+          <option value="">—</option>
+          <option ${(c&&c.vatRegistered)==='Yes'?'selected':''}>Yes</option>
+          <option ${(c&&c.vatRegistered)==='No'?'selected':''}>No</option>
+        </select>
+        <div class="hint">Moved here from Logistics — it's a billing fact. Drives the VAT columns opposite, and the Budget's own VAT figures.</div>
+      </div>
     </div>
-    ${roles.length ? `<div class="rate-rows">
+    ${roles.length ? `<div class="rate-rows-scroll"><div class="rate-rows">
       <div class="rate-row rate-row-head">
-        <span>Role</span><span>Day rate</span><span>Split</span><span>Kit</span><span>Labour</span>
+        <span>Role</span><span>Day rate</span><span>Split</span><span>Kit</span><span>Labour</span><span>VAT</span><span>Inc VAT</span>
       </div>
       ${rows}
-    </div>
-    <div class="hint" style="margin-top:8px;">A rate here is used for that role ahead of Fee / rate below, and a project can still override it for one job. Kit is a fixed equipment charge — labour is whatever is left of the day rate, so the two always add up.</div>`
+    </div></div>
+    <div class="hint" style="margin-top:8px;">A rate here is used for that role ahead of Fee / rate below, and a project can still override it for one job. Kit is a fixed equipment charge — labour is whatever is left of the day rate, so the two always add up.</div>
+    <div class="hint" style="margin-top:4px;">VAT is ${Math.round(VAT_RATE*100)}% of the whole day rate, kit included — it isn't apportioned, because the same rate applies to both halves. Shown only while VAT registered is Yes; every figure entered here is ex-VAT.</div>`
     : `<div class="hint">Rates are per role. Give this person a saved role above and a line will appear here for it.</div>`}
   </details>`;
 }
+/* money for the rate rows only. Plain 2dp with no currency symbol, matching the bare
+   numbers in the inputs beside them — budgetFmt()'s "£1,234.00" next to an unadorned
+   "800" would read as two different kinds of number. */
+function fmtRateVat(n){ return (Math.round(n*100)/100).toFixed(2); }
 /* Recalculates ONE row in place — never a re-render, which would throw away whatever is
    half-typed in the rest of the form. Called from the rate box, the kit box and the
-   toggle, so all three routes land on the same arithmetic. */
+   split toggle, so all three routes land on the same arithmetic. */
 function refreshRateRow(el){
   const row = el.closest('.rate-row'); if(!row) return;
   const split = row.querySelector('.rr-split').checked;
   const kitInput = row.querySelector('.rr-kit');
   kitInput.disabled = !split;
   if(!split) kitInput.value = '';
-  const rate = Number(row.querySelector('.rr-rate').value);
+  const rateRaw = row.querySelector('.rr-rate').value.trim();
+  const rate = Number(rateRaw);
   const kit = Number(kitInput.value);
+  const hasRate = rateRaw!=='' && !isNaN(rate);
   row.querySelector('.rr-labour').textContent =
-    (split && !isNaN(rate) && !isNaN(kit)) ? String(labourOf(rate, kit)) : '—';
+    (split && hasRate && !isNaN(kit)) ? String(labourOf(rate, kit)) : '—';
+  /* ⚠️ Reads #ncVat LIVE rather than a value captured at render: the select sits in this
+     same section and can be changed after the rows are on screen. */
+  const vatReg = (val('ncVat')==='Yes');
+  row.querySelector('.rr-vat').textContent = (vatReg && hasRate) ? fmtRateVat(rate*VAT_RATE) : '—';
+  row.querySelector('.rr-inc').textContent = (vatReg && hasRate) ? fmtRateVat(rate*(1+VAT_RATE)) : '—';
+}
+/* the VAT select changes every row at once, so it re-runs the same per-row function
+   rather than carrying its own copy of the arithmetic */
+function refreshAllRateRows(){
+  document.querySelectorAll('.rate-row[data-rolepath] .rr-rate').forEach(refreshRateRow);
 }
 /* The read side of the Rates section. A row with no usable rate stores NOTHING rather
    than a zero — an absent entry falls through the rate chain to c.rate, which is what
@@ -4846,7 +4880,7 @@ function buildProjectCrewGroups(list, p, days){
     catering: () => groupAlpha(c => c.dietaryGeneral, 'Standard / not set'),
     hotel:      () => groupFixed(c => personHasHotel(c,p,days) ? 'Has hotel' : 'No hotel', ['Has hotel','No hotel']),
     personType: () => groupFixed(c => deptBucketKey(c.department)==='Talent' ? 'Talent' : deptBucketKey(c.department)==='Client' ? 'Client' : 'Crew', ['Crew','Talent','Client']),
-    // c.vatRegistered is strictly '' / 'Yes' / 'No' — the same yn('ncVat',…) field
+    // c.vatRegistered is strictly '' / 'Yes' / 'No' — the same #ncVat field
     // Budget's VAT calc already reads (buildBudgetData()), not a second source
     vat:        () => groupFixed(c => c.vatRegistered==='Yes' ? 'VAT registered' : c.vatRegistered==='No' ? 'Not VAT registered' : 'Not set', ['VAT registered','Not VAT registered','Not set']),
     seniority:  () => groupFixed(crewSeniorityBand, ['Department leads','Mid-level','Support / entry level']),
@@ -7432,7 +7466,7 @@ function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle 
 
 /* AH: Budget Per Person's VAT checkbox — the editable front-end for the same
    c.vatRegistered the crew database's own "VAT registered" field (crewFormHTML's
-   yn('ncVat',...)) and buildBudgetData()'s vat calc already read, not a second flag.
+   #ncVat) and buildBudgetData()'s vat calc already read, not a second flag.
    Mutates the live crewDB record straight away (so VAT toggles on/off in this same
    render, exactly like ticking it on the database form would once saved) but does
    NOT call saveDB itself — per the brief this checkbox has no save icon of its own;
@@ -8839,7 +8873,6 @@ function onNewCrewRolePick(selectEl){
 }
 function crewFormHTML(c, entryId){
   c=c||{};
-  const yn = (id,cur)=>`<select id="${id}"><option value="">—</option><option ${cur==='Yes'?'selected':''}>Yes</option><option ${cur==='No'?'selected':''}>No</option></select>`;
   // saved role is the sole source of role + department (item 1): existing crew get the
   // live tag-list editor (immediate save, same widget as the Roles grid); a brand-new
   // not-yet-saved person picks one role up front via pendingNewCrewRole, required to save.
@@ -8922,9 +8955,13 @@ function crewFormHTML(c, entryId){
         <div><label>Shoe size</label><input type="text" id="ncShoe" value="${esc(c.shoeSize||'')}"></div>
         <div><label>Clothing / jacket size</label><input type="text" id="ncClothing" value="${esc(c.clothingSize||'')}"></div>
       </div>
+      <!-- ⚠️ VAT registered used to sit here beside Drives?. It is a BILLING fact, not a
+           logistics one, and it drives the VAT column in every rate row, so it moved up
+           into Rates next to Invoices as. There must only ever be ONE #ncVat in the
+           form — saveCrew reads it by id. -->
       <div class="grid g3" style="margin-bottom:10px;">
-        <div><label>VAT registered</label>${yn('ncVat',c.vatRegistered)}</div>
         <div><label>Drives?</label><select id="ncDrives" onchange="toggleCarFields()"><option value="">—</option><option ${c.drives==='Yes'?'selected':''}>Yes</option><option ${c.drives==='No'?'selected':''}>No</option></select></div>
+        <div></div>
         <div></div>
       </div>
       <div id="carFields" class="grid g2" style="margin-bottom:10px; display:${c.drives==='Yes'?'grid':'none'};">
