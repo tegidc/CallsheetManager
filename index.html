@@ -576,7 +576,7 @@
   /* the same-human marker on a person split across departments */
   .role-dupe-star{color:var(--tape); font-weight:700; margin-left:3px; cursor:help;}
   /* ---- "Also on this project as" ---- */
-  .also-listed{margin-top:16px; border-top:1px solid var(--line); padding-top:12px;}
+  .also-listed{margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:12px;}
   .also-listed-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
     letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   .also-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer;
@@ -1931,13 +1931,18 @@ function rolesMenuHTML(){
   return `<div class="modal-overlay" onclick="if(event.target===this) closeRolesMenu()">
     <div class="modal-box">
       <h3>${esc(c.name||'Role')}</h3>
+      ${/* ⚠️ WHERE THEY ALREADY ARE COMES FIRST. You open this menu on a person you can
+            see listed twice, so "what is the other one" is the question in your head —
+            and it is read-only. Change to / Add again as are further down because they
+            EDIT: putting a control that rewrites a booking above the thing that tells you
+            what the booking currently is invites changing the wrong one. */''}
+      ${rolesMenuAlsoListedHTML(entryId, e.crewId, p)}
       <div class="tabs" style="margin-bottom:12px;">
         <div class="tab ${rolesMenuMode==='change'?'active':''}" onclick="setRolesMenuMode('change')">Change to</div>
         <div class="tab ${rolesMenuMode==='add'?'active':''}" onclick="setRolesMenuMode('add')">Add again as</div>
       </div>
       ${rolesMenuListHTML(entryId, e.crewId, c)}
       <div style="margin-top:10px;">${rolesMenuAddRolePickerHTML(entryId, e.crewId, c)}</div>
-      ${rolesMenuAlsoListedHTML(entryId, e.crewId, p)}
       <div class="toolbar" style="margin-top:14px;">
         <button onclick="closeRolesMenu()">Close</button>
       </div>
