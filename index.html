@@ -1829,9 +1829,11 @@ function renderGlobalOverlay(){
    which "don't create this" is still a choice is before the write. Cancel writes
    nothing at all; proceed runs duplicateCrew() unchanged.
 
-   Native confirm() deliberately — it is what deleteCrew() and removeSubDeptAdmin()
-   already use on this screen (D-1). The one in-page dialog here (addRoleDialogHTML,
-   D-1.5) is a picker, not a confirmation, so it is not the pattern to copy.
+   Native confirm() deliberately — it is what deleteCrew() already uses on this screen
+   (D-1), alongside the native prompt() in addRoleToDeptAdmin(). (removeSubDeptAdmin()
+   was the other example cited here; it went with the sub-departments block.) The one
+   in-page dialog here (addRoleDialogHTML, D-1.5) is a picker, not a confirmation, so it
+   is not the pattern to copy.
 
    Deferred, not rejected: opening a prefilled form and writing nothing until the name
    is changed is the correct end state. It needs saveCrew()'s pendingNewCrewRole
@@ -8361,9 +8363,9 @@ function renderCrewDatabase(m){
     <div class="page-head"><h1>Crew</h1><div class="eyebrow">Database</div></div>
     <div class="section">
       <h2 class="dept-toggle" style="cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="toggleDeptAdminPanel()">
-        <span class="dept-caret">${deptAdminOpen?'▾':'▸'}</span> Departments &amp; sub-departments
+        <span class="dept-caret">${deptAdminOpen?'▾':'▸'}</span> Departments &amp; roles
       </h2>
-      ${deptAdminOpen ? renderDeptAdminPanel() : '<div class="hint">Manage department structure and Heads of Department at a glance.</div>'}
+      ${deptAdminOpen ? renderDeptAdminPanel() : '<div class="hint">Add roles to a department, set their seniority order, and pick Heads of Department.</div>'}
     </div>
     <div class="section">
       <h2>All crew</h2>
@@ -8377,28 +8379,25 @@ function renderCrewDatabase(m){
   renderCrewList();
 }
 function toggleDeptAdminPanel(){ deptAdminOpen = !deptAdminOpen; refreshCrewDatabase(); }
-/* "Departments & sub-departments" admin panel — an at-a-glance view of every
-   department's sub-departments and roster, with Heads of Department pinned to
-   the top of each department's crew list (not flat/alphabetical). */
+/* "Departments & roles" admin panel — an at-a-glance view of every department's roles
+   and roster, with Heads of Department pinned to the top of each department's crew list
+   (not flat/alphabetical).
+   ⚠️ The SUB-DEPARTMENTS block that used to head each department here is gone, along
+   with addSubDeptAdmin/renameSubDeptAdmin/removeSubDeptAdmin — sub-departments aren't
+   part of how this is run any more (one department, then seniority). Its "+ Add" is
+   what survived, repointed at the thing the panel genuinely couldn't do: put a new role
+   INTO a department. It now sits under the seniority list it adds to, rather than above
+   a heading for a different list. ⚠️ SUBDEPARTMENTS_BY_DEPT and c.subDepartment are
+   deliberately untouched — existing crew records still carry sub-department values and
+   the crew form still offers the field, so nothing here silently drops saved data. */
 function renderDeptAdminPanel(){
   return DEPARTMENTS.map(d=>{
-    const subs = subDeptsFor(d);
     const roster = sortHoDFirst(crewDB.filter(c=>deptBucketKey(c.department)===d));
     const roles = rolesFor(d).slice().sort((a,b)=>roleSeniorityRank(d,a)-roleSeniorityRank(d,b));
     return `<div class="dept-admin-block">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
         <span class="dept-code">${esc(DEPARTMENT_CODES[d]||'')}</span><strong>${esc(d)}</strong>
         <span class="hint">(${roster.length})</span>
-      </div>
-      <div style="margin-bottom:8px;">
-        <div class="hint" style="margin-bottom:4px;">Sub-departments</div>
-        <div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
-          ${subs.length ? subs.map(sd=>`<span class="pill dept">${esc(sd)}
-              <span onclick="renameSubDeptAdmin('${esc(d)}','${esc(sd)}')" style="margin-left:5px;cursor:pointer;" title="Rename">✎</span>
-              <span onclick="removeSubDeptAdmin('${esc(d)}','${esc(sd)}')" style="margin-left:3px;opacity:.65;cursor:pointer;" title="Remove">✕</span>
-            </span>`).join('') : '<span class="hint">None yet.</span>'}
-          <span class="pill" style="cursor:pointer;" onclick="addSubDeptAdmin('${esc(d)}')">+ Add</span>
-        </div>
       </div>
       <div style="margin-bottom:8px;">
         <div class="hint" style="margin-bottom:4px;">Role seniority order (top = most senior)</div>
@@ -8410,7 +8409,10 @@ function renderDeptAdminPanel(){
                 <button class="icon-btn" ${idx===roles.length-1?'disabled':''} onclick="moveRoleSeniority('${esc(d)}','${esc(r)}',1)" title="Less senior">${icon('down')}</button>
               </span>
             </span>`).join('')}
-        </div>` : '<span class="hint">No saved roles yet.</span>'}
+        </div>` : '<span class="hint">No roles yet.</span>'}
+        <div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
+          <span class="pill" style="cursor:pointer;" onclick="addRoleToDeptAdmin('${esc(d)}')">+ Add role</span>
+        </div>
       </div>
       ${roster.length ? `<div class="taglist" style="display:flex;flex-wrap:wrap;gap:4px;">
         ${roster.map(c=>`<span class="pill" style="cursor:pointer;${c.isHoD?'background:var(--tint-6);':''}" onclick="toggleHoD('${c.id}')" title="${c.isHoD?'Head of Department — click to unset':'Click to make Head of Department'}">${c.isHoD?'★ ':''}${esc(c.name)}${c.subDepartment?' · '+esc(c.subDepartment):''}</span>`).join('')}
@@ -8418,32 +8420,25 @@ function renderDeptAdminPanel(){
     </div>`;
   }).join('');
 }
-async function addSubDeptAdmin(dept){
-  const sd = (prompt(`New sub-department under ${dept}:`)||'').trim();
-  if(!sd) return;
-  SUBDEPARTMENTS_BY_DEPT[dept] = SUBDEPARTMENTS_BY_DEPT[dept] || [];
-  if(!SUBDEPARTMENTS_BY_DEPT[dept].includes(sd)) SUBDEPARTMENTS_BY_DEPT[dept].push(sd);
-  await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
-  refreshCrewDatabase();
-}
-async function renameSubDeptAdmin(dept, oldSd){
-  const newSd = (prompt(`Rename "${oldSd}" to:`, oldSd)||'').trim();
-  if(!newSd || newSd===oldSd) return;
-  const list = SUBDEPARTMENTS_BY_DEPT[dept] || [];
-  const i = list.indexOf(oldSd);
-  if(i>-1) list[i] = newSd;
-  crewDB.forEach(c=>{ if(c.department===dept && c.subDepartment===oldSd) c.subDepartment = newSd; });
-  await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
-  await saveDB('db:crew', crewDB);
-  refreshCrewDatabase();
-}
-async function removeSubDeptAdmin(dept, sd){
-  const affected = crewDB.filter(c=>c.department===dept && c.subDepartment===sd).length;
-  if(!confirm(`Remove "${sd}"${affected?` — ${affected} crew member(s) will have their sub-department cleared`:''}?`)) return;
-  SUBDEPARTMENTS_BY_DEPT[dept] = (SUBDEPARTMENTS_BY_DEPT[dept]||[]).filter(x=>x!==sd);
-  crewDB.forEach(c=>{ if(c.department===dept && c.subDepartment===sd) c.subDepartment = ''; });
-  await saveDB('db:subdepartments', SUBDEPARTMENTS_BY_DEPT);
-  await saveDB('db:crew', crewDB);
+/* Add a canonical role to a department, from the department admin panel.
+   ⚠️ Writes ROLES_BY_DEPT / db:roles — the SAME store confirmAddRoleDialog() writes to
+   when it invents a role while attaching it to a person. That was previously the ONLY
+   way a new canonical role could come into existence: you had to be giving it to
+   somebody. This is the department-level entry point that was missing, and it touches
+   no crew record at all.
+   Seniority is left alone deliberately. A new role is pushed to the END of the
+   department's list and has no ROLE_SENIORITY entry, so roleSeniorityRank() ranks it
+   last — most junior — which is the right default and is exactly the fallback that
+   function already documents. Reorder it with the arrows in the list above. */
+async function addRoleToDeptAdmin(dept){
+  const role = (prompt(`New role in ${dept}:`)||'').trim();
+  if(!role) return;
+  ROLES_BY_DEPT[dept] = ROLES_BY_DEPT[dept] || [];
+  // case-insensitive, so "Gaffer" can't be added a second time as "gaffer"
+  const clash = ROLES_BY_DEPT[dept].find(r=>r.toLowerCase()===role.toLowerCase());
+  if(clash){ alert(`${dept} already has a role called "${clash}".`); return; }
+  ROLES_BY_DEPT[dept].push(role);
+  await saveDB('db:roles', ROLES_BY_DEPT);
   refreshCrewDatabase();
 }
 async function toggleHoD(crewId){
