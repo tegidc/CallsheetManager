@@ -4612,3 +4612,117 @@ cluster). Zero console errors; `node --check` clean; CSS braces balanced 483/483
   totals on it.
 - Locations, catering, hotel and travel are still production-only by definition; nothing
   about the "VAT follows the person" rule (Phase AO) changed.
+
+## Phase BT — Post (the edit): a second phase tab, and the Budget's third scope (12 Aug 2026)
+
+**"Make a 'post' sub tab after crew on site — it can be essentially a copy of pre
+production's functionality. It will be for adding people and days to the edit. The
+toggles in budget should follow the order of preproduction, production then edit.
+Pre-production tab is still spaced differently to the others."**
+
+Three things, and the middle one is why the first is cheap: Pre-production already had
+exactly the machinery the edit needs, so Post is not a copy of it — it IS it, rendered
+with a different phase key.
+
+### One implementation, two tabs
+
+- `PHASE_TABS` — the whole difference between the two screens, as data: `store` (the
+  project key), `label`, `daysTitle`, `anchor` and `calHint`. Every function underneath
+  takes `phase` (the crewGridView key, `'preprod'` or `'post'`) and looks the rest up —
+  [Crew ▸ Pre-production / Post]
+  - ⚠️ **There is deliberately NO second copy** of the calendar, the drag, the counter,
+    the row or the storage. `phaseWrite` / `phaseDaysOf` / `phaseDatesOf` /
+    `phaseCalendarHTML` / `phaseRowHTML` replace the `prep*` originals; `prepDaysOf()` and
+    `postDaysOf()` survive only as one-line aliases for the callers outside this section
+    (fronting, Budget). A fix to one tab is a fix to both, and the two cannot drift.
+  - The render branch is `isPhaseTab(crewGridView)`, one branch for both, and the two
+    tabs share the `.prep-*` CSS. Adding a third phase = a `PHASE_TABS` entry + a view key.
+- `p.postSchedule` is `p.prepSchedule`'s shape exactly (`{days, dates[]}` keyed by ENTRY
+  id), and the two are **parallel and independent**: booking 10 prep days says nothing
+  about anyone's edit days, and nothing copies, defaults or reconciles one from the other.
+- `prunePrepSchedule()` → **`prunePhaseSchedules()`**, which walks *every* store in
+  `PHASE_TABS`. Both entry-removal paths (`removeCrewEntries()`, `deleteCrew()`) call it
+  unchanged, so a new phase is pruned for free — a hand-named second store here is exactly
+  the thing that would have been left dangling.
+- One calendar open at a time **across both tabs**, so the open flag holds `{phase,
+  entryId}`, not a bare id — the same entry exists on both, and "open on Pre-production"
+  must not render open on Post. `setCrewGridView()` closes it on every switch as well.
+- The one genuine behavioural difference: **where an unmarked calendar opens.** Prep runs
+  up to the shoot so it anchors on the FIRST shoot day; the edit runs after it, so Post
+  anchors on the LAST (`PHASE_TABS[].anchor`). Both still read-only — neither tab has ever
+  touched a shoot day.
+- Everything Pre-production settled still holds for both, and nothing about it moved:
+  **no totals** anywhere on either screen; marks stay indicative and unreconciled against
+  the booked number; **ONE rate** (`resolveEntryRate`), now shared by four screens, with no
+  prep-specific and no edit-specific rate.
+- Tab order is `Roles · Pre-production · Days on site · Post · Hotel · Travel · Catering` —
+  the three phase tabs read left to right in the order the job happens, and the logistics
+  of the shoot follow.
+
+### Budget: three scopes, in chronological order
+
+- `BUDGET_SCOPES` — **ONE ordered list**: Pre-production, Production, Post. The toggles
+  render from it and `budgetScopeLabel()` reads from it, so the three phases cannot end up
+  in two different orders, and they match the Crew sub-tabs. Do not hand-order the toggles
+  in `budgetSummaryBarHTML()` — [Budget]
+- `postOn` joins `prodOn`/`prepOn` as a 1/0 factor, and a person's VAT now splits **three**
+  ways (`prodVat` / `prepVat` / `postVat`, `pp.vat` still their sum) for Phase BS's reason:
+  each part reconciles against a different thing — `prodVat` against Per Day's VAT column,
+  the other two against their own blocks in that view.
+- ⚠️ `buildPhaseSlice()` — Phase BS's prep department roll-up, made a **function of the
+  three per-person keys** rather than the second hand-written copy Post would otherwise
+  have been. Returns `{departments, exVat, vat, incVat, daysTotal, peopleCount}` plus its
+  own prose labels; `data.prep` / `data.post` / `data.phases` are what the views read.
+  **Both slices are already counted inside `people[].subtotal` → `departments` →
+  `crewTotalExVat` → `totalExVat`** — anything that adds `prep.exVat` or `post.exVat` to
+  `totalExVat` is double-counting — [Budget]
+- ⚠️ **Neither prep nor edit days are touched by the shoot-day filter**, for the reason
+  prep never was: neither is a shoot day, so there is no day to attribute them to. Their
+  own toggles are how you take them out. The department filter still applies to both,
+  because that filters the people list itself.
+
+| view | treatment |
+|---|---|
+| Per Department | both fold into each department's own row, and one hint says how much of the total is each — never a pseudo-department, which would double-count against the rows above it |
+| Per Day | Pre-production leads the day rows and **Post closes them**, each its own always-open block outside `budgetDayBlocks` (which is keyed by day id). The page then reads top to bottom in the order the job happens, and the rows still sum to the total |
+| Per Person | count columns **Prep · Days · Edit**, declared once in that order so header and body cells cannot disagree, each appearing only when its scope is on. One combined note covers whichever off-shoot columns are showing |
+| Copy / Excel | the same column order, and the Pre-production / Post rows lead and close the day shape exactly as the blocks do |
+
+### The spacing bug — measured, not eyeballed
+
+`.prep-grid` was `align-items:start` while `.roles-grid` and `.crewgrid` were
+`align-items:center` — and Phase BO's own note two blocks below it already *claimed* all
+three centred. In the shared 33px row that put Pre-production's name hard against the top:
+
+| | before | after |
+|---|---|---|
+| Roles / Days on site / Hotel / Travel / Catering | 33px, name 8.5px top / 8.5px bottom | unchanged |
+| **Pre-production** | 33px, name **0px top / 17px bottom** | 33px, **8.5 / 8.5** |
+
+Mobile never had it (`.prep-name` is `align-self:stretch` + flex-centred there), which is
+why it only ever showed up on desktop and survived Phases BO, BP, BQ and BR.
+
+### Verified
+
+- All **eight** scope combinations, against the live data with rates seeded onto both
+  stores: `departments(exVat) + extras === totalExVat` ✓, `perDay(exVat) + prep + post
+  === totalExVat` ✓, `perDay(vat) + prepVat + postVat === vatTotal` ✓, `ex + vat === inc` ✓
+- Additive to the penny: prep-only £28,800 + production-only £14,800 + post-only £25,200
+  = all-on £68,800, VAT likewise; each slice's department rows sum back to its own total;
+  all scopes off reads £0.00 with the note
+- Post tab driven by clicking, not by setting state: days typed on three rows persist to
+  `p.postSchedule` and nowhere else (`p.prepSchedule` untouched), the counter reads back,
+  the calendar opens on the last shoot day's month, a click marks a date, and switching
+  tabs closes it. Entry removal prunes both stores in one call
+- Row geometry identical across **all seven** sub-tabs at 1280 (33px; name 8.5/8.5; x at
+  355 / 421 / 601), and at 375 (40px floor, 52px only where a counter has something to
+  say — Phase BQ's documented "floor, not cap", and the same on both phase tabs)
+- Every project tab and every Budget view rendered on two projects; zero console errors;
+  `node --check` clean; CSS braces balanced 483/483
+
+### Left alone
+
+- No totals on either phase tab, no editing phase days from Budget, no prep/edit rate of
+  their own, and no task-flag nag for an unbooked edit.
+- Post carries no shoot-day dimension and never will — that is the whole reason it is not
+  a Days-on-site variant.

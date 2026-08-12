@@ -538,7 +538,16 @@
   /* the fields column is sized to the COUNTER, not to the two 60px inputs — at 150px
      "5 days booked · 7 dates marked" wrapped onto a second line and made rows with
      both figures taller than rows with one. */
-  .prep-grid{display:grid; align-items:start; column-gap:10px;
+  /* ⚠️ Phase BT — align-items:CENTER, not `start`. Phase BO's note two blocks down
+     already claimed all three grids centred; .prep-grid alone still said `start`, and
+     that mismatch WAS the "Pre-production is spaced differently" complaint: in the
+     shared 33px row a 28px input/name sat hard against the top with the slack all
+     below it, while Roles and the four .crewgrid tabs centred theirs. Mobile never
+     had the bug (.prep-name is align-self:stretch + flex-centred there), which is why
+     it only ever showed up on desktop. When a row IS genuinely taller — a counter
+     line, a stacked role — Name/Role now centre against the whole fields group
+     instead of hanging off its first line. Same grid used by both phase sub-tabs. */
+  .prep-grid{display:grid; align-items:center; column-gap:10px;
     grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 200px 32px minmax(0,1fr);}
   .prep-controls{display:flex; align-items:center;}
   .prep-cell{min-width:0;}
@@ -1604,7 +1613,7 @@ async function setEntryRole(entryId, rolePath){
    "Change to" omits the entry's own current role from the list and calls setEntryRole()
    — one entry in, one entry out, nothing else created. Confirmed in code (not assumed):
    every downstream reader of an entry's role — resolveCrewForDay()/dayOverrideFormHTML()
-   for shoot-day positions, and Pre-production's prepRowHTML() (via this same
+   for shoot-day positions, and the phase tabs' phaseRowHTML() (via this same
    roleBannerHTML()) — reads role fresh off the entry object on every render rather than
    caching or duplicating it anywhere, exactly as BF's model established, so
    setEntryRole()'s one write is the only write this needs.
@@ -2112,7 +2121,9 @@ function removeCrewEntries(p, entryIds){
   // place both the single (removeCrewFromProject) and bulk
   // (bulkRemoveSelectedFromProject) removals already meet. deleteCrew() does NOT come
   // through here — it prunes for itself, see its own note.
-  prunePrepSchedule(p, kill);
+  // Phase BT — p.postSchedule is the same structure for the edit, and is pruned by the
+  // same call: prunePhaseSchedules() walks every store in PHASE_TABS.
+  prunePhaseSchedules(p, kill);
 }
 /* ---- the migration ----
    Runs once from initApp(), before the first render, and is IDEMPOTENT: a project that
@@ -4485,7 +4496,10 @@ function toggleAllProjectDeptsCollapsed(deptsCSV){
    allowed to be recomputed (the other is a fresh load). frontedCacheMap() would notice
    the view change on its own; dropping it here as well makes the rule explicit at the
    place the rule is about. */
-function setCrewGridView(view){ crewGridView = view; resetFrontedEntryCache(); renderProjectBody(); }
+/* Phase BT — closing the open date-marks calendar is part of switching tabs: Pre-production
+   and Post render the same entries, so a calendar left open on one would reappear open on
+   the other against a different phase's marks. */
+function setCrewGridView(view){ crewGridView = view; resetFrontedEntryCache(); closePhaseCalendar(); renderProjectBody(); }
 
 /* ============ .filter-panel-foot — shared by all three filter panels ============
    Crew database (D-1.2), Crew on this project (T-2.6) and Budget (T-6.0) each
@@ -4933,19 +4947,20 @@ function buildPersonBlocks(entryViews){
    Fronted = most days IN THE CURRENT PHASE (whichever crewGridView is active), ties
    broken by ROLE_SENIORITY via roleSeniorityRank(), remaining ties by roster order
    (Array#sort is stable). "Days in the current phase" is:
-     'preprod'      → prepDaysOf(entryId)  — that tab's own authoritative day count
+     'preprod'/'post' → phaseDaysOf(view, entryId) — that tab's OWN authoritative day
+                                             count, out of its own store only
      everything else → entryDayCount()     — the shoot-day-worked signal
                                              ((d.positions||[]).some(pos=>pos[0]===entryId))
    ⚠️ ROLES resolves to that same shoot-day signal. Confirmed against the code rather
    than assumed: the Roles grid is Name / Role / Rate / Show as and carries no day
    dimension of its own at all, and entryOnDay()/d.positions is the ONLY per-entry
-   "days" that exists outside Pre-production's p.prepSchedule. So Roles fronts exactly
+   "days" that exists outside the two phase stores. So Roles fronts exactly
    as Days on site does. ⚠️ entryDayCount(), never crewDayCount() — fronting is a
    choice BETWEEN a person's entries, so the person-level union would rank them all
    equal (the Phase AO grain trap, in the direction that silently does nothing).
 
    ⚠️ RECOMPUTED ON LOAD AND TAB-SWITCH ONLY — NEVER ON AN EDIT. Almost every field on
-   these tabs re-renders the whole tab body on save (setPrepDays, saveEntryRate,
+   these tabs re-renders the whole tab body on save (setPhaseDays, saveEntryRate,
    toggleCrewOnDay, toggleMeal…), so computing this inline would re-front — and
    visibly re-order — the row the user just typed into. The choice is memoised per
    person for as long as (crewGridView, project) hold; setCrewGridView() drops the
@@ -4961,7 +4976,9 @@ function frontedCacheMap(){
 }
 function resetFrontedEntryCache(){ frontedEntryCache = { view:null, projectId:null, map:new Map() }; }
 function phaseDaysOfEntry(entryId, p, days){
-  if(crewGridView==='preprod') return prepDaysOf(entryId, p) || 0;
+  // Phase BT — both phase tabs front on their OWN booked days, each reading only its
+  // own store; everything else still fronts on the shoot-day signal.
+  if(isPhaseTab(crewGridView)) return phaseDaysOf(crewGridView, entryId, p) || 0;
   return entryDayCount(entryId, days);
 }
 /* works on entry views AND on raw p.crewEntries records — both carry id/role/department */
@@ -5190,7 +5207,11 @@ function renderProjectCrew(body){
   const unassigned = crewDB.filter(c=>!onProject.has(c.id));
   const filtered = buildPersonBlocks(assigned.filter(personMatchesProjectFilter));
 
-  const viewLabels = {roles:'Roles', preprod:'Pre-production', days:'Days on site', hotel:'Hotel', travel:'Travel', catering:'Catering'};
+  /* Phase BT — Post sits directly after Days on site, so the three phase tabs read
+     left to right in the order the job actually happens: Pre-production, the shoot,
+     then the edit. Hotel/Travel/Catering follow as the logistics of the shoot they
+     always were. Same order as the Budget's scope toggles, deliberately. */
+  const viewLabels = {roles:'Roles', preprod:'Pre-production', days:'Days on site', post:'Post', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
@@ -5251,22 +5272,24 @@ function renderProjectCrew(body){
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewRolesRowHTML(c)).join('')}</div>`;
       }).join('');
       assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
-    } else if(crewGridView==='preprod'){
-      /* Same entry grain and grouping as Roles. ⚠️ Phase BR added this header row —
-         Phase BD's "no header row, magnitude alone distinguishes the two numbers" was
-         overruled: an unlabelled pair of bare numbers is a guess, not a reading. RATE and
-         DAYS sit in one cell over column 4, laid out on the same flex row and the same
-         field widths as `.prep-fields-row` below it, so each label lands over its own
-         input. Column 5 (the date-marks calendar) stays unlabelled — the icon says it. */
-      const prepHeaderRow = `<div class="prep-grid prep-grid-header-row">
+    } else if(isPhaseTab(crewGridView)){
+      /* Pre-production AND Post (Phase BT) — ONE branch, because they are one screen
+         rendered twice. Same entry grain and grouping as Roles. ⚠️ Phase BR added this
+         header row — Phase BD's "no header row, magnitude alone distinguishes the two
+         numbers" was overruled: an unlabelled pair of bare numbers is a guess, not a
+         reading. RATE and DAYS sit in one cell over column 4, laid out on the same flex
+         row and the same field widths as `.prep-fields-row` below it, so each label lands
+         over its own input. Column 5 (the date-marks calendar) stays unlabelled — the
+         icon says it. */
+      const phaseHeaderRow = `<div class="prep-grid prep-grid-header-row">
           ${pbHeadLeadCellsHTML('prep-grid-header')}
           <div class="prep-grid-header prep-header-fields"><span>Rate</span><span>Days</span></div>
         </div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
-        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>prepRowHTML(c)).join('')}</div>`;
+        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>phaseRowHTML(c, crewGridView)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${prepHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${phaseHeaderRow}${groupsHTML}</div>`;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
@@ -6364,14 +6387,24 @@ async function removeCrewFromProject(id){
   saveInBackground('db:shootdays', shootDaysDB);
 }
 
-/* ============================================================ PRE-PRODUCTION (T-8)
+/* ================================================ THE PHASE TABS: PRE-PRODUCTION + POST
 
-   Phase BD. A sibling tab to Crew / Locations / Tech / Shoot Days / Budget /
-   Preview & Export, NOT a sixth view inside Crew — it exists because pre-production
-   has a different scheduling model to a shoot-day roster. It shows the same crew
-   ENTRY rows as the Roles view, so a person doing two roles is two rows.
+   Phase BD built Pre-production (T-8); Phase BT added POST — the edit — as a second
+   tab of exactly the same shape, and turned everything below into ONE implementation
+   the two share rather than a copy. They exist as their own Crew sub-tabs because
+   neither phase has shoot days: a prep day and an edit day are scheduled against the
+   calendar, not against a roster of numbered days. Both show the same crew ENTRY rows
+   as the Roles view, so a person doing two roles is two rows.
 
-   ⚠️ THE ONE RULE THIS SCREEN IS BUILT AROUND: there are NO TOTALS. No rate × days,
+   ⚠️ ONE IMPLEMENTATION, TWO TABS. Every function below takes `phase` — the
+   crewGridView key, 'preprod' or 'post' — and looks the rest up in PHASE_TABS. There
+   is deliberately no second copy of the calendar, the drag, the counter or the row: a
+   fix to one is a fix to both, and the two tabs cannot drift into behaving differently.
+   Adding a third phase is adding a PHASE_TABS entry and a view key, nothing more.
+   They share the .prep-* CSS for the same reason — "essentially a copy of
+   Pre-production's functionality" is the brief, and one grid is how that stays true.
+
+   ⚠️ THE ONE RULE THESE SCREENS ARE BUILT AROUND: there are NO TOTALS. No rate × days,
    no aggregation, no rollup, no section total, no totals column. Rate and days are
    data on rows and nothing on this screen adds anything up. If a later phase wants a
    figure here, that is a decision to be taken deliberately, not a gap to fill in.
@@ -6380,17 +6413,21 @@ async function removeCrewFromProject(id){
    which counts rows, not prep data.)
 
    ---- what lives where ----
-   DAYS       — p.prepSchedule[entryId].days. A plain editable number and the
-                AUTHORITATIVE figure: not derived, not computed, not reconciled
-                against the date marks or against shoot days.
-   DATE MARKS — p.prepSchedule[entryId].dates, a FLAT ARRAY of 'YYYY-MM-DD'. Their
-                purpose is showing NON-CONTIGUOUS patterns (one day, gap, three days,
-                gap, two). Click-and-drag is a selection affordance only — it is never
-                stored as a range, a start/end pair, or anything but the flat list.
+   DAYS       — p.prepSchedule[entryId].days / p.postSchedule[entryId].days. A plain
+                editable number and the AUTHORITATIVE figure: not derived, not computed,
+                not reconciled against the date marks or against shoot days.
+   DATE MARKS — the same record's .dates, a FLAT ARRAY of 'YYYY-MM-DD'. Their purpose is
+                showing NON-CONTIGUOUS patterns (one day, gap, three days, gap, two).
+                Click-and-drag is a selection affordance only — it is never stored as a
+                range, a start/end pair, or anything but the flat list.
    RATE       — NOT here. It is the entry's own existing `rate`, read through
                 resolveEntryRate() and written through saveEntryRate(), the exact same
-                field the Roles view and Budget read. There is deliberately ONE rate:
-                editing it here changes it everywhere. Do not add a prep-specific rate.
+                field the Roles view and Budget read. There is deliberately ONE rate,
+                now across THREE phases: editing it here changes it everywhere. Do not
+                add a prep-specific or edit-specific rate.
+   ⚠️ TWO SEPARATE STORES, ONE SHAPE. p.prepSchedule and p.postSchedule are parallel and
+   independent — booking someone 10 prep days says nothing about their edit days, and
+   nothing anywhere copies, defaults or reconciles one from the other.
 
    ⚠️ MARKS ARE INDICATIVE AND NOT BOUND TO THE DAYS NUMBER. "Booked 5, marked 7" is a
    VALID state — someone spreading five days' work across seven. There is deliberately
@@ -6398,54 +6435,92 @@ async function removeCrewFromProject(id){
    mismatch, in either direction. Do not add one.
 
    ---- why a parallel structure and not a field on the entry ----
-   p.crewEntries' shape was settled deliberately by Phase BF; this is a parallel, not
-   an extension of it. The cost of that choice is that prep data outlives the entry it
-   belongs to unless something removes it, which is why prunePrepSchedule() exists and
+   p.crewEntries' shape was settled deliberately by Phase BF; these are parallel, not
+   an extension of it. The cost of that choice is that phase data outlives the entry it
+   belongs to unless something removes it, which is why prunePhaseSchedules() exists and
    is called from both entry-removal paths — see removeCrewEntries() and deleteCrew().
 */
 
-let prepCalendarFor = null;   // entry id whose calendar is open, or null — one at a time
-let prepCalMonth = null;      // 'YYYY-MM' the open calendar is currently showing
+/* The two tabs, and everything that differs between them. Keyed by crewGridView value
+   — that key IS the phase throughout this section, so there is no second mapping to
+   keep in step. ⚠️ `store` is a PROJECT key: adding a phase here adds a project field. */
+const PHASE_TABS = {
+  preprod: {
+    store:'prepSchedule', label:'Pre-production', daysTitle:'Pre-production days',
+    // where the calendar opens when nothing is marked yet: prep runs UP TO the shoot,
+    // so it anchors on the first shoot day; the edit runs after it, so post anchors on
+    // the last. Read-only either way — neither tab ever touches a shoot day.
+    anchor:'first',
+    calHint:"Click or drag to mark the days this person is needed in prep. Marks are indicative — they don't have to match the booked number."
+  },
+  post: {
+    store:'postSchedule', label:'Post', daysTitle:'Edit days',
+    anchor:'last',
+    calHint:"Click or drag to mark the days this person is needed in the edit. Marks are indicative — they don't have to match the booked number."
+  }
+};
+const isPhaseTab = (view) => Object.prototype.hasOwnProperty.call(PHASE_TABS, view);
+
+/* ONE calendar open at a time across BOTH tabs — it holds the phase as well as the
+   entry, because the same entry id exists on both and "open on Pre-production" must
+   not render open on Post. (setCrewGridView() closes it on every tab switch anyway;
+   this is the belt to that braces.) */
+let phaseCalendarFor = null;   // {phase, entryId} or null
+let phaseCalMonth = null;      // 'YYYY-MM' the open calendar is currently showing
+const phaseCalOpen = (phase, entryId) =>
+  !!phaseCalendarFor && phaseCalendarFor.phase===phase && phaseCalendarFor.entryId===entryId;
+function closePhaseCalendar(){ phaseCalendarFor = null; phaseCalMonth = null; }
 
 /* ---- storage accessors ----
-   Read-only helpers never create a record: an entry with no prep data must stay
-   absent from p.prepSchedule entirely, so a project nobody has used this tab on
+   Read-only helpers never create a record: an entry with no data for a phase must stay
+   absent from that phase's store entirely, so a project nobody has used the tab on
    carries no key at all. */
-const prepScheduleOf = (p) => ((p||currentProject()||{}).prepSchedule)||{};
-const prepRecordOf   = (entryId, p) => prepScheduleOf(p)[entryId] || null;
-const prepDaysOf     = (entryId, p) => { const r = prepRecordOf(entryId, p); return r && r.days!=null ? r.days : null; };
-const prepDatesOf    = (entryId, p) => { const r = prepRecordOf(entryId, p); return Array.isArray(r&&r.dates) ? r.dates : []; };
+const phaseScheduleOf = (phase, p) => ((p||currentProject()||{})[PHASE_TABS[phase].store])||{};
+const phaseRecordOf   = (phase, entryId, p) => phaseScheduleOf(phase, p)[entryId] || null;
+const phaseDaysOf     = (phase, entryId, p) => { const r = phaseRecordOf(phase, entryId, p); return r && r.days!=null ? r.days : null; };
+const phaseDatesOf    = (phase, entryId, p) => { const r = phaseRecordOf(phase, entryId, p); return Array.isArray(r&&r.dates) ? r.dates : []; };
+/* the two named readers the REST of the app uses (fronting, Budget). Thin aliases, so
+   there is still exactly one implementation underneath them. */
+const prepDaysOf = (entryId, p) => phaseDaysOf('preprod', entryId, p);
+const postDaysOf = (entryId, p) => phaseDaysOf('post', entryId, p);
 
-/* the ONE write path into p.prepSchedule. Normalises on the way out (dates sorted and
+/* the ONE write path into either store. Normalises on the way out (dates sorted and
    deduplicated) and deletes rather than storing an empty husk — the same idiom as
    saveEntryRate()'s "clearing the field deletes the key". */
-function prepWrite(p, entryId, mutate){
+function phaseWrite(phase, p, entryId, mutate){
   if(!p || !entryId) return;
-  p.prepSchedule = p.prepSchedule || {};
-  const existing = p.prepSchedule[entryId];
+  const store = PHASE_TABS[phase].store;
+  p[store] = p[store] || {};
+  const existing = p[store][entryId];
   const rec = { days: existing && existing.days!=null ? existing.days : null,
                 dates: Array.isArray(existing&&existing.dates) ? existing.dates.slice() : [] };
   mutate(rec);
   const dates = [...new Set(rec.dates||[])].sort();
-  if(rec.days==null && !dates.length) delete p.prepSchedule[entryId];
-  else p.prepSchedule[entryId] = { days: rec.days, dates };
-  if(!Object.keys(p.prepSchedule).length) delete p.prepSchedule;
+  if(rec.days==null && !dates.length) delete p[store][entryId];
+  else p[store][entryId] = { days: rec.days, dates };
+  if(!Object.keys(p[store]).length) delete p[store];
 }
 
 /* Pruning. Called from removeCrewEntries() (single + bulk removal) and from
-   deleteCrew() (which does not route through it). Takes a Set of entry ids. */
-function prunePrepSchedule(p, entryIds){
-  if(!p || !p.prepSchedule) return;
+   deleteCrew() (which does not route through it). Takes a Set of entry ids.
+   ⚠️ Phase BT — clears EVERY phase store, not just prep. A new phase added to
+   PHASE_TABS is pruned by both call sites for free; one hand-named store here would
+   have been the thing left dangling. */
+function prunePhaseSchedules(p, entryIds){
+  if(!p) return;
   const kill = entryIds instanceof Set ? entryIds : new Set(entryIds||[]);
-  kill.forEach(id=>{ delete p.prepSchedule[id]; });
-  if(!Object.keys(p.prepSchedule).length) delete p.prepSchedule;
+  Object.values(PHASE_TABS).forEach(({store})=>{
+    if(!p[store]) return;
+    kill.forEach(id=>{ delete p[store][id]; });
+    if(!Object.keys(p[store]).length) delete p[store];
+  });
 }
 
 /* Days. Written on `onchange`, so it only fires when the value actually changed and
    focus has left. Garbage reverts by re-rendering without saving, exactly as
    saveEntryRate() does — the field visibly returns to the last valid value rather
    than sitting there holding text that was never stored. Empty clears it. */
-async function setPrepDays(entryId, rawValue){
+async function setPhaseDays(phase, entryId, rawValue){
   const p = currentProject(); if(!p) return;
   if(!entryById(entryId, p)) return;
   const trimmed = (rawValue||'').trim();
@@ -6455,42 +6530,44 @@ async function setPrepDays(entryId, rawValue){
     if(isNaN(n) || n < 0){ renderProjectBody(); return; }
     next = n;
   }
-  prepWrite(p, entryId, rec=>{ rec.days = next; });
+  phaseWrite(phase, p, entryId, rec=>{ rec.days = next; });
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
 
 /* ---- the per-entry calendar ---- */
-function prepCalAnchorMonth(entryId){
-  const marks = prepDatesOf(entryId);
+function phaseCalAnchorMonth(phase, entryId){
+  const marks = phaseDatesOf(phase, entryId);
   if(marks.length) return marks[0].slice(0,7);
-  // otherwise open on something meaningful: the project's first shoot day, else its
-  // start date, else this month. Read-only — this tab never touches shoot days.
+  // otherwise open on something meaningful: the shoot day this phase sits next to
+  // (first for prep, last for the edit), else the project's start date, else this
+  // month. Read-only — neither tab ever touches shoot days.
   const p = currentProject();
-  const first = projectDays(p&&p.id)[0];
-  const iso = (first && first.date) || (p && p.startDate) || '';
+  const days = projectDays(p&&p.id);
+  const anchorDay = PHASE_TABS[phase].anchor==='last' ? days[days.length-1] : days[0];
+  const iso = (anchorDay && anchorDay.date) || (p && p.startDate) || '';
   return /^\d{4}-\d{2}/.test(iso) ? iso.slice(0,7) : new Date().toISOString().slice(0,7);
 }
-function togglePrepCalendar(entryId){
-  if(prepCalendarFor===entryId){ prepCalendarFor = null; prepCalMonth = null; }
-  else { prepCalendarFor = entryId; prepCalMonth = prepCalAnchorMonth(entryId); }
+function togglePhaseCalendar(phase, entryId){
+  if(phaseCalOpen(phase, entryId)) closePhaseCalendar();
+  else { phaseCalendarFor = {phase, entryId}; phaseCalMonth = phaseCalAnchorMonth(phase, entryId); }
   renderProjectBody();
 }
-function shiftPrepCalMonth(delta){
-  if(!prepCalMonth) return;
-  const [y,m] = prepCalMonth.split('-').map(Number);
+function shiftPhaseCalMonth(delta){
+  if(!phaseCalMonth) return;
+  const [y,m] = phaseCalMonth.split('-').map(Number);
   const d = new Date(Date.UTC(y, m-1+delta, 1));
-  prepCalMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  phaseCalMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
   renderProjectBody();
 }
-async function commitPrepDates(entryId, isoList){
+async function commitPhaseDates(phase, entryId, isoList){
   const p = currentProject(); if(!p) return;
   if(!entryById(entryId, p)) return;
-  prepWrite(p, entryId, rec=>{ rec.dates = isoList||[]; });
+  phaseWrite(phase, p, entryId, rec=>{ rec.dates = isoList||[]; });
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
-async function clearPrepDates(entryId){ await commitPrepDates(entryId, []); }
+async function clearPhaseDates(phase, entryId){ await commitPhaseDates(phase, entryId, []); }
 
 /* Click-and-drag selection. The drag is a UI affordance for picking several dates
    quickly and nothing more — what gets stored is still the flat array.
@@ -6499,14 +6576,14 @@ async function clearPrepDates(entryId){ await commitPrepDates(entryId, []); }
    ONE save and ONE render happen on mouseup. The first cell decides the direction
    (dragging from an unmarked day marks; from a marked day unmarks), so a drag can
    clear a run as easily as it makes one. A plain click is a one-cell drag. */
-let prepDrag = null;   // {entryId, mode:'add'|'remove', set:Set}
-function prepDayDown(entryId, iso, ev){
+let prepDrag = null;   // {phase, entryId, mode:'add'|'remove', set:Set}
+function phaseDayDown(phase, entryId, iso, ev){
   if(ev) ev.preventDefault();
-  const cur = new Set(prepDatesOf(entryId));
-  prepDrag = { entryId, mode: cur.has(iso) ? 'remove' : 'add', set: cur };
+  const cur = new Set(phaseDatesOf(phase, entryId));
+  prepDrag = { phase, entryId, mode: cur.has(iso) ? 'remove' : 'add', set: cur };
   prepDragApply(iso);
 }
-function prepDayEnter(iso){ if(prepDrag) prepDragApply(iso); }
+function phaseDayEnter(iso){ if(prepDrag) prepDragApply(iso); }
 function prepDragApply(iso){
   if(!prepDrag) return;
   if(prepDrag.mode==='add') prepDrag.set.add(iso); else prepDrag.set.delete(iso);
@@ -6516,36 +6593,36 @@ function prepDragApply(iso){
 document.addEventListener('mouseup', ()=>{
   if(!prepDrag) return;
   const d = prepDrag; prepDrag = null;
-  commitPrepDates(d.entryId, [...d.set]);
+  commitPhaseDates(d.phase, d.entryId, [...d.set]);
 });
 
 const PREP_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const PREP_WEEKDAYS = ['M','T','W','T','F','S','S'];
-function prepCalendarHTML(entryId){
-  const ym = prepCalMonth || prepCalAnchorMonth(entryId);
+function phaseCalendarHTML(phase, entryId){
+  const ym = phaseCalMonth || phaseCalAnchorMonth(phase, entryId);
   const [y, m] = ym.split('-').map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const lead = (new Date(Date.UTC(y, m-1, 1)).getUTCDay() + 6) % 7;   // Monday-first
-  const marked = new Set(prepDatesOf(entryId));
+  const marked = new Set(phaseDatesOf(phase, entryId));
   const cells = [];
   for(let i=0;i<lead;i++) cells.push('<span class="prep-cal-day empty"></span>');
   for(let d=1; d<=daysInMonth; d++){
     const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     cells.push(`<span class="prep-cal-day${marked.has(iso)?' marked':''}" data-iso="${iso}"
-      onmousedown="prepDayDown('${entryId}','${iso}',event)" onmouseenter="prepDayEnter('${iso}')">${d}</span>`);
+      onmousedown="phaseDayDown('${phase}','${entryId}','${iso}',event)" onmouseenter="phaseDayEnter('${iso}')">${d}</span>`);
   }
   return `<div class="prep-cal">
       <div class="prep-cal-head">
-        <span class="prep-cal-nav" onclick="shiftPrepCalMonth(-1)" title="Previous month">‹</span>
+        <span class="prep-cal-nav" onclick="shiftPhaseCalMonth(-1)" title="Previous month">‹</span>
         <span class="prep-cal-title">${PREP_MONTH_NAMES[m-1]} ${y}</span>
-        <span class="prep-cal-nav" onclick="shiftPrepCalMonth(1)" title="Next month">›</span>
-        ${marked.size ? `<span class="prep-cal-clear" onclick="clearPrepDates('${entryId}')">Clear marks</span>` : ''}
+        <span class="prep-cal-nav" onclick="shiftPhaseCalMonth(1)" title="Next month">›</span>
+        ${marked.size ? `<span class="prep-cal-clear" onclick="clearPhaseDates('${phase}','${entryId}')">Clear marks</span>` : ''}
       </div>
       <div class="prep-cal-grid">
         ${PREP_WEEKDAYS.map(w=>`<span class="prep-cal-wd">${w}</span>`).join('')}
         ${cells.join('')}
       </div>
-      <div class="hint">Click or drag to mark the days this person is needed in prep. Marks are indicative — they don't have to match the booked number.</div>
+      <div class="hint">${esc(PHASE_TABS[phase].calHint)}</div>
     </div>`;
 }
 
@@ -6559,24 +6636,22 @@ function prepCounterText(days, markCount){
   return parts.join(' · ');
 }
 
-/* Pre-production (T-2.9) PERSON BLOCK (Phase BK; collapsible Phase BL).
-   ⚠️ Takes a PERSON BLOCK. Prep days, the entry rate and the date marks are ALL
-   entry-level (p.prepSchedule is keyed by entry id), so every one of them sits on a
-   ROLE ROW — the name line here carries nothing but the person, because this tab has
-   no person-level fact of its own. Rate and days are still two bare number fields with
-   NO column headers and NO inline labels: magnitude alone distinguishes them. Do not
-   add labels back. ⚠️ Still no totals of any kind on this screen — nothing here sums,
-   rolls up or multiplies anything, and BK/BL added none.
+/* Pre-production (T-2.9) and Post (Phase BT) PERSON BLOCK (Phase BK; collapsible BL).
+   ⚠️ Takes a PERSON BLOCK and the phase. Booked days, the entry rate and the date marks
+   are ALL entry-level (both stores are keyed by entry id), so every one of them sits on
+   a ROLE ROW — the name line here carries nothing but the person, because these tabs
+   have no person-level fact of their own. ⚠️ Still no totals of any kind on either
+   screen — nothing here sums, rolls up or multiplies anything, and BK/BL/BT added none.
    The role cell reuses roleBannerHTML() exactly as the Roles view has it — since Phase
    BM that is one chip which IS the roles-menu trigger, no separate "+" marker. */
-function prepRowHTML(block){
+function phaseRowHTML(block, phase){
   const p = currentProject(), shootDays = projectDays();
   const fronted = frontedEntryOfBlock(block, p, shootDays);
   const rest = block.entries.filter(e=>e.id!==fronted.id);
   // an open date-marks calendar belonging to a stacked-away entry has to stay on
-  // screen, so the block renders open in that one case — derived from prepCalendarFor,
+  // screen, so the block renders open in that one case — derived from phaseCalendarFor,
   // which already exists; NOT a new piece of open/closed state.
-  const open = rest.some(e=>e.id===prepCalendarFor);
+  const open = rest.some(e=>phaseCalOpen(phase, e.id));
   /* Phase BN — the fronted entry's Role/fields/calendar cells render straight onto
      the SAME .prep-grid div as the name (not a second, independently-gridded
      .pb-role-row), which is what let a single-role person's name and prep fields
@@ -6584,9 +6659,9 @@ function prepRowHTML(block){
      .pb-role-row below, genuinely a new row. */
   const entryCellsHTML = (e, toggleHTML) => {
     const rate = resolveEntryRate(e.id, p);
-    const days = prepDaysOf(e.id, p);
-    const marks = prepDatesOf(e.id, p);
-    const calOpen = prepCalendarFor===e.id;
+    const days = phaseDaysOf(phase, e.id, p);
+    const marks = phaseDatesOf(phase, e.id, p);
+    const calOpen = phaseCalOpen(phase, e.id);
     return { calOpen, html: `<div class="prep-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
       <div class="prep-cell prep-fields" style="grid-column:4;">
         <div class="prep-fields-row">
@@ -6594,18 +6669,18 @@ function prepRowHTML(block){
             title="Day rate — the same rate as the Roles view and Budget"
             onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">
           <input type="text" inputmode="numeric" class="budget-rate-input prep-days-input" value="${days!=null?days:''}" placeholder="—"
-            title="Pre-production days"
-            onclick="event.stopPropagation()" onchange="setPrepDays('${e.id}', this.value)">
+            title="${esc(PHASE_TABS[phase].daysTitle)}"
+            onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)">
         </div>
         <div class="prep-counter">${esc(prepCounterText(days, marks.length))}</div>
       </div>
       <div class="prep-cell prep-calcell" style="grid-column:5;">
         <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
-          onclick="togglePrepCalendar('${e.id}')"
+          onclick="togglePhaseCalendar('${phase}','${e.id}')"
           title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
           aria-label="Date marks">${icon('calendar')}</button>
       </div>
-      ${calOpen ? `<div class="prep-calwrap">${prepCalendarHTML(e.id)}</div>` : ''}` };
+      ${calOpen ? `<div class="prep-calwrap">${phaseCalendarHTML(phase, e.id)}</div>` : ''}` };
   };
   const frontedCells = entryCellsHTML(fronted, personBlockToggleHTML(block, rest.length, open));
   const isEditing = editingCrewId===block.id;
@@ -6622,8 +6697,9 @@ function prepRowHTML(block){
      Days on site. It was the one sub-tab without one (Phase BJ: "no crew-record edit
      path of its own"), which meant the Controls column rendered a checkbox and a gap
      where every other tab has a pencil. Same crewControlsHTML/crewExpansionHTML pair
-     the other five use — no second edit path, and nothing about prep days/marks
-     changes; this only reaches the crew RECORD, exactly as the pencil does elsewhere. */
+     the others use — no second edit path, and nothing about booked days/marks
+     changes; this only reaches the crew RECORD, exactly as the pencil does elsewhere.
+     Post inherits it by construction, being the same function. */
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
@@ -7080,28 +7156,37 @@ function toggleBudgetOutputPanel(){ budgetOutputOpen = !budgetOutputOpen; render
 let budgetVatToggle = true;
 function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(); }
 /* Phase BS — WHAT is being costed, sitting alongside Itemize VAT (which is HOW).
+   Phase BT added the third phase and fixed the ORDER (see BUDGET_SCOPES).
+     preproduction — the Pre-production sub-tab's prep days × the SAME entry rate
+                     (resolveEntryRate — one rate, shared by Roles, the two phase tabs
+                     and here; there is no separate prep rate and no separate edit rate).
      production    — the shoot itself: day rate × days on site, plus the
                      catering / travel / hotel / location extras. Everything Budget
-                     costed before this phase.
-     preproduction — the Pre-production sub-tab's prep days × the SAME entry rate
-                     (resolveEntryRate — one rate, shared by Roles, Pre-production and
-                     here; there is no separate prep rate and this phase didn't add one).
-   ⚠️ BOTH DEFAULT ON, so the out-of-the-box figure is the complete one. Turning both
-   off is allowed — it reads £0.00 with a note — rather than silently refusing the
-   click; nothing about that state is dangerous, just empty.
+                     costed before Phase BS.
+     post          — the Post sub-tab's edit days × that same entry rate.
+   ⚠️ ALL THREE DEFAULT ON, so the out-of-the-box figure is the complete one. Turning
+   them all off is allowed — it reads £0.00 with a note — rather than silently refusing
+   the click; nothing about that state is dangerous, just empty.
    ⚠️ Session state, like budgetView / budgetVatToggle / the filters. Deliberately NOT
    persisted to the project: this is "what am I looking at right now", not a property
    of the shoot. */
-let budgetScope = { production:true, preproduction:true };
+/* ⚠️ Phase BT — ONE ordered list, and it is CHRONOLOGICAL: prep, shoot, edit. The
+   toggles render from it, the scope label reads from it, and the Crew sub-tabs are in
+   the same order, so nothing can put the three phases in two different orders. Adding a
+   scope means adding a row here, not editing three places. */
+const BUDGET_SCOPES = [
+  ['preproduction', 'Pre-production'],
+  ['production',    'Production'],
+  ['post',          'Post']
+];
+let budgetScope = { preproduction:true, production:true, post:true };
 function toggleBudgetScope(key, on){ budgetScope[key] = on; renderProjectBody(); }
 /* One phrase for what's being costed, used by the summary-bar note and the export
    header so the two can't describe the same state differently. */
 function budgetScopeLabel(){
-  const {production:pr, preproduction:pp} = budgetScope;
-  return pr && pp ? 'Production + Pre-production'
-    : pr ? 'Production only'
-    : pp ? 'Pre-production only'
-    : 'Nothing (both scopes off)';
+  const on = BUDGET_SCOPES.filter(([k])=>budgetScope[k]).map(([,label])=>label);
+  if(!on.length) return 'Nothing (every scope off)';
+  return on.length===1 ? `${on[0]} only` : on.join(' + ');
 }
 // {dayId: true/false}, same shared plumbing (toggleBlock/setAllBlocksCollapsed
 // /applyBlockState) as the sd/tt/pv collapsible blocks. Unlike those, the
@@ -7292,25 +7377,30 @@ function buildBudgetData(){
      over days (see firstEntryOnDay in perDay below) it still equals each person's own
      figure. Charging it per entry would double a two-role person's travel AND the VAT
      on it, since AO's VAT base is (day rate + travel). */
-  /* Phase BS — the two scopes. `prodOn` gates every figure that belongs to the shoot
-     (day rate × days on site, and the catering/travel/hotel/location extras below);
-     `prepOn` gates prep days × the same entry rate. Written as a 1/0 factor rather
-     than sprinkled `if`s so a scope can never be applied in one place and forgotten
-     in another — every production figure in this function is multiplied by it once. */
+  /* Phase BS — the scopes, three of them since BT. `prodOn` gates every figure that
+     belongs to the shoot (day rate × days on site, and the catering/travel/hotel/
+     location extras below); `prepOn` gates prep days and `postOn` edit days, each ×
+     the same entry rate. Written as 1/0 factors rather than sprinkled `if`s so a scope
+     can never be applied in one place and forgotten in another — every production
+     figure in this function is multiplied by prodOn exactly once. */
   const prodOn = budgetScope.production ? 1 : 0;
   const prepOn = budgetScope.preproduction ? 1 : 0;
+  const postOn = budgetScope.post ? 1 : 0;
   const travelClaimed = new Set();
   const people = crewInScope.map(c=>{
     const {rate, hasRate, isOverride} = resolveEntryRate(c.id, p);
     const daysWorked = entryDayCount(c.id, days);
-    /* Prep days are per ENTRY, like the rate and the days worked — p.prepSchedule is
-       keyed by entry id (see prepDaysOf). ⚠️ They are NOT filtered by the day filter:
-       a prep day is not a shoot day and can't be attributed to one, so filtering to
-       "Day 2" leaves prep whole. The Pre-production toggle is how you take it out. */
+    /* Prep and edit days are per ENTRY, like the rate and the days worked — both stores
+       are keyed by entry id (see phaseDaysOf). ⚠️ NEITHER is filtered by the day filter:
+       a prep day and an edit day are not shoot days and can't be attributed to one, so
+       filtering to "Day 2" leaves both whole. Their own toggles are how you take them
+       out. */
     const prepDays = prepDaysOf(c.id, p) || 0;
+    const postDays = postDaysOf(c.id, p) || 0;
     const prodSubtotal = rate * daysWorked * prodOn;
     const prepSubtotal = rate * prepDays * prepOn;
-    const subtotal = prodSubtotal + prepSubtotal;
+    const postSubtotal = rate * postDays * postOn;
+    const subtotal = prodSubtotal + prepSubtotal + postSubtotal;
     const claimsTravel = !travelClaimed.has(c.crewId);
     if(claimsTravel) travelClaimed.add(c.crewId);
     const travelRate = (claimsTravel ? travelRateFor(c.crewId) : 0) * prodOn;
@@ -7319,18 +7409,21 @@ function buildBudgetData(){
     /* AO — the VAT base is day rate AND travel, both invoiced by this person.
        travelCost itself is NOT added to `subtotal`/`display`: it's already counted
        once in the Travel extras row, and counting it here too would double it.
-       ⚠️ Phase BS splits the VAT in two along the same seam as the money, because the
-       two halves reconcile against different things: prodVat has to sum back to the
-       Per Day view's VAT column (prep has no shoot day to land on), and prepVat to
-       the Pre-production block that view now carries. pp.vat is still their sum, so
-       every project-wide figure is unchanged when both scopes are on. */
+       ⚠️ Phase BS splits the VAT along the same seam as the money (Phase BT makes that
+       three ways, not two), because the parts reconcile against different things:
+       prodVat has to sum back to the Per Day view's VAT column (neither prep nor the
+       edit has a shoot day to land on), prepVat to the Pre-production block and postVat
+       to the Post block that view carries. pp.vat is still their sum, so every
+       project-wide figure is unchanged when all three scopes are on. */
     const prodVat = vatRegistered ? (prodSubtotal + travelCost) * VAT_RATE : 0;
     const prepVat = vatRegistered ? prepSubtotal * VAT_RATE : 0;
-    const vat = prodVat + prepVat;
+    const postVat = vatRegistered ? postSubtotal * VAT_RATE : 0;
+    const vat = prodVat + prepVat + postVat;
     return {
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
-      rate, hasRate, isOverride, daysWorked, prepDays, subtotal, prodSubtotal, prepSubtotal,
-      travelRate, travelCost, vatRegistered, vat, prodVat, prepVat,
+      rate, hasRate, isOverride, daysWorked, prepDays, postDays,
+      subtotal, prodSubtotal, prepSubtotal, postSubtotal,
+      travelRate, travelCost, vatRegistered, vat, prodVat, prepVat, postVat,
       display: budgetPersonDisplay(subtotal, vat)
     };
   });
@@ -7356,26 +7449,42 @@ function buildBudgetData(){
     ({dept:d, code:DEPARTMENT_CODES[d]||'', total:deptTotals[d]||0,
       exVat:deptExVat[d]||0, vat:deptVat[d]||0, incVat:(deptExVat[d]||0)+(deptVat[d]||0)}));
 
-  /* Phase BS — the SAME department roll-up again, over prep money only. Not a second
-     source of truth: it reads pp.prepSubtotal/pp.prepVat, the same per-person figures
-     already folded into `departments` above. It exists because Per Day needs somewhere
-     honest to put prep — a prep day has no shoot day to sit on — and because Per
-     Department's hint has to be able to say how much of the total is prep. */
-  const prepDeptExVat = {}, prepDeptVat = {}, prepDeptCounts = {};
-  people.forEach(pp=>{
-    if(!pp.prepSubtotal && !pp.prepDays) return;
-    prepDeptExVat[pp.department] = (prepDeptExVat[pp.department]||0) + pp.prepSubtotal;
-    prepDeptVat[pp.department]   = (prepDeptVat[pp.department]||0) + pp.prepVat;
-    prepDeptCounts[pp.department] = (prepDeptCounts[pp.department]||0) + 1;
-  });
-  const prepDepartments = DEPARTMENTS.filter(d=>prepDeptCounts[d]).map(d=>
-    ({dept:d, code:DEPARTMENT_CODES[d]||'', exVat:prepDeptExVat[d]||0, vat:prepDeptVat[d]||0,
-      incVat:(prepDeptExVat[d]||0)+(prepDeptVat[d]||0),
-      total: budgetPersonDisplay(prepDeptExVat[d]||0, prepDeptVat[d]||0)}));
-  const prepExVat = people.reduce((s,pp)=>s+pp.prepSubtotal, 0);
-  const prepVatTotal = people.reduce((s,pp)=>s+pp.prepVat, 0);
-  const prepDaysTotal = people.reduce((s,pp)=>s+(pp.prepDays||0), 0);
-  const prepPeopleCount = people.filter(pp=>pp.prepDays>0).length;
+  /* Phase BS — the SAME department roll-up again, over ONE phase's money. Not a second
+     source of truth: it reads pp.prepSubtotal/pp.prepVat (and since Phase BT
+     pp.postSubtotal/pp.postVat), the same per-person figures already folded into
+     `departments` above. It exists because Per Day needs somewhere honest to put a
+     phase that has no shoot day to sit on, and because Per Department's hint has to be
+     able to say how much of the total is prep and how much is the edit.
+     ⚠️ Phase BT made it a FUNCTION taking the three per-person keys, rather than the
+     second hand-written copy Post would otherwise have been — the two slices are the
+     same arithmetic and have to stay that way. */
+  const buildPhaseSlice = ({label, noteName, dayNoun, subKey, vatKey, daysKey, on}) => {
+    const ex = {}, vt = {}, counts = {};
+    people.forEach(pp=>{
+      if(!pp[subKey] && !pp[daysKey]) return;
+      ex[pp.department]     = (ex[pp.department]||0) + pp[subKey];
+      vt[pp.department]     = (vt[pp.department]||0) + pp[vatKey];
+      counts[pp.department] = (counts[pp.department]||0) + 1;
+    });
+    const exVat = people.reduce((s,pp)=>s+pp[subKey], 0);
+    const vat   = people.reduce((s,pp)=>s+pp[vatKey], 0);
+    return {
+      // label — the block heading and the export row. noteName — how the phase is named
+      // mid-sentence in a hint. dayNoun — how its days are named. All three so the prose
+      // reads as English rather than as a label dropped into a template.
+      label, noteName, dayNoun, on: !!on,
+      departments: DEPARTMENTS.filter(d=>counts[d]).map(d=>
+        ({dept:d, code:DEPARTMENT_CODES[d]||'', exVat:ex[d]||0, vat:vt[d]||0,
+          incVat:(ex[d]||0)+(vt[d]||0), total: budgetPersonDisplay(ex[d]||0, vt[d]||0)})),
+      exVat, vat, incVat: exVat + vat,
+      daysTotal: people.reduce((s,pp)=>s+(pp[daysKey]||0), 0),
+      peopleCount: people.filter(pp=>pp[daysKey]>0).length
+    };
+  };
+  const prep = buildPhaseSlice({label:'Pre-production', noteName:'pre-production', dayNoun:'Prep days',
+    subKey:'prepSubtotal', vatKey:'prepVat', daysKey:'prepDays', on:prepOn});
+  const post = buildPhaseSlice({label:'Post', noteName:'the edit', dayNoun:'Edit days',
+    subKey:'postSubtotal', vatKey:'postVat', daysKey:'postDays', on:postOn});
 
   /* R2 — location fees. A fee is entered once on the location record, then spread
      evenly across the shoot days that location is actually used on, so Per Day and
@@ -7505,13 +7614,15 @@ function buildBudgetData(){
   return {
     people, departments, cateringTotal, travelTotal, hotelTotal, locationTotal, extrasTotal,
     crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
-    // Phase BS — the pre-production slice, already counted inside the figures above
-    // (people[].subtotal → departments → crewTotalExVat → totalExVat). Carried
-    // separately so Per Day can show it as its own block and Per Department can say
-    // how much of itself is prep, never as a second thing to add on.
-    prepDepartments, prepExVat, prepVat: prepVatTotal, prepIncVat: prepExVat + prepVatTotal,
-    prepDaysTotal, prepPeopleCount,
-    prepOn: !!prepOn, prodOn: !!prodOn,
+    /* Phase BS/BT — the two non-shoot phase slices, ALREADY counted inside the figures
+       above (people[].subtotal → departments → crewTotalExVat → totalExVat). Carried
+       separately so Per Day can show each as its own block and Per Department can say
+       how much of itself is prep and how much is the edit — never as a second thing to
+       add on. ⚠️ Anything that adds prep.exVat or post.exVat to totalExVat is
+       double-counting. `phases` is the pair in chronological render order; the two
+       named keys are the same objects, for readers that want one specifically. */
+    prep, post, phases:[prep, post],
+    prepOn: !!prepOn, prodOn: !!prodOn, postOn: !!postOn,
     hasCrew: crewInScope.length>0, hasDays: days.length>0
   };
 }
@@ -7521,19 +7632,20 @@ function budgetSummaryBarHTML(data){
   const stats = budgetVatToggle
     ? [['Total (ex-VAT)', data.totalExVat], ['VAT', data.vatTotal], ['Total (inc-VAT)', data.totalIncVat]]
     : [['Total', data.totalIncVat]];
-  /* Phase BS — the two scope toggles sit in the same cluster as Itemize VAT, and in
-     that reading order: WHAT is being costed, then HOW it's shown. Both start ticked,
-     so the number you land on is the complete one. */
-  const scopeBox = (key, label) => `<label><input type="checkbox" ${budgetScope[key]?'checked':''} onchange="toggleBudgetScope('${key}', this.checked)"> ${label}</label>`;
-  const nothingOn = !budgetScope.production && !budgetScope.preproduction;
+  /* Phase BS — the scope toggles sit in the same cluster as Itemize VAT, and in that
+     reading order: WHAT is being costed, then HOW it's shown. All start ticked, so the
+     number you land on is the complete one.
+     ⚠️ Phase BT — they render from BUDGET_SCOPES, which is chronological: Pre-production,
+     Production, Post. Do not hand-order them here; that list is the one order. */
+  const scopeBox = ([key, label]) => `<label><input type="checkbox" ${budgetScope[key]?'checked':''} onchange="toggleBudgetScope('${key}', this.checked)"> ${esc(label)}</label>`;
+  const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   return `<div class="budget-summary">
     ${stats.map(([lbl,v])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}</div></div>`).join('')}
     <div class="budget-vat-toggle">
-      ${scopeBox('production','Production')}
-      ${scopeBox('preproduction','Pre-production')}
+      ${BUDGET_SCOPES.map(scopeBox).join('')}
       <label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label>
     </div>
-    ${nothingOn ? `<div class="budget-scope-note hint">Both scopes are off, so nothing is being costed. Tick Production, Pre-production, or both.</div>` : ''}
+    ${nothingOn ? `<div class="budget-scope-note hint">Every scope is off, so nothing is being costed. Tick Pre-production, Production or Post — or all three.</div>` : ''}
   </div>`;
 }
 
@@ -7599,13 +7711,17 @@ function budgetDepartmentViewHTML(data){
   /* Phase BS — prep money is folded INTO each department's row (a prep day is that
      department's cost), so the only thing missing was a way to see how much of the
      total it is. This note says it rather than adding a "Pre-production" pseudo-
-     department, which would double-count against the rows above it. */
-  const prepNote = data.prepOn && data.prepExVat ? `<div class="hint" style="margin-top:8px;">Department totals include ${budgetFmt(budgetVatToggle ? data.prepExVat : data.prepIncVat)} of pre-production — ${data.prepDaysTotal} prep day${data.prepDaysTotal===1?'':'s'} across ${data.prepPeopleCount} crew member${data.prepPeopleCount===1?'':'s'}, at the same day rate. Untick Pre-production above for the shoot on its own.</div>` : '';
+     department, which would double-count against the rows above it. Phase BT — the
+     edit is folded in exactly the same way, and gets a sentence in the same note
+     rather than a second block of hint text under the table. */
+  const phaseParts = data.phases.filter(ph=>ph.on && ph.exVat).map(ph=>
+    `${budgetFmt(budgetVatToggle ? ph.exVat : ph.incVat)} of ${ph.noteName} (${ph.daysTotal} day${ph.daysTotal===1?'':'s'} across ${ph.peopleCount} crew member${ph.peopleCount===1?'':'s'})`);
+  const noteHTML = phaseParts.length ? `<div class="hint" style="margin-top:8px;">Department totals include ${phaseParts.join(' and ')}, at the same day rate. Untick ${phaseParts.length>1?'either scope':'that scope'} above for the shoot on its own.</div>` : '';
   return budgetDeptExtrasTableHTML({
     departments: data.departments, catering: data.cateringTotal, travel: data.travelTotal,
     hotel: data.hotelTotal, location: data.locationTotal, extrasLabel: 'Project-wide extras',
     total: displayTotal, exVat: data.totalExVat, vat: data.vatTotal, incVat: data.totalIncVat
-  }) + prepNote;
+  }) + noteHTML;
 }
 
 function budgetPersonViewHTML(data){
@@ -7629,24 +7745,38 @@ function budgetPersonViewHTML(data){
     return `<td${travelNote}>${pp.vat ? fmt(pp.vat) : '<span class="budget-noRate">—</span>'}</td>`;
   };
   /* Phase BS — a count column appears only when its scope is being costed, so the
-     Subtotal is always explicable from the columns beside it. With both on you see
-     Days AND Prep and the subtotal is rate × (days + prep); with Production off the
-     Days column goes rather than sitting there uncosted next to a smaller number. */
-  const showDays = data.prodOn, showPrep = data.prepOn;
+     Subtotal is always explicable from the columns beside it. With all three on you see
+     Prep, Days AND Edit and the subtotal is rate × (prep + days + edit); with Production
+     off the Days column goes rather than sitting there uncosted next to a smaller
+     number. Phase BT — the three count columns are declared once, in the same
+     chronological order as the toggles, so the header and the body cells cannot
+     disagree about which ones are showing. */
+  const countCols = [
+    {on:data.prepOn, head:'Prep', title:'Pre-production days', tab:'Pre-production', value:pp=>pp.prepDays},
+    {on:data.prodOn, head:'Days', title:'Days on site',        tab:null,             value:pp=>pp.daysWorked},
+    {on:data.postOn, head:'Edit', title:'Edit days booked on the Post tab', tab:'Post', value:pp=>pp.postDays}
+  ].filter(c=>c.on);
+  /* The one note covering whichever non-shoot columns are showing — two near-identical
+     sentences stacked under the table said the same thing twice. */
+  const offShoot = countCols.filter(c=>c.tab);
+  const offShootNote = offShoot.length ? `<div class="hint" style="margin-top:8px;">${
+      offShoot.map(c=>c.head).join(' and ')} ${offShoot.length>1?'are':'is'} the ${
+      offShoot.map(c=>c.tab).join(' and ')} tab${offShoot.length>1?'s\'':'\'s'} booked days, at the same day rate — ${
+      offShoot.length>1?'neither is':'it is not'} filtered by the shoot-day filter, because ${
+      offShoot.length>1?'neither is a shoot day':'a '+offShoot[0].head.toLowerCase()+' day isn\'t a shoot day'}.</div>` : '';
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th>${showDays?'<th style="text-align:center;">Days</th>':''}${showPrep?'<th style="text-align:center;" title="Pre-production days">Prep</th>':''}${budgetVatToggle?'<th>VAT</th>':''}<th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th>${countCols.map(c=>`<th style="text-align:center;" title="${esc(c.title)}">${c.head}</th>`).join('')}${budgetVatToggle?'<th>VAT</th>':''}<th>Subtotal</th></tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
       <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
       <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
-      ${showDays?`<td style="text-align:center;">${pp.daysWorked}</td>`:''}
-      ${showPrep?`<td style="text-align:center;">${pp.prepDays || '<span class="budget-noRate">—</span>'}</td>`:''}
+      ${countCols.map(c=>`<td style="text-align:center;">${c.value(pp) || '<span class="budget-noRate">—</span>'}</td>`).join('')}
       ${budgetVatToggle?vatCell(pp):''}
       <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
     </tr>`).join('')}
   </table></div>
-  ${showPrep && data.prepDaysTotal ? `<div class="hint" style="margin-top:8px;">Prep is the Pre-production tab's booked days, at the same day rate — it is not filtered by the shoot-day filter, because a prep day isn't a shoot day.</div>` : ''}
+  ${data.phases.some(ph=>ph.on && ph.daysTotal) ? offShootNote : ''}
   ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}
   ${anyTravel ? `<div class="hint" style="margin-top:8px;">A VAT-registered crew member's travel carries VAT too — it's charged back through them — so their VAT covers day rate ${budgetVatToggle?'and travel':'and travel, baked into the Subtotal'}. The travel cost itself is counted once, in the Travel line of Per Department.</div>` : ''}
   <div class="hint" style="margin-top:8px;">Ticking VAT here doesn't save on its own — it's saved to the crew database together with the day rate, the next time that row's Save icon is clicked.</div>`;
@@ -7661,22 +7791,29 @@ function budgetDayViewHTML(data){
      not one of them: `budgetDayBlocks` is keyed by day id and syncBudgetDayBlocks()
      prunes anything that isn't, so this block is deliberately outside that plumbing
      and always open. Without it the day rows would no longer sum to the total the
-     summary bar shows, which is the one thing this view has to be able to do. */
-  const prepBlock = (data.prepOn && data.prepExVat) ? `<div class="sd-block">
-      <div class="sd-block-head" style="margin:0 0 0;">
-        <span style="flex:1;">Pre-production <span class="dept-count">(${data.prepDaysTotal} day${data.prepDaysTotal===1?'':'s'} · ${data.prepPeopleCount} crew)</span></span>
-        <strong>${fmt(budgetVatToggle ? data.prepExVat : data.prepIncVat)}</strong>
+     summary bar shows, which is the one thing this view has to be able to do.
+     ⚠️ Phase BT — Post is the SAME block, built by the same expression from data.phases,
+     and it sits BELOW the shoot days for the reason Pre-production sits above them:
+     this view reads down the page in the order the job happens. */
+  const phaseBlockHTML = (ph, topMargin) => (ph.on && ph.exVat) ? `<div class="sd-block">
+      <div class="sd-block-head" style="margin:${topMargin} 0 0;">
+        <span style="flex:1;">${esc(ph.label)} <span class="dept-count">(${ph.daysTotal} day${ph.daysTotal===1?'':'s'} · ${ph.peopleCount} crew)</span></span>
+        <strong>${fmt(budgetVatToggle ? ph.exVat : ph.incVat)}</strong>
       </div>
       <div style="margin-top:10px;">
         ${budgetDeptExtrasTableHTML({
-          departments: data.prepDepartments, catering:0, travel:0, hotel:0, location:0,
+          departments: ph.departments, catering:0, travel:0, hotel:0, location:0,
           hideExtras: true,
-          total: budgetVatToggle ? data.prepExVat : data.prepIncVat,
-          exVat: data.prepExVat, vat: data.prepVat, incVat: data.prepIncVat
+          total: budgetVatToggle ? ph.exVat : ph.incVat,
+          exVat: ph.exVat, vat: ph.vat, incVat: ph.incVat
         })}
-        <div class="hint" style="margin-top:8px;">Prep days belong to the project, not to any one shoot day, so they sit here rather than on a day row — and the shoot-day filter leaves them alone.</div>
+        <div class="hint" style="margin-top:8px;">${esc(ph.dayNoun)} belong to the project, not to any one shoot day, so they sit here rather than on a day row — and the shoot-day filter leaves them alone.</div>
       </div>
     </div>` : '';
+  // prep leads the list, so it keeps a flush top; post follows the day rows and takes
+  // the same 14px gap they put between each other.
+  const prepBlock = phaseBlockHTML(data.prep, '0');
+  const postBlock = phaseBlockHTML(data.post, '14px');
   const rows = data.perDay.map(d=>{
     const open = budgetDayBlocks[d.dayId];
     const title = `Day ${esc(d.dayNum||'?')}${d.locationLabel?' — '+esc(d.locationLabel):''}`;
@@ -7696,7 +7833,7 @@ function budgetDayViewHTML(data){
       </div>
     </div>`;
   }).join('');
-  return toggleRow + prepBlock + rows;
+  return toggleRow + prepBlock + rows + postBlock;
 }
 
 /* AF: Budget's own "Costs" tab. Deliberately holds no state of its own — every field
@@ -7802,27 +7939,34 @@ function budgetExportRows(data, view){
   // AO — the itemized shapes mirror the screen column-for-column: Per Person gains
   // the VAT amount, Per Department/Per Day the ex-VAT/VAT/inc-VAT breakdown.
   if(view==='person'){
-    // Phase BS — the count columns follow the scopes, exactly as on screen.
+    /* Phase BS — the count columns follow the scopes, exactly as on screen. Phase BT —
+       and in the same chronological order the screen puts them in (Prep, Days, Edit),
+       so a pasted table and the tab it came from read identically. */
     rows.push(['Name','Role','Day rate','VAT reg.',
-      ...(data.prodOn ? ['Days'] : []), ...(data.prepOn ? ['Prep'] : []),
+      ...(data.prepOn ? ['Prep'] : []), ...(data.prodOn ? ['Days'] : []),
+      ...(data.postOn ? ['Edit'] : []),
       ...(budgetVatToggle ? ['VAT'] : []), 'Subtotal']);
     budgetOrderedPeople(data).forEach(pp=>rows.push([
       pp.name, pp.role||'', pp.hasRate?fmt(pp.rate):'no rate on file',
       pp.vatRegistered?'Yes':'No',
-      ...(data.prodOn ? [pp.daysWorked] : []),
       ...(data.prepOn ? [pp.prepDays||0] : []),
+      ...(data.prodOn ? [pp.daysWorked] : []),
+      ...(data.postOn ? [pp.postDays||0] : []),
       ...(budgetVatToggle ? [pp.vat?fmt(pp.vat):'—'] : []),
       pp.hasRate?fmt(pp.display):'—']));
   } else if(view==='day'){
     rows.push(budgetVatToggle ? ['Day','Location','Ex-VAT','VAT','Inc-VAT'] : ['Day','Location','Total']);
-    // Phase BS — the prep row leads, same as the block does on screen, so the rows
-    // still add up to the total printed above them.
-    if(data.prepOn && data.prepExVat) rows.push(budgetVatToggle
-      ? ['Pre-production', `${data.prepDaysTotal} day${data.prepDaysTotal===1?'':'s'}`, fmt(data.prepExVat), fmt(data.prepVat), fmt(data.prepIncVat)]
-      : ['Pre-production', `${data.prepDaysTotal} day${data.prepDaysTotal===1?'':'s'}`, fmt(data.prepIncVat)]);
+    // Phase BS/BT — the prep row leads and the post row closes, same as the blocks do
+    // on screen, so the rows still add up to the total printed above them.
+    const phaseRow = ph => { if(!(ph.on && ph.exVat)) return;
+      const span = `${ph.daysTotal} day${ph.daysTotal===1?'':'s'}`;
+      rows.push(budgetVatToggle ? [ph.label, span, fmt(ph.exVat), fmt(ph.vat), fmt(ph.incVat)]
+                                : [ph.label, span, fmt(ph.incVat)]); };
+    phaseRow(data.prep);
     data.perDay.forEach(d=>rows.push(budgetVatToggle
       ? [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.exVat), fmt(d.vat), fmt(d.incVat)]
       : [`Day ${d.dayNum||'?'}`, d.locationLabel||'', fmt(d.total)]));
+    phaseRow(data.post);
   } else if(view==='costs'){
     /* AP — Costs is the one view that isn't a rollup, so R1 quietly exported the
        Per Department shape for it. Now that the menu names it, it exports what it
@@ -8654,14 +8798,14 @@ async function deleteCrew(id){
     if(!gone.size) return;
     p.crewEntries = (p.crewEntries||[]).filter(e=>!gone.has(e.id));
     /* Phase BD — this is the THIRD path that drops entries from a project, and the one
-       that does not go through removeCrewEntries(). Its pre-production records are
-       pruned here for the same reason theirs are: p.prepSchedule is keyed by entry id
-       and nothing else would ever clear it. This is not the same decision as the
+       that does not go through removeCrewEntries(). Its pre-production and post records
+       are pruned here for the same reason theirs are: both stores are keyed by entry id
+       and nothing else would ever clear them. This is not the same decision as the
        shoot-day positions left dangling above — those render as "(removed crew)" and
        have always been visible; an orphaned prep record is invisible and would simply
        accumulate in the project row forever. Undo is unaffected: prep data lives in
        db:projects, which beginUndo() already snapshots on this path. */
-    prunePrepSchedule(p, gone);
+    prunePhaseSchedules(p, gone);
   });
   await saveDB('db:crew', crewDB); await saveDB('db:projects', projectsDB);
   renderCrewList();
