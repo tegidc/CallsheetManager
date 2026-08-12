@@ -868,6 +868,10 @@
   .budget-total-row td{padding-top:10px; border-top:1.5px solid var(--field-line);
     font-weight:600;}
   .budget-noRate{color:var(--muted); font-style:italic;}
+  /* the VAT note riding on the TOTAL's label. Body font, not the label's uppercase
+     letter-spaced type — it is a sentence about the number, not a second heading for it. */
+  .budget-stat-note{font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
+    letter-spacing:0; text-transform:none; color:var(--muted); margin-left:8px;}
   /* ---- catering summary ----
      The total leads the block: it's the number you came for, and it used to sit under a
      six-column grid, below the fold. */
@@ -8097,9 +8101,16 @@ function buildBudgetData(){
 
 function budgetSummaryBarHTML(data){
   const fmt = budgetFmt;
+  /* ⚠️ With Itemize VAT OFF the single headline is ALREADY the inc-VAT figure — it just
+     never said so, and "TOTAL" beside a number carrying £6,567 of VAT is a number you
+     could quote to a client by mistake. The third element is a tiny note on the label
+     line naming the VAT inside it. Not shown with the toggle ON: the three stats there
+     spell the same thing out in full, and repeating it would be noise. Not shown when
+     the VAT is zero either — nobody on the job is VAT registered, and "inc. £0.00 VAT"
+     is a fact about nothing. */
   const stats = budgetVatToggle
     ? [['Total (ex-VAT)', data.totalExVat], ['VAT', data.vatTotal], ['Total (inc-VAT)', data.totalIncVat]]
-    : [['Total', data.totalIncVat]];
+    : [['Total', data.totalIncVat, data.vatTotal>0 ? `inc. ${fmt(data.vatTotal)} VAT` : '']];
   /* Phase BS — the scope toggles sit in the same cluster as Itemize VAT, and in that
      reading order: WHAT is being costed, then HOW it's shown. All start ticked, so the
      number you land on is the complete one.
@@ -8108,7 +8119,7 @@ function budgetSummaryBarHTML(data){
   const scopeBox = ([key, label]) => `<label><input type="checkbox" ${budgetScope[key]?'checked':''} onchange="toggleBudgetScope('${key}', this.checked)"> ${esc(label)}</label>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   return `<div class="budget-summary">
-    ${stats.map(([lbl,v])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}</div></div>`).join('')}
+    ${stats.map(([lbl,v,note])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div></div>`).join('')}
     <div class="budget-vat-toggle">
       ${BUDGET_SCOPES.map(scopeBox).join('')}
       <label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label>
