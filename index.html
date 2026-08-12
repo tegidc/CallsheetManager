@@ -891,6 +891,12 @@
   /* Est. Costs is a look, not a sum — italic, and never bold, so it can't be mistaken
      for one of the figures that adds into the total beside it */
   .budget-est-costs{font-style:italic; color:var(--muted);}
+  /* ⚠️ A multi-role person is several ROWS (one per entry). The rule between them is
+     dropped and the name left blank on the continuations, so the block reads as one
+     human with two lines rather than two people who happen to share a name. The rule
+     under the LAST of their rows stays — that one separates them from the next person. */
+  .budget-same-person td{border-top:none;}
+  tr:has(+ .budget-same-person) td{border-bottom:none;}
   /* ---- catering summary ----
      The total leads the block: it's the number you came for, and it used to sit under a
      six-column grid, below the fold. */
@@ -8408,8 +8414,8 @@ function budgetPersonViewHTML(data){
   const estCell = pp => `<td class="budget-est-costs">${pp.estCosts ? fmt(pp.estCosts) : '<span class="budget-noRate">—</span>'}</td>`;
   return `<div class="tablewrap"><table>
     <tr><th>Name</th><th>Role</th><th>TOTAL</th>${countCols.map(c=>`<th style="text-align:center;" title="${esc(c.title)}">${c.head}</th>`).join('')}<th>Day rate</th><th>Subtotal</th>${showSplit?'<th title="Equipment portion of the day rate, across every day being costed">Kit</th><th title="What is left of the day rate once kit comes out">Labour</th>':''}${budgetCostsPP?'<th>Est. Costs</th>':''}<th style="text-align:center;">VAT reg.</th>${budgetVatToggle?'<th>VAT</th>':''}</tr>
-    ${ordered.map(pp=>`<tr>
-      <td>${esc(pp.name)}</td>
+    ${ordered.map((pp,i)=>`<tr class="${i>0 && ordered[i-1].crewId===pp.crewId ? 'budget-same-person' : ''}">
+      <td>${i>0 && ordered[i-1].crewId===pp.crewId ? '' : esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
       <td><strong>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</strong></td>
       ${countCols.map(c=>`<td style="text-align:center;">${c.value(pp) || '<span class="budget-noRate">—</span>'}</td>`).join('')}
