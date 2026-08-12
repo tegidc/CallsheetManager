@@ -550,7 +550,13 @@
   .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   /* Roles tab (Phase S, reordered Phase Z) — proper tidy columns instead of one
      packed inline row. Controls | Name | Role | Rate | Show as. */
-  .roles-grid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 118px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  .roles-grid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 118px 74px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  /* a buyout is a different KIND of number from a day rate, so the row says so rather
+     than leaving the reader to infer it from a tick box three columns away */
+  .roles-buyout{display:flex; align-items:center; justify-content:center;}
+  .buyout-flag{font-family:var(--label); font-size:10px; font-weight:600; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--tape); border:1px solid var(--tape);
+    border-radius:20px; padding:0 6px; margin-left:6px; white-space:nowrap;}
   .roles-grid-rate{white-space:nowrap;}
   .roles-grid-header-row, .prep-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
   .roles-grid-header, .prep-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
@@ -5632,6 +5638,7 @@ function renderProjectCrew(body){
       const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
           ${pbHeadLeadCellsHTML('roles-grid-header')}
           <div class="roles-grid-header">Rate</div>
+          <div class="roles-grid-header" title="One agreed fee for the whole job — days below only split it across the phases">Buyout</div>
           <div class="roles-grid-header">Show as</div>
         </div>`;
       const groupsHTML = groups.map(g=>{
@@ -5745,13 +5752,14 @@ function crewRolesRowHTML(block){
   const roleCellsHTML = (e, toggleHTML) => {
     const rate = resolveEntryRate(e.id, p);
     return `<div class="roles-grid-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
-      <div class="roles-grid-cell roles-grid-rate" data-label="Rate" style="grid-column:4;"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>`;
+      <div class="roles-grid-cell roles-grid-rate" data-label="Rate" style="grid-column:4;"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>
+      <div class="roles-grid-cell roles-buyout" data-label="Buyout" style="grid-column:5;"><input type="checkbox" ${entryIsBuyout(e.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>`;
   };
   const head = `<div class="roles-grid pb-head">
     <div class="roles-grid-controls">${personBlockSelectCbHTML(block)}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
     ${roleCellsHTML(fronted, personBlockToggleHTML(block, rest.length, false))}
-    <div class="roles-grid-cell" data-label="Show as" style="grid-column:5;">${showAsQuickEditHTML(block)}</div>
+    <div class="roles-grid-cell" data-label="Show as" style="grid-column:6;">${showAsQuickEditHTML(fronted)}</div>
   </div>`;
   const stack = rest.map(e=>`<div class="roles-grid pb-role-row pb-role-extra" style="display:none;">${roleCellsHTML(e, '')}</div>`).join('');
   return personBlockWrapHTML(block, head + stack,
@@ -5762,6 +5770,19 @@ function crewRolesRowHTML(block){
    It is just a field (Phase Detail): type in it or leave it blank. No pencil,
    no edit state, no save button. onchange (not oninput) means it only writes when the
    value actually changed and focus has left, so tabbing through 66 rows saves nothing. */
+/* Buyout lives on the ENTRY: it is a fact about this booking, not about the person —
+   the same DOP can be on a day rate for one job and a buyout for the next, and can even
+   hold a buyout on one role and a day rate on another within one project. */
+const entryIsBuyout = entryId => !!(entryById(entryId, currentProject())||{}).buyout;
+async function toggleEntryBuyout(entryId, on){
+  const p = currentProject(); if(!p) return;
+  selectedEditTargets(entryId).forEach(id=>{
+    const e = entryById(id, p); if(!e) return;
+    if(on) e.buyout = true; else delete e.buyout;
+  });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
 /* ⚠️ Takes an ENTRY view and writes the ENTRY. "Show as" was person-level — one human,
    one display name — which meant renaming Karim "Cam Op B" for the camera list renamed
    him on the edit too. It describes a ROLE, so it lives on the role's entry now. */
@@ -7962,16 +7983,31 @@ function buildBudgetData(){
        out. */
     const prepDays = prepDaysOf(c.id, p) || 0;
     const postDays = postDaysOf(c.id, p) || 0;
-    /* ⚠️ RAW = "what this would be if its scope were on". The scoped figures below are
-       multiplied by prodOn/prepOn/postOn and collapse to 0 when you switch a phase off —
-       which is right for every total, and useless for the scope stack, which has to keep
-       showing what a switched-off phase WOULD cost. Same arithmetic, minus the factor. */
-    const prodRaw = rate * daysWorked;
-    const prepRaw = rate * prepDays;
-    const postRaw = rate * postDays;
-    const prodSubtotal = rate * daysWorked * prodOn;
-    const prepSubtotal = rate * prepDays * prepOn;
-    const postSubtotal = rate * postDays * postOn;
+    /* ---- BUYOUT ----
+       A buyout is one agreed fee for the whole job, not a day rate. With it on, `rate` IS
+       the total and the day counts stop multiplying — they only decide how that fee is
+       APPORTIONED across the three phases, so Per Day, the phase stack and Per Department
+       all still have something honest to show. £5,000 over 5 prep / 10 shoot / 5 post is
+       £1,250 / £2,500 / £1,250, and sums back to £5,000 — never £100,000.
+       ⚠️ A buyout with NO days recorded lands entirely on Production. The fee exists
+       whether or not anyone has filled the days in, and the shoot is the phase it
+       belongs to by default; dropping it because a field is blank would silently lose
+       real money from the total.
+       ⚠️ Switching a scope off still removes that phase's share, exactly as it does for a
+       day rate — the scopes mean "don't cost this phase", and a buyout is not exempt.
+       ⚠️ RAW = "what this would be if its scope were on". The scoped figures collapse to
+       0 when a phase is off, which is right for a total and useless for the scope stack,
+       which has to keep showing what switching it back on would add. */
+    const ent = entryById(c.id, p);
+    const isBuyout = !!(ent && ent.buyout);
+    const totalPhaseDays = daysWorked + prepDays + postDays;
+    const share = n => totalPhaseDays ? rate * (n / totalPhaseDays) : 0;
+    const prodRaw = isBuyout ? (totalPhaseDays ? share(daysWorked) : rate) : rate * daysWorked;
+    const prepRaw = isBuyout ? share(prepDays) : rate * prepDays;
+    const postRaw = isBuyout ? share(postDays) : rate * postDays;
+    const prodSubtotal = prodRaw * prodOn;
+    const prepSubtotal = prepRaw * prepOn;
+    const postSubtotal = postRaw * postOn;
     const subtotal = prodSubtotal + prepSubtotal + postSubtotal;
     /* The kit/labour split of THIS person's subtotal. Same day count the subtotal is
        built from — scopes already applied — so kitSubtotal + labourSubtotal === subtotal
@@ -8001,7 +8037,11 @@ function buildBudgetData(){
       return sum + (m.b?cateringCosts.b:0) + (m.l?cateringCosts.l:0) + (m.d?cateringCosts.d:0);
     }, 0) * prodOn : 0;
     const paidDays = daysWorked*prodOn + prepDays*prepOn + postDays*postOn;
-    const kitSubtotal = kit!=null ? Math.min(kit, rate) * paidDays : null;
+    /* ⚠️ A buyout's kit is a share of the FEE, not kit × days — the same reasoning as the
+       phase split above. Proportion the kit the same way the rate was agreed. */
+    const kitSubtotal = kit==null ? null
+      : isBuyout ? (rate ? subtotal * (Math.min(kit, rate) / rate) : 0)
+                 : Math.min(kit, rate) * paidDays;
     const labourSubtotal = kit!=null ? subtotal - kitSubtotal : null;
     const claimsTravel = !travelClaimed.has(c.crewId);
     if(claimsTravel) travelClaimed.add(c.crewId);
@@ -8027,7 +8067,7 @@ function buildBudgetData(){
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
       rate, hasRate, isOverride, kit, kitSubtotal, labourSubtotal,
       hotelCost, mealCost, estCosts: hotelCost + mealCost + travelCost,
-      prodRaw, prepRaw, postRaw, travelCostRaw,
+      isBuyout, prodRaw, prepRaw, postRaw, travelCostRaw,
       prodVatRaw: vatRegistered ? (prodRaw + travelCostRaw) * VAT_RATE : 0,
       prepVatRaw: vatRegistered ? prepRaw * VAT_RATE : 0,
       postVatRaw: vatRegistered ? postRaw * VAT_RATE : 0,
@@ -8462,7 +8502,7 @@ function budgetPersonViewHTML(data){
       <td>${esc(pp.role||'')}</td>
       <td><strong>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</strong></td>
       ${countCols.map(c=>`<td style="text-align:center;">${c.value(pp) || '<span class="budget-noRate">—</span>'}</td>`).join('')}
-      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
+      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span>${pp.isBuyout?'<span class="buyout-flag" title="One agreed fee — the day counts only split it across the phases">Buyout</span>':''}</td>
       <td>${pp.hasRate ? fmt(pp.subtotal) : '<span class="budget-noRate">—</span>'}</td>
       ${showSplit ? splitCell(pp.kitSubtotal)+splitCell(pp.labourSubtotal) : ''}
       ${budgetCostsPP ? estCell(pp) : ''}
