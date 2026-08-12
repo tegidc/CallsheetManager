@@ -565,6 +565,21 @@
   .roles-shoot-n{font-size:var(--fs-meta); color:var(--muted); font-variant-numeric:tabular-nums;}
   /* the same-human marker on a person split across departments */
   .role-dupe-star{color:var(--tape); font-weight:700; margin-left:3px; cursor:help;}
+  /* ---- "Also on this project as" ---- */
+  .also-listed{margin-top:16px; border-top:1px solid var(--line); padding-top:12px;}
+  .also-listed-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
+    letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
+  .also-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer;
+    padding:7px 8px; margin:0 -8px; border-radius:6px; font-size:var(--fs-meta);}
+  .also-row:hover{background:var(--tint-2);}
+  .also-row:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
+  .also-dept{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:1.1px;
+    text-transform:uppercase; color:var(--tape);}
+  .also-stages{color:var(--muted);}
+  /* the row you were sent to, so arriving reads as arriving */
+  @keyframes roleRowFlash{ from{background:var(--tint-4);} to{background:transparent;} }
+  .role-row-flash{animation:roleRowFlash 1.6s ease-out 1;}
+  @media (prefers-reduced-motion: reduce){ .role-row-flash{animation:none; outline:2px solid var(--tape); outline-offset:-2px;} }
   /* a buyout is a different KIND of number from a day rate, so the row says so rather
      than leaving the reader to infer it from a tick box three columns away */
   .roles-buyout{display:flex; align-items:center; justify-content:center;}
@@ -1878,11 +1893,73 @@ function rolesMenuHTML(){
       </div>
       ${rolesMenuListHTML(entryId, e.crewId, c)}
       <div style="margin-top:10px;">${rolesMenuAddRolePickerHTML(entryId, e.crewId, c)}</div>
+      ${rolesMenuAlsoListedHTML(entryId, e.crewId, p)}
       <div class="toolbar" style="margin-top:14px;">
         <button onclick="closeRolesMenu()">Close</button>
       </div>
     </div>
   </div>`;
+}
+/* ---- "Also on this project as" ----
+   The menu used to open on a two-role person and say "No other saved roles", which is
+   true of their crew record and useless on a screen where they are visibly listed twice.
+   What you actually want to know is where ELSE this person is booked, and to be able to
+   get there. Role · stage · days, one line per other entry, and clicking it takes you to
+   that row.
+   ⚠️ Reads the same three sources the Roles row does — phaseDaysOf for prep and post,
+   the shoot opt-in plus entryDayCount for the shoot — so it can never disagree with the
+   row it sends you to. An entry booked in two stages lists both. */
+function entryStageSummary(e, p){
+  const out = [];
+  const prep = phaseDaysOf('preprod', e.id, p);
+  const post = phaseDaysOf('post', e.id, p);
+  const shoot = entryOnShoot(e.id, p) ? entryDayCount(e.id, projectDays()) : 0;
+  if(prep) out.push({stage:'Pre-Prod', days:prep});
+  if(shoot) out.push({stage:'Production', days:shoot});
+  if(post) out.push({stage:'Post', days:post});
+  return out;
+}
+function rolesMenuAlsoListedHTML(entryId, crewId, p){
+  const others = entriesForCrew(crewId, p).filter(e=>e.id!==entryId);
+  if(!others.length) return '';
+  return `<div class="also-listed">
+    <div class="also-listed-head">Also on this project as</div>
+    ${others.map(o=>{
+      const stages = entryStageSummary(o, p);
+      const dept = deptBucketKey(o.department);
+      return `<div class="also-row" role="button" tabindex="0"
+          onclick="goToRoleRow('${o.id}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToRoleRow('${o.id}');}"
+          title="Go to this role">
+        <span class="role-chip">${esc(o.role||'—')}</span>
+        <span class="also-dept">${esc(DEPARTMENT_CODES[dept]||dept)}</span>
+        <span class="also-stages">${stages.length
+          ? stages.map(st=>`${esc(st.stage)} · ${st.days} day${st.days===1?'':'s'}`).join('  ·  ')
+          : '<span class="budget-noRate">Not booked in any stage yet</span>'}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+/* Close the menu, make sure the target row's department group is open, then scroll to it
+   and flash it — a row three departments down that you were silently teleported to is
+   indistinguishable from nothing having happened. */
+function goToRoleRow(entryId){
+  closeRolesMenu();
+  const p = currentProject();
+  const e = p && entryById(entryId, p);
+  if(e){
+    const dept = deptBucketKey(e.department);
+    if(collapsedProjectDepts.has(dept)){ collapsedProjectDepts.delete(dept); renderProjectBody(); }
+  }
+  setTimeout(()=>{
+    const el = document.getElementById('role-row-'+entryId);
+    if(!el) return;
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({behavior: smooth?'smooth':'auto', block:'center'});
+    el.classList.remove('role-row-flash');
+    void el.offsetWidth;                 // restart the animation if it is already running
+    el.classList.add('role-row-flash');
+  }, 30);
 }
 /* ---- "Add new role" dialog (item 5) ----
    Single in-page dialog: canonical Department select + free-text Role name,
@@ -5637,6 +5714,22 @@ function renderProjectCrew(body){
       .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryOnShoot(e.id, p))}))
       .filter(b=>b.entries.length);
   }
+  /* ⚠️ A PHASE TAB LISTS ONLY WHO IS BOOKED IN THAT PHASE. Blank days on Roles means
+     they aren't in it, so they don't appear — which is what makes Roles the one place
+     you put someone into a stage, rather than every tab showing all 66 people and you
+     hunting for the four who matter.
+     ⚠️ Date marks count as being booked even with no number typed. Someone with days
+     marked on the calendar and the count still blank is plainly involved, and filtering
+     them out would hide the marks with no way back to them. */
+  if(isPhaseTab(crewGridView)){
+    const inPhase = e => {
+      const r = phaseRecordOf(crewGridView, e.id, p);
+      return !!(r && (r.days!=null || (r.dates||[]).length));
+    };
+    filtered = filtered
+      .map(b=>Object.assign({}, b, {entries: b.entries.filter(inPhase)}))
+      .filter(b=>b.entries.length);
+  }
 
   /* Phase BT — Post sits directly after the shoot, so the three phase tabs read left to
      right in the order the job actually happens: prep, the shoot, then the edit.
@@ -5721,13 +5814,13 @@ function renderProjectCrew(body){
          human, so collapsing is right there and wrong here. */
       const entriesInScope = filtered.flatMap(b=>b.entries);
       const deptOf = e => deptBucketKey(e.department);
-      const multiDept = new Set();
-      const seenDeptByPerson = {};
-      entriesInScope.forEach(e=>{
-        const d = deptOf(e);
-        if(seenDeptByPerson[e.crewId] && seenDeptByPerson[e.crewId]!==d) multiDept.add(e.crewId);
-        seenDeptByPerson[e.crewId] = seenDeptByPerson[e.crewId] || d;
-      });
+      /* ⚠️ The star means "this name appears more than once in THIS list", full stop —
+         not "in more than one department". Matt Wells as Field Producer and Producer is
+         two Production rows, and a reader scanning the department sees the same name
+         twice; that it happens to be one department makes it MORE confusable, not less. */
+      const nameCounts = {};
+      entriesInScope.forEach(e=>{ nameCounts[e.crewId] = (nameCounts[e.crewId]||0) + 1; });
+      const multiDept = new Set(Object.keys(nameCounts).filter(id=>nameCounts[id]>1));
       const roleGroups = DEPARTMENTS.map(d=>({
         key:d, label:d, code:DEPARTMENT_CODES[d]||'',
         items: entriesInScope.filter(e=>deptOf(e)===d)
@@ -5870,7 +5963,7 @@ function crewRolesRowHTML(e, alsoElsewhere){
       <input type="text" inputmode="numeric" class="budget-rate-input" value="${value!=null&&value!==0?value:''}" placeholder="—"
         onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)"
         title="${esc(label)} days — the same number the ${label==='Prep'?'Pre-Prod':'Post'} tab holds"></div>`;
-  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}">
+  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}${alsoElsewhere?' — also booked in another department':''}">${esc(e.name)}${alsoElsewhere?'<span class="role-dupe-star" title="Also booked in another department">*</span>':''}</div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
