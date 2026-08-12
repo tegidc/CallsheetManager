@@ -5892,19 +5892,17 @@ function renderProjectCrew(body){
          than fixing it.
          The other six sub-tabs keep person blocks: a bed, a lunch and a lift belong to a
          human, so collapsing is right there and wrong here. */
-      const entriesInScope = filtered.flatMap(b=>b.entries);
-      const deptOf = e => deptBucketKey(e.department);
-      /* ⚠️ The star means "this name appears more than once in THIS list", full stop —
-         not "in more than one department". Matt Wells as Field Producer and Producer is
-         two Production rows, and a reader scanning the department sees the same name
-         twice; that it happens to be one department makes it MORE confusable, not less. */
-      // repeatedInView is computed once, above, and shared by every entry-level tab
-      const roleGroups = DEPARTMENTS.map(d=>({
-        key:d, label:d, code:DEPARTMENT_CODES[d]||'',
-        items: entriesInScope.filter(e=>deptOf(e)===d)
-          .sort((a,b)=> roleSeniorityRank(d, a.role)-roleSeniorityRank(d, b.role)
-                     || (a.name||'').localeCompare(b.name||''))
-      })).filter(g=>g.items.length);
+      /* ⚠️ USES THE SHARED `groups`, like every other sub-tab. It briefly built its own
+         department-ordered list instead, which quietly made the filter panel's Sort and
+         Group by do NOTHING on this tab — they feed buildProjectCrewGroups(), and a
+         branch that ignores its output ignores both controls with it. The rows are
+         single-entry blocks by the time they get here (see the split above), so the
+         shared grouper handles them unchanged: group by department and each block's
+         department is its own entry's, group by role and a two-role person lands in two
+         role groups, sort by cost and the rows sort by that entry's cost.
+         ⚠️ Do not reintroduce a local grouping here. If Roles needs an ordering nothing
+         else has, it belongs in buildProjectCrewGroups as an option, where the panel can
+         reach it. */
       const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row${crewShowMoney?'':' no-money'}">
           ${pbHeadLeadCellsHTML('roles-grid-header')}
           ${crewShowMoney?'<div class="roles-grid-header roles-head-c" title="Fee for this role across every phase being costed">Total</div>':''}
@@ -5915,9 +5913,9 @@ function renderProjectCrew(body){
           ${crewShowMoney?'<div class="roles-grid-header roles-head-c">Day rate</div>':''}
           <div class="roles-grid-header">Show as</div>
         </div>`;
-      const groupsHTML = roleGroups.map(g=>{
+      const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
-        return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectDeptCollapse('${g.key}')`, g.code)
+        return groupHeaderHTML(g)
           + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${
               g.items.map(e=>crewRolesRowHTML(e)).join('')}</div>`;
       }).join('');
