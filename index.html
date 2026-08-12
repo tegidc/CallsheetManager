@@ -1767,14 +1767,15 @@ function setRolesMenuMode(mode){
   rolesMenuMode = mode;
   renderGlobalOverlay();
 }
-/* the role NAMES to hide from the current mode's list: just this entry's own role in
-   "change", or every role any of this person's entries on this project currently holds
-   in "add" */
+/* ⚠️ ONE exclusion list for BOTH modes: every role any of this person's entries on this
+   project already holds. It used to differ — "add again as" excluded them all, "change"
+   excluded only the entry's OWN role — and that asymmetry was a live duplicate-maker.
+   With Camera Operator and Editor already booked, opening the Editor row and CHANGING it
+   to Camera Operator gave you Camera Operator twice, in two departments, from a menu
+   whose sibling mode existed specifically to prevent that. The modes differ in whether
+   they create a new entry, and in nothing else. */
 function rolesMenuExcludedNames(entryId, crewId){
-  const p = currentProject();
-  if(rolesMenuMode==='add') return new Set(entriesForCrew(crewId, p).map(e=>e.role));
-  const e = entryById(entryId, p);
-  return new Set([e ? e.role : '']);
+  return new Set(entriesForCrew(crewId, currentProject()).map(e=>e.role));
 }
 function rolesMenuListHTML(entryId, crewId, c){
   const exclude = rolesMenuExcludedNames(entryId, crewId);
@@ -2284,7 +2285,13 @@ function entryView(e){
   if(!c) return null;
   return Object.assign({}, c, {
     id: e.id, crewId: e.crewId, role: e.role||'',
-    department: e.department||''
+    department: e.department||'',
+    /* ⚠️ SHOW AS IS PER ROLE now. The entry wins when it has one — including an entry
+       explicitly set to blank, hence hasOwnProperty rather than `||`. The crew record's
+       own showAs stays as the DEFAULT a new entry inherits, exactly the way c.rate backs
+       an entry's rate; migrateShowAsToEntries() copied it down to everything that already
+       existed, so nothing changed on screen when this landed. */
+    showAs: Object.prototype.hasOwnProperty.call(e,'showAs') ? (e.showAs||'') : (c.showAs||'')
   });
 }
 const projectEntryViews = (p) => projectEntries(p).map(entryView).filter(Boolean);
@@ -2508,6 +2515,38 @@ async function migrateNormaliseDietary(){
   });
   await saveDB('db:crew', crewDB);
   console.info('[DIET] dietary spellings normalised:', report);
+  return report;
+}
+/* Copy each person's display name down onto every entry they hold, now that "Show as" is
+   a fact about a ROLE rather than about a human. Nothing changes on screen the day this
+   runs — every entry inherits exactly what the person-level field was already showing —
+   but from then on the two can diverge, which is the point: Karim is "Cam Op B" on the
+   camera list and just Karim on the edit.
+
+   ⚠️ The crew record KEEPS its showAs, deliberately. It is the DEFAULT a newly-created
+   entry inherits (see entryView), the same relationship c.rate has with an entry's rate.
+   Deleting it would leave new bookings unnamed and would throw away the only value there
+   is to inherit.
+
+   Same contract as the migrations above: scans first and writes nothing when there is
+   nothing to copy, backs up db:projects before the first write, aborts on a failed
+   backup, and is a no-op on every load after the first. */
+async function migrateShowAsToEntries(){
+  const pending = [];
+  projectsDB.forEach(pr=>(pr.crewEntries||[]).forEach(e=>{
+    if(Object.prototype.hasOwnProperty.call(e,'showAs')) return;   // already migrated or set
+    const c = crewById(e.crewId);
+    if(c && c.showAs) pending.push(e);
+  }));
+  if(!pending.length) return null;
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const key = `backup_pre_SHOWAS_${stamp}:db:projects`;
+  const res = await saveDB(key, projectsDB);
+  if(res && res.ok===false){ console.error('[SHOWAS] backup failed, migration aborted:', res); return {aborted:key}; }
+  pending.forEach(e=>{ e.showAs = (crewById(e.crewId)||{}).showAs || ''; });
+  await saveDB('db:projects', projectsDB);
+  const report = { backupKey:key, entries:pending.length };
+  console.info('[SHOWAS] show-as copied onto entries:', report);
   return report;
 }
 /* the location currently picked in the Shoot Day form's primary-location select */
@@ -2878,6 +2917,7 @@ async function initApp(){
   await migrateCrewEntries();
   await migrateDropSubDepartments();
   await migrateNormaliseDietary();
+  await migrateShowAsToEntries();
   renderSide(); renderMain();
 }
 initApp();
@@ -5722,22 +5762,25 @@ function crewRolesRowHTML(block){
    It is just a field (Phase Detail): type in it or leave it blank. No pencil,
    no edit state, no save button. onchange (not oninput) means it only writes when the
    value actually changed and focus has left, so tabbing through 66 rows saves nothing. */
+/* ⚠️ Takes an ENTRY view and writes the ENTRY. "Show as" was person-level — one human,
+   one display name — which meant renaming Karim "Cam Op B" for the camera list renamed
+   him on the edit too. It describes a ROLE, so it lives on the role's entry now. */
 function showAsQuickEditHTML(c){
-  // Phase BF — "Show as" lives on the crew record (one person, one display name), so
-  // this writes against the PERSON even though the row it sits on is an entry.
   return `<span class="roles-grid-showas">
     <input type="text" value="${esc(c.showAs||'')}" placeholder="Show as…"
       onclick="event.stopPropagation()"
-      onchange="saveQuickShowAs('${personIdOf(c)}', this.value)"
+      onchange="saveQuickShowAs('${c.id}', this.value)"
       onkeydown="if(event.key==='Enter')this.blur()">
   </span>`;
 }
-async function saveQuickShowAs(crewId, value){
-  const c = crewById(crewId); if(!c) return;
+async function saveQuickShowAs(entryId, value){
+  const proj = currentProject(); if(!proj) return;
+  const self = entryById(entryId, proj); if(!self) return;
   const next = (value||'').trim();
-  if(c.showAs === next) return;
-  selectedCrewTargets(crewId).forEach(id=>{ const other = crewById(id); if(other) other.showAs = next; });
-  await saveDB('db:crew', crewDB);
+  if((self.showAs||'') === next) return;
+  // bulk-select still fans out — over the selected ENTRIES, not crew records
+  selectedEditTargets(entryId).forEach(id=>{ const e = entryById(id, proj); if(e) e.showAs = next; });
+  await saveDB('db:projects', projectsDB);
   // no re-render: the input already shows the new value, and re-rendering here
   // would steal focus from wherever the user tabbed to next. Other selected
   // rows' inputs pick up the propagated value next time they're rendered.
