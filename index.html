@@ -893,6 +893,26 @@
   /* the three numeric columns on Roles read as a block of figures, so they centre together
      — a right-aligned rate beside a left-aligned day count reads as two different tables */
   .roles-num .budget-rate-input, .roles-grid-rate .money-field input{text-align:center;}
+  /* a header sits over its own column, so it aligns the way that column's CONTENT does.
+     ⚠️ After .pb-head-name/.pb-head-role's left-align rule, which is :is()-weighted — a
+     plain .roles-head-c would lose to it. It never applies to Name/Role anyway; the
+     specificity is so a later edit to either rule can't silently re-align the other. */
+  :is(.roles-grid-header, .prep-grid-header).roles-head-c{text-align:center;}
+  /* ⚠️ WITH £££ OFF the grid loses its Total and Day rate columns, so the template has to
+     lose them too — a template with more tracks than cells silently shifts every column
+     after the gap. Header row and body rows both carry .no-money, always together. */
+  .roles-grid.no-money{grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w)
+      56px 56px 56px 60px minmax(110px,1fr);}
+  /* Pre-Prod/Post keep their column but it holds one field instead of two */
+  .prep-grid.no-money{--pb-phase-fields-w:60px;}
+  .prep-grid.no-money .prep-header-fields span{width:60px;}
+  /* the £££ control. Muted when off, brand green when on — the same "this is live" signal
+     the role chips use, so the two read as one language. */
+  .crew-money-toggle{cursor:pointer; font-family:var(--label); font-size:var(--fs-ctl);
+    letter-spacing:1.2px; color:var(--muted); user-select:none; padding:0 2px;}
+  .crew-money-toggle:hover{color:var(--text);}
+  .crew-money-toggle.on{color:var(--tape); font-weight:600;}
+  .crew-money-toggle:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   /* ---- the crew form's Rates section: one row per saved role ----
      A grid, not a table, so the header cells and the body cells share one column
      definition and cannot drift; the role column takes the slack so the four number
@@ -5661,6 +5681,22 @@ function crewToolbarSelectAll(idsCSV, allSelected, filterCount){
       <input type="checkbox" ${allSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${idsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
     </label>`;
 }
+/* ---- £££ : show the money on the Crew screens ----
+   Off by default. Roles is used far more often for "who is on this job and doing what"
+   than for what they cost, and a rate column invites reading — and quoting — a number
+   over someone's shoulder. Ticking it reveals Total and Day rate on Roles, and the rate
+   field on Pre-Prod and Post.
+   ⚠️ Labelled £££, NOT "Costs". The Budget already has Est. Costs and a Costs PP toggle
+   meaning something else entirely (a person's hotel/travel/food), and a second control
+   called Costs that showed day rates would collide with both. */
+let crewShowMoney = false;
+function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody(); }
+const crewMoneyToggleHTML = () =>
+  `<span class="crew-money-toggle${crewShowMoney?' on':''}" role="button" tabindex="0"
+    onclick="toggleCrewMoney()"
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCrewMoney();}"
+    aria-pressed="${crewShowMoney?'true':'false'}"
+    title="${crewShowMoney?'Hide rates and totals':'Show rates and totals'}">£££</span>`;
 function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
   return `<div class="crew-header-row">
       <div class="crew-header-left">${selectAllHTML||''}${filterHTML||''}</div>
@@ -5832,7 +5868,10 @@ function renderProjectCrew(body){
     }
     // Summary before Expand/Collapse all — the All-type action sits furthest right,
     // directly above the grid's own All column.
-    rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
+    // £££ first in the cluster: it changes what the table CONTAINS, the others only how
+    // much of it is on screen.
+    const moneyToggleHTML = ['roles','preprod','post'].includes(crewGridView) ? crewMoneyToggleHTML() : '';
+    rightHeaderHTML = `${moneyToggleHTML}${summaryLinkHTML}${expandAllHTML}`;
     const groupHeaderHTML = g => deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
       `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
@@ -5866,14 +5905,14 @@ function renderProjectCrew(body){
           .sort((a,b)=> roleSeniorityRank(d, a.role)-roleSeniorityRank(d, b.role)
                      || (a.name||'').localeCompare(b.name||''))
       })).filter(g=>g.items.length);
-      const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
+      const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row${crewShowMoney?'':' no-money'}">
           ${pbHeadLeadCellsHTML('roles-grid-header')}
-          <div class="roles-grid-header" title="Fee for this role across every phase being costed">Total</div>
-          <div class="roles-grid-header" title="Booked pre-production days — the same number the Pre-Prod tab holds">Prep</div>
-          <div class="roles-grid-header" title="On the shoot — tick to put them in the Production day grid">Shoot</div>
-          <div class="roles-grid-header" title="Booked edit days — the same number the Post tab holds">Post</div>
-          <div class="roles-grid-header" title="One agreed fee for the whole job — the day counts above only split it across the phases">Buyout</div>
-          <div class="roles-grid-header">Day rate</div>
+          ${crewShowMoney?'<div class="roles-grid-header roles-head-c" title="Fee for this role across every phase being costed">Total</div>':''}
+          <div class="roles-grid-header roles-head-c" title="Booked pre-production days — the same number the Pre-Prod tab holds">Prep</div>
+          <div class="roles-grid-header roles-head-c" title="On the shoot — tick to put them in the Production day grid">Shoot</div>
+          <div class="roles-grid-header roles-head-c" title="Booked edit days — the same number the Post tab holds">Post</div>
+          <div class="roles-grid-header roles-head-c" title="One agreed fee for the whole job — the day counts above only split it across the phases">Buyout</div>
+          ${crewShowMoney?'<div class="roles-grid-header roles-head-c">Day rate</div>':''}
           <div class="roles-grid-header">Show as</div>
         </div>`;
       const groupsHTML = roleGroups.map(g=>{
@@ -5893,9 +5932,9 @@ function renderProjectCrew(body){
          row and the same field widths as `.prep-fields-row` below it, so each label lands
          over its own input. Column 5 (the date-marks calendar) stays unlabelled — the
          icon says it. */
-      const phaseHeaderRow = `<div class="prep-grid prep-grid-header-row">
+      const phaseHeaderRow = `<div class="prep-grid prep-grid-header-row${crewShowMoney?'':' no-money'}">
           ${pbHeadLeadCellsHTML('prep-grid-header')}
-          <div class="prep-grid-header prep-header-fields"><span>Rate</span><span>Days</span></div>
+          <div class="prep-grid-header prep-header-fields">${crewShowMoney?'<span>Rate</span>':''}<span>Days</span></div>
         </div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
@@ -6008,11 +6047,11 @@ function crewRolesRowHTML(e){
       <input type="text" inputmode="numeric" class="budget-rate-input" value="${value!=null&&value!==0?value:''}" placeholder="—"
         onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)"
         title="${esc(label)} days — the same number the ${label==='Prep'?'Pre-Prod':'Post'} tab holds"></div>`;
-  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}" id="role-row-${e.id}">
+  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}${crewShowMoney?'':' no-money'}" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${esc(e.name)}${repeatStarHTML(e.crewId)}</div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
-    <div class="roles-grid-cell roles-total" data-label="Total">${total?budgetFmt(total):'<span class="budget-noRate">—</span>'}</div>
+    ${crewShowMoney?`<div class="roles-grid-cell roles-total" data-label="Total">${total?budgetFmt(total):'<span class="budget-noRate">—</span>'}</div>`:''}
     ${dayBox('Prep', prepDays, 'preprod')}
     <div class="roles-grid-cell roles-num" data-label="Shoot">
       <label class="roles-shoot" title="${onShoot?'On the shoot — tick days on the Production tab':'Not on the shoot — tick to add them to the Production day grid'}">
@@ -6022,7 +6061,7 @@ function crewRolesRowHTML(e){
     </div>
     ${dayBox('Post', postDays, 'post')}
     <div class="roles-grid-cell roles-buyout" data-label="Buyout"><input type="checkbox" ${buyout?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>
-    <div class="roles-grid-cell roles-grid-rate" data-label="${buyout?'Buyout fee':'Day rate'}"><span class="rate-with-save"><span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)"></span>${crewRateSaveIconHTML(e.id, 'r')}</span></div>
+    ${crewShowMoney?`<div class="roles-grid-cell roles-grid-rate" data-label="${buyout?'Buyout fee':'Day rate'}"><span class="rate-with-save"><span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)"></span>${crewRateSaveIconHTML(e.id, 'r')}</span></div>`:''}
     <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(e)}</div>
   </div>`;
   return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
@@ -7480,9 +7519,9 @@ function phaseRowHTML(block, phase){
     return { calOpen, html: `<div class="prep-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
       <div class="prep-cell prep-fields" style="grid-column:4;">
         <div class="prep-fields-row">
-          <span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
+          ${crewShowMoney?`<span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
             title="Day rate — the same rate as the Roles view and Budget"
-            onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)"></span>
+            onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)"></span>`:''}
           <input type="text" inputmode="numeric" class="budget-rate-input prep-days-input" value="${days!=null?days:''}" placeholder="—"
             title="${esc(PHASE_TABS[phase].daysTitle)}"
             onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)">
@@ -7498,14 +7537,14 @@ function phaseRowHTML(block, phase){
   };
   const frontedCells = entryCellsHTML(fronted, personBlockToggleHTML(block, rest.length, open));
   const isEditing = editingCrewId===block.id;
-  const head = `<div class="prep-grid pb-head${frontedCells.calOpen?' prep-grid-row-open':''}">
+  const head = `<div class="prep-grid pb-head${frontedCells.calOpen?' prep-grid-row-open':''}${crewShowMoney?'':' no-money'}">
     <div class="prep-cell prep-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
     <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}${repeatStarHTML(block.crewId)}</div>
     ${frontedCells.html}
   </div>`;
   const stack = rest.map(e=>{
     const cells = entryCellsHTML(e, '');
-    return `<div class="prep-grid pb-role-row pb-role-extra${cells.calOpen?' prep-grid-row-open':''}"${open?'':' style="display:none;"'}>${cells.html}</div>`;
+    return `<div class="prep-grid pb-role-row pb-role-extra${cells.calOpen?' prep-grid-row-open':''}${crewShowMoney?'':' no-money'}"${open?'':' style="display:none;"'}>${cells.html}</div>`;
   }).join('');
   /* Phase BQ — Pre-production carries the Edit pencil and its expansion like Roles and
      Days on site. It was the one sub-tab without one (Phase BJ: "no crew-record edit
