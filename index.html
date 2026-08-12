@@ -879,6 +879,20 @@
     font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer;}
   .budget-rate-input{width:64px; text-align:left;}
+  /* ---- money fields ----
+     ⚠️ The £ is a SIBLING of the input, never inside its value. Everything that reads
+     these fields parses them as numbers (saveEntryRate, saveCateringCosts, collectRoleRates,
+     the whole budget), so a symbol in the value would have to be stripped in a dozen
+     places and would silently cost £0 in whichever one got missed.
+     ⚠️ The prefix greys out when the field is empty, so a column of placeholders reads as
+     "nothing entered" rather than as a column of naked currency symbols. */
+  .money-field{display:inline-flex; align-items:baseline; gap:1px; min-width:0;}
+  .money-field::before{content:'£'; color:var(--muted); font-size:var(--fs-meta); flex:0 0 auto;}
+  .money-field:has(input:placeholder-shown)::before{opacity:.45;}
+  .money-field input{text-align:center;}
+  /* the three numeric columns on Roles read as a block of figures, so they centre together
+     — a right-aligned rate beside a left-aligned day count reads as two different tables */
+  .roles-num .budget-rate-input, .roles-grid-rate .money-field input{text-align:center;}
   /* ---- the crew form's Rates section: one row per saved role ----
      A grid, not a table, so the header cells and the body cells share one column
      definition and cannot drift; the role column takes the slack so the four number
@@ -2089,10 +2103,10 @@ function crewRatesSectionHTML(c){
     const hasRate = rate!=='' && !isNaN(n);
     return `<div class="rate-row" data-rolepath="${esc(rp)}">
       <span class="rate-row-role" title="${esc(rp)}">${esc(name)}</span>
-      <input type="text" inputmode="decimal" class="budget-rate-input rr-rate" value="${esc(String(rate))}" placeholder="—" oninput="refreshRateRow(this)">
+      <span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input rr-rate" value="${esc(String(rate))}" placeholder="—" oninput="refreshRateRow(this)"></span>
       <label class="rate-row-split"><input type="checkbox" class="rr-split" ${hasSplit?'checked':''} onchange="refreshRateRow(this)"> with Kit</label>
-      <input type="text" inputmode="decimal" class="budget-rate-input rr-kit" value="${esc(String(kit))}" placeholder="—" ${hasSplit?'':'disabled'} oninput="refreshRateRow(this)">
-      <span class="rr-labour">${hasSplit ? esc(String(labourOf(rate, kit))) : '—'}</span>
+      <span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input rr-kit" value="${esc(String(kit))}" placeholder="—" ${hasSplit?'':'disabled'} oninput="refreshRateRow(this)"></span>
+      <span class="rr-labour">${hasSplit ? esc(fmtRateVat(labourOf(rate, kit))) : '—'}</span>
       <span class="rr-vat">${(vatReg && hasRate) ? esc(fmtRateVat(n*VAT_RATE)) : '—'}</span>
       <span class="rr-inc">${(vatReg && hasRate) ? esc(fmtRateVat(n*(1+VAT_RATE))) : '—'}</span>
     </div>`;
@@ -2129,7 +2143,7 @@ function crewRatesSectionHTML(c){
 /* money for the rate rows only. Plain 2dp with no currency symbol, matching the bare
    numbers in the inputs beside them — budgetFmt()'s "£1,234.00" next to an unadorned
    "800" would read as two different kinds of number. */
-function fmtRateVat(n){ return (Math.round(n*100)/100).toFixed(2); }
+function fmtRateVat(n){ return '£' + (Math.round(n*100)/100).toFixed(2); }
 /* Recalculates ONE row in place — never a re-render, which would throw away whatever is
    half-typed in the rest of the form. Called from the rate box, the kit box and the
    split toggle, so all three routes land on the same arithmetic. */
@@ -2144,7 +2158,7 @@ function refreshRateRow(el){
   const kit = Number(kitInput.value);
   const hasRate = rateRaw!=='' && !isNaN(rate);
   row.querySelector('.rr-labour').textContent =
-    (split && hasRate && !isNaN(kit)) ? String(labourOf(rate, kit)) : '—';
+    (split && hasRate && !isNaN(kit)) ? fmtRateVat(labourOf(rate, kit)) : '—';
   /* ⚠️ Reads #ncVat LIVE rather than a value captured at render: the select sits in this
      same section and can be changed after the rows are on screen. */
   const vatReg = (val('ncVat')==='Yes');
@@ -6008,7 +6022,7 @@ function crewRolesRowHTML(e){
     </div>
     ${dayBox('Post', postDays, 'post')}
     <div class="roles-grid-cell roles-buyout" data-label="Buyout"><input type="checkbox" ${buyout?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>
-    <div class="roles-grid-cell roles-grid-rate" data-label="${buyout?'Buyout fee':'Day rate'}"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>
+    <div class="roles-grid-cell roles-grid-rate" data-label="${buyout?'Buyout fee':'Day rate'}"><span class="rate-with-save"><span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)"></span>${crewRateSaveIconHTML(e.id, 'r')}</span></div>
     <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(e)}</div>
   </div>`;
   return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
@@ -7466,9 +7480,9 @@ function phaseRowHTML(block, phase){
     return { calOpen, html: `<div class="prep-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
       <div class="prep-cell prep-fields" style="grid-column:4;">
         <div class="prep-fields-row">
-          <input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
+          <span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
             title="Day rate — the same rate as the Roles view and Budget"
-            onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">
+            onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)"></span>
           <input type="text" inputmode="numeric" class="budget-rate-input prep-days-input" value="${days!=null?days:''}" placeholder="—"
             title="${esc(PHASE_TABS[phase].daysTitle)}"
             onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)">
@@ -8803,7 +8817,7 @@ function budgetPersonViewHTML(data){
       <td>${esc(pp.role||'')}</td>
       <td><strong>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</strong></td>
       ${countCols.map(c=>`<td style="text-align:center;">${c.value(pp) || '<span class="budget-noRate">—</span>'}</td>`).join('')}
-      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span>${pp.isBuyout?'<span class="buyout-flag" title="One agreed fee — the day counts only split it across the phases">Buyout</span>':''}</td>
+      <td><span class="rate-with-save"><span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)"></span>${crewRateSaveIconHTML(pp.id, 'b')}</span>${pp.isBuyout?'<span class="buyout-flag" title="One agreed fee — the day counts only split it across the phases">Buyout</span>':''}</td>
       <td>${pp.hasRate ? fmt(pp.subtotal) : '<span class="budget-noRate">—</span>'}</td>
       ${showSplit ? splitCell(pp.kitSubtotal)+splitCell(pp.labourSubtotal) : ''}
       ${budgetCostsPP ? estCell(pp) : ''}
