@@ -775,7 +775,11 @@
   .crewgrid-row{padding:8px 0;}
   .crewgrid-controls{display:flex; align-items:center;}
   .crewgrid-role-cell{min-width:0;}
-  .crewgrid-row-name{min-width:0;}
+  /* ⚠️ FLEX, so the repeat asterisk sits BESIDE the name rather than under it. The cell
+     holds a <div class="crew-ident"> and then the star as a sibling; block-level layout
+     put the star on its own line on every crewgrid tab. */
+  .crewgrid-row-name{min-width:0; display:flex; align-items:center; gap:3px;}
+  .crewgrid-row-name > .crew-ident{min-width:0;}
   .crewgrid-row-name .icon-btn{margin-left:0; margin-right:2px;}
   .crewgrid-check{display:flex; justify-content:center;}
   .crewview-tabs{margin-bottom:12px;}
@@ -6406,16 +6410,17 @@ function crewCateringBlockHTML(block, days){
      the meal rows below are unaffected, always their own rows regardless of role
      count, so their label spans the same Controls+Name+Role width the head's
      three leading cells occupy. */
+  /* ⚠️ PERSON-LEVEL VIEW: ONE ROW, ONE ROLE, NO EXPAND. A bed, a lift and a lunch belong
+     to a human — two roles is still one lunch — so there is nothing a second role row
+     could hold. The chip shows their MOST SENIOR role (topSeniorityEntry, the same
+     ranking the department order uses) rather than whichever entry has the most days:
+     with only one on screen it should be the role that identifies them, and the asterisk
+     on the name says there are others.
+     ⚠️ Comments do NOT go inside the template literal below — one placed there renders as
+     text in every row, which is exactly how this note first shipped. */
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${days.length};">
       <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
       <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}${repeatStarHTML(block.crewId)}</div>
-  /* ⚠️ PERSON-LEVEL VIEW: ONE ROW, ONE ROLE, NO EXPAND. A bed, a lift and a lunch belong
-     to a human — two roles is still one room — so there is nothing here that a second
-     role row could hold, and a chevron promising one was offering to expand into a
-     duplicate of the row above. The chip shows their MOST SENIOR role (topSeniorityEntry,
-     the same ranking the department order uses) rather than whichever entry has the most
-     days, because with only one on screen it should be the one that identifies them; the
-     asterisk on the name says there are others. */
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span></div>
     </div>`;
   /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch —
