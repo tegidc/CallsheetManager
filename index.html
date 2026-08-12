@@ -882,6 +882,10 @@
      heading than the block's own — the same label type as a column header, not an h2 */
   .csm-subhead{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
     letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:18px 0 4px;}
+  /* the note and its pencil are one unit: the pencil sits at the END of the text rather
+     than in a column of its own, so a short note doesn't leave the icon stranded */
+  .csm-note{display:inline-flex; align-items:flex-start; gap:4px;}
+  .csm-note .icon-btn{flex:0 0 auto;}
 
   /* AI Scan (Phase AI Scan) — the first chat UI in the app. Deliberately NOT
      rounded chat bubbles: this app's whole visual language is ruled lines and
@@ -1897,6 +1901,29 @@ function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
   if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML() + rolesMenuHTML();
 }
+/* ---- Dietary (general) ----
+   ⚠️ THE SELECT MUST BE ABLE TO REPRESENT WHAT IS STORED. It could not: the options were
+   '' / Vegetarian / Vegan / Pescatarian, while real records held free text from earlier
+   imports ("Meat & Fish", "Meat/Fish", "Veggie", …). A <select> with no matching option
+   falls back to its FIRST one, so val() read '' and saving any of those 35 records
+   silently wiped their requirement to omnivore — a vegetarian quietly becoming someone
+   who eats meat, on the document that goes to the caterer. Opening a record must never
+   be able to destroy a field nobody touched.
+
+   Two halves to the fix: "Meat & Fish" is now a canonical option (see
+   migrateNormaliseDietary, which folds Meat/Fish and Meat/Veg into it), and ANY other
+   stored value is rendered as an extra option so it round-trips untouched. That second
+   half is the guard — it keeps working for values no one has thought of yet. */
+const DIETARY_OPTIONS = ['Meat & Fish', 'Vegetarian', 'Vegan', 'Pescatarian'];
+function dietaryGeneralSelectHTML(c){
+  const cur = (c && c.dietaryGeneral) || '';
+  const known = DIETARY_OPTIONS.slice();
+  if(cur && !known.includes(cur)) known.push(cur);   // preserve, never silently drop
+  return `<select id="ncDietaryGeneral">
+    <option value="" ${!cur?'selected':''}>— (nothing recorded)</option>
+    ${known.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>${esc(o)}${DIETARY_OPTIONS.includes(o)?'':' (as recorded)'}</option>`).join('')}
+  </select>`;
+}
 /* ---- the crew form's Rates section ----
    ONE LINE PER SAVED ROLE, because the rate is a fact about the role a person is doing,
    not about the person: a DOP who also operates is worth two different numbers and
@@ -2419,6 +2446,41 @@ async function migrateDropSubDepartments(){
   console.info('[SUBDEPT] sub-departments dropped:', report);
   return report;
 }
+/* Fold the meat-eating spellings into one. "Meat & Fish", "Meat/Fish" and "Meat/Veg"
+   were three ways of writing the same requirement, arriving from earlier imports, and
+   they split the caterer's head count across three rows that all meant "no
+   restrictions beyond the obvious".
+
+   ⚠️ ONLY THESE THREE. "Veggie" and "Veggie (fish yes, meat no)" are deliberately left
+   alone — the first might mean Vegetarian and the second is closer to Pescatarian, and
+   guessing on a dietary requirement is exactly the kind of helpfulness that gets
+   someone served fish they don't eat. They keep their own rows, and the crew form now
+   preserves them rather than wiping them (dietaryGeneralSelectHTML).
+   ⚠️ Blank is NOT folded in either, even though "nothing recorded" and "Meat & Fish"
+   feed the same lunch. Blank means nobody asked; Meat & Fish means somebody answered.
+
+   Same contract as the two migrations above: scans first and writes nothing when
+   there's nothing to fold, so it is idempotent and safe to leave on the load path;
+   backs up db:crew before the first write and aborts if that backup fails. */
+const DIETARY_MERGE = { 'Meat/Fish':'Meat & Fish', 'Meat/Veg':'Meat & Fish' };
+async function migrateNormaliseDietary(){
+  const hits = crewDB.filter(c=>DIETARY_MERGE[c.dietaryGeneral]);
+  if(!hits.length) return null;
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const key = `backup_pre_DIET_${stamp}:db:crew`;
+  const res = await saveDB(key, crewDB);
+  if(res && res.ok===false){ console.error('[DIET] backup failed, migration aborted:', res); return {aborted:key}; }
+  const report = { backupKey:key, changed:0, from:{} };
+  hits.forEach(c=>{
+    const was = c.dietaryGeneral;
+    c.dietaryGeneral = DIETARY_MERGE[was];
+    report.from[was] = (report.from[was]||0) + 1;
+    report.changed++;
+  });
+  await saveDB('db:crew', crewDB);
+  console.info('[DIET] dietary spellings normalised:', report);
+  return report;
+}
 /* the location currently picked in the Shoot Day form's primary-location select */
 const selectedDayLocation = () => locById(document.getElementById('sdLocation')?.value);
 /* the whole Crew Database screen — the filter/sort/admin controls all live outside
@@ -2786,6 +2848,7 @@ async function initApp(){
      seed in the same pass rather than leaving it on the old shape. */
   await migrateCrewEntries();
   await migrateDropSubDepartments();
+  await migrateNormaliseDietary();
   renderSide(); renderMain();
 }
 initApp();
@@ -6095,7 +6158,7 @@ function buildCateringSummaryGrid(){
   const fedOnce = [...new Map(fedPerDay.flat().map(c=>[c.id,c])).values()]
     .filter(c=>c.dietaryGeneral || c.dietarySpecific)
     .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const specials = fedOnce.map(c=>({ name:c.name||'', general:c.dietaryGeneral||'', specific:c.dietarySpecific||'' }));
+  const specials = fedOnce.map(c=>({ id:c.id, name:c.name||'', general:c.dietaryGeneral||'', specific:c.dietarySpecific||c.dietary||'' }));
   return { costs, cols, totalCost, diets, specials, fedPeak: Math.max(0, ...fedPerDay.map(l=>l.length)) };
 }
 /* ---- the catering summary, as something you can send a caterer ----
@@ -6145,20 +6208,44 @@ function cateringDietTableHTML(data){
   </div>`;
 }
 /* The named exceptions. Everyone fed who has a diet or a note recorded — blanks are
-   omnivores with nothing to say and are left out. */
+   omnivores with nothing to say and are left out.
+   ⚠️ The notes are EDITABLE from here, because this is the one screen where you read
+   them all together and can see which are useful ("Mild walnut allergy") and which are
+   somebody thinking aloud ("Loves tomatoes, chillis, cheese; will eat anything").
+   Fixing that on the crew record means leaving the summary, finding the person, opening
+   their record and coming back — by which point you have lost your place in the list. */
 function cateringSpecialsHTML(data){
   if(!data.specials.length) return '';
   return `<div class="csm-subhead">Specials</div>
+  <div class="hint" style="margin-bottom:6px;">Everyone being fed who has a diet or a note on their record. Notes edit in place and save to the crew database — clear one to drop it.</div>
   <div class="tablewrap">
     <table>
       <tr><th>Name</th><th>Dietary</th><th>Notes</th></tr>
       ${data.specials.map(s=>`<tr>
         <td>${esc(s.name)}</td>
         <td>${s.general ? esc(s.general) : '<span class="budget-noRate">—</span>'}</td>
-        <td>${s.specific ? esc(s.specific) : '<span class="budget-noRate">—</span>'}</td>
+        <td><span class="csm-note">${s.specific ? esc(s.specific) : '<span class="budget-noRate">—</span>'}<button class="icon-btn" onclick="editDietaryNote('${s.id}')" title="Edit this note" aria-label="Edit note">${icon('edit')}</button></span></td>
       </tr>`).join('')}
     </table>
   </div>`;
+}
+/* ⚠️ Writes to the CREW DATABASE, not to the project — a dietary note is a fact about
+   the person, so correcting it here corrects it everywhere they are ever booked. That is
+   the intent, but it is worth knowing before you tidy one.
+   prompt() returns null when cancelled and '' when the user clears the box, and those
+   two mean opposite things here: cancel leaves the note alone, cleared removes it. Do
+   not collapse them with `|| ''`. */
+async function editDietaryNote(crewId){
+  const c = crewById(crewId); if(!c) return;
+  const next = prompt(`Dietary note for ${c.name}\n\nClear the box to remove it.`, c.dietarySpecific||c.dietary||'');
+  if(next===null) return;
+  const v = next.trim();
+  if(v) c.dietarySpecific = v; else delete c.dietarySpecific;
+  /* the legacy c.dietary is read as a fallback everywhere this note is displayed, so a
+     note "cleared" here would come straight back from it — clear both or neither */
+  if(!v) delete c.dietary;
+  await saveDB('db:crew', crewDB);
+  renderProjectBody();
 }
 /* ⚠️ IN-PLACE, not a re-render. The cost inputs are inside this block now, so replacing
    its innerHTML while someone types would destroy the element they are typing into —
@@ -9106,14 +9193,7 @@ function crewFormHTML(c, entryId){
     <details class="formgroup">
       <summary class="fg-title">Logistics &amp; sizing</summary>
       <div class="grid g3" style="margin-bottom:10px;">
-        <div><label>Dietary (general)</label>
-          <select id="ncDietaryGeneral">
-            <option value="" ${!c.dietaryGeneral?'selected':''}>— (Omnivore / eats everything)</option>
-            <option value="Vegetarian" ${c.dietaryGeneral==='Vegetarian'?'selected':''}>Vegetarian</option>
-            <option value="Vegan" ${c.dietaryGeneral==='Vegan'?'selected':''}>Vegan</option>
-            <option value="Pescatarian" ${c.dietaryGeneral==='Pescatarian'?'selected':''}>Pescatarian</option>
-          </select>
-        </div>
+        <div><label>Dietary (general)</label>${dietaryGeneralSelectHTML(c)}</div>
         <div><label>Dietary (specific)</label><input type="text" id="ncDietarySpecific" value="${esc(c.dietarySpecific||c.dietary||'')}" placeholder="Allergies, intolerances, detail"></div>
         <div><label>Shoe size</label><input type="text" id="ncShoe" value="${esc(c.shoeSize||'')}"></div>
         <div><label>Clothing / jacket size</label><input type="text" id="ncClothing" value="${esc(c.clothingSize||'')}"></div>
