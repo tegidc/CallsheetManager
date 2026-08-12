@@ -422,10 +422,20 @@
      3px radius, no fill) rather than a new nearby-but-different number, and
      var(--text) for "primary text colour" — the same variable the checkbox
      itself switches to on :checked. */
+  /* ⚠️ GREEN AT REST, INK ON HOVER. Every role chip on a project screen opens the roles
+     menu, and an all-black chip gave no sign of that — it read as a printed label. Green
+     is this app's one interactive colour, and darkening to ink on hover is the feedback
+     that says the thing under the cursor does something. The muted/.active pair stays
+     underneath for the one case that ISN'T a control: a chip rendered for a role that is
+     not currently set reads muted, as it always did. */
   .role-chip{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
     letter-spacing:1.2px; padding:2px 8px; border-radius:3px; vertical-align:middle;
-    background:transparent; border:1.5px solid var(--muted); color:var(--muted);}
-  .role-chip.active{border-color:var(--text); color:var(--text);}
+    background:transparent; border:1.5px solid var(--muted); color:var(--muted);
+    transition:color .12s ease, border-color .12s ease;}
+  .role-chip.active{border-color:var(--tape); color:var(--tape);}
+  .role-chip[onclick]{cursor:pointer;}
+  .role-chip[onclick]:hover, .role-chip[onclick]:focus-visible{border-color:var(--text); color:var(--text); outline:none;}
+  @media (prefers-reduced-motion: reduce){ .role-chip{transition:none;} }
   /* Inline pickers (department, company) are just fields (Fonts Review): same Jost,
      same size, same ruled underline as a typed input — to the person filling the form
      it's another thing to fill in, so it shouldn't look like a coloured tag. Keeps the
@@ -5730,6 +5740,23 @@ function renderProjectCrew(body){
       .map(b=>Object.assign({}, b, {entries: b.entries.filter(inPhase)}))
       .filter(b=>b.entries.length);
   }
+  /* ⚠️ ONE ROW PER ROLE on every ENTRY-LEVEL tab, not just Roles. Days worked, prep days
+     and edit days are all facts about a ROLE — they are keyed by entry id — so collapsing
+     a two-role person into one line there meant a chevron, a hidden second row, and the
+     same "which entry represents them" guess Roles was rebuilt to delete. Splitting each
+     block into single-entry blocks reuses every existing row renderer unchanged: with one
+     entry in a block there is nothing to front and no "+N" to expand.
+     ⚠️ Hotel, Travel and Catering are NOT in this list and must not be. A bed, a lift and
+     a lunch belong to a HUMAN — two roles is still one bed — so those three keep person
+     blocks, which is exactly what stops a two-role person being charged twice. */
+  repeatedInView = new Set();
+  if(['roles','preprod','post','days'].includes(crewGridView)){
+    const seen = {};
+    filtered.forEach(b=>b.entries.forEach(e=>{ seen[e.crewId] = (seen[e.crewId]||0)+1; }));
+    repeatedInView = new Set(Object.keys(seen).filter(id=>seen[id]>1));
+    filtered = filtered.flatMap(b=>b.entries.map(e=>
+      Object.assign({}, e, {crewId:e.crewId, entries:[e], isPersonBlock:true})));
+  }
 
   /* Phase BT — Post sits directly after the shoot, so the three phase tabs read left to
      right in the order the job actually happens: prep, the shoot, then the edit.
@@ -5818,9 +5845,7 @@ function renderProjectCrew(body){
          not "in more than one department". Matt Wells as Field Producer and Producer is
          two Production rows, and a reader scanning the department sees the same name
          twice; that it happens to be one department makes it MORE confusable, not less. */
-      const nameCounts = {};
-      entriesInScope.forEach(e=>{ nameCounts[e.crewId] = (nameCounts[e.crewId]||0) + 1; });
-      const multiDept = new Set(Object.keys(nameCounts).filter(id=>nameCounts[id]>1));
+      // repeatedInView is computed once, above, and shared by every entry-level tab
       const roleGroups = DEPARTMENTS.map(d=>({
         key:d, label:d, code:DEPARTMENT_CODES[d]||'',
         items: entriesInScope.filter(e=>deptOf(e)===d)
@@ -5841,7 +5866,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectDeptCollapse('${g.key}')`, g.code)
           + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${
-              g.items.map(e=>crewRolesRowHTML(e, multiDept.has(e.crewId))).join('')}</div>`;
+              g.items.map(e=>crewRolesRowHTML(e)).join('')}</div>`;
       }).join('');
       assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>
         <div class="hint" style="margin-top:8px;">One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records. Prep and Post are the same numbers those tabs hold; Shoot puts them in the Production day grid, where you tick which days.</div>`;
@@ -5944,7 +5969,13 @@ function renderProjectCrew(body){
    Post tabs read, keyed by the same entry id, so a change here shows there and back with
    nothing to synchronise. Shoot is an opt-in to the Production day grid; which days is
    still that grid's own question. */
-function crewRolesRowHTML(e, alsoElsewhere){
+/* who appears more than once in the list currently on screen. Set by renderProjectCrew
+   before any row renders; read by the row renderers so every entry-level tab marks a
+   repeated name the same way, from one calculation. */
+let repeatedInView = new Set();
+const repeatStarHTML = crewId => repeatedInView.has(crewId)
+  ? '<span class="role-dupe-star" title="This person is listed more than once here">*</span>' : '';
+function crewRolesRowHTML(e){
   const p = currentProject();
   const isEditing = editingCrewId===e.id;
   const rate = resolveEntryRate(e.id, p);
@@ -5965,7 +5996,7 @@ function crewRolesRowHTML(e, alsoElsewhere){
         title="${esc(label)} days — the same number the ${label==='Prep'?'Pre-Prod':'Post'} tab holds"></div>`;
   const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}${alsoElsewhere?' — also booked in another department':''}">${esc(e.name)}${alsoElsewhere?'<span class="role-dupe-star" title="Also booked in another department">*</span>':''}</div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${esc(e.name)}${repeatStarHTML(e.crewId)}</div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
     <div class="roles-grid-cell roles-total" data-label="Total">${total?budgetFmt(total):'<span class="budget-noRate">—</span>'}</div>
     ${dayBox('Prep', prepDays, 'preprod')}
@@ -6124,7 +6155,7 @@ function crewAssignRowHTML(block, days){
   const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true};
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${colCount};">
     <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-    <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}</div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}${repeatStarHTML(block.crewId)}</div>
     <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(fronted, personBlockToggleHTML(block, rest.length, false))}</div>
     ${isHotel ? headCells : entryCellsHTML(fronted)}
     <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
@@ -7455,7 +7486,7 @@ function phaseRowHTML(block, phase){
   const isEditing = editingCrewId===block.id;
   const head = `<div class="prep-grid pb-head${frontedCells.calOpen?' prep-grid-row-open':''}">
     <div class="prep-cell prep-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-    <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
+    <div class="prep-cell prep-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}${repeatStarHTML(block.crewId)}</div>
     ${frontedCells.html}
   </div>`;
   const stack = rest.map(e=>{
