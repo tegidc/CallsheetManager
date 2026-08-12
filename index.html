@@ -5101,7 +5101,16 @@ function filterToggleHTML({open=false, count=0, onToggle='', inverted=false} = {
    One shared filter state across every view-switcher tab (Roles/Days on
    site/Hotel/Travel/Catering) — it's a module-level global, so switching
    tabs via setCrewGridView() never resets it. */
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
+/* ⚠️ THE OPENING VIEW IS ALREADY NARROWED, deliberately: grouped by department, sorted
+   by seniority, with Talent and other companies excluded. That is the list you are
+   almost always after — our own crew, HoD first — rather than all 70 rows including
+   presenters and other outfits' people.
+   ⚠️ It is NOT what Clear resets to. Clear means "show me everything", so it drops both
+   exclusions; landing back on the same filtered view would leave no way to see the
+   whole roster. The Filter chip shows 2 on load, which is honest — two filters ARE on.
+   ⚠️ THIS ALSO SCOPES THE BUDGET, which shares this filter. The opening total therefore
+   excludes Talent and other-company crew unless you clear it. */
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:true, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'dept', days:new Set(), daysMode:'or' };
 let projectCrewFilterOpen = false;
 let projectCrewFilterRolesOpen = false;
 function toggleProjectFilterRolesSection(){ projectCrewFilterRolesOpen = !projectCrewFilterRolesOpen; renderProjectBody(); }
@@ -5283,8 +5292,11 @@ function toggleProjectFilterDay(dayId, checked){
 }
 function setProjectFilterField(field, value){ projectCrewFilter[field] = value; renderProjectBody(); }
 function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = checked; renderProjectBody(); }
+/* Clear = show everything. Keeps the opening SHAPE (department groups, seniority order)
+   because those aren't filters and clearing them would be a different, unasked-for
+   change; drops every actual exclusion. */
 function clearProjectCrewFilter(){
-  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'dept', groupBy:'dept', days:new Set(), daysMode:'or' };
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'dept', days:new Set(), daysMode:'or' };
   renderProjectBody();
 }
 function projectCrewActiveFilterCount(){
