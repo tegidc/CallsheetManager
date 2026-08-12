@@ -340,6 +340,21 @@
      left), so .meta has to claim the width .list-card's space-between used to hand to
      the buttons — otherwise the roles wrap early against a phantom right column. */
   .crew-entry .list-card .meta{flex:1 1 auto; min-width:0;}
+  /* THE CARD IS THE CONTROL — clicking it opens the record in read mode, so it has to
+     say so before it's clicked. Hover tint and pointer only; no border change, because
+     .list-card-editing already owns the border and the two would fight. */
+  .crew-card{cursor:pointer;}
+  .crew-card:hover{background:var(--tint-1);}
+  .crew-card:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  /* the caret sits where the eye/pencil pair used to, so the DEPT | Name | Roles line
+     starts at the same x whether a card is open or shut */
+  .crew-card-caret{flex:0 0 auto; color:var(--muted); font-size:11px; width:12px;}
+  .crew-card-open .crew-card-caret{color:var(--tape);}
+  /* the banner's Edit / back control is pushed to the far end of the head line, so it
+     reads as acting on the panel below rather than on the name beside it */
+  .crew-card-action{margin-left:auto; flex:0 0 auto;}
+  /* an open card and its expansion are one object: square off the join between them */
+  .crew-card-open{border-bottom-left-radius:0; border-bottom-right-radius:0;}
   .crew-card-head{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;}
   /* the name sets the line, so it does NOT shrink to make room for a long role list —
      the roles wrap to the next line instead. Overrides `.list-card .meta strong`'s
@@ -2039,17 +2054,20 @@ async function crewCompanyPicked(selectEl){
    separately instead. */
 function crewControlsHTML(c, opts){
   opts = opts||{};
-  const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
+  const isEditing = editingCrewId===c.id;
   /* opts.selectCbHTML (Phase BK) — the caller supplies the bulk-select checkbox
      outright. ⚠️ This REPLACED opts.bulkSelect (do not look for it): every Crew-tab
      list is one PERSON BLOCK per person now, and the ids a block's checkbox must
      toggle are that person's currently VISIBLE entries — which only the block knows,
      since a partial-match filter can hide some of them. The old branch built the
-     checkbox from `c` alone and had no way to express that. */
-  const viewOrSelect = opts.selectCbHTML ? opts.selectCbHTML
-    : `<button class="icon-btn ${isViewing?'active':''}" onclick="toggleCrewView('${c.id}')" title="${isViewing?'Close':'View'}" aria-label="View">${isViewing?icon('close'):icon('view')}</button>`;
+     checkbox from `c` alone and had no way to express that.
+     ⚠️ There is no longer a fallback when it is omitted. It used to render a VIEW eye
+     for the Crew Database card; that card is now click-to-open and supplies no controls
+     at all, which left the branch — and toggleCrewView() with it — reachable from
+     nothing. Every caller here passes a checkbox; a caller that doesn't gets the pencil
+     alone, deliberately. */
   return `
-    ${viewOrSelect}
+    ${opts.selectCbHTML||''}
     <button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${c.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
 }
 function crewIdentityHTML(c, opts){
@@ -8784,25 +8802,64 @@ function telHref(phone){ return (phone||'').replace(/[^\d+]/g, ''); }
    — cameras / drives / dietary / skill tags: the View (eye) panel already lists every
      one of them, and they were what made a resting card five lines deep. */
 function crewCardHTML(c){
-  const isEditing = editingCrewId===c.id;
+  const isEditing = editingCrewId===c.id, isViewing = viewingCrewId===c.id;
+  const open = isEditing || isViewing;
   const contact = [
     c.phone ? `<a class="crew-card-link" href="tel:${esc(telHref(c.phone))}" onclick="event.stopPropagation()">${esc(c.phone)}</a>` : '',
     c.email ? `<a class="crew-card-link" href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : ''
   ].filter(Boolean).join('<span class="crew-card-sep">·</span>');
+  /* The banner's one action, and it only exists while the card is open. Read mode
+     offers Edit; edit mode offers the way back to read, NOT a way to collapse — closing
+     the whole card from inside the form is what Cancel is for, and having the same
+     glyph mean "stop editing" here and "stop looking" when collapsed would be two jobs
+     for one control. stopPropagation on both, or the card's own click would fight it. */
+  const bannerAction = !open ? '' : (isEditing
+    ? `<button class="icon-btn active crew-card-action" onclick="event.stopPropagation();backToCrewView('${c.id}')" title="Done editing — back to the record" aria-label="Back to the record">${icon('close')}</button>`
+    : `<button class="icon-btn crew-card-action" onclick="event.stopPropagation();editCrew('${c.id}')" title="Edit this record" aria-label="Edit">${icon('edit')}</button>`);
   return `<div class="crew-entry">
-    <div class="list-card ${isEditing?'list-card-editing':''}">
+    <div class="list-card crew-card ${isEditing?'list-card-editing':''} ${open?'crew-card-open':''}"
+      role="button" tabindex="0" aria-expanded="${open?'true':'false'}"
+      onclick="toggleCrewCard('${c.id}')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCrewCard('${c.id}');}">
       <div class="meta">
         <div class="crew-card-head">
-          ${crewControlsHTML(c)}
+          <span class="dept-caret crew-card-caret">${open?'▾':'▸'}</span>
           ${deptLabelHTML(c)}
           <strong class="crew-card-name" title="${esc(c.name)}">${esc(c.name)}</strong>
           <span class="roles-inline crew-card-roles">${rolesTagListHTML(c, null)}${roleAddPickerHTML(c)}</span>
+          ${bannerAction}
         </div>
         ${contact?`<div class="crew-card-contact">${contact}</div>`:''}
       </div>
     </div>
     ${crewExpansionHTML(c, 'inline-form-card')}
   </div>`;
+}
+/* ---- Crew Database: the card IS the control ----
+   Clicking anywhere on a card opens it in READ mode; clicking it again closes it. The
+   eye and pencil that used to sit in front of the department badge are gone — one is
+   the card itself, the other moved into the banner and only appears once open.
+
+   ⚠️ Everything interactive INSIDE the head must stopPropagation or it will also open
+   the card: the role chips and their ×, the add-role select, the tel/mailto links and
+   the banner action all do. Anything added to that line needs the same.
+   ⚠️ The click sits on .list-card, not on .crew-entry, so clicks anywhere in the
+   expansion below — the whole read panel and the entire edit form — never reach it.
+   ⚠️ Crew Database ONLY. crewControlsHTML() is untouched and every project Crew row
+   still carries its own checkbox/pencil pair; those lists are for selecting and
+   ticking, not for opening a record. */
+function toggleCrewCard(id){
+  const open = (viewingCrewId===id) || (editingCrewId===id);
+  viewingCrewId = open ? null : id;
+  editingCrewId = null;
+  refreshCrewScreen();
+}
+/* edit → read, keeping the card open. Distinct from closeCrewForm(), which is Cancel:
+   this is "I'm done changing things", that is "put it back how it was". */
+function backToCrewView(id){
+  editingCrewId = null;
+  viewingCrewId = id;
+  refreshCrewScreen();
 }
 let collapsedDepts = new Set();
 function toggleDeptCollapse(dept){
@@ -9071,7 +9128,14 @@ function toggleCrewForm(){
 }
 function closeCrewForm(){
   const id = val('crewEditId');
-  if(id) editingCrewId = null; else { addingCrewNew = false; pendingNewCrewRole = ''; }
+  if(id){
+    editingCrewId = null;
+    /* ⚠️ Crew Database only. There the card is an open record you were reading before
+       you chose to edit it, so Cancel goes back to reading it. On a project screen the
+       expansion is the only thing the pencil opens, so cancelling closes it outright —
+       leaving a read panel behind there would be a state that screen has never had. */
+    if(route.screen==='db-crew') viewingCrewId = id;
+  } else { addingCrewNew = false; pendingNewCrewRole = ''; }
   refreshCrewScreen();
 }
 function editCrew(id){
@@ -9079,11 +9143,9 @@ function editCrew(id){
   if(editingCrewId){ addingCrewNew = false; viewingCrewId = null; }
   refreshCrewScreen();
 }
-function toggleCrewView(id){
-  viewingCrewId = (viewingCrewId===id) ? null : id;
-  if(viewingCrewId) editingCrewId = null;
-  refreshCrewScreen();
-}
+/* ⚠️ REMOVED: toggleCrewView(). The Crew Database card is the control now — see
+   toggleCrewCard(), which owns opening a record in read mode. viewingCrewId itself is
+   very much alive; only the eye button that used to set it is gone. */
 function crewViewHTML(c){
   const rows = [];
   const add = (label, value) => { if(value) rows.push([label, value]); };
@@ -9195,6 +9257,11 @@ async function saveCrew(){
   }
   pendingNewCrewRole = '';
   editingCrewId = null; addingCrewNew = false;
+  /* Saving an EXISTING record on the Crew Database drops back to read mode on that same
+     card, so what you just changed is on screen instead of the list snapping shut. A
+     brand-new person is left collapsed: they are new to the list, and the useful thing
+     is seeing them take their place in it. */
+  if(existing && route.screen==='db-crew') viewingCrewId = merged.id;
   refreshCrewScreen();
 }
 async function deleteCrew(id){
