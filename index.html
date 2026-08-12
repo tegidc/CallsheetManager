@@ -330,6 +330,26 @@
   .list-card .meta strong{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text);}
   .list-card .meta div{color:var(--muted); font-size:var(--fs-meta); margin-top:2px;}
   .list-card .actions{display:flex; gap:6px; flex-wrap:wrap;}
+  /* ---- the Crew Database card's two lines ----
+     The crew card has no .actions column any more (Use as template and Delete both
+     left), so .meta has to claim the width .list-card's space-between used to hand to
+     the buttons — otherwise the roles wrap early against a phantom right column. */
+  .crew-entry .list-card .meta{flex:1 1 auto; min-width:0;}
+  .crew-card-head{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;}
+  /* the name sets the line, so it does NOT shrink to make room for a long role list —
+     the roles wrap to the next line instead. Overrides `.list-card .meta strong`'s
+     size/weight only where it needs to (nothing) — it inherits both. */
+  .crew-card-name{flex:0 0 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+  .crew-card-roles{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;}
+  .crew-card-roles select.pill-select{max-width:180px;}
+  /* ⚠️ `.list-card .meta div` above sets the muted meta colour and a 2px top margin on
+     ANY div inside .meta — this line is one of them, so it only adds the link
+     treatment. Anchors are styled explicitly: they inherit nothing useful from the
+     muted rule, and an unstyled <a> here would arrive blue-and-underlined. */
+  .crew-card-contact{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .crew-card-link{color:var(--muted); text-decoration:none; font-size:var(--fs-meta);}
+  .crew-card-link:hover{color:var(--tape); text-decoration:underline;}
+  .crew-card-sep{color:var(--muted); opacity:.5;}
   .empty-note{color:var(--muted); font-size:var(--fs-meta); font-style:italic;}
 
   .searchresults{position:relative;}
@@ -1817,70 +1837,50 @@ function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
   if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML() + rolesMenuHTML();
 }
-/* "Use as template" (Phase BG) — the confirm step in front of duplicateCrew().
-   The control is for making a DIFFERENT PERSON off an existing record (same company,
-   agent and rate; new name), never a second role for the same person.
-
-   ⚠️ Why the guard lives HERE and not in saveCrew(): duplicateCrew() writes to db:crew
-   on click. There is no pending record and no save step to gate, so the only moment at
-   which "don't create this" is still a choice is before the write. Cancel writes
-   nothing at all; proceed runs duplicateCrew() unchanged.
-
-   Native confirm() deliberately — it is what deleteCrew() already uses on this screen
-   (D-1), alongside the native prompt() in addRoleToDeptAdmin(). (removeSubDeptAdmin()
-   was the other example cited here; it went with the sub-departments block.) The one
-   in-page dialog here (addRoleDialogHTML, D-1.5) is a picker, not a confirmation, so it
-   is not the pattern to copy.
-
-   Deferred, not rejected: opening a prefilled form and writing nothing until the name
-   is changed is the correct end state. It needs saveCrew()'s pendingNewCrewRole
-   invariant reworked, so it waits until after the schema work — see MAP.md's Phase BG
-   section. Do not build toward it here. */
-async function useCrewAsTemplate(crewId){
-  const src = crewById(crewId); if(!src) return;
-  const who = src.name || 'this crew member';
-  if(!confirm(`This creates a second record named "${who}". It's a new person, so you'll need to give it a different name.`)) return;
-  await duplicateCrew(crewId);
-}
-/* clone a crew member — independent record, keeps everything, meant to be
-   reassigned to a different role. Shows a quiet "copy" badge (via crewIdentityHTML)
-   until the role is actually changed away from the original's.
-   ⚠️ Reached only through useCrewAsTemplate() above, which owns the confirm. */
-async function duplicateCrew(crewId){
-  const src = crewById(crewId); if(!src) return;
-  const copy = Object.assign({}, src, { id: uid(), _copyOriginalRole: src.role||'' });
-  crewDB.push(copy);
-  await saveDB('db:crew', crewDB);
-  refreshCrewScreen();
-}
-/* co-production company — quick select, backed by an extensible saved list */
-function coProPillSelect(c){
-  const empty = !c.coProductionCompany;
-  // offer every company already in use anywhere in the crew database, plus any saved manually
+/* The Edit form's Company field, in place of the old free-text "Co-Production company".
+   ⚠️ THE FIRST OPTION IS THE LEAD COMPANY, and it is labelled with COMPANY — the same
+   production company Settings shows — rather than a blank or a dash, because "who is
+   this person from?" has a real answer for almost everyone and it is us. Its VALUE is
+   still the empty string, so the stored shape is unchanged: c.coProductionCompany empty
+   means lead company, and every reader of that field (the call sheet's co-production
+   buckets, Group by → Lead company, the Budget) keeps working untouched. Do not be
+   tempted to store COMPANY itself — that would make "lead company" a string every one
+   of those readers would then have to special-case. */
+function crewCompanySelectHTML(c){
   const inUse = crewDB.map(x=>x.coProductionCompany).filter(Boolean);
   const known = [...new Set(coProCompaniesList.concat(inUse))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-  const opts = ['<option value="">— Lead company —</option>']
+  const opts = [`<option value="">${esc(COMPANY)}</option>`]
     .concat(known.map(n=>`<option value="${esc(n)}" ${c.coProductionCompany===n?'selected':''}>${esc(n)}</option>`))
-    .concat(['<option value="__add__">+ Add company…</option>']).join('');
-  return `<select class="pill-select copro ${empty?'empty':''}" onchange="quickSetCoPro('${c.id}', this)" onclick="event.stopPropagation()" title="Which company supplied this person">${opts}</select>`;
+    .concat([`<option value="__add__">+ Add company…</option>`]).join('');
+  return `<select id="ncCoPro" onchange="crewCompanyPicked(this)">${opts}</select>`;
 }
-async function quickSetCoPro(crewId, selectEl){
-  const c = crewById(crewId); if(!c) return;
-  let value = selectEl.value;
-  if(value==='__add__'){
-    value = (prompt('Co-production company name:')||'').trim();
-    if(value && !coProCompaniesList.includes(value)){
-      coProCompaniesList.push(value);
-      await saveDB('db:coprocompanies', coProCompaniesList);
-    }
+/* "+ Add company…" — adds to the saved list and leaves the new name selected, so the
+   form still reads it from #ncCoPro on save like any other pick. Cancelling snaps back
+   to whatever was selected before rather than leaving "__add__" in the field. */
+async function crewCompanyPicked(selectEl){
+  if(selectEl.value!=='__add__') return;
+  const name = (prompt('Company name:')||'').trim();
+  if(!name){ selectEl.value = (crewById(val('crewEditId'))||{}).coProductionCompany || ''; return; }
+  if(!coProCompaniesList.includes(name)){
+    coProCompaniesList.push(name);
+    await saveDB('db:coprocompanies', coProCompaniesList);
   }
-  c.coProductionCompany = value;
-  await saveDB('db:crew', crewDB);
-  refreshCrewScreen();
+  const opt = document.createElement('option');
+  opt.value = name; opt.textContent = name;
+  selectEl.insertBefore(opt, selectEl.lastElementChild);
+  selectEl.value = name;
 }
+/* ⚠️ REMOVED HERE: useCrewAsTemplate() / duplicateCrew() ("Use as template", Phase BG)
+   and coProPillSelect() / quickSetCoPro() (the "— Lead company —" quick-pick select).
+   Both were Crew Database CARD controls and the card is two lines now — see
+   crewCardHTML. The company is a field in the Edit form instead (one place, not two),
+   and there is no duplicate-a-person control at all, so the "copy" badge that tracked
+   duplicateCrew()'s output went with it. saveCrew()'s duplicate-NAME warning stays: it
+   covers records created or renamed by hand, which is now the only way to make one.
+   coProCompaniesList and c.coProductionCompany are unchanged — the Edit form's Company
+   field reads and extends the same list. */
 /* ---- single canonical crew identity block, used by every crew list in the app ----
    opts.hideDept      — suppress the read-only department badge (Crew-on-project Roles row: department is implied by Role, shown separately, not repeated here)
-   opts.hideLeadPill  — suppress the inline Lead Company quick-pick (Crew-on-project main row: Lead Company only lives in the edit expansion / bulk edit now)
    opts.showAsOrRole  — display c.showAs||c.role instead of the raw role (Phase S item 8: Days on site/Hotel/Travel/Catering are display-only for role — editing only ever happens on the Roles tab)
    opts.showPhone     — show phone on the sub-line
    opts.oneLine       — compact single-row layout
@@ -1914,26 +1914,23 @@ function crewIdentityHTML(c, opts){
   const buttons = opts.hideButtons ? '' : crewControlsHTML(c, opts);
   const roleText = opts.showRole===false ? null : (opts.showAsOrRole ? (c.showAs||c.role) : c.role);
   const bits = [roleText, opts.showPhone!==false ? c.phone : null].filter(Boolean).map(esc).join(' · ');
-  // quiet "copy" badge: shows only until the duplicate's role is actually changed
-  const copyBadge = (c._copyOriginalRole!==undefined && c.role===c._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
   const deptBadge = opts.hideDept ? '' : deptLabelHTML(c);
-  const leadPill = opts.hideLeadPill ? '' : coProPillSelect(c);
   if(opts.oneLine){
     // compact: everything on a single row (or wrapped onto further lines
     // within the same person-block, when opts.wrap is set)
     return `<div class="crew-ident one-line${opts.wrap?' wrap-row':''}">
-      ${buttons}<strong>${esc(c.name)}</strong>${copyBadge}
-      ${deptBadge}${leadPill}
+      ${buttons}<strong>${esc(c.name)}</strong>
+      ${deptBadge}
       ${bits?`<span class="hint crew-ident-sub">${bits}</span>`:''}
       ${opts.extraLine||''}
     </div>`;
   }
-  return `<div class="crew-ident">
-    <div class="crew-ident-top">${buttons}<strong>${esc(c.name)}</strong>${copyBadge}</div>
-    <div class="crew-ident-pills">${deptBadge}${leadPill}</div>
-    ${bits?`<div class="hint">${bits}</div>`:''}
-    ${opts.extraLine||''}
-  </div>`;
+  /* ⚠️ ONE-LINE ONLY now. The stacked branch that used to live here (name row, then a
+     pills row, then the sub-line) existed for the Crew Database card, and that card
+     builds its own two lines in crewCardHTML — every remaining caller is a project Crew
+     row passing oneLine:true. Left in place it would have been unreachable code still
+     referencing the deleted copyBadge/leadPill. */
+  return `<div class="crew-ident one-line">${buttons}<strong>${esc(c.name)}</strong>${deptBadge}${bits?`<span class="hint crew-ident-sub">${bits}</span>`:''}${opts.extraLine||''}</div>`;
 }
 /* read-only department badge, for screens where the pickers are deliberately hidden */
 function deptLabelHTML(c){
@@ -5432,7 +5429,6 @@ function crewRolesRowHTML(block){
   const rest = block.entries.filter(e=>e.id!==fronted.id);
   const isEditing = editingCrewId===block.id;
   const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${block.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
-  const copyBadge = (block._copyOriginalRole!==undefined && block.role===block._copyOriginalRole) ? `<span class="pill" style="opacity:.65;margin-left:4px;" title="Created from another crew record as a template — still has the original's role">copy</span>` : '';
   /* Phase BN — Role/Rate belong to whichever entry is fronted. Rendering them
      straight onto the SAME .roles-grid div as the name (rather than a second,
      independently-gridded .pb-role-row) is what makes a single-role person read as
@@ -5446,7 +5442,7 @@ function crewRolesRowHTML(block){
   };
   const head = `<div class="roles-grid pb-head">
     <div class="roles-grid-controls">${personBlockSelectCbHTML(block)}${editBtn}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}${copyBadge}</div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
     ${roleCellsHTML(fronted, personBlockToggleHTML(block, rest.length, false))}
     <div class="roles-grid-cell" data-label="Show as" style="grid-column:5;">${showAsQuickEditHTML(block)}</div>
   </div>`;
@@ -8485,25 +8481,47 @@ function crewSearchBlob(c){
           c.previousProjects, c.generalNotes, c.coffeeOrder, c.instagram, c.youtube, c.linkedin, c.email, c.phone, (c.roles||[]).join(' ')]
     .filter(Boolean).join(' ').toLowerCase();
 }
+/* tel: needs the number without spaces or punctuation; the DISPLAYED text keeps
+   whatever formatting was typed, because that is how people read a phone number. */
+function telHref(phone){ return (phone||'').replace(/[^\d+]/g, ''); }
+/* The Crew Database card — TWO LINES, deliberately:
+
+     [view][edit]  DEPT  Name   role chips…   + Add a saved role…
+                   phone · email
+
+   ⚠️ Roles are the point of this screen, so they are ON the card rather than only
+   inside the Edit expansion: rolesTagListHTML(c, null) renders every saved role (● marks
+   the active one, clicking another makes it active, × removes it through the guarded
+   dialog) and roleAddPickerHTML(c) adds one without opening anything. Both are the SAME
+   renderers the Edit form uses — not a second copy that can drift. `null` for entryId is
+   what makes a pick set the person's database default rather than a project entry's role
+   (see rolesTagListHTML).
+
+   ⚠️ WHAT CAME OFF, and where it went, so none of it reads as accidentally lost:
+   — the "— Lead company —" quick-pick select: now the Company field in the Edit form
+     (coProPillSelect/quickSetCoPro are gone with it, and hideLeadPill with them).
+   — "Use as template": removed outright, with useCrewAsTemplate()/duplicateCrew() and
+     the "copy" badge that tracked its output.
+   — "Delete": now the last collapsible IN the Edit form, so it can't be hit from a
+     resting list.
+   — cameras / drives / dietary / skill tags: the View (eye) panel already lists every
+     one of them, and they were what made a resting card five lines deep. */
 function crewCardHTML(c){
-  const tags = (c.skills||'').split(',').map(s=>s.trim()).filter(Boolean);
-  const cams = [c.camera1,c.camera2,c.camera3].filter(Boolean);
-  const extras = [];
-  if(cams.length) extras.push(icon('camera')+' '+cams.map(esc).join(', '));
-  if(c.drives==='Yes') extras.push(icon('car')+' '+([c.carMakeModel,c.carReg].filter(Boolean).map(esc).join(' · ')||'Drives'));
-  const dietaryDisplay = [c.dietaryGeneral, c.dietarySpecific||c.dietary].filter(Boolean).join(', ');
-  if(dietaryDisplay) extras.push(icon('dietary')+' '+esc(dietaryDisplay));
-  const extraLine = `
-    ${c.email?`<div class="hint">${esc(c.email)}</div>`:''}
-    ${extras.length?`<div>${extras.join(' &nbsp;·&nbsp; ')}</div>`:''}
-    ${tags.length?`<div class="taglist">${tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}</div>`:''}`;
   const isEditing = editingCrewId===c.id;
+  const contact = [
+    c.phone ? `<a class="crew-card-link" href="tel:${esc(telHref(c.phone))}" onclick="event.stopPropagation()">${esc(c.phone)}</a>` : '',
+    c.email ? `<a class="crew-card-link" href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : ''
+  ].filter(Boolean).join('<span class="crew-card-sep">·</span>');
   return `<div class="crew-entry">
     <div class="list-card ${isEditing?'list-card-editing':''}">
-      <div class="meta">${crewIdentityHTML(c, {extraLine})}</div>
-      <div class="actions">
-        <button class="small" onclick="useCrewAsTemplate('${c.id}')" title="Create a new person from this record's details — same company and rate, different name">Use as template</button>
-        <button class="small danger" onclick="deleteCrew('${c.id}')">Delete</button>
+      <div class="meta">
+        <div class="crew-card-head">
+          ${crewControlsHTML(c)}
+          ${deptLabelHTML(c)}
+          <strong class="crew-card-name" title="${esc(c.name)}">${esc(c.name)}</strong>
+          <span class="roles-inline crew-card-roles">${rolesTagListHTML(c, null)}${roleAddPickerHTML(c)}</span>
+        </div>
+        ${contact?`<div class="crew-card-contact">${contact}</div>`:''}
       </div>
     </div>
     ${crewExpansionHTML(c, 'inline-form-card')}
@@ -8601,14 +8619,16 @@ function crewFormHTML(c, entryId){
       </div>
       <!-- ⚠️ g2, not g3 — the Sub-department input that used to lead this row is gone
            (sub-departments were dropped entirely; see migrateDropSubDepartments). Show
-           as and Co-Production company now share the row. -->
+           as and Company share the row. -->
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label>Show as <span style="color:var(--muted)">(optional, cosmetic)</span></label>
           <input type="text" id="ncShowAs" value="${esc(c.showAs||'')}" placeholder="e.g. Talent Guest">
           <div class="hint">Shown on the call sheet instead of the role label. Searchable. The saved role/department stay unaffected.</div>
         </div>
-        <div><label>Co-Production company <span style="color:var(--muted)">(if not lead company)</span></label>
-          <input type="text" id="ncCoPro" value="${esc(c.coProductionCompany||'')}" placeholder="e.g. Big Co Productions"></div>
+        <div><label>Company</label>
+          ${crewCompanySelectHTML(c)}
+          <div class="hint">Defaults to ${esc(COMPANY)} — the production company set in Settings. Pick or add another only for someone supplied by a co-production company.</div>
+        </div>
       </div>
       <div class="grid g3" style="margin-bottom:10px;">
         <div><label>Phone</label><input type="text" id="ncPhone" value="${esc(c.phone||'')}"></div>
@@ -8683,10 +8703,31 @@ function crewFormHTML(c, entryId){
       <label>Notes <span style="color:var(--muted)">(private)</span></label><textarea id="ncNotes">${esc(c.notes||'')}</textarea>
     </details>
 
+    ${deleteCrewBlockHTML(c, entryId)}
+
     <div class="toolbar" style="margin-top:10px;">
       <button class="primary" onclick="saveCrew()">Save crew member</button>
       <button onclick="closeCrewForm()">Cancel</button>
     </div>`;
+}
+/* Delete, as the form's last collapsible — closed, so it takes a deliberate open before
+   the button is even on screen. It used to sit on the resting Crew Database card, one
+   click from every name in the list.
+
+   ⚠️ CREW-DATABASE ONLY, hence the !entryId guard. crewFormHTML() also renders inside
+   every project Crew tab's Edit expansion, where entryId is set; deleteCrew() removes
+   the PERSON from the shared database and cascades through every project, which is not
+   something a project screen should be able to reach in passing. Removing someone from
+   a project is what that screen's own remove control is for. And no id means an unsaved
+   new record — nothing to delete yet. deleteCrew() keeps its own confirm; this is a
+   second gate in front of it, not a replacement for it. */
+function deleteCrewBlockHTML(c, entryId){
+  if(!c.id || entryId) return '';
+  return `<details class="formgroup">
+    <summary class="fg-title">Delete</summary>
+    <div class="hint" style="margin-bottom:8px;">Removes ${esc(c.name||'this person')} from the crew database entirely, and from every project they are on. There is no undo.</div>
+    <button class="small danger" onclick="deleteCrew('${c.id}')">Delete ${esc(c.name||'crew member')}</button>
+  </details>`;
 }
 function toggleCarFields(){
   const drives = val('ncDrives'); const cf = document.getElementById('carFields');
@@ -8752,7 +8793,8 @@ function crewViewHTML(c){
   const add = (label, value) => { if(value) rows.push([label, value]); };
   add('Role', c.role); add('Department', c.department);
   add('Show as', c.showAs);
-  add('Co-production company', c.coProductionCompany);
+  // blank means the lead company — name it, rather than showing no company row at all
+  add('Company', c.coProductionCompany || COMPANY);
   add('Phone', c.phone); add('Email', c.email); add('Skills / tags', c.skills);
   add('Main camera 1', c.camera1); add('Main camera 2', c.camera2); add('Main camera 3', c.camera3);
   add('Other equipment', c.cameraExtras);
@@ -8776,10 +8818,9 @@ async function saveCrew(){
   /* Duplicate-name warning (Phase BG) — a WARNING, not a block. Two different people
      genuinely can share a name, so this asks rather than forbids.
 
-     Covers records created or renamed BY HAND, which is the path that actually passes
-     through this function. The "Use as template" flow does not reach here at all —
-     duplicateCrew() writes straight to db:crew — so it carries its own confirm step in
-     useCrewAsTemplate(). Two entry points, two guards, on purpose.
+     Every record now arrives through this function — "Use as template", the one path
+     that wrote to db:crew without passing here (and so carried its own confirm), is
+     gone. One entry point, one guard.
 
      Match is on the NAME ALONE, normalised (trimmed, case-insensitive) — never name +
      role. Under BF one record will hold several saved roles, so one person with two
