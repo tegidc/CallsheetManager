@@ -885,8 +885,9 @@
   .budget-scope-amt{font-weight:600; white-space:nowrap;}
   /* off ≠ gone: the line stays, greyed, so "switched off" and "nothing booked" read
      differently. Not display:none, and not a strikethrough — this is a state, not a deletion. */
+  /* off ≠ gone, and off ≠ blank: the figure STAYS and fades with its own label, at the
+     one opacity, so an excluded phase still tells you what including it would add. */
   .budget-scope-row.off{opacity:.38;}
-  .budget-scope-row.off .budget-scope-amt{font-weight:400;}
   /* Est. Costs is a look, not a sum — italic, and never bold, so it can't be mistaken
      for one of the figures that adds into the total beside it */
   .budget-est-costs{font-style:italic; color:var(--muted);}
@@ -7912,6 +7913,13 @@ function buildBudgetData(){
        out. */
     const prepDays = prepDaysOf(c.id, p) || 0;
     const postDays = postDaysOf(c.id, p) || 0;
+    /* ⚠️ RAW = "what this would be if its scope were on". The scoped figures below are
+       multiplied by prodOn/prepOn/postOn and collapse to 0 when you switch a phase off —
+       which is right for every total, and useless for the scope stack, which has to keep
+       showing what a switched-off phase WOULD cost. Same arithmetic, minus the factor. */
+    const prodRaw = rate * daysWorked;
+    const prepRaw = rate * prepDays;
+    const postRaw = rate * postDays;
     const prodSubtotal = rate * daysWorked * prodOn;
     const prepSubtotal = rate * prepDays * prepOn;
     const postSubtotal = rate * postDays * postOn;
@@ -7948,7 +7956,9 @@ function buildBudgetData(){
     const labourSubtotal = kit!=null ? subtotal - kitSubtotal : null;
     const claimsTravel = !travelClaimed.has(c.crewId);
     if(claimsTravel) travelClaimed.add(c.crewId);
-    const travelRate = (claimsTravel ? travelRateFor(c.crewId) : 0) * prodOn;
+    const travelRateRaw = claimsTravel ? travelRateFor(c.crewId) : 0;
+    const travelCostRaw = travelRateRaw * crewDayCount(c.crewId, days, p);
+    const travelRate = travelRateRaw * prodOn;
     const travelCost = travelRate * crewDayCount(c.crewId, days, p);
     const vatRegistered = c.vatRegistered==='Yes';
     /* AO — the VAT base is day rate AND travel, both invoiced by this person.
@@ -7968,6 +7978,10 @@ function buildBudgetData(){
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
       rate, hasRate, isOverride, kit, kitSubtotal, labourSubtotal,
       hotelCost, mealCost, estCosts: hotelCost + mealCost + travelCost,
+      prodRaw, prepRaw, postRaw, travelCostRaw,
+      prodVatRaw: vatRegistered ? (prodRaw + travelCostRaw) * VAT_RATE : 0,
+      prepVatRaw: vatRegistered ? prepRaw * VAT_RATE : 0,
+      postVatRaw: vatRegistered ? postRaw * VAT_RATE : 0,
       daysWorked, prepDays, postDays,
       subtotal, prodSubtotal, prepSubtotal, postSubtotal,
       travelRate, travelCost, vatRegistered, vat, prodVat, prepVat, postVat,
@@ -8054,7 +8068,8 @@ function buildBudgetData(){
     return sum + perDay * dayList.filter(d=>usesLocation(d, locId)).length;
   }, 0);
   // Phase BS — every extra below belongs to the shoot, so they all follow prodOn.
-  const locationTotal = locationFeeForDays(days) * prodOn;
+  const locationRaw = locationFeeForDays(days);
+  const locationTotal = locationRaw * prodOn;
 
   const cateringGrid = buildCateringSummaryGrid();
   const transportSummary = buildTransportSummary();
@@ -8074,8 +8089,10 @@ function buildBudgetData(){
   const dayIdsInScope = new Set(days.map(d=>d.id));
   const sumDailyCost = g => g ? g.cols.filter(c=>dayIdsInScope.has(c.dayId))
                                       .reduce((s,c)=>s+c.dailyCost, 0) : 0;
-  const cateringTotal = sumDailyCost(cateringGrid) * prodOn;
-  const travelTotal = sumDailyCost(transportSummary) * prodOn;
+  const cateringRaw = sumDailyCost(cateringGrid);
+  const travelRaw = sumDailyCost(transportSummary);
+  const cateringTotal = cateringRaw * prodOn;
+  const travelTotal = travelRaw * prodOn;
   // Room-nights counted directly off the day records rather than via
   // buildHotelSummary(), which filters down to "active" nights only and would
   // need label-matching to recover one specific day's figure — this way, the
@@ -8087,7 +8104,8 @@ function buildBudgetData(){
   const preNightRooms = (firstProjectDay && days.some(d=>d.id===firstProjectDay.id))
     ? (p.hotelNightBefore||[]).length : 0;
   const dayHotelRooms = days.map(d=>(d.hotelNights||[]).length);
-  const hotelTotal = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight * prodOn;
+  const hotelRaw = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
+  const hotelTotal = hotelRaw * prodOn;
 
   /* ⚠️ AO — Catering, Hotel and Locations carry NO per-person VAT, and that is
      DELIBERATE, not an oversight: they are paid direct to a supplier (caterer,
@@ -8169,6 +8187,18 @@ function buildBudgetData(){
        double-counting. `phases` is the pair in chronological render order; the two
        named keys are the same objects, for readers that want one specifically. */
     prep, post, phases:[prep, post],
+    /* ⚠️ THE SCOPE STACK'S OWN FIGURES, and the only ones in here that ignore the on/off
+       flags. Everything else above collapses to 0 when its scope is switched off, which
+       is correct for a total and wrong for a control that has to keep saying what
+       switching it back on would add. Production carries the extras because prodOn is
+       what gates them; prep and post are crew fee alone, which is all a prep or edit day
+       has. Never add these to a total — they double everything above. */
+    phaseRaw: {
+      preproduction: { ex: people.reduce((n,pp)=>n+pp.prepRaw,0), vat: people.reduce((n,pp)=>n+pp.prepVatRaw,0) },
+      post:          { ex: people.reduce((n,pp)=>n+pp.postRaw,0), vat: people.reduce((n,pp)=>n+pp.postVatRaw,0) },
+      production:    { ex: people.reduce((n,pp)=>n+pp.prodRaw,0) + cateringRaw + travelRaw + hotelRaw + locationRaw,
+                       vat: people.reduce((n,pp)=>n+pp.prodVatRaw,0) },
+    },
     prepOn: !!prepOn, prodOn: !!prodOn, postOn: !!postOn,
     hasCrew: crewInScope.length>0, hasDays: days.length>0
   };
@@ -8201,11 +8231,12 @@ function budgetSummaryBarHTML(data){
      ⚠️ Production has no phase slice of its own — prep and post are the two carved OUT
      of the shoot — so its figure is the remainder, total minus the two. Same arithmetic
      Per Department already shows, not a second source that could disagree with it. */
+  /* Reads phaseRaw, NOT the scoped slices — a switched-off phase still has to show what
+     it would cost, and its scoped figure is 0 by construction. Follows Itemize VAT so
+     the three lines are in the same money as the headline they sit under. */
   const phaseTotal = key => {
-    const pick = ph => budgetVatToggle ? ph.exVat : ph.incVat;
-    if(key==='preproduction') return pick(data.prep);
-    if(key==='post')          return pick(data.post);
-    return (budgetVatToggle ? data.totalExVat : data.totalIncVat) - pick(data.prep) - pick(data.post);
+    const r = (data.phaseRaw||{})[key] || {ex:0, vat:0};
+    return budgetVatToggle ? r.ex : r.ex + r.vat;
   };
   const scopeRow = ([key, label]) => `<div class="budget-scope-row${budgetScope[key]?'':' off'}"
       role="button" tabindex="0" aria-pressed="${budgetScope[key]?'true':'false'}"
@@ -8213,7 +8244,7 @@ function budgetSummaryBarHTML(data){
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
       title="${budgetScope[key]?'Costed — click to leave it out':'Not costed — click to include it'}">
       <span class="budget-scope-name">${esc(label)}</span>
-      <span class="budget-scope-amt">${budgetScope[key]?fmt(phaseTotal(key)):'—'}</span>
+      <span class="budget-scope-amt">${fmt(phaseTotal(key))}</span>
     </div>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   return `<div class="budget-summary">
