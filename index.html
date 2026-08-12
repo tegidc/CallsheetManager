@@ -2366,6 +2366,11 @@ function addCrewEntry(p, crewId, force){
   const e = { id: uid(), crewId,
     role: (c&&c.role)||'', department: (c&&c.department)||'' };
   p.crewEntries.push(e);
+  /* new bookings join the shoot by default: putting someone on a project has always put
+     them in the Production grid, and starting them off it would hide the person you just
+     added. Untick to take them out. */
+  p.onShoot = p.onShoot || [];
+  if(!p.onShoot.includes(e.id)) p.onShoot.push(e.id);
   return e;
 }
 /* remove entries and everything keyed to THEM — the entry-id equivalent of what
@@ -2567,6 +2572,43 @@ async function migrateShowAsToEntries(){
   await saveDB('db:projects', projectsDB);
   const report = { backupKey:key, entries:pending.length };
   console.info('[SHOWAS] show-as copied onto entries:', report);
+  return report;
+}
+/* Seed p.onShoot with EVERY entry on the project, once, so the list is complete and
+   authoritative from then on.
+
+   ⚠️ Everyone ON, not just those with day ticks. Today every person on a project appears
+   in the Production grid; seeding only the ticked ones would silently hide anybody not
+   yet scheduled — including the people you were about to schedule, leaving nowhere to
+   tick them. Seeding everyone reproduces exactly the behaviour that was there the moment
+   before, and unticking is then a thing you choose rather than something that happened
+   to you on upgrade.
+
+   Same contract as the migrations above: writes nothing once every project has a list,
+   backs up db:projects before the first write, aborts on a failed backup. */
+async function migrateOnShoot(){
+  /* ⚠️ Gated on its own MARKER, not on the list being absent. c0e2270 shipped a version
+     where entryOnShoot() fell back to "has a day ticked", so unticking anyone created an
+     `onShoot: []` that meant "no explicit opt-ins yet" while everyone still read as on
+     the shoot. Under the authoritative rule the same empty array means "nobody is on the
+     shoot" — so seeding only when the key is MISSING would have silently blanked the
+     entire shoot of any project upgraded from that build. A marker separates "never
+     seeded" from "seeded, and you have since unticked everyone", which are different
+     facts that an empty array cannot tell apart. */
+  const stale = projectsDB.filter(pr=>!pr.onShootInit);
+  if(!stale.length) return null;
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const key = `backup_pre_ONSHOOT_${stamp}:db:projects`;
+  const res = await saveDB(key, projectsDB);
+  if(res && res.ok===false){ console.error('[ONSHOOT] backup failed, migration aborted:', res); return {aborted:key}; }
+  const report = { backupKey:key, projects:0, entries:0 };
+  stale.forEach(pr=>{
+    pr.onShoot = (pr.crewEntries||[]).map(e=>e.id);
+    pr.onShootInit = true;
+    report.projects++; report.entries += pr.onShoot.length;
+  });
+  await saveDB('db:projects', projectsDB);
+  console.info('[ONSHOOT] shoot opt-in seeded:', report);
   return report;
 }
 /* the location currently picked in the Shoot Day form's primary-location select */
@@ -2938,6 +2980,7 @@ async function initApp(){
   await migrateDropSubDepartments();
   await migrateNormaliseDietary();
   await migrateShowAsToEntries();
+  await migrateOnShoot();
   renderSide(); renderMain();
 }
 initApp();
@@ -5580,7 +5623,20 @@ function renderProjectCrew(body){
   const assigned = projectEntryViews(p);
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   const unassigned = crewDB.filter(c=>!onProject.has(c.id));
-  const filtered = buildPersonBlocks(assigned.filter(personMatchesProjectFilter));
+  let filtered = buildPersonBlocks(assigned.filter(personMatchesProjectFilter));
+  /* ⚠️ THE FOUR SHOOT-LOGISTICS TABS ONLY SHOW PEOPLE ON THE SHOOT. Days on site, Hotel,
+     Travel and Catering are all "what does this person need while we're shooting", so
+     someone taken off the shoot drops out of them — which is the point of the toggle.
+     Roles, Pre-Prod and Post are NOT shoot tabs and keep everyone: taking a person off
+     the shoot is done ON Roles, so removing them from it would delete the control you
+     just used, and being cut from the shoot says nothing about the edit.
+     ⚠️ FILTERS THE VIEW, NEVER THE DATA. Their day ticks, meals and hotel nights stay
+     exactly where they are — see toggleEntryOnShoot. */
+  if(['days','hotel','travel','catering'].includes(crewGridView)){
+    filtered = filtered
+      .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryOnShoot(e.id, p))}))
+      .filter(b=>b.entries.length);
+  }
 
   /* Phase BT — Post sits directly after the shoot, so the three phase tabs read left to
      right in the order the job actually happens: prep, the shoot, then the edit.
@@ -5848,10 +5904,20 @@ function entrySelectCbHTML(e){
    Unticking does NOT delete their day ticks — it takes them out of the grid, and putting
    them back shows the days exactly as they were. Losing real bookings to a stray click on
    a checkbox is not a trade worth making. */
+/* ⚠️ AUTHORITATIVE. It used to fall back to "do they have a day ticked", which was fine
+   while the toggle only added people and fatal once it had to remove them: unticking
+   someone who already had ticks read straight back as true and the toggle did nothing.
+   migrateOnShoot() seeds every existing project with all its entries, so the list is
+   always complete and the fallback isn't needed. */
 function entryOnShoot(entryId, p){
   const proj = p || currentProject(); if(!proj) return false;
-  if((proj.onShoot||[]).includes(entryId)) return true;
-  return entryDayCount(entryId, projectDays()) > 0;
+  return (proj.onShoot||[]).includes(entryId);
+}
+/* person-level, for the things a HUMAN has rather than a role — a bed, a lunch, a lift.
+   On the shoot in any role is on the shoot. */
+function crewOnShoot(crewId, p){
+  const proj = p || currentProject(); if(!proj) return false;
+  return entriesForCrew(crewId, proj).some(e=>entryOnShoot(e.id, proj));
 }
 async function toggleEntryOnShoot(entryId, on){
   const p = currentProject(); if(!p) return;
@@ -6307,9 +6373,15 @@ function buildCateringSummaryGrid(){
   const costs = getCateringCosts(p);
   const cols = days.map(d=>{
     const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
+    /* ⚠️ Meals are kept on the day record for everyone, on the shoot or not — taking
+       someone off does not wipe what you had ticked. They simply stop being counted, so
+       putting them back gives the identical headcount. */
     const meals = d.cateringMeals || {};
     let b=0, l=0, dd=0;
-    Object.values(meals).forEach(m=>{ if(m.b) b++; if(m.l) l++; if(m.d) dd++; });
+    Object.entries(meals).forEach(([crewId,m])=>{
+      if(!crewOnShoot(crewId, p)) return;
+      if(m.b) b++; if(m.l) l++; if(m.d) dd++;
+    });
     const deliveryFee = (b>0?costs.delivery:0) + (l>0?costs.delivery:0) + (dd>0?costs.delivery:0);
     const dailyCost = (b*costs.b) + (l*costs.l) + (dd*costs.d) + deliveryFee;
     /* G15 — dayId is the join key Budget uses to attach this column's cost to a
@@ -6333,7 +6405,7 @@ function buildCateringSummaryGrid(){
   const OMNI = 'Omnivore / eats everything';
   const dietOf = c => (c && c.dietaryGeneral) ? c.dietaryGeneral : OMNI;
   const fedPerDay = days.map(d=>Object.entries(d.cateringMeals||{})
-    .filter(([,m])=>m && (m.b||m.l||m.d))
+    .filter(([crewId,m])=>m && (m.b||m.l||m.d) && crewOnShoot(crewId, p))
     .map(([crewId])=>crewById(crewId))
     .filter(Boolean));
   const dietLabels = [...new Set(fedPerDay.flat().map(dietOf))]
@@ -8073,7 +8145,13 @@ function buildBudgetData(){
   const cateringCosts = getCateringCosts(p);
   const people = crewInScope.map(c=>{
     const {rate, hasRate, isOverride, kit} = resolveEntryRate(c.id, p);
-    const daysWorked = entryDayCount(c.id, days);
+    /* ⚠️ Off the shoot = no shoot days costed, however many are still TICKED. The ticks
+       are kept exactly as they were (see toggleEntryOnShoot); this only stops them being
+       counted, so switching back on restores the identical figure. Prep and Post are not
+       shoot facts and are deliberately untouched — someone can be cut from the shoot and
+       still be booked for the edit. */
+    const onShoot = entryOnShoot(c.id, p);
+    const daysWorked = onShoot ? entryDayCount(c.id, days) : 0;
     /* Prep and edit days are per ENTRY, like the rate and the days worked — both stores
        are keyed by entry id (see phaseDaysOf). ⚠️ NEITHER is filtered by the day filter:
        a prep day and an edit day are not shoot days and can't be attributed to one, so
@@ -8122,7 +8200,7 @@ function buildBudgetData(){
        ⚠️ Hotel and meals are PERSON-level (keyed by crewId) while a row is an ENTRY, so
        a two-role person would otherwise be charged twice for one bed and one lunch —
        the first entry claims them, exactly as travel already does. */
-    const claimsPerson = !personCostClaimed.has(c.crewId);
+    const claimsPerson = crewOnShoot(c.crewId, p) && !personCostClaimed.has(c.crewId);
     if(claimsPerson) personCostClaimed.add(c.crewId);
     const hotelNights = claimsPerson
       ? ((p.hotelNightBefore||[]).includes(c.crewId) ? 1 : 0)
@@ -8141,7 +8219,7 @@ function buildBudgetData(){
       : isBuyout ? (rate ? subtotal * (Math.min(kit, rate) / rate) : 0)
                  : Math.min(kit, rate) * paidDays;
     const labourSubtotal = kit!=null ? subtotal - kitSubtotal : null;
-    const claimsTravel = !travelClaimed.has(c.crewId);
+    const claimsTravel = crewOnShoot(c.crewId, p) && !travelClaimed.has(c.crewId);
     if(claimsTravel) travelClaimed.add(c.crewId);
     const travelRateRaw = claimsTravel ? travelRateFor(c.crewId) : 0;
     const travelCostRaw = travelRateRaw * crewDayCount(c.crewId, days, p);
@@ -8289,8 +8367,9 @@ function buildBudgetData(){
   // still days[0] — which keeps the `i===0` fold-in below correct either way.
   const firstProjectDay = projectDays()[0];
   const preNightRooms = (firstProjectDay && days.some(d=>d.id===firstProjectDay.id))
-    ? (p.hotelNightBefore||[]).length : 0;
-  const dayHotelRooms = days.map(d=>(d.hotelNights||[]).length);
+    ? (p.hotelNightBefore||[]).filter(id=>crewOnShoot(id, p)).length : 0;
+  const onShootRooms = list => (list||[]).filter(id=>crewOnShoot(id, p)).length;
+  const dayHotelRooms = days.map(d=>onShootRooms(d.hotelNights));
   const hotelRaw = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
   const hotelTotal = hotelRaw * prodOn;
 
