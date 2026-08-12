@@ -288,6 +288,11 @@
   .page-head .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:var(--tape); margin-top:4px;}
 
   .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  /* Crew Database tab strip. The count rides INSIDE the tab, muted and at body weight,
+     so it reads as a quantity rather than as part of the label — the same treatment
+     .dept-count gets on a department heading, which is the other place in this app a
+     number sits next to a name. */
+  .crewdb-tab-count{font-family:var(--body); font-weight:400; letter-spacing:0; opacity:.55;}
   .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px;
     color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;}
   .tab.active{color:var(--tape); border-color:var(--tape);}
@@ -8385,29 +8390,90 @@ function crewDbFilterPanelHTML(){
     })}
   </div>`;
 }
+/* ---- Crew Database tabs ----
+   PURELY A VIEW. Nothing here writes, and no record carries a "which tab am I on"
+   field — each tab is a predicate over the same crewDB, so moving someone between
+   tabs means changing their DEPARTMENT or their COMPANY on the record itself, which
+   is the only place that fact lives. Do not add a tab that can't be expressed as a
+   predicate over an existing field.
+
+   ⚠️ ONE ORDERED LIST: the strip renders from this, the counts count with it, and
+   setCrewDbView validates against it, so tab order, label and membership cannot
+   drift apart. Adding a tab is a row here.
+
+   The three specific tabs deliberately OVERLAP — a Talent who came via a co-pro
+   company is in both Talent and Other companies, because both are true of them.
+   'crew' is the REMAINDER, defined as "none of the specific tabs claim them", so it
+   stays "our own people" automatically as tabs are added rather than needing its own
+   ever-growing exclusion list. That is also why it's the default: it's the roster you
+   actually come here to amend.
+
+   `test:null` marks a non-list tab (Settings). */
+const isCrewDbTalent  = c => deptBucketKey(c.department)==='Talent';
+const isCrewDbClient  = c => deptBucketKey(c.department)==='Client';
+const isCrewDbOtherCo = c => !!c.coProductionCompany;
+const CREW_DB_TABS = [
+  { key:'crew',      label:'Crew',            test:c=>!isCrewDbTalent(c) && !isCrewDbClient(c) && !isCrewDbOtherCo(c) },
+  { key:'talent',    label:'Talent',          test:isCrewDbTalent },
+  { key:'clients',   label:'Clients',         test:isCrewDbClient },
+  { key:'companies', label:'Other companies', test:isCrewDbOtherCo },
+  { key:'all',       label:'All',             test:()=>true },
+  { key:'settings',  label:'Settings',        test:null },
+];
+let crewDbView = 'crew';
+const crewDbTab = () => CREW_DB_TABS.find(t=>t.key===crewDbView) || CREW_DB_TABS[0];
+function setCrewDbView(key){
+  if(!CREW_DB_TABS.some(t=>t.key===key)) return;
+  crewDbView = key;
+  // a card left open in one tab must not reopen against a different list
+  editingCrewId = null; viewingCrewId = null; addingCrewNew = false;
+  refreshCrewDatabase();
+}
+/* everyone the CURRENT tab is about, before search and before the filter panel —
+   the one place the tab predicate is applied, so the list and the count can't disagree */
+function crewDbTabList(tab){
+  const t = tab || crewDbTab();
+  return t.test ? crewDB.filter(t.test) : [];
+}
+function crewDbTabsHTML(){
+  return `<div class="tabs crewdb-tabs">${CREW_DB_TABS.map(t=>{
+    const count = t.test ? ` <span class="crewdb-tab-count">${crewDbTabList(t).length}</span>` : '';
+    return `<div class="tab ${crewDbView===t.key?'active':''}" onclick="setCrewDbView('${t.key}')">${esc(t.label)}${count}</div>`;
+  }).join('')}</div>`;
+}
 function renderCrewDatabase(m){
   setTopbarTitle('Crew database');
-  const filterCount = crewDbActiveFilterCount();
+  /* ⚠️ This screen now RENDERS A TAB STRIP, and it re-renders itself through
+     refreshCrewDatabase() — a tab switch, a save, a role change — without going via
+     renderMain(), which is where every other screen gets its scroll cue refreshed.
+     The wrapper .tabscroll lives inside #main, so each of those re-renders destroys it
+     and the mobile edge-fade would never come back. Same setTimeout-0 idiom as
+     renderMain: run once this frame's innerHTML has actually landed. */
+  setTimeout(refreshTabScrollCues, 0);
+  const tab = crewDbTab();
+  /* Settings is a different SHAPE of screen, not a differently-filtered list — no
+     search, no filter panel, no "+ Add crew member". Hence two whole sections rather
+     than one with pieces switched off inside it. */
+  const body = tab.key==='settings'
+    ? `<div class="section">
+        <h2>Departments &amp; roles</h2>
+        <div class="hint" style="margin-bottom:12px;">Add roles to a department, set their seniority order, and pick Heads of Department.</div>
+        ${renderDeptAdminPanel()}
+      </div>`
+    : `<div class="section">
+        <input type="text" id="crewSearch" value="${esc(crewSearchQuery)}" style="margin-bottom:10px;" placeholder="Search name, role, skills, camera gear…" oninput="crewSearchQuery=this.value;renderCrewList()">
+        ${filterToggleHTML({open: crewDbFilterOpen, count: crewDbActiveFilterCount(), onToggle: 'toggleCrewDbFilterPanel()'})}
+        ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
+        <div id="crewList"></div>
+        <button class="small" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
+        ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
+      </div>`;
   m.innerHTML = `
     <div class="page-head"><h1>Crew</h1><div class="eyebrow">Database</div></div>
-    <div class="section">
-      <h2 class="dept-toggle" style="cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="toggleDeptAdminPanel()">
-        <span class="dept-caret">${deptAdminOpen?'▾':'▸'}</span> Departments &amp; roles
-      </h2>
-      ${deptAdminOpen ? renderDeptAdminPanel() : '<div class="hint">Add roles to a department, set their seniority order, and pick Heads of Department.</div>'}
-    </div>
-    <div class="section">
-      <h2>All crew</h2>
-      <input type="text" id="crewSearch" value="${esc(crewSearchQuery)}" style="margin-bottom:10px;" placeholder="Search name, role, skills, camera gear…" oninput="crewSearchQuery=this.value;renderCrewList()">
-      ${filterToggleHTML({open: crewDbFilterOpen, count: filterCount, onToggle: 'toggleCrewDbFilterPanel()'})}
-      ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
-      <div id="crewList"></div>
-      <button class="small" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
-      ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
-    </div>`;
-  renderCrewList();
+    ${crewDbTabsHTML()}
+    ${body}`;
+  if(tab.key!=='settings') renderCrewList();
 }
-function toggleDeptAdminPanel(){ deptAdminOpen = !deptAdminOpen; refreshCrewDatabase(); }
 /* "Departments & roles" admin panel — an at-a-glance view of every department's roles
    and roster, with Heads of Department pinned to the top of each department's crew list
    (not flat/alphabetical).
@@ -8547,9 +8613,21 @@ function sortCrewDbGroup(list){
 function renderCrewList(){
   const q = (val('crewSearch')||crewSearchQuery||'').toLowerCase();
   const list = document.getElementById('crewList'); if(!list) return;
-  let filtered = crewDB.filter(c => !q || crewSearchBlob(c).includes(q));
+  /* TAB FIRST, then search, then the filter panel — narrowing, in that order. Search
+     deliberately does NOT reach across tabs: the tab is the question you asked, and a
+     search that silently returned people from Talent while you were on Crew would make
+     the strip a lie. The count on each tab is that tab's whole list, unsearched, so a
+     search that empties the current tab still shows you which one to look in. */
+  const tab = crewDbTab();
+  let filtered = crewDbTabList(tab).filter(c => !q || crewSearchBlob(c).includes(q));
   filtered = filtered.filter(personMatchesCrewDbFilter);
-  if(!filtered.length){ list.innerHTML = '<div class="empty-note">No crew found.</div>'; return; }
+  if(!filtered.length){
+    const narrowed = q || crewDbActiveFilterCount();
+    list.innerHTML = `<div class="empty-note">${narrowed
+      ? `No one in ${esc(tab.label)} matches that.`
+      : `No one in ${esc(tab.label)} yet.`}</div>`;
+    return;
+  }
   // group by department; unknown/blank departments fall under "Other"
   const buckets = {};
   filtered.forEach(c=>{ const key = deptBucketKey(c.department); (buckets[key]=buckets[key]||[]).push(c); });
@@ -8736,7 +8814,9 @@ function toggleCarFields(){
 let addingCrewNew = false;
 let editingCrewId = null;
 let viewingCrewId = null;
-let deptAdminOpen = false;   // "Departments & roles" panel, collapsed by default
+/* ⚠️ REMOVED: deptAdminOpen / toggleDeptAdminPanel(). The Departments & roles panel was
+   a collapsed block at the top of the crew list; it is the Settings TAB now, so being on
+   it is the "open" state and there is nothing left to toggle. */
 function refreshCrewScreen(){
   if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
   else if(route.screen==='project' && currentProjectTab==='days'){ captureInProgressPositions(); renderPositionAssignments(); }
