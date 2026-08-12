@@ -550,7 +550,21 @@
   .bulk-edit-panel{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); margin-bottom:10px; background:var(--tint-1);}
   /* Roles tab (Phase S, reordered Phase Z) — proper tidy columns instead of one
      packed inline row. Controls | Name | Role | Rate | Show as. */
-  .roles-grid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) 118px 74px minmax(120px,1fr); align-items:center; column-gap:10px;}
+  /* Controls | Name | Role | Total | Prep | Shoot | Post | Buyout | Day rate | Show as.
+     The three phase columns sit together and in chronological order, with Buyout
+     immediately after them because it is what changes their meaning. */
+  .roles-grid{display:grid; align-items:center; column-gap:10px;
+    grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w)
+      92px 56px 56px 56px 60px 104px minmax(110px,1fr);}
+  .roles-total{font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .roles-num{min-width:0;}
+  .roles-num .budget-rate-input{width:100%; text-align:left;}
+  .roles-shoot{display:flex; align-items:center; gap:5px; margin:0; cursor:pointer;}
+  /* the day count rides beside the tick, so "on the shoot" and "how many days" are one
+     glance rather than a trip to another tab */
+  .roles-shoot-n{font-size:var(--fs-meta); color:var(--muted); font-variant-numeric:tabular-nums;}
+  /* the same-human marker on a person split across departments */
+  .role-dupe-star{color:var(--tape); font-weight:700; margin-left:3px; cursor:help;}
   /* a buyout is a different KIND of number from a day rate, so the row says so rather
      than leaving the reader to infer it from a tick box three columns away */
   .roles-buyout{display:flex; align-items:center; justify-content:center;}
@@ -5634,18 +5648,54 @@ function renderProjectCrew(body){
       `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
 
     if(crewGridView==='roles'){
-      // tidy columns (Phase S): CONTROLS | Name | Role | Department (reference) | Show as — one row per person, no day columns
+      /* ============ ROLES: ONE ROW PER ROLE, filed where that role actually sits =======
+         ⚠️ This tab does NOT use person blocks, and that is the whole point. A block
+         collapsed a person's entries to one line and then had to pick which entry stood
+         for them — and two different rules did the picking. topSeniorityEntry() chose the
+         department, frontedEntryOfBlock() chose the chip. They disagreed, so Karim filed
+         under Post Production (Editor ranks 0 there) while showing Camera Operator (where
+         his days are). Worse, seniorityRankOf() compared roleSeniorityRank() ACROSS
+         departments, but those ranks are per-department indices — so a head of department
+         in a late-listed department loses to a junior role in an early one.
+         Nothing here picks. An entry is a row, a row sits in its own entry's department,
+         and a two-department person appears twice — once in each, marked with an
+         asterisk so you can see they are one human. That deletes the comparison rather
+         than fixing it.
+         The other six sub-tabs keep person blocks: a bed, a lunch and a lift belong to a
+         human, so collapsing is right there and wrong here. */
+      const entriesInScope = filtered.flatMap(b=>b.entries);
+      const deptOf = e => deptBucketKey(e.department);
+      const multiDept = new Set();
+      const seenDeptByPerson = {};
+      entriesInScope.forEach(e=>{
+        const d = deptOf(e);
+        if(seenDeptByPerson[e.crewId] && seenDeptByPerson[e.crewId]!==d) multiDept.add(e.crewId);
+        seenDeptByPerson[e.crewId] = seenDeptByPerson[e.crewId] || d;
+      });
+      const roleGroups = DEPARTMENTS.map(d=>({
+        key:d, label:d, code:DEPARTMENT_CODES[d]||'',
+        items: entriesInScope.filter(e=>deptOf(e)===d)
+          .sort((a,b)=> roleSeniorityRank(d, a.role)-roleSeniorityRank(d, b.role)
+                     || (a.name||'').localeCompare(b.name||''))
+      })).filter(g=>g.items.length);
       const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
           ${pbHeadLeadCellsHTML('roles-grid-header')}
-          <div class="roles-grid-header">Rate</div>
-          <div class="roles-grid-header" title="One agreed fee for the whole job — days below only split it across the phases">Buyout</div>
+          <div class="roles-grid-header" title="Fee for this role across every phase being costed">Total</div>
+          <div class="roles-grid-header" title="Booked pre-production days — the same number the Pre-Prod tab holds">Prep</div>
+          <div class="roles-grid-header" title="On the shoot — tick to put them in the Production day grid">Shoot</div>
+          <div class="roles-grid-header" title="Booked edit days — the same number the Post tab holds">Post</div>
+          <div class="roles-grid-header" title="One agreed fee for the whole job — the day counts above only split it across the phases">Buyout</div>
+          <div class="roles-grid-header">Day rate</div>
           <div class="roles-grid-header">Show as</div>
         </div>`;
-      const groupsHTML = groups.map(g=>{
+      const groupsHTML = roleGroups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
-        return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewRolesRowHTML(c)).join('')}</div>`;
+        return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectDeptCollapse('${g.key}')`, g.code)
+          + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${
+              g.items.map(e=>crewRolesRowHTML(e, multiDept.has(e.crewId))).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${rolesHeaderRow}${groupsHTML}</div>
+        <div class="hint" style="margin-top:8px;">One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records. Prep and Post are the same numbers those tabs hold; Shoot puts them in the Production day grid, where you tick which days.</div>`;
     } else if(isPhaseTab(crewGridView)){
       /* Pre-production AND Post (Phase BT) — ONE branch, because they are one screen
          rendered twice. Same entry grain and grouping as Roles. ⚠️ Phase BR added this
@@ -5737,33 +5787,81 @@ function renderProjectCrew(body){
    (resolveEntryRate/saveEntryRate). "Add a saved role" and Lead Company still live only
    in the Edit/pencil expansion or the bulk-edit panel. There is deliberately NO
    per-person total: no rate × days, no roll-up, nothing summed. */
-function crewRolesRowHTML(block){
-  const p = currentProject(), days = projectDays();
-  const fronted = frontedEntryOfBlock(block, p, days);
-  const rest = block.entries.filter(e=>e.id!==fronted.id);
-  const isEditing = editingCrewId===block.id;
-  const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${block.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
-  /* Phase BN — Role/Rate belong to whichever entry is fronted. Rendering them
-     straight onto the SAME .roles-grid div as the name (rather than a second,
-     independently-gridded .pb-role-row) is what makes a single-role person read as
-     one line: two sibling divs each declaring their own display:grid can never
-     share a row, however few entries either one holds. A stacked-away (extra) entry
-     still gets its own .pb-role-row below, genuinely a separate row. */
-  const roleCellsHTML = (e, toggleHTML) => {
-    const rate = resolveEntryRate(e.id, p);
-    return `<div class="roles-grid-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
-      <div class="roles-grid-cell roles-grid-rate" data-label="Rate" style="grid-column:4;"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>
-      <div class="roles-grid-cell roles-buyout" data-label="Buyout" style="grid-column:5;"><input type="checkbox" ${entryIsBuyout(e.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>`;
-  };
-  const head = `<div class="roles-grid pb-head">
-    <div class="roles-grid-controls">${personBlockSelectCbHTML(block)}${editBtn}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(block.name)}">${esc(block.name)}</div>
-    ${roleCellsHTML(fronted, personBlockToggleHTML(block, rest.length, false))}
-    <div class="roles-grid-cell" data-label="Show as" style="grid-column:6;">${showAsQuickEditHTML(fronted)}</div>
+/* ONE ROLE = ONE ROW. Takes an ENTRY view, not a person block — see the note in
+   renderProjectCrew's roles branch for why this tab stopped collapsing people.
+   `alsoElsewhere` marks a person who holds roles in more than one department, so the
+   repeat reads as the same human rather than a duplicate record.
+   Prep and Post write p.prepSchedule / p.postSchedule — the SAME stores the Pre-Prod and
+   Post tabs read, keyed by the same entry id, so a change here shows there and back with
+   nothing to synchronise. Shoot is an opt-in to the Production day grid; which days is
+   still that grid's own question. */
+function crewRolesRowHTML(e, alsoElsewhere){
+  const p = currentProject();
+  const isEditing = editingCrewId===e.id;
+  const rate = resolveEntryRate(e.id, p);
+  const buyout = entryIsBuyout(e.id);
+  const prepDays = phaseDaysOf('preprod', e.id, p);
+  const postDays = phaseDaysOf('post', e.id, p);
+  const onShoot = entryOnShoot(e.id, p);
+  const shootDays = entryDayCount(e.id, projectDays());
+  const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${e.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
+  /* the row's own money, in the same shape Per Person shows it: rate × the days being
+     costed, or the buyout itself. Read-only here — it is the consequence of the columns
+     beside it, not somewhere to type. */
+  const totalDays = prepDays + shootDays + postDays;
+  const total = buyout ? (rate.hasRate ? rate.rate : 0) : (rate.hasRate ? rate.rate * totalDays : 0);
+  const dayBox = (label, value, phase) => `<div class="roles-grid-cell roles-num" data-label="${label}">
+      <input type="text" inputmode="numeric" class="budget-rate-input" value="${value!=null&&value!==0?value:''}" placeholder="—"
+        onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)"
+        title="${esc(label)} days — the same number the ${label==='Prep'?'Pre-Prod':'Post'} tab holds"></div>`;
+  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}">
+    <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}${alsoElsewhere?' — also booked in another department':''}">${esc(e.name)}${alsoElsewhere?'<span class="role-dupe-star" title="Also booked in another department">*</span>':''}</div>
+    <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+    <div class="roles-grid-cell roles-total" data-label="Total">${total?budgetFmt(total):'<span class="budget-noRate">—</span>'}</div>
+    ${dayBox('Prep', prepDays, 'preprod')}
+    <div class="roles-grid-cell roles-num" data-label="Shoot">
+      <label class="roles-shoot" title="${onShoot?'On the shoot — tick days on the Production tab':'Not on the shoot — tick to add them to the Production day grid'}">
+        <input type="checkbox" ${onShoot?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryOnShoot('${e.id}', this.checked)">
+        ${onShoot&&shootDays?`<span class="roles-shoot-n">${shootDays}</span>`:''}
+      </label>
+    </div>
+    ${dayBox('Post', postDays, 'post')}
+    <div class="roles-grid-cell roles-buyout" data-label="Buyout"><input type="checkbox" ${buyout?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>
+    <div class="roles-grid-cell roles-grid-rate" data-label="${buyout?'Buyout fee':'Day rate'}"><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—" onclick="event.stopPropagation()" onchange="saveEntryRate('${e.id}', this.value)">${crewRateSaveIconHTML(e.id, 'r')}</span></div>
+    <div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(e)}</div>
   </div>`;
-  const stack = rest.map(e=>`<div class="roles-grid pb-role-row pb-role-extra" style="display:none;">${roleCellsHTML(e, '')}</div>`).join('');
-  return personBlockWrapHTML(block, head + stack,
-    { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
+  return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
+}
+/* the bulk-select checkbox for ONE entry. The person-block version had to work out which
+   of a person's entries were visible; a row is one entry, so there is nothing to work out. */
+function entrySelectCbHTML(e){
+  return `<input type="checkbox" class="bulk-select-cb" ${projectCrewSelected.has(e.id)?'checked':''}
+    onclick="event.stopPropagation()" onchange="toggleCrewPersonSelected('${e.crewId}', this.checked, '${e.id}')" title="Select">`;
+}
+/* ---- on the shoot ----
+   ⚠️ STORED AS AN OPT-IN LIST, p.onShoot — not derived from whether they happen to have a
+   day ticked. Those are different facts: someone booked on the shoot who has not had
+   their days filled in yet must still appear in the Production grid, or there is nowhere
+   to tick them. Anyone with a day already ticked counts as on the shoot regardless, so
+   this reads true for every existing project without a migration.
+   Unticking does NOT delete their day ticks — it takes them out of the grid, and putting
+   them back shows the days exactly as they were. Losing real bookings to a stray click on
+   a checkbox is not a trade worth making. */
+function entryOnShoot(entryId, p){
+  const proj = p || currentProject(); if(!proj) return false;
+  if((proj.onShoot||[]).includes(entryId)) return true;
+  return entryDayCount(entryId, projectDays()) > 0;
+}
+async function toggleEntryOnShoot(entryId, on){
+  const p = currentProject(); if(!p) return;
+  p.onShoot = p.onShoot || [];
+  selectedEditTargets(entryId).forEach(id=>{
+    if(on){ if(!p.onShoot.includes(id)) p.onShoot.push(id); }
+    else { p.onShoot = p.onShoot.filter(x=>x!==id); }
+  });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
 }
 /* "Show as" — a purely cosmetic override shown on the call sheet instead of the role
    label. The saved role/department stay untouched.
