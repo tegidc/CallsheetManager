@@ -819,6 +819,31 @@
     font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer;}
   .budget-rate-input{width:64px; text-align:left;}
+  /* ---- the crew form's Rates section: one row per saved role ----
+     A grid, not a table, so the header cells and the body cells share one column
+     definition and cannot drift; the role column takes the slack so the four number
+     columns stay put down the list. */
+  .rate-rows{display:flex; flex-direction:column; gap:2px;}
+  .rate-row{display:grid; grid-template-columns:minmax(0,1fr) 74px 92px 74px 60px;
+    align-items:center; column-gap:10px; min-height:32px;}
+  .rate-row-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
+    letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);
+    padding-bottom:4px; margin-bottom:2px; border-bottom:1px solid var(--line);}
+  .rate-row-role{font-family:var(--body); font-weight:600; font-size:var(--fs-name);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rate-row-split{display:flex; align-items:center; gap:6px; margin:0;
+    font-family:var(--body); font-size:var(--fs-meta); font-weight:400; letter-spacing:0;
+    text-transform:none; color:var(--muted); cursor:pointer; white-space:nowrap;}
+  .rate-row .budget-rate-input{width:100%;}
+  /* a disabled kit box still holds its column — it reads as "not split", not as missing */
+  .rate-row .rr-kit:disabled{opacity:.4; cursor:not-allowed;}
+  /* derived, so it is TEXT and never looks typeable */
+  .rr-labour{font-size:var(--fs-meta); color:var(--muted);}
+  @media (max-width:900px){
+    /* the four number columns keep their widths and the row scrolls with the form
+       rather than collapsing into an unreadable stack of half-width boxes */
+    .rate-row{grid-template-columns:minmax(90px,1fr) 68px 88px 68px 54px; column-gap:8px;}
+  }
   /* AG: the Day Rate input + its "save to crew database" icon, wherever the pair appears
      (Roles tab, Budget Per Person, the crew Edit expansion) */
   .rate-with-save{display:inline-flex; align-items:center; gap:4px;}
@@ -1841,6 +1866,85 @@ async function confirmAddRoleDialog(){
 function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
   if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML() + rolesMenuHTML();
+}
+/* ---- the crew form's Rates section ----
+   ONE LINE PER SAVED ROLE, because the rate is a fact about the role a person is doing,
+   not about the person: a DOP who also operates is worth two different numbers and
+   c.rate ("Fee / rate", still there, still the catch-all) can only hold one.
+
+   ⚠️ These inputs save with the FORM, on Save crew member — not on change. Every other
+   rate box in this app (Budget's, the Roles tab's) writes immediately, but those sit in
+   a list, not inside a form with its own Save and Cancel. A field that had already
+   written itself while Cancel was still on screen would be the trap; consistency with
+   the box six lines up (Fee / rate) matters more here than consistency with the ones on
+   another screen. collectRoleRates() is the read side, and it reads the DOM rather than
+   any shadow state, so what you see is what saves.
+
+   Labour is derived on every keystroke and is not an input — see the note on roleRateFor
+   for why it is never stored. */
+function crewRatesSectionHTML(c){
+  const roles = (c && c.roles) || [];
+  const rows = roles.map(rp=>{
+    const rr = roleRateFor(c, rp) || {};
+    const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+    const hasSplit = rr.kit!=null;
+    const rate = rr.rate!=null ? rr.rate : '';
+    const kit = rr.kit!=null ? rr.kit : '';
+    return `<div class="rate-row" data-rolepath="${esc(rp)}">
+      <span class="rate-row-role" title="${esc(rp)}">${esc(name)}</span>
+      <input type="text" inputmode="decimal" class="budget-rate-input rr-rate" value="${esc(String(rate))}" placeholder="—" oninput="refreshRateRow(this)">
+      <label class="rate-row-split"><input type="checkbox" class="rr-split" ${hasSplit?'checked':''} onchange="refreshRateRow(this)"> with Kit</label>
+      <input type="text" inputmode="decimal" class="budget-rate-input rr-kit" value="${esc(String(kit))}" placeholder="—" ${hasSplit?'':'disabled'} oninput="refreshRateRow(this)">
+      <span class="rr-labour">${hasSplit ? esc(String(labourOf(rate, kit))) : '—'}</span>
+    </div>`;
+  }).join('');
+  return `<details class="formgroup" open>
+    <summary class="fg-title">Rates</summary>
+    <div style="margin-bottom:14px;">
+      <label>Invoices as <span style="color:var(--muted)">(optional)</span></label>
+      <input type="text" id="ncInvoicesAs" value="${esc((c&&c.invoicesAs)||'')}" placeholder="${esc((c&&c.name)||'Their own name')}">
+      <div class="hint">Blank means they invoice in their own name. Fill it in with a limited company or trading name — who the money is actually paid to.</div>
+    </div>
+    ${roles.length ? `<div class="rate-rows">
+      <div class="rate-row rate-row-head">
+        <span>Role</span><span>Day rate</span><span>Split</span><span>Kit</span><span>Labour</span>
+      </div>
+      ${rows}
+    </div>
+    <div class="hint" style="margin-top:8px;">A rate here is used for that role ahead of Fee / rate below, and a project can still override it for one job. Kit is a fixed equipment charge — labour is whatever is left of the day rate, so the two always add up.</div>`
+    : `<div class="hint">Rates are per role. Give this person a saved role above and a line will appear here for it.</div>`}
+  </details>`;
+}
+/* Recalculates ONE row in place — never a re-render, which would throw away whatever is
+   half-typed in the rest of the form. Called from the rate box, the kit box and the
+   toggle, so all three routes land on the same arithmetic. */
+function refreshRateRow(el){
+  const row = el.closest('.rate-row'); if(!row) return;
+  const split = row.querySelector('.rr-split').checked;
+  const kitInput = row.querySelector('.rr-kit');
+  kitInput.disabled = !split;
+  if(!split) kitInput.value = '';
+  const rate = Number(row.querySelector('.rr-rate').value);
+  const kit = Number(kitInput.value);
+  row.querySelector('.rr-labour').textContent =
+    (split && !isNaN(rate) && !isNaN(kit)) ? String(labourOf(rate, kit)) : '—';
+}
+/* The read side of the Rates section. A row with no usable rate stores NOTHING rather
+   than a zero — an absent entry falls through the rate chain to c.rate, which is what
+   an empty box should mean; a stored 0 would silently cost that role at nothing. */
+function collectRoleRates(existing){
+  const out = Object.assign({}, existing||{});
+  document.querySelectorAll('.rate-row[data-rolepath]').forEach(row=>{
+    const path = row.getAttribute('data-rolepath');
+    const rateRaw = row.querySelector('.rr-rate').value.trim();
+    const rate = Number(rateRaw);
+    if(rateRaw==='' || isNaN(rate)){ delete out[path]; return; }
+    const split = row.querySelector('.rr-split').checked;
+    const kitRaw = row.querySelector('.rr-kit').value.trim();
+    const kit = Number(kitRaw);
+    out[path] = { rate, kit: (split && kitRaw!=='' && !isNaN(kit)) ? kit : null };
+  });
+  return out;
 }
 /* The Edit form's Company field, in place of the old free-text "Co-Production company".
    ⚠️ THE FIRST OPTION IS THE LEAD COMPANY, and it is labelled with COMPANY — the same
@@ -7135,16 +7239,52 @@ function parseRateNumber(str){
    the argument changed from a crew record to an entry id, and a silent signature change
    on a money field is exactly the kind of thing that reads fine and computes wrong. Do
    not look for resolveCrewRate / saveCrewRateOverride. */
+/* ---- per-role rates (the crew form's Rates section) ----
+   c.roleRates is keyed by ROLE PATH — "Cinematography/DOP", the same string c.roles
+   holds — so one person carries a different rate for each role they're booked as:
+
+     c.roleRates = { "Cinematography/DOP": { rate:800, kit:200 }, … }
+
+   ⚠️ kit == null (or the key absent) means "with Kit" is OFF: one undivided rate.
+   ⚠️ kit is an ABSOLUTE amount, never a percentage. It is an equipment charge, so it
+      does not move when the day rate does — which is what makes it survive a project
+      override (see resolveEntryRate).
+   ⚠️ LABOUR IS NEVER STORED. It is always rate − kit, so the parts cannot drift out of
+      agreement with the rate they are a split of. Do not add a labour field. */
+const roleRateFor = (c, rolePath) => (rolePath && c && c.roleRates && c.roleRates[rolePath]) || null;
+/* an ENTRY stores department and role separately; c.roles/c.roleRates key on the joined
+   path, so this is the one place the two shapes are reconciled */
+const entryRolePath = e => (e && e.department && e.role) ? `${e.department}/${e.role}` : '';
+/* floored at 0, so a kit charge larger than the day rate reads as "all kit" rather than
+   as a negative operator fee */
+const labourOf = (rate, kit) => Math.max(0, (Number(rate)||0) - (Number(kit)||0));
+/* THE RATE CHAIN, most specific first:
+     1. the project entry's own override        (this job only)
+     2. this person's rate FOR THIS ROLE        (Rates section)
+     3. their single catch-all rate, c.rate     (Fee / rate)
+     4. no rate
+   ⚠️ Step 2 is new and sits ABOVE c.rate because it is the more specific fact — a DOP
+   who also operates has two real rates, and c.rate can only hold one. Nobody's number
+   moved when it landed: a person with no roleRates entry falls straight through to
+   exactly the behaviour that was here before.
+   The kit split is resolved SEPARATELY from the rate and rides along with it even when
+   an override wins, because kit is an absolute equipment charge: re-rating the DOP from
+   800 to 900 for one job leaves the 200 of kit alone and puts the extra 100 on labour. */
 function resolveEntryRate(entryId, p){
   const e = entryById(entryId, p || currentProject());
+  const c = e ? crewById(e.crewId) : null;
+  const rr = roleRateFor(c, entryRolePath(e));
+  const kit = (rr && rr.kit!=null && !isNaN(Number(rr.kit))) ? Number(rr.kit) : null;
   if(e && Object.prototype.hasOwnProperty.call(e, 'rate')){
     const n = Number(e.rate);
-    if(!isNaN(n)) return { rate:n, hasRate:true, isOverride:true };
+    if(!isNaN(n)) return { rate:n, hasRate:true, isOverride:true, kit };
   }
-  const c = e ? crewById(e.crewId) : null;
+  if(rr && rr.rate!=null && rr.rate!=='' && !isNaN(Number(rr.rate))){
+    return { rate:Number(rr.rate), hasRate:true, isOverride:false, kit };
+  }
   const parsed = parseRateNumber(c && c.rate);
-  if(parsed!=null) return { rate:parsed, hasRate:true, isOverride:false };
-  return { rate:0, hasRate:false, isOverride:false };
+  if(parsed!=null) return { rate:parsed, hasRate:true, isOverride:false, kit };
+  return { rate:0, hasRate:false, isOverride:false, kit:null };
 }
 async function saveEntryRate(entryId, rawValue){
   const p = currentProject(); if(!p) return;
@@ -7219,6 +7359,14 @@ function toggleBudgetOutputPanel(){ budgetOutputOpen = !budgetOutputOpen; render
 // whole job — see budgetPersonDisplay().
 let budgetVatToggle = true;
 function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(); }
+/* Split kit & labour — HOW it's shown, like Itemize VAT, so it lives in the same
+   cluster rather than needing a Budget settings screen of its own. ON by default: a
+   split rate is entered precisely because you want to see the two halves, and a hidden
+   default would mean the Rates section quietly did nothing. Purely presentational —
+   the Subtotal, the totals and every other view are identical either way, because Kit
+   and Labour are two slices of the same number, not extra cost. */
+let budgetSplitKit = true;
+function toggleBudgetSplitKit(checked){ budgetSplitKit = checked; renderProjectBody(); }
 /* Phase BS — WHAT is being costed, sitting alongside Itemize VAT (which is HOW).
    Phase BT added the third phase and fixed the ORDER (see BUDGET_SCOPES).
      preproduction — the Pre-production sub-tab's prep days × the SAME entry rate
@@ -7452,7 +7600,7 @@ function buildBudgetData(){
   const postOn = budgetScope.post ? 1 : 0;
   const travelClaimed = new Set();
   const people = crewInScope.map(c=>{
-    const {rate, hasRate, isOverride} = resolveEntryRate(c.id, p);
+    const {rate, hasRate, isOverride, kit} = resolveEntryRate(c.id, p);
     const daysWorked = entryDayCount(c.id, days);
     /* Prep and edit days are per ENTRY, like the rate and the days worked — both stores
        are keyed by entry id (see phaseDaysOf). ⚠️ NEITHER is filtered by the day filter:
@@ -7465,6 +7613,16 @@ function buildBudgetData(){
     const prepSubtotal = rate * prepDays * prepOn;
     const postSubtotal = rate * postDays * postOn;
     const subtotal = prodSubtotal + prepSubtotal + postSubtotal;
+    /* The kit/labour split of THIS person's subtotal. Same day count the subtotal is
+       built from — scopes already applied — so kitSubtotal + labourSubtotal === subtotal
+       exactly, for any combination of scopes. labour is the REMAINDER rather than
+       labourOf() × days, so a rounding difference can never leave the two halves
+       failing to add up to the whole they are a split of.
+       kit is null for anyone with no split: not zero, because "no kit in this rate" and
+       "£0 of kit" print differently (a dash, not a figure). */
+    const paidDays = daysWorked*prodOn + prepDays*prepOn + postDays*postOn;
+    const kitSubtotal = kit!=null ? Math.min(kit, rate) * paidDays : null;
+    const labourSubtotal = kit!=null ? subtotal - kitSubtotal : null;
     const claimsTravel = !travelClaimed.has(c.crewId);
     if(claimsTravel) travelClaimed.add(c.crewId);
     const travelRate = (claimsTravel ? travelRateFor(c.crewId) : 0) * prodOn;
@@ -7485,7 +7643,8 @@ function buildBudgetData(){
     const vat = prodVat + prepVat + postVat;
     return {
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
-      rate, hasRate, isOverride, daysWorked, prepDays, postDays,
+      rate, hasRate, isOverride, kit, kitSubtotal, labourSubtotal,
+      daysWorked, prepDays, postDays,
       subtotal, prodSubtotal, prepSubtotal, postSubtotal,
       travelRate, travelCost, vatRegistered, vat, prodVat, prepVat, postVat,
       display: budgetPersonDisplay(subtotal, vat)
@@ -7708,6 +7867,7 @@ function budgetSummaryBarHTML(data){
     <div class="budget-vat-toggle">
       ${BUDGET_SCOPES.map(scopeBox).join('')}
       <label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label>
+      <label><input type="checkbox" ${budgetSplitKit?'checked':''} onchange="toggleBudgetSplitKit(this.checked)"> Split kit &amp; labour</label>
     </div>
     ${nothingOn ? `<div class="budget-scope-note hint">Every scope is off, so nothing is being costed. Tick Pre-production, Production or Post — or all three.</div>` : ''}
   </div>`;
@@ -7835,8 +7995,17 @@ function budgetPersonViewHTML(data){
       offShoot.map(c=>c.tab).join(' and ')} tab${offShoot.length>1?'s\'':'\'s'} booked days, at the same day rate — ${
       offShoot.length>1?'neither is':'it is not'} filtered by the shoot-day filter, because ${
       offShoot.length>1?'neither is a shoot day':'a '+offShoot[0].head.toLowerCase()+' day isn\'t a shoot day'}.</div>` : '';
+  /* Kit and Labour appear only when the toggle is ON *and* somebody on this project
+     actually has a split rate — two empty columns on a job where nobody brings kit
+     would be noise on every other job. They sit immediately before Subtotal because
+     they are that Subtotal taken apart: Kit + Labour === Subtotal, always. A person
+     with no split shows a dash in both rather than their whole fee under Labour, which
+     would read as a claim their rate had been examined and found to be all labour. */
+  const anySplit = data.people.some(pp=>pp.kit!=null);
+  const showSplit = budgetSplitKit && anySplit;
+  const splitCell = v => `<td>${v!=null ? fmt(v) : '<span class="budget-noRate">—</span>'}</td>`;
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th>${countCols.map(c=>`<th style="text-align:center;" title="${esc(c.title)}">${c.head}</th>`).join('')}${budgetVatToggle?'<th>VAT</th>':''}<th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th>${countCols.map(c=>`<th style="text-align:center;" title="${esc(c.title)}">${c.head}</th>`).join('')}${budgetVatToggle?'<th>VAT</th>':''}${showSplit?'<th title="Equipment portion of the day rate, across every day being costed">Kit</th><th title="What is left of the day rate once kit comes out">Labour</th>':''}<th>Subtotal</th></tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
@@ -7844,9 +8013,17 @@ function budgetPersonViewHTML(data){
       <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
       ${countCols.map(c=>`<td style="text-align:center;">${c.value(pp) || '<span class="budget-noRate">—</span>'}</td>`).join('')}
       ${budgetVatToggle?vatCell(pp):''}
+      ${showSplit ? splitCell(pp.kitSubtotal)+splitCell(pp.labourSubtotal) : ''}
       <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
     </tr>`).join('')}
+    ${showSplit ? `<tr class="budget-total-row">
+      <td colspan="${4+countCols.length+(budgetVatToggle?1:0)}">Kit and labour</td>
+      <td>${fmt(data.people.reduce((n,pp)=>n+(pp.kitSubtotal||0),0))}</td>
+      <td>${fmt(data.people.reduce((n,pp)=>n+(pp.labourSubtotal||0),0))}</td>
+      <td></td>
+    </tr>` : ''}
   </table></div>
+  ${showSplit ? `<div class="hint" style="margin-top:8px;">Kit is the equipment portion of a split day rate, set per role on the crew record. It is part of the Subtotal, not on top of it — the two columns add up to it. Untick Split kit &amp; labour above to hide them.</div>` : ''}
   ${data.phases.some(ph=>ph.on && ph.daysTotal) ? offShootNote : ''}
   ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}
   ${anyTravel ? `<div class="hint" style="margin-top:8px;">A VAT-registered crew member's travel carries VAT too — it's charged back through them — so their VAT covers day rate ${budgetVatToggle?'and travel':'and travel, baked into the Subtotal'}. The travel cost itself is counted once, in the Travel line of Per Department.</div>` : ''}
@@ -8717,6 +8894,8 @@ function crewFormHTML(c, entryId){
       <input type="text" id="ncSkills" value="${esc(c.skills||'')}" placeholder="e.g. drone, underwater, Steadicam, Welsh speaker">
     </details>
 
+    ${crewRatesSectionHTML(c)}
+
     <details class="formgroup">
       <summary class="fg-title">Camera &amp; equipment</summary>
       <div class="grid g3" style="margin-bottom:10px;">
@@ -8875,6 +9054,17 @@ function crewViewHTML(c){
   add('Show as', c.showAs);
   // blank means the lead company — name it, rather than showing no company row at all
   add('Company', c.coProductionCompany || COMPANY);
+  // only when set: blank means they invoice as themselves, which the Name row already says
+  add('Invoices as', c.invoicesAs);
+  /* one line per role that carries its own rate, so the View panel says the same thing
+     the Rates section does without duplicating its arithmetic */
+  Object.entries((c.roleRates)||{}).forEach(([path, rr])=>{
+    if(rr==null || rr.rate==null) return;
+    const role = path.includes('/') ? path.split('/').slice(1).join('/') : path;
+    add(`Rate · ${role}`, rr.kit!=null
+      ? `${rr.rate} (kit ${rr.kit} + labour ${labourOf(rr.rate, rr.kit)})`
+      : String(rr.rate));
+  });
   add('Phone', c.phone); add('Email', c.email); add('Skills / tags', c.skills);
   add('Main camera 1', c.camera1); add('Main camera 2', c.camera2); add('Main camera 3', c.camera3);
   add('Other equipment', c.cameraExtras);
@@ -8943,7 +9133,14 @@ async function saveCrew(){
     homeAddress: val('ncAddress'),
     generalNotes: val('ncGeneralNotes'), previousProjects: val('ncPrevProjects'),
     instagram: val('ncInstagram'), youtube: val('ncYouTube'), linkedin: val('ncLinkedIn'), coffeeOrder: val('ncCoffeeOrder'),
-    rate: val('ncRate'), notes: val('ncNotes') };
+    rate: val('ncRate'), notes: val('ncNotes'),
+    invoicesAs: val('ncInvoicesAs') };
+  /* ⚠️ Seeded from the EXISTING map, not built fresh: the Rates section only renders a
+     row per role the person currently holds, so rebuilding from the DOM alone would
+     quietly drop the rate for a role that had been removed and later added back. Rows
+     that are on screen and empty do get deleted — that's collectRoleRates' own job. */
+  const roleRates = collectRoleRates(existing && existing.roleRates);
+  if(Object.keys(roleRates).length) rec.roleRates = roleRates;
   if(!existing){
     // brand-new crew: the picked role is the only source of role + department
     rec.roles = [pendingNewCrewRole];
