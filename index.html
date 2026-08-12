@@ -872,6 +872,24 @@
      letter-spaced type — it is a sentence about the number, not a second heading for it. */
   .budget-stat-note{font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); margin-left:8px;}
+  /* ---- the phase stack, under the grand total it sums to ---- */
+  .budget-headline{display:flex; align-items:flex-start; gap:32px; flex-wrap:wrap;}
+  .budget-scope-stack{display:flex; flex-direction:column; gap:1px; min-width:230px;}
+  .budget-scope-row{display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+    padding:3px 0; cursor:pointer; border-bottom:1px solid var(--line);
+    font-family:var(--body); font-size:var(--fs-meta);}
+  .budget-scope-row:last-child{border-bottom:none;}
+  .budget-scope-row:hover{color:var(--tape);}
+  .budget-scope-row:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .budget-scope-name{white-space:nowrap;}
+  .budget-scope-amt{font-weight:600; white-space:nowrap;}
+  /* off ≠ gone: the line stays, greyed, so "switched off" and "nothing booked" read
+     differently. Not display:none, and not a strikethrough — this is a state, not a deletion. */
+  .budget-scope-row.off{opacity:.38;}
+  .budget-scope-row.off .budget-scope-amt{font-weight:400;}
+  /* Est. Costs is a look, not a sum — italic, and never bold, so it can't be mistaken
+     for one of the figures that adds into the total beside it */
+  .budget-est-costs{font-style:italic; color:var(--muted);}
   /* ---- catering summary ----
      The total leads the block: it's the number you came for, and it used to sit under a
      six-column grid, below the fold. */
@@ -7616,6 +7634,12 @@ function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(
    and Labour are two slices of the same number, not extra cost. */
 let budgetSplitKit = true;
 function toggleBudgetSplitKit(checked){ budgetSplitKit = checked; renderProjectBody(); }
+/* Costs PP — the Est. Costs column on Per Person: that individual's hotel, travel and
+   meals. Off by default; it answers "what is this person costing me all in", which is a
+   question you ask sometimes, not a column you want in every glance at the sheet. It
+   changes NO total anywhere — see the note on estCosts in buildBudgetData. */
+let budgetCostsPP = false;
+function toggleBudgetCostsPP(checked){ budgetCostsPP = checked; renderProjectBody(); }
 /* Phase BS — WHAT is being costed, sitting alongside Itemize VAT (which is HOW).
    Phase BT added the third phase and fixed the ORDER (see BUDGET_SCOPES).
      preproduction — the Pre-production sub-tab's prep days × the SAME entry rate
@@ -7741,8 +7765,22 @@ function setBudgetSort(v){ budgetSort = v; renderProjectBody(); }
    function grew to cover it, but the old name stuck and a second, day-only
    definition of it sat above this one as dead code (the later definition
    silently won). Both are gone; this is the only one. */
-function clearBudgetFilter(){ budgetDayFilter.clear(); budgetDeptFilter.clear(); renderProjectBody(); }
-function budgetActiveFilterCount(){ return budgetDayFilterCount() + budgetDeptFilter.size; }
+function clearBudgetFilter(){
+  budgetDayFilter.clear();
+  /* ⚠️ Clears the SHARED crew filter too, because that is what is scoping the money now.
+     Sort and Group by are display choices, not scope, and are deliberately left alone. */
+  projectCrewFilter.depts.clear(); projectCrewFilter.roles.clear();
+  projectCrewFilter.company = ''; projectCrewFilter.excludeTalent = false;
+  projectCrewFilter.excludeOtherCompanies = false; projectCrewFilter.inverse = false;
+  renderProjectBody();
+}
+/* counts the SHARED crew scope, not a budget-local one — so the Filter chip shows a
+   number when the Crew tab is the thing narrowing the money */
+function budgetActiveFilterCount(){
+  return budgetDayFilterCount() + projectCrewFilter.depts.size
+       + (projectCrewFilter.excludeTalent?1:0) + (projectCrewFilter.excludeOtherCompanies?1:0)
+       + projectCrewFilter.roles.size + (projectCrewFilter.company?1:0) + (projectCrewFilter.inverse?1:0);
+}
 /* budgetScopeParts() — the "N of M day(s)" segment of "describe the active
    budget scope", written three times (filter panel hint, export header,
    output-menu hint) and unified here (Gate 1 / G10). This is the part that was
@@ -7769,15 +7807,20 @@ function budgetFilterPanelHTML(){
   // Only departments actually present on this project — same rule as the Crew panel.
   const p = currentProject();
   const present = DEPARTMENTS.filter(d=>projectEntryViews(p).some(c=>deptBucketKey(c.department)===d));
+  /* ⚠️ These write projectCrewFilter — the Crew tab's own state — not a budget-local
+     copy. Same boxes, same effect, whichever screen you tick them on. */
   const deptChips = present.length ? present.map(d=>
-      `<label><input type="checkbox" ${budgetDeptFilter.has(d)?'checked':''} onchange="toggleBudgetFilterDept('${d}', this.checked)"> ${esc(d)}</label>`
+      `<label><input type="checkbox" ${projectCrewFilter.depts.has(d)?'checked':''} onchange="toggleProjectFilterDept('${d}', this.checked); renderProjectBody();"> ${esc(d)}</label>`
     ).join('') : '<span class="hint">No crew on this project yet.</span>';
-  const dn = budgetDeptFilter.size;
+  const excludeChips = `<label><input type="checkbox" ${projectCrewFilter.excludeTalent?'checked':''} onchange="projectCrewFilter.excludeTalent=this.checked; renderProjectBody();"> Exclude Talent</label>
+    <label><input type="checkbox" ${projectCrewFilter.excludeOtherCompanies?'checked':''} onchange="projectCrewFilter.excludeOtherCompanies=this.checked; renderProjectBody();"> Exclude other companies</label>`;
+  const dn = projectCrewFilter.depts.size;
   const scope = budgetScopeParts();
   if(dn) scope.push(`${dn} department${dn>1?'s':''}`);
   return `<div class="filter-panel">
     <div><div class="hint" style="margin-bottom:4px;">Shoot days</div><div class="filter-chips">${chips}</div></div>
-    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChips}</div></div>
+    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Departments <span style="opacity:.7;">— shared with the Crew tab's filter</span></div><div class="filter-chips">${deptChips}</div></div>
+    <div style="margin-top:10px;"><div class="filter-chips">${excludeChips}</div></div>
     <div class="grid g3" style="margin-top:10px;">
       <div><label for="budgetSortPick">Sort (Per Person)</label>
         <select id="budgetSortPick" onchange="setBudgetSort(this.value)">
@@ -7826,11 +7869,18 @@ function buildBudgetData(){
     return 0;   // Train / Flying / Production transport / custom: counted, never costed
   };
 
-  // R16 — department scope. Applied to the people list itself, so the summary bar,
-  // Per Department, Per Day and Per Person can't disagree about what's being costed.
-  const crewInScope = budgetDeptFilter.size
-    ? crew.filter(c=>budgetDeptFilter.has(deptBucketKey(c.department)))
-    : crew;
+  /* R16 — WHO is costed. Applied to the people list itself, so the summary bar, Per
+     Department, Per Day and Per Person can't disagree about it.
+     ⚠️ ONE FILTER, SHARED WITH THE CREW TAB. This used to be budgetDeptFilter, a second
+     department scope that knew nothing about the Crew tab's — so excluding Talent there
+     left them costed here, and the two screens disagreed about who was on the job.
+     personMatchesProjectFilter() is the exact predicate the Crew tab filters with
+     (departments, company, roles, exclude Talent / other companies, inverse, day
+     membership), so narrowing on either screen narrows both.
+     ⚠️ IT MOVES MONEY. Excluding someone on the Crew tab takes their cost out of every
+     Budget figure — that is the point, but it means the grand total now depends on a
+     control that lives on another tab. The filter row says what is in scope. */
+  const crewInScope = crew.filter(personMatchesProjectFilter);
   /* ⚠️ Phase BF — travel is charged ONCE PER PERSON, not once per entry, and over the
      DEDUPLICATED union of that person's days. Attributing it to whichever of their
      entries is in scope first keeps AO's reconciliation exact in both directions:
@@ -7848,6 +7898,10 @@ function buildBudgetData(){
   const prepOn = budgetScope.preproduction ? 1 : 0;
   const postOn = budgetScope.post ? 1 : 0;
   const travelClaimed = new Set();
+  /* the same once-per-person rule travelClaimed enforces, for the two other person-level
+     costs (a bed and a lunch belong to a human, not to each role they are booked as) */
+  const personCostClaimed = new Set();
+  const cateringCosts = getCateringCosts(p);
   const people = crewInScope.map(c=>{
     const {rate, hasRate, isOverride, kit} = resolveEntryRate(c.id, p);
     const daysWorked = entryDayCount(c.id, days);
@@ -7869,6 +7923,26 @@ function buildBudgetData(){
        failing to add up to the whole they are a split of.
        kit is null for anyone with no split: not zero, because "no kit in this rate" and
        "£0 of kit" print differently (a dash, not a figure). */
+    /* ---- Est. Costs: what this person costs the production BESIDE their fee ----
+       Their hotel nights, their travel, and their meals. ⚠️ DELIBERATELY NOT added to
+       subtotal, display, VAT or any total: those figures are already counted once each
+       in the Catering / Travel / Hotels extras rows of Per Department, and adding them
+       per person as well would double the whole lot. This column is a look, not a sum.
+       ⚠️ Hotel and meals are PERSON-level (keyed by crewId) while a row is an ENTRY, so
+       a two-role person would otherwise be charged twice for one bed and one lunch —
+       the first entry claims them, exactly as travel already does. */
+    const claimsPerson = !personCostClaimed.has(c.crewId);
+    if(claimsPerson) personCostClaimed.add(c.crewId);
+    const hotelNights = claimsPerson
+      ? ((p.hotelNightBefore||[]).includes(c.crewId) ? 1 : 0)
+        + days.filter(d=>(d.hotelNights||[]).includes(c.crewId)).length
+      : 0;
+    const hotelCost = hotelNights * hotelCosts.perRoomNight * prodOn;
+    const mealCost = claimsPerson ? days.reduce((sum,d)=>{
+      const m = (d.cateringMeals||{})[c.crewId];
+      if(!m) return sum;
+      return sum + (m.b?cateringCosts.b:0) + (m.l?cateringCosts.l:0) + (m.d?cateringCosts.d:0);
+    }, 0) * prodOn : 0;
     const paidDays = daysWorked*prodOn + prepDays*prepOn + postDays*postOn;
     const kitSubtotal = kit!=null ? Math.min(kit, rate) * paidDays : null;
     const labourSubtotal = kit!=null ? subtotal - kitSubtotal : null;
@@ -7893,6 +7967,7 @@ function buildBudgetData(){
     return {
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
       rate, hasRate, isOverride, kit, kitSubtotal, labourSubtotal,
+      hotelCost, mealCost, estCosts: hotelCost + mealCost + travelCost,
       daysWorked, prepDays, postDays,
       subtotal, prodSubtotal, prepSubtotal, postSubtotal,
       travelRate, travelCost, vatRegistered, vat, prodVat, prepVat, postVat,
@@ -8116,16 +8191,42 @@ function budgetSummaryBarHTML(data){
      number you land on is the complete one.
      ⚠️ Phase BT — they render from BUDGET_SCOPES, which is chronological: Pre-production,
      Production, Post. Do not hand-order them here; that list is the one order. */
-  const scopeBox = ([key, label]) => `<label><input type="checkbox" ${budgetScope[key]?'checked':''} onchange="toggleBudgetScope('${key}', this.checked)"> ${esc(label)}</label>`;
+  /* ⚠️ THE THREE SCOPES ARE A STACK NOW, not checkboxes in the toggle cluster. Each line
+     carries its own total, sitting under the grand total it adds up to, so the shape of
+     the job is readable without ticking anything: how much is prep, how much is the
+     shoot, how much is the edit. The whole line is the control — clicking it toggles
+     that scope — and a scope that is off GREYS OUT rather than disappearing, because a
+     £0 you switched off and a £0 you never booked are different facts.
+     ⚠️ Order comes from BUDGET_SCOPES, which is chronological. Do not hand-order here.
+     ⚠️ Production has no phase slice of its own — prep and post are the two carved OUT
+     of the shoot — so its figure is the remainder, total minus the two. Same arithmetic
+     Per Department already shows, not a second source that could disagree with it. */
+  const phaseTotal = key => {
+    const pick = ph => budgetVatToggle ? ph.exVat : ph.incVat;
+    if(key==='preproduction') return pick(data.prep);
+    if(key==='post')          return pick(data.post);
+    return (budgetVatToggle ? data.totalExVat : data.totalIncVat) - pick(data.prep) - pick(data.post);
+  };
+  const scopeRow = ([key, label]) => `<div class="budget-scope-row${budgetScope[key]?'':' off'}"
+      role="button" tabindex="0" aria-pressed="${budgetScope[key]?'true':'false'}"
+      onclick="toggleBudgetScope('${key}', !budgetScope['${key}'])"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
+      title="${budgetScope[key]?'Costed — click to leave it out':'Not costed — click to include it'}">
+      <span class="budget-scope-name">${esc(label)}</span>
+      <span class="budget-scope-amt">${budgetScope[key]?fmt(phaseTotal(key)):'—'}</span>
+    </div>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   return `<div class="budget-summary">
-    ${stats.map(([lbl,v,note])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div></div>`).join('')}
+    <div class="budget-headline">
+      ${stats.map(([lbl,v,note])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div></div>`).join('')}
+      <div class="budget-scope-stack">${BUDGET_SCOPES.map(scopeRow).join('')}</div>
+    </div>
     <div class="budget-vat-toggle">
-      ${BUDGET_SCOPES.map(scopeBox).join('')}
       <label><input type="checkbox" ${budgetVatToggle?'checked':''} onchange="toggleBudgetVat(this.checked)"> Itemize VAT</label>
       <label><input type="checkbox" ${budgetSplitKit?'checked':''} onchange="toggleBudgetSplitKit(this.checked)"> Split kit &amp; labour</label>
+      <label><input type="checkbox" ${budgetCostsPP?'checked':''} onchange="toggleBudgetCostsPP(this.checked)"> Costs PP</label>
     </div>
-    ${nothingOn ? `<div class="budget-scope-note hint">Every scope is off, so nothing is being costed. Tick Pre-production, Production or Post — or all three.</div>` : ''}
+    ${nothingOn ? `<div class="budget-scope-note hint">Every scope is off, so nothing is being costed. Click Pre-production, Production or Post — or all three.</div>` : ''}
   </div>`;
 }
 
@@ -8168,17 +8269,22 @@ function budgetDeptExtrasTableHTML(o){
       <tr class="budget-total-row"><td>Total</td><td>${fmt(o.total)}</td></tr>
     </table></div>`;
   }
-  const extraRow = (lbl, v) => `<tr><td>${lbl}</td><td>${fmt(v)}</td><td>${fmt(0)}</td><td>${fmt(v)}</td></tr>`;
+  /* ⚠️ TOTAL FIRST, then the working: TOTAL (inc-VAT) · xVAT (ex-VAT) · VAT. Same
+     reading order and the same two names as Per Person's TOTAL / Subtotal pair — the
+     figure you want, then what it is made of. An extras line carries no VAT (paid direct
+     to a supplier, not through a crew member), so its TOTAL and xVAT are the same number
+     and its VAT is zero. */
+  const extraRow = (lbl, v) => `<tr><td>${lbl}</td><td>${fmt(v)}</td><td>${fmt(v)}</td><td>${fmt(0)}</td></tr>`;
   const anyTravelVat = departments.some(d=>d.vat>0) && travel>0;
   return `<div class="tablewrap"><table>
-    <tr><th>Department</th><th>Ex-VAT</th><th>VAT</th><th>Inc-VAT</th></tr>
-    ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.exVat)}</td><td>${fmt(d.vat)}</td><td>${fmt(d.incVat)}</td></tr>`).join('')}
+    <tr><th>Department</th><th>TOTAL</th><th>xVAT</th><th>VAT</th></tr>
+    ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.incVat)}</td><td>${fmt(d.exVat)}</td><td>${fmt(d.vat)}</td></tr>`).join('')}
     ${hideExtras ? '' : `<tr class="budget-extras-row"><td colspan="4"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
     ${extraRow('Catering', catering)}
     ${extraRow('Travel', travel)}
     ${extraRow('Hotels', hotel)}
     ${extraRow('Locations', location)}`}
-    <tr class="budget-total-row"><td>Total</td><td>${fmt(o.exVat)}</td><td>${fmt(o.vat)}</td><td>${fmt(o.incVat)}</td></tr>
+    <tr class="budget-total-row"><td>Total</td><td>${fmt(o.incVat)}</td><td>${fmt(o.exVat)}</td><td>${fmt(o.vat)}</td></tr>
   </table></div>
   ${hideExtras ? '' : `<div class="hint" style="margin-top:8px;">A department's VAT is summed from the people in it who are actually VAT-registered — not 20% of its total.${anyTravelVat?' It includes VAT on their travel, which is itself shown ex-VAT in the Travel row above.':''} Catering, Hotels and Locations are paid direct to a supplier, so no crew member's VAT attaches to them.</div>`}`;
 }
@@ -8260,23 +8366,35 @@ function budgetPersonViewHTML(data){
   const anySplit = data.people.some(pp=>pp.kit!=null);
   const showSplit = budgetSplitKit && anySplit;
   const splitCell = v => `<td>${v!=null ? fmt(v) : '<span class="budget-noRate">—</span>'}</td>`;
+  /* COLUMN ORDER, and it is deliberate: Name · Role · TOTAL · Prep · Days · Edit ·
+     Day rate · Subtotal · [Kit · Labour] · Est. Costs · VAT reg. · VAT.
+     TOTAL leads because it is what you scan the list for; the columns after it are the
+     working that produces it, left to right — how many days, at what rate, giving what
+     subtotal. Kit/Labour sit next to Subtotal because they are a split OF it.
+     ⚠️ TOTAL is inc-VAT (pp.display) and Subtotal is ex-VAT, the same pair of names the
+     Per Department table uses (TOTAL / xVAT / VAT). Do not relabel one without the other.
+     ⚠️ Est. Costs is NOT part of TOTAL and never should be — see buildBudgetData. */
+  const estCell = pp => `<td class="budget-est-costs">${pp.estCosts ? fmt(pp.estCosts) : '<span class="budget-noRate">—</span>'}</td>`;
   return `<div class="tablewrap"><table>
-    <tr><th>Name</th><th>Role</th><th>Day rate</th><th style="text-align:center;">VAT reg.</th>${countCols.map(c=>`<th style="text-align:center;" title="${esc(c.title)}">${c.head}</th>`).join('')}${budgetVatToggle?'<th>VAT</th>':''}${showSplit?'<th title="Equipment portion of the day rate, across every day being costed">Kit</th><th title="What is left of the day rate once kit comes out">Labour</th>':''}<th>Subtotal</th></tr>
+    <tr><th>Name</th><th>Role</th><th>TOTAL</th>${countCols.map(c=>`<th style="text-align:center;" title="${esc(c.title)}">${c.head}</th>`).join('')}<th>Day rate</th><th>Subtotal</th>${showSplit?'<th title="Equipment portion of the day rate, across every day being costed">Kit</th><th title="What is left of the day rate once kit comes out">Labour</th>':''}${budgetCostsPP?'<th>Est. Costs</th>':''}<th style="text-align:center;">VAT reg.</th>${budgetVatToggle?'<th>VAT</th>':''}</tr>
     ${ordered.map(pp=>`<tr>
       <td>${esc(pp.name)}</td>
       <td>${esc(pp.role||'')}</td>
-      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
-      <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
+      <td><strong>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</strong></td>
       ${countCols.map(c=>`<td style="text-align:center;">${c.value(pp) || '<span class="budget-noRate">—</span>'}</td>`).join('')}
-      ${budgetVatToggle?vatCell(pp):''}
+      <td><span class="rate-with-save"><input type="text" inputmode="decimal" class="budget-rate-input" value="${pp.rate||''}" placeholder="—" onchange="saveEntryRate('${pp.id}', this.value)">${crewRateSaveIconHTML(pp.id, 'b')}</span></td>
+      <td>${pp.hasRate ? fmt(pp.subtotal) : '<span class="budget-noRate">—</span>'}</td>
       ${showSplit ? splitCell(pp.kitSubtotal)+splitCell(pp.labourSubtotal) : ''}
-      <td>${pp.hasRate ? fmt(pp.display) : '<span class="budget-noRate">—</span>'}</td>
+      ${budgetCostsPP ? estCell(pp) : ''}
+      <td style="text-align:center;"><input type="checkbox" ${pp.vatRegistered?'checked':''} onchange="toggleBudgetVatRegistered('${pp.id}', this.checked)" title="Charges VAT"></td>
+      ${budgetVatToggle?vatCell(pp):''}
     </tr>`).join('')}
-    ${showSplit ? `<tr class="budget-total-row">
-      <td colspan="${4+countCols.length+(budgetVatToggle?1:0)}">Kit and labour</td>
-      <td>${fmt(data.people.reduce((n,pp)=>n+(pp.kitSubtotal||0),0))}</td>
-      <td>${fmt(data.people.reduce((n,pp)=>n+(pp.labourSubtotal||0),0))}</td>
-      <td></td>
+    ${showSplit || budgetCostsPP ? `<tr class="budget-total-row">
+      <td colspan="${3+countCols.length}">${[showSplit?'Kit and labour':'', budgetCostsPP?'est. costs':''].filter(Boolean).join(' · ')}</td>
+      <td></td><td></td>
+      ${showSplit ? `<td>${fmt(data.people.reduce((n,pp)=>n+(pp.kitSubtotal||0),0))}</td><td>${fmt(data.people.reduce((n,pp)=>n+(pp.labourSubtotal||0),0))}</td>` : ''}
+      ${budgetCostsPP ? `<td class="budget-est-costs">${fmt(data.people.reduce((n,pp)=>n+(pp.estCosts||0),0))}</td>` : ''}
+      <td></td>${budgetVatToggle?'<td></td>':''}
     </tr>` : ''}
   </table></div>
   ${showSplit ? `<div class="hint" style="margin-top:8px;">Kit is the equipment portion of a split day rate, set per role on the crew record. It is part of the Subtotal, not on top of it — the two columns add up to it. Untick Split kit &amp; labour above to hide them.</div>` : ''}
