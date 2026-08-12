@@ -5947,11 +5947,15 @@ function renderProjectCrew(body){
      ⚠️ Hotel, Travel and Catering are NOT in this list and must not be. A bed, a lift and
      a lunch belong to a HUMAN — two roles is still one bed — so those three keep person
      blocks, which is exactly what stops a two-role person being charged twice. */
-  repeatedInView = new Set();
+  /* ⚠️ Computed for EVERY tab. On an entry-level tab the star means "this name is in the
+     list twice"; on a person-level one it means "this person holds more than one role,
+     and the single chip beside their name is only the most senior of them". Different
+     sentence, same fact and same calculation — and the person-level tabs need it MORE,
+     because there the other roles are not on screen at all. */
+  const seenEntries = {};
+  filtered.forEach(b=>b.entries.forEach(e=>{ seenEntries[e.crewId] = (seenEntries[e.crewId]||0)+1; }));
+  repeatedInView = new Set(Object.keys(seenEntries).filter(id=>seenEntries[id]>1));
   if(['roles','preprod','post','days'].includes(crewGridView)){
-    const seen = {};
-    filtered.forEach(b=>b.entries.forEach(e=>{ seen[e.crewId] = (seen[e.crewId]||0)+1; }));
-    repeatedInView = new Set(Object.keys(seen).filter(id=>seen[id]>1));
     filtered = filtered.flatMap(b=>b.entries.map(e=>
       Object.assign({}, e, {crewId:e.crewId, entries:[e], isPersonBlock:true})));
   }
@@ -6355,11 +6359,14 @@ function crewAssignRowHTML(block, days){
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${colCount};">
     <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
     <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}${repeatStarHTML(block.crewId)}</div>
-    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(fronted, personBlockToggleHTML(block, rest.length, false))}</div>
+    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(isHotel?topSeniorityEntry(block.entries):fronted, isHotel?'':personBlockToggleHTML(block, rest.length, false))}</div>
     ${isHotel ? headCells : entryCellsHTML(fronted)}
     <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
   </div>`;
-  const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${colCount};display:none;">
+  // ⚠️ Hotel has no stack: nothing about a room is per role, so a second row would be a
+  // duplicate of the first. Days on site keeps its own — but a days block holds exactly
+  // one entry now, so `rest` is empty there and this renders nothing either way.
+  const stack = isHotel ? '' : rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${colCount};display:none;">
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(e, '')}</div>
       ${isHotel ? '' : entryCellsHTML(e)}
       <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? '' : entryRightHTML(e)}</div>
@@ -6401,10 +6408,20 @@ function crewCateringBlockHTML(block, days){
      three leading cells occupy. */
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${days.length};">
       <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}</div>
-      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span></div>
+      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}${repeatStarHTML(block.crewId)}</div>
+  /* ⚠️ PERSON-LEVEL VIEW: ONE ROW, ONE ROLE, NO EXPAND. A bed, a lift and a lunch belong
+     to a human — two roles is still one room — so there is nothing here that a second
+     role row could hold, and a chevron promising one was offering to expand into a
+     duplicate of the row above. The chip shows their MOST SENIOR role (topSeniorityEntry,
+     the same ranking the department order uses) rather than whichever entry has the most
+     days, because with only one on screen it should be the one that identifies them; the
+     asterisk on the name says there are others. */
+      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span></div>
     </div>`;
-  const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${days.length};display:none;">
+  /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch —
+     so a second row here would duplicate the first. */
+  const stack = '';
+  const unusedCateringStack = () => rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${days.length};display:none;">
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
     </div>`).join('');
   return personBlockWrapHTML(block,
@@ -6893,11 +6910,14 @@ function crewTravelRowHTML(block, p){
      .pb-role-row below. */
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:1; --daycolwidth:210px;">
     <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}</div>
-    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(fronted)}${personBlockToggleHTML(block, rest.length, false)}</span></div>
+    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}${repeatStarHTML(block.crewId)}</div>
+    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span></div>
     <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
   </div>`;
-  const stack = rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:1; --daycolwidth:210px;display:none;">
+  /* ⚠️ NO STACK. Travel method is one choice per person per project, so a per-role
+     row could only ever repeat it. */
+  const stack = '';
+  const unusedTravelStack = () => rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:1; --daycolwidth:210px;display:none;">
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
     </div>`).join('');
   return personBlockWrapHTML(block, head + stack,
