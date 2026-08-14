@@ -627,6 +627,16 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   - ⚠️ **REMOVED in Phase BU: `.budget-summary`, `.budget-headline`, `.budget-vat-toggle`**
     and the three checkbox labels inside the last of them. Itemize VAT / Split kit &
     labour / Costs PP are `.bnr-tool` buttons now, in one cluster with £££.
+  - ⚠️ **TOOLS IS TWO RIGHT-ALIGNED ROWS, AND £££ IS LAST ON THE SECOND ONE.** Row 1 is the
+    mode picker ("what am I editing"), row 2 is `Itemize VAT · Split kit & labour · Costs PP
+    · £££` ("what am I looking at"). Being last in a right-aligned row is what pins £££ to
+    ONE x whether its three companions are beside it or not, so the extras grow LEFTWARD
+    from it — the same rule STAGE follows, applied to the control reached for most.
+    **Do not put £££ first** (it was): turning it off then pulled it from the left end of a
+    four-button row to the right end of a one-button row, jumping ~290px out from under the
+    pointer that had just clicked it. **Do not merge the two rows** either — one wrapping row
+    of seven re-flowed unpredictably as the extras came and went. Verified: ONE £££ position
+    (1067..1106) across all 48 Roles states and both phase tabs.
 - `budgetFmt()` (Phase AN) — the one money formatter for every Budget figure: the
   summary bar, all four views and the Copy/Excel export (`budgetExportRows()`).
   Adds thousands separators (`toLocaleString('en-GB', …)`), still 2dp — formatting

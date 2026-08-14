@@ -944,8 +944,12 @@
      different affordances (a bare word, a checkbox, a checkbox) doing one kind of job:
      changing what this screen shows. The Crew toolbar keeps what acts on the LIST —
      Select all, Filter, Copy · Export, Collapse all. */
-  .bnr-tools{grid-area:tools; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    justify-content:flex-end; min-width:0;}
+  /* ⚠️ A COLUMN OF RIGHT-ALIGNED ROWS, not one wrapping row. The mode picker sits on top and
+     the money controls below it, and both are flush to the same right edge — which is what
+     pins £££ (the last button on the lower row) to one x whether its three companions are
+     showing or not. See budgetSummaryBarHTML for why the order within the row matters. */
+  .bnr-tools{grid-area:tools; display:flex; flex-direction:column; align-items:flex-end;
+    gap:7px; min-width:0;}
   .bnr-toolrow{display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
   .bnr-tool{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px;
     text-transform:uppercase; color:var(--muted); background:transparent;
@@ -1451,7 +1455,10 @@
       grid-template-areas:"totals" "stage" "tools"; gap:14px 0;}
     .bnr-totals{gap:22px; flex-wrap:wrap;}
     .phase-banner .budget-scope-stack{width:100%;}
-    .bnr-tools{justify-content:flex-start; gap:10px;}
+    /* £££ stays last in its row on mobile too, so it keeps holding one position — but the
+       rows go flush LEFT, since right-aligned against the screen edge with nothing beside
+       them reads as a stray. */
+    .bnr-tools{align-items:flex-start; gap:8px;}
     .bnr-toolrow{justify-content:flex-start;}
 
     /* --- sticky save bar on the shoot-day editor --- */
@@ -9379,12 +9386,24 @@ function budgetSummaryBarHTML(data, o){
       toolBtn(budgetCostsPP, 'Costs PP', `toggleBudgetCostsPP(${!budgetCostsPP})`,
         "Show what each person costs besides their fee — their hotel, travel and meals")
     ].join('') : '';
+  /* ⚠️ TWO ROWS, AND £££ IS THE LAST THING ON THE SECOND ONE. Both rows are right-aligned
+     and £££ sits at the end of its row, so it holds ONE x whether the three money tools are
+     beside it or not — the same rule STAGE follows, applied to the control you reach for
+     most. The extras therefore grow LEFTWARD from it: `Itemize VAT · Split kit & labour ·
+     Costs PP · £££`.
+     ⚠️ Do not put £££ first. It was, and turning it on made the three extras appear to its
+     RIGHT — which shoved nothing, but turning it off then pulled £££ from the left end of a
+     four-button row to the right end of a one-button row, i.e. the button you had just
+     clicked jumped ~290px out from under the pointer.
+     ⚠️ And do not merge the two rows. The mode picker answers "what am I editing"; £££ and
+     its tools answer "what am I looking at". One wrapping row of seven buttons re-flowed
+     unpredictably as the extras came and went, which is what moved £££ in the first place. */
   return `<div class="phase-banner">
     <div class="bnr-totals">${o.showTotals||o.showStage ? totalsHTML : ''}</div>
     <div class="budget-scope-stack">${o.showStage ? BUDGET_SCOPES.map(scopeRow).join('') : ''}</div>
     <div class="bnr-tools">
       ${modeHTML ? `<div class="bnr-toolrow">${modeHTML}</div>` : ''}
-      <div class="bnr-toolrow">${moneyHTML}${moneyToolsHTML}</div>
+      <div class="bnr-toolrow">${moneyToolsHTML}${moneyHTML}</div>
     </div>
     ${o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every phase is off, so nothing is being costed${o.showModes?' and only crew in no phase at all are listed':''}. Click Pre-production, Production or Post — or all three.</div>` : ''}
   </div>`;
