@@ -5263,13 +5263,7 @@ column directly after Shoot (and after the expanded day ticks, so it stays besid
 A unit is a day-equivalent, so the field takes decimals. Pruned by `prunePhaseSchedules()`,
 which is where every entry-keyed project store is cleaned up.
 
-- ⚠️ **NOT COSTED, DELIBERATELY.** Nothing in `buildBudgetData()` reads `p.overtime`. Overtime is
-  real money, but what a unit is WORTH was not specified: 1× the day rate, 1.5×, a flat unit
-  price, per-hour, capped, or agreed per person. Picking one would change every figure on the
-  Budget tab on the strength of a guess. **Verified**: changing OT from 1.5 to 5 moves
-  `totalExVat` by £0. When it should cost something, the multiplier belongs beside
-  `resolveEntryRate()` and the factor next to `prodSubtotal` in the `people` map — one place,
-  gated like every other scope.
+- ⚠️ **Uncosted in BX, costed at 1× the day rate from Phase BY.** See that section.
 
 ### Budget, not £££
 
@@ -5303,3 +5297,58 @@ figures it reveals.
 - Shoot total toggles open and closed; not a control in Stage mode
 - 93 renders across 4 projects including the Dates popup in all three phases: 0 thrown errors,
   0 console errors; `node --check` clean; CSS braces balanced 648/648
+
+## Phase BY — overtime costs at the day rate (14 Aug 2026)
+
+**"it x day rate"** — the multiplier Phase BX captured units for but deliberately left
+uncosted.
+
+`otUnits` / `otRaw` / `otSubtotal` on each `people[]` row. A unit is a day-equivalent, so the
+cost is `rate × units`, it lands on the PRODUCTION side (there is no prep or edit overtime
+column) and `prodOn` gates it like every other production figure. Being inside `prodRaw` means
+it flows to `prodSubtotal` → `subtotal` → `departments` → every total, and the VAT base picks
+it up for free — `prodVat` is `(prodSubtotal + travelCost) × VAT_RATE`, so a VAT-registered
+person's overtime carries VAT and an unregistered one's doesn't, with nothing added to say so.
+
+⚠️ **`otSubtotal` is ALREADY counted inside `subtotal`.** Anything that adds it on top is
+double-counting — the same standing rule as `prep`/`post`.
+
+### Two cases where units deliberately do not multiply
+
+| case | why |
+|---|---|
+| **a buyout** | `rate` IS the whole agreed fee, so "units × the day rate" has nothing to multiply. Deriving a day-equivalent (fee ÷ days) would push the total past the one agreed number, which is the only thing a buyout means. |
+| **no shoot days** | ⚠️ **Load-bearing, not philosophical.** Per Day spreads a person's production money across the days they work, so money belonging to somebody with zero days has no row to sit on and would break `perDay + prep + post === totalExVat` — the invariant Phase BU had to repair. Overtime on a shoot you are not on is not a real fact either. |
+
+Both keep the typed number visible in the column, and the cell's **tooltip says which case it
+is in** — a bare number that quietly costs nothing is the thing worth avoiding here.
+
+### The Per Day share became one expression
+
+⚠️ `perDayShare` was `pp.isBuyout ? prodRaw/daysWorked : pp.rate`. That `pp.rate` branch
+silently dropped the overtime and would have broken the Per Day reconciliation all over again.
+It is now `pp.daysWorked ? pp.prodRaw / pp.daysWorked : 0` for both — a day rate plus that
+day's share of the OT, or an apportioned fee, from one line. For a person with no overtime it
+resolves to exactly `rate`, so nothing else moved.
+
+### Said on screen, because the arithmetic looks wrong otherwise
+
+Budget ▸ Per Person gains a hint when any overtime exists: a subtotal higher than rate × days
+with nothing on screen to explain the gap reads as a bug. It names the figure, the number of
+roles, and where the units are entered. Not shown at all on a job with no overtime.
+
+### Verified
+
+- Sabrina Goreeba, £450 × 6 days, 2 OT units → `otRaw` £900, project total £109,720 → £110,620;
+  her row's Subtotal £2,700 + £900 = £3,600 === `prodSubtotal`
+- Matt Wells (Field Producer, VAT-registered), £500, 1 unit → +£500 ex-VAT **and +£100 VAT**
+- The buyout entry, 3 units → `otRaw` £0, total unchanged
+- Tegid Cartwright, 0 shoot days, 4 units → `otRaw` £0, total unchanged, units still on screen
+- **All 8 scope combinations with overtime live**: `dept + extras === totalExVat` ✓,
+  `perDay + prep + post === totalExVat` ✓, `perDayVat + prepVat + postVat === vatTotal` ✓,
+  `ex + vat === inc` ✓, `kit + labour === subtotal` ✓ (overtime falls into labour, which is
+  right — an overtime hour is not another kit day)
+- Roles rows vs Budget: 41 checked, 0 disagreements
+- Test overtime cleared; totals back to £109,720 / £8,127 / £117,847 and no project carries an
+  `overtime` key
+- 84 renders across 4 projects: 0 thrown errors, 0 console errors; `node --check` clean

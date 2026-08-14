@@ -6836,7 +6836,7 @@ function rolesColumns(data){
        Production scope is what gates it. */
     if(isShoot && budgetScope.production){
       push('OT', '52px', {key:'overtime',
-        title:'Overtime, in units — a unit is one day’s equivalent, so 0.5 is half a day. Not costed into the Budget yet.'});
+        title:'Overtime, in units — a unit is one day’s equivalent, so 0.5 is half a day, costed at the day rate. Not costed on a buyout (no day rate to multiply) or with no shoot days.'});
     }
   });
   /* ⚠️ Phase BV — NOT IN THE DATES MODE. Buyout is a fact about the DEAL ("one agreed fee
@@ -6926,12 +6926,21 @@ function crewRolesRowHTML(e, spec, data){
       case 'shootday': return shootDayCellHTML(e, c.day);
       /* decimals allowed — a unit is a day-equivalent, so half a day is 0.5. `inputmode` is
          decimal for the same reason the rate field's is. */
+      /* the tooltip carries what the units COST, since the column shows only the count and the
+         money lands invisibly inside Total and Subtotal. It also says when they don't cost
+         anything, which is the case a bare number would leave you guessing about. */
       case 'overtime': {
         const ot = entryOvertime(e.id, p);
+        let why = 'Overtime units — a unit is one day’s equivalent, costed at the day rate';
+        if(ot){
+          if(pp && pp.otRaw) why = `${ot} unit${ot===1?'':'s'} × the day rate = ${budgetFmt(pp.otRaw)}`;
+          else if(buyout)    why = `${ot} unit${ot===1?'':'s'} — not costed: a buyout is one agreed fee, so there is no day rate to multiply`;
+          else               why = `${ot} unit${ot===1?'':'s'} — not costed: they have no shoot days for it to sit on`;
+        }
         return `<div class="roles-grid-cell roles-num" data-label="OT">
           <input type="text" inputmode="decimal" class="budget-rate-input" value="${ot!=null?ot:''}" placeholder="—"
             onclick="event.stopPropagation()" onchange="setEntryOvertime('${e.id}', this.value)"
-            title="Overtime units — a unit is one day’s equivalent"></div>`;
+            title="${esc(why)}"></div>`;
       }
       case 'buyout':
         return `<div class="roles-grid-cell roles-buyout" data-label="Buyout"><input type="checkbox" ${buyout?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>`;
@@ -7138,14 +7147,11 @@ const toggleEntryOnShoot = (entryId, on) => toggleEntryPhase('production', entry
    Units of overtime against a ROLE, sitting beside the Shoot column it belongs to. A unit is
    a day-equivalent, so the field takes decimals: 0.5 is half a day's overtime, 2 is two.
 
-   ⚠️ NOT COSTED YET, AND THAT IS DELIBERATE, NOT AN OVERSIGHT. Nothing in buildBudgetData()
-   reads p.overtime. Overtime is real money, but what a unit is WORTH is a commercial decision
-   this phase was not given: 1× the day rate, 1.5×, a flat unit price, per-hour, capped, or
-   agreed per person. Picking one and quietly adding it to the total would change every figure
-   on the Budget tab on the strength of a guess. So the number is captured and displayed, and
-   the day it should cost something, the multiplier belongs in resolveEntryRate()'s
-   neighbourhood and the factor in the `people` map next to prodSubtotal — one place, gated
-   like every other scope.
+   ⚠️ COSTED AT 1× THE DAY RATE since Phase BY (it was captured but uncosted in BX, because the
+   multiplier had not been decided). buildBudgetData() reads this store once, in the `people`
+   map beside prodSubtotal — see the OVERTIME note there for the two cases where units
+   deliberately do NOT multiply (a buyout, and nobody with zero shoot days) and why the second
+   of those is load-bearing rather than a preference.
    ⚠️ Stored per ENTRY, like the rate, the buyout and the phase days: the same person can do
    overtime as a Camera Operator and none as an Editor. Pruned by prunePhaseSchedules(), which
    is where every entry-keyed project store gets cleaned up. */
@@ -9686,7 +9692,21 @@ function buildBudgetData(){
     const isBuyout = !!(ent && ent.buyout);
     const totalPhaseDays = daysWorked + prepDays + postDays;
     const share = n => totalPhaseDays ? rate * (n / totalPhaseDays) : 0;
-    const prodRaw = isBuyout ? (totalPhaseDays ? share(daysWorked) : rate) : rate * daysWorked;
+    /* ---- OVERTIME (Phase BY) — units × the day rate, on the PRODUCTION side ----
+       A unit is a day-equivalent, so the cost is simply rate × units and it lands on the shoot:
+       there is no prep or edit overtime column, and prodOn is what gates it.
+       ⚠️ NOT COSTED ON A BUYOUT. A buyout has no day rate — `rate` IS the whole agreed fee, so
+       "units × the day rate" has nothing to multiply. Deriving a day-equivalent from the fee
+       (fee ÷ days) would make the total exceed the one agreed number, which is the single thing
+       a buyout means. The units stay visible in the column; they just don't multiply.
+       ⚠️ NOT COSTED WITH NO SHOOT DAYS either, and this one is load-bearing rather than
+       philosophical: Per Day spreads a person's production money across the days they work, so
+       money belonging to somebody with zero days has no row to sit on and would break
+       `perDay + prep + post === totalExVat` — the exact invariant Phase BU had to repair. And
+       overtime on a shoot you are not on is not a real fact anyway. */
+    const otUnits = entryOvertime(c.id, p) || 0;
+    const otRaw = (!isBuyout && daysWorked > 0) ? rate * otUnits : 0;
+    const prodRaw = (isBuyout ? (totalPhaseDays ? share(daysWorked) : rate) : rate * daysWorked) + otRaw;
     const prepRaw = isBuyout ? share(prepDays) : rate * prepDays;
     const postRaw = isBuyout ? share(postDays) : rate * postDays;
     const prodSubtotal = prodRaw * prodOn;
@@ -9752,6 +9772,11 @@ function buildBudgetData(){
       rate, hasRate, isOverride, kit, kitSubtotal, labourSubtotal,
       hotelCost, mealCost, estCosts: hotelCost + mealCost + travelCost,
       isBuyout, prodRaw, prepRaw, postRaw, travelCostRaw,
+      /* otUnits is what was typed; otRaw is what it costs (0 on a buyout or with no shoot
+         days — see above); otSubtotal is that gated by Production, and is ALREADY inside
+         prodSubtotal → subtotal → every total. Carried separately so a screen can say how much
+         of a fee is overtime, never as a second thing to add on. */
+      otUnits, otRaw, otSubtotal: otRaw * prodOn,
       prodVatRaw: vatRegistered ? (prodRaw + travelCostRaw) * VAT_RATE : 0,
       prepVatRaw: vatRegistered ? prepRaw * VAT_RATE : 0,
       postVatRaw: vatRegistered ? postRaw * VAT_RATE : 0,
@@ -9931,7 +9956,15 @@ function buildBudgetData(){
          always-open blocks outside the day rows. No such record exists in either project
          today. Closing it properly means a third block, which is a deliberate decision, not
          a line to slip into a bug fix. */
-      const perDayShare = pp.isBuyout ? (pp.daysWorked ? pp.prodRaw / pp.daysWorked : 0) : pp.rate;
+      /* ⚠️ ONE expression for both, and Phase BY needed it to be: a person's production money
+         spread over the shoot days they actually work. For a day rate that is
+         (rate × days + overtime) ÷ days — i.e. the rate plus that day's share of the OT — and
+         for a buyout it is the apportioned fee ÷ days. Written as `pp.rate` for the non-buyout
+         case it silently dropped the overtime, which is what would have broken
+         `perDay + prep + post === totalExVat` all over again.
+         ⚠️ prodRaw, not prodSubtotal: the `* prodOn` is applied here, once, like every other
+         production figure in this function. */
+      const perDayShare = pp.daysWorked ? pp.prodRaw / pp.daysWorked : 0;
       const dayRate = perDayShare * prodOn;
       const dayVat = pp.vatRegistered ? (dayRate + dayTravelRate(pp))*VAT_RATE : 0;
       dayDeptTotals[pp.department] = (dayDeptTotals[pp.department]||0) + budgetPersonDisplay(dayRate, dayVat);
@@ -10335,6 +10368,15 @@ function budgetPersonViewHTML(data){
   ${showSplit ? `<div class="hint" style="margin-top:8px;">Kit is the equipment portion of a split day rate, set per role on the crew record. It is part of the Subtotal, not on top of it — the two columns add up to it. Untick Split kit &amp; labour above to hide them.</div>` : ''}
   ${data.phases.some(ph=>ph.on && ph.daysTotal) ? offShootNote : ''}
   ${noRateCount ? `<div class="hint" style="margin-top:8px;">${noRateCount} crew member${noRateCount>1?'s have':' has'} no day rate on file — enter one above, or add it on their crew database record.</div>` : ''}
+  ${(()=>{
+    /* ⚠️ Phase BY — said here because without it this table's arithmetic looks WRONG: a
+       subtotal that is more than rate × days, with nothing on screen to explain the difference.
+       Overtime is entered on Crew ▸ Roles and is already inside Subtotal and TOTAL. Shown only
+       when somebody actually has some, so a job with no overtime carries no note about it. */
+    const ot = data.people.reduce((n,pp)=>n+(pp.otSubtotal||0), 0);
+    const who = data.people.filter(pp=>pp.otSubtotal>0).length;
+    return ot ? `<div class="hint" style="margin-top:8px;">Subtotals include ${budgetFmt(ot)} of overtime across ${who} role${who===1?'':'s'}, at the day rate — so a row can read higher than its rate × days. Overtime units are entered in the <strong>OT</strong> column on Crew ▸ Roles.</div>` : '';
+  })()}
   ${anyTravel ? `<div class="hint" style="margin-top:8px;">A VAT-registered crew member's travel carries VAT too — it's charged back through them — so their VAT covers day rate ${budgetVatToggle?'and travel':'and travel, baked into the Subtotal'}. The travel cost itself is counted once, in the Travel line of Per Department.</div>` : ''}
   <div class="hint" style="margin-top:8px;">Ticking VAT here doesn't save on its own — it's saved to the crew database together with the day rate, the next time that row's Save icon is clicked.</div>`;
 }
