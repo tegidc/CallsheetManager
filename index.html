@@ -581,10 +581,10 @@
   .roles-total{font-variant-numeric:tabular-nums; white-space:nowrap; text-align:center;}
   .roles-num{min-width:0; text-align:center; font-variant-numeric:tabular-nums;}
   .roles-num .budget-rate-input{width:100%; text-align:center;}
-  /* Days mode — the booked number and its calendar button share the cell, which is why
-     this column is wider than the other two (see rolesColumns) */
-  .roles-phase-days{display:flex; align-items:center; gap:3px; min-width:0;}
-  .roles-phase-days .budget-rate-input{width:100%; min-width:0; text-align:center;}
+  /* ⚠️ REPLACED in Phase BV: .roles-phase-days, which laid a number field and a calendar
+     button side by side in one cell. The DATES mode carries the icon alone now, so the cell
+     just centres it — and the phase columns are one width across all three modes again. */
+  .roles-phase-cal{display:flex; align-items:center; justify-content:center; min-width:0;}
   /* the Shoot header, when it is a disclosure control. Inherits the header row's own
      uppercase Oswald — this is a heading that happens to be clickable, not a button dropped
      into a header, so it grows a caret and a pointer and nothing else. Same idiom as
@@ -1060,6 +1060,11 @@
   .budget-scope-row:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .budget-scope-name{white-space:nowrap;}
   .budget-scope-amt{font-weight:600; white-space:nowrap;}
+  /* what the row says with the money hidden. Body font and muted, NOT the amount's Oswald
+     600 — it is a description of the phase, not a figure standing where a figure was, and
+     matching the money's weight would invite reading it as one. */
+  .budget-scope-count{font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
+    letter-spacing:0; color:var(--muted); white-space:nowrap;}
   /* off ≠ gone: the line stays, greyed, so "switched off" and "nothing booked" read
      differently. Not display:none, and not a strikethrough — this is a state, not a deletion. */
   /* off ≠ gone, and off ≠ blank: the figure STAYS and fades with its own label, at the
@@ -6516,7 +6521,12 @@ function rolesColumns(data){
              aria-expanded="${rolesShootOpen()?'true':'false'}"
              ><span class="dept-caret">${rolesShootOpen()?'▾':'▸'}</span>${ph.head}</span>`
         : ph.head,
-      crewRolesMode==='days' && !isShoot ? '86px' : '56px',
+      /* ⚠️ Phase BV — 56px in every mode now. The DATES mode's Prep/Post cells used to hold a
+         number field AND a calendar button and needed 86px; the field is gone (dates are what
+         that mode is for, and the number is what the DAYS mode is for), so the icon alone sits
+         in the standard width and the three phase columns finally line up across all three
+         modes. */
+      '56px',
       {key:'phase', phase:ph,
        title: canOpen ? (rolesShootOpen()?'Click to close the day ticks':'Click to tick which shoot days') : ph.headTitle});
     /* ⚠️ ONE COLUMN PER SHOOT DAY, emitted straight into the same spec — which is what gets
@@ -6530,7 +6540,14 @@ function rolesColumns(data){
          title:`Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`}));
     }
   });
-  push('Buyout', '60px', {key:'buyout', title:'One agreed fee for the whole job — the day counts only split it across the phases'});
+  /* ⚠️ Phase BV — NOT IN THE DATES MODE. Buyout is a fact about the DEAL ("one agreed fee
+     rather than a day rate"), so it belongs beside the things that describe the booking —
+     which phases someone is in (Stage) and how many days (Days). Dates answers "which days
+     of the calendar", where a tick box about how the fee is structured is just a column you
+     have to scroll past. Its state is untouched either way; only the column is absent. */
+  if(crewRolesMode!=='days'){
+    push('Buyout', '60px', {key:'buyout', title:'One agreed fee for the whole job — the day counts only split it across the phases'});
+  }
   if(money){
     push('Day rate', '104px', {key:'rate'});
     push('Subtotal', '92px', {key:'subtotal', title:'This role’s fee ex-VAT'});
@@ -6557,7 +6574,7 @@ function rolesFootnoteHTML(data){
   } else if(crewRolesMode==='days'){
     /* ⚠️ key 'days', label "Dates" — see ROLES_MODES. The prose must quote the LABEL, since
        it tells the user which button they are standing on. */
-    parts.push('<strong>Dates:</strong> the calendar marks prep and edit dates, the same marks the Pre-Prod and Post tabs hold. Marks are indicative — they don’t have to match the booked number. Shoot days have no calendar here: they belong to numbered shoot days, and the Production tab is where you tick them.');
+    parts.push('<strong>Dates:</strong> one calendar per phase — the same marks the Pre-Prod and Post tabs hold. Marks are indicative: they don’t have to match the booked number, which lives in <strong>Days</strong>. Shoot has no calendar because its days are numbered shoot days rather than dates — open <strong>Shoot</strong> to tick them.');
   } else {
     parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase.');
   }
@@ -6699,12 +6716,19 @@ function phaseCellHTML(e, ph, pp){
   const dayField = `<input type="text" inputmode="numeric" class="budget-rate-input" value="${value}" placeholder="—"
       onclick="event.stopPropagation()" onchange="setPhaseDays('${ph.view}','${e.id}', this.value)"
       title="${esc(ph.headTitle)}">`;
+  /* ⚠️ DATES: THE CALENDAR ICON ALONE — no number field beside it (Phase BV). The two modes
+     ask different questions and each should offer one answer: DAYS is where you type how
+     many, DATES is where you say which. Carrying the field into both meant the same number
+     had two homes one click apart, and the wider cell it needed knocked the phase columns out
+     of line with the other modes.
+     The number is not lost — it is one click away in DAYS, and marks stay indicative and
+     unreconciled against it exactly as the Pre-Prod/Post tabs have it. The button still shows
+     whether anything IS marked (.has-marks) and how many, in its tooltip. */
   if(crewRolesMode==='days'){
-    return `<div class="roles-grid-cell roles-phase-days" data-label="${ph.head}">
-      ${dayField}
+    return `<div class="roles-grid-cell roles-phase-cal" data-label="${ph.head}">
       <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
         onclick="event.stopPropagation();togglePhaseCalendar('${ph.view}','${e.id}')"
-        title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
+        title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked — ${esc(ph.head.toLowerCase())}` : 'No dates marked — click to mark '+esc(ph.head.toLowerCase())+' days'}"
         aria-label="${ph.head} date marks">${icon('calendar')}</button></div>`;
   }
   return `<div class="roles-grid-cell roles-num" data-label="${ph.head}">${dayField}</div>`;
@@ -9394,12 +9418,36 @@ function buildBudgetData(){
        switching it back on would add. Production carries the extras because prodOn is
        what gates them; prep and post are crew fee alone, which is all a prep or edit day
        has. Never add these to a total — they double everything above. */
-    phaseRaw: {
-      preproduction: { ex: people.reduce((n,pp)=>n+pp.prepRaw,0), vat: people.reduce((n,pp)=>n+pp.prepVatRaw,0) },
-      post:          { ex: people.reduce((n,pp)=>n+pp.postRaw,0), vat: people.reduce((n,pp)=>n+pp.postVatRaw,0) },
-      production:    { ex: people.reduce((n,pp)=>n+pp.prodRaw,0) + cateringRaw + travelRaw + hotelRaw + locationRaw,
-                       vat: people.reduce((n,pp)=>n+pp.prodVatRaw,0) },
-    },
+    /* ⚠️ Phase BV — `peopleCount` / `daysTotal` on each entry, for the STAGE stack to show
+       when the money is hidden (£££ off on Roles). Same "ignore the on/off flags" rule as the
+       figures beside them: a switched-off phase greys out but still says what it holds.
+         peopleCount — DISTINCT HUMANS, counted on crewId, not rows. A person booked twice in
+                       one phase is one person; counting entries here would be the Phase AO
+                       double-count wearing a different hat.
+                       ⚠️ Counted from MEMBERSHIP, not from "has days" — "booked, days not
+                       settled yet" is exactly the state the membership lists exist for, and a
+                       phase reading "0 people" while its tab lists four of them would be a
+                       lie. So `4 people · 0 days` is a real and useful state.
+         daysTotal   — PERSON-DAYS, summed, which is the quantity the money is built from
+                       (people × days × rate) and the same thing Per Department's hint already
+                       means by "60 days across 4 crew members". NOT the number of distinct
+                       calendar days — for Production that would be the 6-day shoot rather
+                       than the 180 person-days being paid for, and the two differ by two
+                       orders of magnitude. */
+    phaseRaw: (()=>{
+      const daysKeyFor = {preproduction:'prepDays', production:'daysWorked', post:'postDays'};
+      const countsFor = scope => {
+        const members = people.filter(pp=>entryInPhase(scope, pp.id, p));
+        return { peopleCount: new Set(members.map(pp=>pp.crewId)).size,
+                 daysTotal: people.reduce((n,pp)=>n+(pp[daysKeyFor[scope]]||0), 0) };
+      };
+      return {
+        preproduction: Object.assign({ ex: people.reduce((n,pp)=>n+pp.prepRaw,0), vat: people.reduce((n,pp)=>n+pp.prepVatRaw,0) }, countsFor('preproduction')),
+        post:          Object.assign({ ex: people.reduce((n,pp)=>n+pp.postRaw,0), vat: people.reduce((n,pp)=>n+pp.postVatRaw,0) }, countsFor('post')),
+        production:    Object.assign({ ex: people.reduce((n,pp)=>n+pp.prodRaw,0) + cateringRaw + travelRaw + hotelRaw + locationRaw,
+                                       vat: people.reduce((n,pp)=>n+pp.prodVatRaw,0) }, countsFor('production')),
+      };
+    })(),
     prepOn: !!prepOn, prodOn: !!prodOn, postOn: !!postOn,
     hasCrew: crewInScope.length>0, hasDays: days.length>0
   };
@@ -9461,13 +9509,28 @@ function budgetSummaryBarHTML(data, o){
     const r = (data.phaseRaw||{})[key] || {ex:0, vat:0};
     return budgetVatToggle ? r.ex : r.ex + r.vat;
   };
+  /* ⚠️ WITH THE MONEY OFF, THE STACK SAYS WHAT IS IN THE PHASE INSTEAD OF WHAT IT COSTS.
+     It used to print the figure regardless, which quietly defeated £££: the whole point of
+     that control is that a rate or a total cannot be read over your shoulder, and three
+     phase totals are exactly the numbers you would least want on screen. So the amount is
+     replaced — not blanked, since a row with a name and nothing after it reads as broken —
+     by the two counts that ARE safe to show and are what you want while staffing anyway.
+     Counts come from phaseRaw, so they ignore the on/off flags for the same reason the
+     figures do: a switched-off phase greys out and still says what it holds. */
+  const scopeMeta = key => {
+    const r = (data.phaseRaw||{})[key] || {};
+    const n = r.peopleCount||0, d = r.daysTotal||0;
+    return `${n} ${n===1?'person':'people'} · ${d} ${d===1?'day':'days'}`;
+  };
   const scopeRow = ([key, label]) => `<div class="budget-scope-row${budgetScope[key]?'':' off'}"
       role="button" tabindex="0" aria-pressed="${budgetScope[key]?'true':'false'}"
       onclick="toggleBudgetScope('${key}', !budgetScope['${key}'])"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
       title="${budgetScope[key]?'Costed — click to leave it out':'Not costed — click to include it'}">
       <span class="budget-scope-name">${esc(label)}</span>
-      <span class="budget-scope-amt">${fmt(phaseTotal(key))}</span>
+      ${o.showTotals
+        ? `<span class="budget-scope-amt">${fmt(phaseTotal(key))}</span>`
+        : `<span class="budget-scope-count">${esc(scopeMeta(key))}</span>`}
     </div>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   /* ---- TOTALS, zone 1. "Totaliser or blank" — and blank keeps its column ----

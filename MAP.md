@@ -4858,7 +4858,7 @@ switches on `crewRolesMode`:
 |---|---|---|---|
 | **Stage** | `'stage'` | one membership checkbox each | one membership checkbox |
 | **Days** *(default)* | `'totals'` | typeable day count | ⚠️ **read-only count, nothing beside it** |
-| **Dates** | `'days'` | day count + the per-entry calendar | read-only count |
+| **Dates** | `'days'` | ⚠️ **the calendar icon ALONE** — no number field (Phase BV) | read-only count |
 
 So `crewRolesMode==='days'` is the **Dates** mode, and the mode labelled "Days" is
 `'totals'`. ⚠️ And `'days'` is a *third* thing again in `crewGridView`, where it is the
@@ -5023,3 +5023,69 @@ then which dates. Coarse to fine.
 - 96 combinations re-run: 0 header/body cell mismatches, £££ still one x (1067), STAGE still
   one x (788)
 - `node --check` clean; CSS untouched
+
+## Phase BV follow-up — counts when the money is off; Dates is dates only (14 Aug 2026)
+
+**"When money is off — replace this with (x) People, (x) Days. And in Dates get rid of the
+'Days' and just put the calendar icons — I'll use that to input dates for Prep and Post.
+Buyout only needs to be in Stage and Totals."**
+
+### The STAGE stack stopped leaking the money
+
+⚠️ **This was a real hole in £££, not a preference.** The stack printed its three phase
+totals regardless, so switching the money off left the three numbers you would least want
+read over your shoulder sitting in the banner. With `showTotals` false each row now carries
+`N people · N days` in place of the amount — replaced rather than blanked, because a row with
+a name and nothing after it reads as broken.
+
+- `phaseRaw[key].peopleCount` / `.daysTotal` (`buildBudgetData`) — same "ignore the on/off
+  flags" rule as the figures beside them: a switched-off phase greys out and still says what
+  it holds.
+  - ⚠️ `peopleCount` is **distinct humans, counted on crewId** — a person booked twice in one
+    phase is one person. Counting rows here would be the Phase AO double-count again.
+  - ⚠️ Counted from **membership**, not from "has days": "booked, days not settled yet" is the
+    state the membership lists exist for, and a phase reading `0 people` while its own tab
+    lists four would be a lie. `4 people · 0 days` is real and useful.
+  - ⚠️ `daysTotal` is **person-days, summed** — the quantity the money is built from, and what
+    Per Department's hint already means by "60 days across 4 crew members". NOT distinct
+    calendar days: for Production that would be a 6-day shoot rather than the 140 person-days
+    being paid for, two orders of magnitude apart.
+- `.budget-scope-count` is body font and muted, deliberately not the amount's Oswald 600 — a
+  description of the phase, not a figure standing where a figure was.
+- ⚠️ **The Budget tab is unaffected** and must stay so: it passes `showTotals:true` always,
+  because £££ is a *Crew* control and a Budget view with its own totals hidden would only be
+  a way to reach a blank screen. Verified: £££ off, Budget still reads £109,720 / £8,127 /
+  £117,847.
+
+### Dates carries the calendar and nothing else
+
+`phaseCellHTML()`'s `'days'` branch renders the `.prep-cal-btn` alone; the number field is
+gone. The two modes ask different questions and each now offers one answer — **Days** is
+where you type how many, **Dates** is where you say which. The number is one click away and
+marks stay indicative and unreconciled against it, exactly as the Pre-Prod/Post tabs have it.
+
+- `.roles-phase-days` → **`.roles-phase-cal`** (centres one icon; do not look for the old
+  field+button flex row).
+- Phase columns are **56px in all three modes** now — the 86px the field+button pair needed
+  was what knocked Dates out of line with Stage and Days.
+
+### Buyout is absent in Dates
+
+It describes the DEAL ("one agreed fee rather than a day rate"), so it belongs beside the
+things that describe the booking — which phases (Stage) and how many days (Days). In Dates it
+was a column to scroll past. ⚠️ Only the COLUMN is absent; `e.buyout` is untouched, and every
+figure that depends on it is unchanged.
+
+### Verified
+
+- Stack with £££ off: `6 people · 77 days` / `36 people · 140 days` / `1 person · 10 days`,
+  each cross-checked against a recomputation from `entryInPhase` + the per-person day keys
+- **Zero `£n.nn` anywhere on the Crew screen with £££ off** (banner and rows, excluding the
+  £££ button's own label) — the leak is closed
+- Per mode: Stage → checkbox/checkbox/checkbox + Buyout; Days → field/count/field + Buyout;
+  Dates → calendar/count/calendar, **no Buyout**
+- Prep column 56px in all three modes
+- The Dates calendar still writes: 2 marks stored to `prepSchedule`, the booked number (15)
+  untouched, the Pre-Prod tab reads the same marks back, button gains `.has-marks`
+- 96 combinations: 0 header/body mismatches, 0 money leaks, £££ still one x (1067), STAGE one
+  x (788); 44 renders across 4 projects with 0 errors; `node --check` clean
