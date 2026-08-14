@@ -583,7 +583,7 @@
      The three phase columns sit together and in chronological order, with Buyout
      immediately after them because it is what changes their meaning. */
   /* ⚠️ Phase BU — THE TEMPLATE IS A VARIABLE, set as --roles-cols on the enclosing
-     .tablewrap by rolesColumns(). It has to be: the column set now depends on £££, Itemize
+     .tablewrap by rolesColumns(). It has to be: the column set now depends on Budget, Itemize
      VAT, Split kit, Costs PP, the Stage/Days/Dates mode and the three phase filters, which
      is far past what a handful of static classes can enumerate — .no-money was already the
      second of them. The fallback keeps the grid sane if a caller forgets to set it. */
@@ -650,6 +650,90 @@
     border-radius:20px; padding:0 6px; margin-left:6px; white-space:nowrap;}
   .roles-grid-rate{white-space:nowrap;}
   .roles-grid-header-row, .prep-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
+  /* the Name/Role headings, when they are disclosure controls (Phase BX). Same treatment as
+     .roles-shoot-head — a heading that happens to be clickable, so it grows a caret and a
+     pointer and nothing else. */
+  .roles-col-toggle{cursor:pointer; user-select:none; display:inline-flex; align-items:center;
+    gap:2px; white-space:nowrap;}
+  .roles-col-toggle:hover{color:var(--text);}
+  .roles-col-toggle:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .roles-col-toggle .dept-caret{font-size:9px; line-height:1;}
+  /* the Shoot day-count as a second trigger for the expansion (Phase BX) */
+  .roles-shoot-total{cursor:pointer; user-select:none;}
+  .roles-shoot-total:hover{color:var(--tape);}
+  .roles-shoot-total:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
+  /* ============ FROZEN PANES ON ROLES (Phase BX) ============
+     Roles scrolls sideways at desktop width with the money columns on, and scrolled right you
+     could no longer tell whose £2,250 of VAT you were reading. Controls / Name / Role pin to
+     the left edge of the scrollport; the heading row pins to the top of it.
+     ⚠️ This needs .tablewrap to be a REAL two-axis scrollport, which is why .roles-tablewrap
+     carries a max-height. `overflow-x:auto` alone computes overflow-y to `auto` per spec, so
+     the wrapper already captures vertical sticky — a header row with `top:0` would pin to the
+     top of the wrapper's own content box and then scroll away with the page, i.e. not stick at
+     all. Giving it a height makes the pinning real in both directions.
+     ⚠️ Only ROLES gets this. The other six sub-tabs fit their width and are pinned on mobile by
+     the rules further down; adding a scroll box to all of them would put a second scrollbar on
+     screens that never needed one. */
+  /* ⚠️ The height is SET IN JS, by sizeRolesTablewrap(), and it has to be: the box must end at
+     the bottom of the viewport, and where it STARTS moves. The banner above it changes height
+     when Budget is toggled (three figures vs a sentence), when Itemize VAT is toggled, and when
+     the mode picker appears — so any fixed `calc(100vh - Npx)` is wrong for most states, and
+     wrong in the way that matters: too tall, the box runs past the viewport, the PAGE scrolls
+     instead, and the frozen header row scrolls off with it. 60vh is the fallback for the frame
+     before the measurement lands. */
+  .roles-tablewrap{max-height:60vh; overflow:auto; overscroll-behavior:contain;}
+  /* ⚠️ WITHOUT THIS THE FROZEN COLUMNS ONLY HALF WORK, and the failure is subtle enough to
+     ship by accident: a sticky box is never pushed outside its own CONTAINING BLOCK, which
+     here is the grid container. Left at the wrapper's width (800px) while the template sums to
+     1415px, the grid overflows its own box — so scrolling 615px right let Name travel about
+     50px and then jam, sliding away with everything else. max-content makes the container as
+     wide as its columns, which is the span the sticky cells need to hold across.
+     min-width:100% is the other half of the pair: when the columns DO fit, the grid fills the
+     wrapper so the trailing minmax(…,1fr) can still absorb the slack (under max-content alone a
+     1fr resolves to its minimum and the rows would stop short of the right-hand rule).
+     Same rule the mobile block below has always applied to all seven sub-tabs — this is it at
+     desktop width, for Roles only. */
+  .roles-tablewrap .roles-grid,
+  .roles-tablewrap .dept-group,
+  .roles-tablewrap .person-block{width:max-content; min-width:100%;}
+  .roles-tablewrap .roles-grid-header-row{
+    position:sticky; top:0; z-index:3; background:var(--bg); margin-bottom:0;
+    padding-top:2px;
+  }
+  /* the three leading columns. Each needs an opaque fill of its own — rows are transparent, so
+     without it the scrolling cells show through underneath. The offsets are the column widths
+     plus the 10px grid gap, and they are read from the SAME tokens the grid template uses, so a
+     collapsed Name column (Phase BX narrows --pb-name-w) moves the Role column's pin with it
+     rather than leaving a gap or an overlap. */
+  .roles-tablewrap .roles-grid-controls,
+  .roles-tablewrap .pb-head-blank{
+    position:sticky; left:0; z-index:2; background:var(--bg); align-self:stretch;
+    width:calc(var(--pb-controls-w) + 10px);
+  }
+  .roles-tablewrap .roles-grid-name,
+  .roles-tablewrap .pb-head-name{
+    position:sticky; left:calc(var(--pb-controls-w) + 10px); z-index:2; background:var(--bg);
+    align-self:stretch; display:flex; align-items:center;
+  }
+  .roles-tablewrap .pb-role-cell,
+  .roles-tablewrap .pb-head-role{
+    position:sticky; left:calc(var(--pb-controls-w) + var(--pb-name-w) + 20px); z-index:2;
+    background:var(--bg); align-self:stretch; display:flex; align-items:center;
+    box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
+  }
+  /* the header row's own three lead cells sit at BOTH edges, so they outrank the row cells
+     (z-index 2) and the header row (3) alike */
+  .roles-tablewrap .roles-grid-header-row .pb-head-blank,
+  .roles-tablewrap .roles-grid-header-row .pb-head-name,
+  .roles-tablewrap .roles-grid-header-row .pb-head-role{z-index:4;}
+  /* the department heading is narrower than the rows it labels, so it pins left too rather
+     than sliding out of view as you scroll across */
+  .roles-tablewrap > .dept-toggle{position:sticky; left:0; z-index:5; background:var(--bg);
+    width:calc(100% - 2px);}
+  /* an open person-block edit form is a FORM, not a row — it must not inherit the row's
+     max-content width and scroll sideways as 700px of text fields */
+  .roles-tablewrap{container-type:inline-size;}
+  .roles-tablewrap .pb-editform{position:sticky; left:0; width:100cqw;}
   .roles-grid-header, .prep-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
   /* Phase BR — RATE and DAYS over Pre-production's two bare number fields. One header
      CELL (column 4 holds both inputs), laid out on the same flex row and the same field
@@ -1004,7 +1088,7 @@
      is the whole point of the rule: THE STAGE CLUSTER MUST NOT MOVE. It is the same three
      phase buttons on the Budget's three views and on Crew ▸ Roles, and it is a CONTROL you
      click repeatedly while switching between them — so it holds one position, and the
-     TOTALS zone keeps its width whether it is showing three figures, one, or (with £££ off
+     TOTALS zone keeps its width whether it is showing three figures, one, or (with Budget off
      on Roles) nothing at all. "Totaliser or blank", and blank still occupies its column.
      ⚠️ Do not make --bnr-totals-w content-sized, and do not swap this for flex with
      margin-left:auto. Either one reintroduces exactly the jump this replaced: Itemize VAT
@@ -1021,7 +1105,7 @@
      STAGE's left edge pinned at --bnr-totals-w + the gap no matter what.
      ⚠️ The first column is FIXED and the second takes the slack. That single fact is what
      stops STAGE moving: with Itemize VAT off the headline drops from three figures to one,
-     and with £££ off on Roles it has no figures at all — under a content-sized column each
+     and with Budget off on Roles it has no figures at all — under a content-sized column each
      of those slid STAGE hundreds of pixels sideways, mid-click. Do not make column 1
      auto/max-content, and do not go back to a flex row with margin-left:auto. */
   .phase-banner{display:grid; grid-template-columns:var(--bnr-totals-w) minmax(0,1fr);
@@ -1042,14 +1126,14 @@
   .bnr-totals-off{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);
     align-self:center; max-width:34ch; line-height:1.45;}
   /* ---- TOOLS: buttons, right-aligned, one cluster ----
-     Phase BU pulled the £££ text toggle out of the Crew toolbar and the three checkbox
+     Phase BU pulled the Budget text toggle out of the Crew toolbar and the three checkbox
      labels out of the summary bar, and made all of them the same pill. They were three
      different affordances (a bare word, a checkbox, a checkbox) doing one kind of job:
      changing what this screen shows. The Crew toolbar keeps what acts on the LIST —
      Select all, Filter, Copy · Export, Collapse all. */
   /* ⚠️ A COLUMN OF RIGHT-ALIGNED ROWS, not one wrapping row. The mode picker sits on top and
      the money controls below it, and both are flush to the same right edge — which is what
-     pins £££ (the last button on the lower row) to one x whether its three companions are
+     pins Budget (the last button on the lower row) to one x whether its three companions are
      showing or not. See budgetSummaryBarHTML for why the order within the row matters. */
   .bnr-tools{grid-area:tools; display:flex; flex-direction:column; align-items:flex-end;
     gap:7px; min-width:0;}
@@ -1094,7 +1178,7 @@
   /* Pre-Prod/Post keep their column but it holds one field instead of two */
   .prep-grid.no-money{--pb-phase-fields-w:60px;}
   .prep-grid.no-money .prep-header-fields span{width:60px;}
-  /* ⚠️ REMOVED in Phase BU: .crew-money-toggle. The £££ control is a .bnr-tool in the
+  /* ⚠️ REMOVED in Phase BU: .crew-money-toggle. The Budget control is a .bnr-tool in the
      banner's TOOLS cluster now, the same pill as Itemize VAT / Split kit / Costs PP — they
      all change what the screen shows, and they were three different affordances doing it.
      Do not look for a bare-text toggle in the Crew toolbar. */
@@ -1559,11 +1643,19 @@
        position left to hold, so it is released rather than forcing a 450px column to
        scroll. TOOLS goes left-aligned here — right-aligned against the screen edge with
        nothing beside it reads as a stray. */
+    /* ⚠️ NO FROZEN-PANE BOX ON A PHONE. The banner is tall here, so the measured box hits its
+       240px floor and lands below the fold — a cramped nested scroller inside a page that also
+       scrolls, which is worse than what it replaced. Released back to the horizontal-only
+       scroll the mobile rules further down already handle, where Controls and Name pin and the
+       PAGE scrolls vertically. The frozen header is a desktop affordance; on a phone you are
+       scrolling one row at a time anyway. sizeRolesTablewrap() bails out at this width too. */
+    .roles-tablewrap{max-height:none; overflow-x:auto; overflow-y:visible;}
+    .roles-tablewrap .roles-grid-header-row{position:static;}
     .phase-banner{grid-template-columns:minmax(0,1fr);
       grid-template-areas:"totals" "stage" "tools"; gap:14px 0;}
     .bnr-totals{gap:22px; flex-wrap:wrap;}
     .phase-banner .budget-scope-stack{width:100%;}
-    /* £££ stays last in its row on mobile too, so it keeps holding one position — but the
+    /* Budget stays last in its row on mobile too, so it keeps holding one position — but the
        rows go flush LEFT, since right-aligned against the screen edge with nothing beside
        them reads as a stray. */
     .bnr-tools{align-items:flex-start; gap:8px;}
@@ -1854,9 +1946,13 @@ function rolesTagListHTML(c, entryId){
    stays reachable in the degenerate case AZ's always-rendered marker used to cover.
    The muted, non-.active treatment is the same "nothing set here" signal roleChipHTML()
    gave it before BM folded that function in. */
-function roleBannerHTML(c){
+/* ⚠️ `o.abbreviate` (Phase BX) is OPT-IN and only Roles passes it — the other five callers get
+   the full role, unchanged. The chip's TITLE always carries the full role either way, so the
+   abbreviation never costs you the answer, and the chip is still the roles-menu trigger. */
+function roleBannerHTML(c, o){
   const has = !!c.role;
-  return `<span class="role-chip${has?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();openRolesMenu('${c.id}')" title="${has?esc(c.role)+' — change or add a role':'Change or add a role'}">${has?esc(c.role):'—'}</span>`;
+  const shown = has ? ((o&&o.abbreviate) ? rolesShortRole(c.role) : c.role) : '—';
+  return `<span class="role-chip${has?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();openRolesMenu('${c.id}')" title="${has?esc(c.role)+' — change or add a role':'Change or add a role'}">${esc(shown)}</span>`;
 }
 /* the canonical-role <option> list (Phase R item 1 — no free-text role anywhere): every
    ROLES_BY_DEPT role the person doesn't already hold, grouped by department, plus a
@@ -6086,17 +6182,18 @@ function crewToolbarSelectAll(idsCSV, allSelected, filterCount){
       <input type="checkbox" ${allSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${idsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
     </label>`;
 }
-/* ---- £££ : show the money on the Crew screens ----
+/* ---- BUDGET : show the money on the Crew screens ----
    Off by default. Roles is used far more often for "who is on this job and doing what"
    than for what they cost, and a rate column invites reading — and quoting — a number
-   over someone's shoulder. Ticking it reveals Total and Day rate on Roles, and the rate
-   field on Pre-Prod and Post.
-   ⚠️ Labelled £££, NOT "Costs". The Budget already has Est. Costs and a Costs PP toggle
-   meaning something else entirely (a person's hotel/travel/food), and a second control
-   called Costs that showed day rates would collide with both. */
+   over someone's shoulder. Turning it on reveals the banner's totals, Total and Day rate on
+   Roles, and the rate field on Pre-Prod and Post.
+   ⚠️ Labelled "Budget" since Phase BX; it was "Budget" from Phase BU. Still NOT "Costs" — the
+   Budget tab has Est. Costs and a Costs PP toggle meaning something else entirely (a person's
+   hotel/travel/food), and a control called Costs that showed day rates would collide with
+   both. "Budget" is unambiguous because it names the TAB whose figures it reveals. */
 let crewShowMoney = false;
 function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody(); }
-/* ⚠️ REMOVED in Phase BU: crewMoneyToggleHTML(). The £££ control is a .bnr-tool button in
+/* ⚠️ REMOVED in Phase BU: crewMoneyToggleHTML(). The Budget control is a .bnr-tool button in
    the banner's TOOLS cluster now, built by budgetSummaryBarHTML() — do not look for a
    second copy in the Crew toolbar. The Crew toolbar keeps only what acts on the LIST. */
 
@@ -6166,6 +6263,85 @@ function setCrewRolesMode(mode){
    Session state, like the mode itself — not persisted. */
 let rolesShootExpanded = false;
 function toggleRolesShootColumn(){ rolesShootExpanded = !rolesShootExpanded; renderProjectBody(); }
+
+/* ---- NAME AND ROLE COLLAPSE SIDEWAYS (Phase BX) ----
+   Roles is the widest table in the app and the two widest columns on it are text you already
+   know: you are scanning for a number, and 170px of "Sabrina Goreeba" plus 150px of "Line
+   Producer" is 320px of it. Clicking either header collapses that column to an abbreviation,
+   which buys back most of the horizontal scroll the money columns cost.
+   ⚠️ Roles ONLY, applied by overriding --pb-name-w / --pb-role-w on this tab's own .tablewrap.
+   Those tokens are SHARED by .roles-grid, .crewgrid and .prep-grid so the lead columns line up
+   across all seven Crew sub-tabs (Phase BO) — overriding them globally would knock the other
+   six out of step with each other. A custom property set on the wrapper reaches only the grids
+   inside it, which is exactly the scope wanted.
+   ⚠️ Nothing is lost: the full text stays in each cell's `title`, and the role chip is still
+   the roles-menu trigger. Session state, like every other view choice here. */
+/* ---- the frozen-pane box's height, measured (Phase BX) ----
+   Runs after every Crew render and on resize. Ends the scroll box at the bottom of the viewport
+   from wherever it actually starts, which is the only way the frozen header row stays on screen:
+   see the note on .roles-tablewrap for why a fixed calc() cannot work here.
+   ⚠️ A FLOOR of 240px, so a short window or a tall banner can't collapse the box to a sliver.
+   Below the floor the page scrolls as it always did — a cramped 240px of rows you can scroll is
+   better than 40px of rows you can't read. */
+const ROLES_FREEZE_MIN_W = 901;   // matches the @media(max-width:900px) block that releases it
+function sizeRolesTablewrap(){
+  const el = document.querySelector('.roles-tablewrap');
+  if(!el) return;
+  /* ⚠️ Below the mobile breakpoint the CSS releases the scroll box entirely (see the
+     @media(max-width:900px) rule), so an inline max-height here would fight it and win. Clear
+     it rather than compute one. */
+  if(window.innerWidth < ROLES_FREEZE_MIN_W){ el.style.maxHeight = ''; return; }
+  const top = el.getBoundingClientRect().top;
+  el.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 24)) + 'px';
+}
+window.addEventListener('resize', sizeRolesTablewrap);
+let rolesNameCollapsed = false;
+let rolesRoleCollapsed = false;
+function toggleRolesNameColumn(){ rolesNameCollapsed = !rolesNameCollapsed; renderProjectBody(); }
+function toggleRolesRoleColumn(){ rolesRoleCollapsed = !rolesRoleCollapsed; renderProjectBody(); }
+/* "Tegid Cartwright" → "Tegid C."  ·  "Anne-Marie de Vries" → "Anne-Marie d.V."
+   First name kept whole up to NAME_ABBREV_MAX, then an initial for every remaining word — the
+   rule the brief asked for ("a sensible amount of first name characters and second name
+   initials"). A single-word name is just truncated; nothing is invented for it. */
+/* ⚠️ NAMED rolesShortName, NOT abbreviateName — there is ALREADY an abbreviateName() further
+   down (the hotel summary's, "T. Cartwright": first initial + surname, for room lists). Two
+   `function` declarations of one name in the same scope do not error; the LAST one silently
+   wins. The first version of this phase did call it abbreviateName and got the hotel format on
+   Roles for free — and had it been declared any later in the file it would have rewritten the
+   hotel room list instead, with nothing to show for it. Different rule, different name.
+   ⚠️ The two rules are deliberately different and both are right: a room list wants the surname
+   (that is what is on the booking), a roster column wants the first name (that is what you call
+   them). Do not "unify" them. */
+/* 10, so a hyphenated first name ("Anne-Marie") survives whole — the common case that a
+   tighter cap mangles. The cell CSS-ellipsises anything longer anyway; this cap only decides
+   where the JS puts its own "…", and the full name is always in the title. */
+const NAME_ABBREV_MAX = 10;
+function rolesShortName(name){
+  const parts = String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '';
+  const first = parts[0].length>NAME_ABBREV_MAX ? parts[0].slice(0,NAME_ABBREV_MAX)+'…' : parts[0];
+  if(parts.length===1) return first;
+  return first + ' ' + parts.slice(1).map(w=>w[0].toUpperCase()+'.').join('');
+}
+/* "Executive Producer" → "EP"  ·  "1st AD" → "1AD"  ·  "Colourist" → "Colourist"
+   ⚠️ INITIALS, not truncation, and that is the one place this differs from the name rule —
+   film roles are conventionally initialised (EP, DOP, 1st AD, PA), so initials read as the
+   role rather than as a word cut in half. Joining words ("of", "and", "the") are dropped, and
+   a single-word role is left alone up to the same cap: "Colourist" is already short, and "Co."
+   would be worse than useless.
+   ⚠️ Abbreviations can collide — "Executive Producer" and "Exec Producer" both give EP. That is
+   acceptable for a view you switch on deliberately, and every chip keeps its full role in the
+   title tooltip. */
+const ROLE_JOINERS = new Set(['of','and','the','for','to','a']);
+function rolesShortRole(role){
+  const raw = String(role||'').trim();
+  if(!raw) return '';
+  const words = raw.split(/[\s/]+/).filter(Boolean).filter(w=>!ROLE_JOINERS.has(w.toLowerCase()));
+  if(words.length<2) return raw.length>NAME_ABBREV_MAX+2 ? raw.slice(0,NAME_ABBREV_MAX+2)+'…' : raw;
+  /* a word that is already an abbreviation ("AD", "PA", "DOP") contributes itself, not just
+     its first letter — "1st AD" must not collapse to "1A" */
+  return words.map(w=>(w.length<=3 && w===w.toUpperCase()) ? w : w[0].toUpperCase()).join('');
+}
 /* whether the column can be open at all: the modes that show a count, and a project that
    actually has days to show. Guarded in one place so the header, the template and the cells
    cannot disagree about it. */
@@ -6380,10 +6556,10 @@ function renderProjectCrew(body){
     }
     // Summary before Expand/Collapse all — the All-type action sits furthest right,
     // directly above the grid's own All column.
-    /* ⚠️ Phase BU — £££ IS NOT IN THIS ROW ANY MORE. It is a .bnr-tool in the banner's
+    /* ⚠️ Phase BU — Budget IS NOT IN THIS ROW ANY MORE. It is a .bnr-tool in the banner's
        TOOLS cluster, with the other three money toggles it belongs beside (see
        budgetSummaryBarHTML). This row keeps only what acts on the LIST: Select all,
-       Filter, Summary, Expand/Collapse all. Do not add a second £££ here. */
+       Filter, Summary, Expand/Collapse all. Do not add a second Budget here. */
     rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
     const groupHeaderHTML = g => deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
@@ -6417,14 +6593,27 @@ function renderProjectCrew(body){
          else has, it belongs in buildProjectCrewGroups as an option, where the panel can
          reach it. */
       /* ⚠️ ONE COLUMN SPEC drives the header row, the grid template AND every body cell
-         (see rolesColumns()), because the set is no longer fixed: £££, Itemize VAT, Split
+         (see rolesColumns()), because the set is no longer fixed: Budget, Itemize VAT, Split
          kit, Costs PP, the mode and the three phase filters between them give it dozens of
          shapes. Three hand-written copies of "which columns are showing" is how a template
          ends up with more tracks than cells, which silently shifts every column after the
          gap — the exact bug the old .no-money class existed to dodge with two columns. */
       const spec = rolesColumns(budgetData);
+      /* ⚠️ Roles builds its OWN lead cells rather than calling pbHeadLeadCellsHTML(), because
+         its Name and Role headings are disclosure CONTROLS (Phase BX) and the other six
+         sub-tabs' are not. Same classes, same order, same `.pb-head-name`/`.pb-head-role`
+         hooks the pinning and left-align rules key off — only a caret and a click added. */
+      const leadHead = (cls, label, collapsed, onToggle) => `<div class="roles-grid-header ${cls}">
+          <span class="roles-col-toggle" role="button" tabindex="0" onclick="${onToggle}"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${onToggle}}"
+            aria-expanded="${collapsed?'false':'true'}"
+            title="${collapsed?`Show full ${label.toLowerCase()}s`:`Abbreviate ${label.toLowerCase()}s`}"
+            ><span class="dept-caret">${collapsed?'▸':'▾'}</span>${label}</span>
+        </div>`;
       const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
-          ${pbHeadLeadCellsHTML('roles-grid-header')}
+          <div class="roles-grid-header pb-head-blank"></div>
+          ${leadHead('pb-head-name', 'Name', rolesNameCollapsed, 'toggleRolesNameColumn()')}
+          ${leadHead('pb-head-role', 'Role', rolesRoleCollapsed, 'toggleRolesRoleColumn()')}
           ${spec.cols.map(c=>`<div class="roles-grid-header${c.left?'':' roles-head-c'}"${c.title?` title="${esc(c.title)}"`:''}>${c.head}</div>`).join('')}
         </div>`;
       const groupsHTML = groups.map(g=>{
@@ -6433,7 +6622,17 @@ function renderProjectCrew(body){
           + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${
               g.items.map(e=>crewRolesRowHTML(e, spec, budgetData)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap" style="--roles-cols:${spec.template};">${rolesHeaderRow}${groupsHTML}</div>
+      /* ⚠️ The two width overrides are scoped HERE, on this tab's wrapper, so the shared
+         --pb-name-w/--pb-role-w tokens keep their values for the other six sub-tabs. */
+      /* 104px fits "Anne-Marie D.V."; 72px fits a single-word role left whole by
+         rolesShortRole ("Producer", "Colourist") as well as a 2–3 letter initialism. 62px
+         looked tighter but CSS-truncated exactly the roles the abbreviation had deliberately
+         left alone, which reads as a bug rather than as a setting. */
+      const collapseVars = (rolesNameCollapsed ? '--pb-name-w:104px;' : '')
+                         + (rolesRoleCollapsed ? '--pb-role-w:72px;' : '');
+      /* .roles-tablewrap adds the frozen panes — Roles only; see the CSS for why the other
+         six sub-tabs deliberately don't get a scroll box of their own. */
+      assignedHTML = `<div class="tablewrap roles-tablewrap" style="--roles-cols:${spec.template};${collapseVars}">${rolesHeaderRow}${groupsHTML}</div>
         ${rolesFootnoteHTML(budgetData)}`;
     } else if(isPhaseTab(crewGridView)){
       /* Pre-production AND Post (Phase BT) — ONE branch, because they are one screen
@@ -6490,7 +6689,7 @@ function renderProjectCrew(body){
      honestly carry (see budgetSummaryBarHTML for which and why).
      ⚠️ ROLES ONLY gets STAGE and the mode picker — its phase buttons both cost and filter,
      and it is the only sub-tab with rows whose columns the modes reshape. Pre-Prod and Post
-     take the TOOLS cluster alone rather than a second copy of the £££ button. */
+     take the TOOLS cluster alone rather than a second copy of the Budget button. */
   const bannerHTML = budgetData ? `<div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(budgetData, {
       showTotals: crewShowMoney,
       showStage:  crewGridView==='roles',
@@ -6521,6 +6720,9 @@ function renderProjectCrew(body){
       <div class="hint">Need someone new? <span style="color:var(--tape);cursor:pointer" onclick="toggleCrewForm()">Add them here</span> — they'll be saved to the Crew database and assigned to this project.</div>
       ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
     </div>`;
+  // Phase BX — after this render's innerHTML lands, so the box can measure where it started.
+  // Same idiom as renderMain()'s refreshTabScrollCues().
+  setTimeout(sizeRolesTablewrap, 0);
   body.oninput = crewGridView==='catering'
     ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); refreshCateringSummaryFigures(); })
     : crewGridView==='travel'
@@ -6561,7 +6763,7 @@ const repeatStarHTML = crewId => repeatedInView.has(crewId)
 
    ⚠️ ONE DECLARATION, THREE CONSUMERS — the header row, the template and the body cells.
    Roles now carries Budget Per Person's whole column set behind Budget's own toggles, and
-   between £££, Itemize VAT, Split kit, Costs PP, the mode and the three phase filters the
+   between Budget, Itemize VAT, Split kit, Costs PP, the mode and the three phase filters the
    set has dozens of shapes. Header and body cannot be allowed to disagree about which of
    them is showing: a template with more tracks than cells silently shifts every column
    after the gap, which is a wrong number under the wrong heading on a costing screen.
@@ -6627,6 +6829,14 @@ function rolesColumns(data){
       projectDays().forEach(d=>push(`D${esc(d.dayNum||'?')}`, '30px',
         {key:'shootday', day:d,
          title:`Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`}));
+    }
+    /* ⚠️ OT SITS DIRECTLY AFTER SHOOT — including after the expanded day ticks, so it stays
+       next to the phase it belongs to rather than being pushed away from it when the column
+       opens. Overtime is a shoot fact: there is no prep or edit overtime column, and the
+       Production scope is what gates it. */
+    if(isShoot && budgetScope.production){
+      push('OT', '52px', {key:'overtime',
+        title:'Overtime, in units — a unit is one day’s equivalent, so 0.5 is half a day. Not costed into the Budget yet.'});
     }
   });
   /* ⚠️ Phase BV — NOT IN THE DATES MODE. Buyout is a fact about the DEAL ("one agreed fee
@@ -6714,6 +6924,15 @@ function crewRolesRowHTML(e, spec, data){
         return `<div class="roles-grid-cell roles-total" data-label="Total">${pp&&pp.hasRate?`<strong>${budgetFmt(pp.display)}</strong>`:dash}</div>`;
       case 'phase':  return phaseCellHTML(e, c.phase, pp);
       case 'shootday': return shootDayCellHTML(e, c.day);
+      /* decimals allowed — a unit is a day-equivalent, so half a day is 0.5. `inputmode` is
+         decimal for the same reason the rate field's is. */
+      case 'overtime': {
+        const ot = entryOvertime(e.id, p);
+        return `<div class="roles-grid-cell roles-num" data-label="OT">
+          <input type="text" inputmode="decimal" class="budget-rate-input" value="${ot!=null?ot:''}" placeholder="—"
+            onclick="event.stopPropagation()" onchange="setEntryOvertime('${e.id}', this.value)"
+            title="Overtime units — a unit is one day’s equivalent"></div>`;
+      }
       case 'buyout':
         return `<div class="roles-grid-cell roles-buyout" data-label="Buyout"><input type="checkbox" ${buyout?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>`;
       case 'rate':
@@ -6747,8 +6966,8 @@ function crewRolesRowHTML(e, spec, data){
      TABS keep their inline calendars; only Roles' went. */
   const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${esc(e.name)}${repeatStarHTML(e.crewId)}</div>
-    <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</div>
+    <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e, {abbreviate:rolesRoleCollapsed})}</span></div>
     ${spec.cols.map(cellHTML).join('')}
   </div>`;
   return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
@@ -6803,8 +7022,16 @@ function phaseCellHTML(e, ph, pp){
      are not on the shoot, exactly the contract entryOnShoot has always had. */
   if(isShoot){
     const n = member ? entryDayCount(e.id, projectDays()) : 0;
-    return `<div class="roles-grid-cell roles-num" data-label="Shoot"
-      title="${member?'Days on the shoot — ticked day by day on the Production tab':'Not on the shoot — switch to Stage to add them'}">${n||dash}</div>`;
+    /* ⚠️ Phase BX — THE COUNT IS A SECOND TRIGGER for the same expansion the header drives.
+       It is the number you are looking at when you want to know which days made it, so it is
+       the natural thing to click; the header alone meant travelling to the top of the list to
+       open the detail for a row halfway down. One toggle, two ways in — not two behaviours. */
+    const canOpen = crewRolesMode!=='stage' && projectDays().length>0;
+    const openTitle = rolesShootOpen() ? 'Click to close the day ticks' : 'Click to open the day ticks';
+    return `<div class="roles-grid-cell roles-num${canOpen?' roles-shoot-total':''}" data-label="Shoot"
+      ${canOpen?`role="button" tabindex="0" onclick="event.stopPropagation();toggleRolesShootColumn()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRolesShootColumn();}"`:''}
+      title="${member?(canOpen?openTitle+' — days on the shoot are ticked day by day':'Days on the shoot — ticked day by day on the Production tab'):'Not on the shoot — switch to Stage to add them'}">${n||dash}</div>`;
   }
   const days = phaseDaysOf(ph.view, e.id, p);
   const value = member && days!=null ? days : '';
@@ -6907,6 +7134,55 @@ const toggleEntryOnShoot = (entryId, on) => toggleEntryPhase('production', entry
    It is just a field (Phase Detail): type in it or leave it blank. No pencil,
    no edit state, no save button. onchange (not oninput) means it only writes when the
    value actually changed and focus has left, so tabbing through 66 rows saves nothing. */
+/* ---- OVERTIME (Phase BX) ----
+   Units of overtime against a ROLE, sitting beside the Shoot column it belongs to. A unit is
+   a day-equivalent, so the field takes decimals: 0.5 is half a day's overtime, 2 is two.
+
+   ⚠️ NOT COSTED YET, AND THAT IS DELIBERATE, NOT AN OVERSIGHT. Nothing in buildBudgetData()
+   reads p.overtime. Overtime is real money, but what a unit is WORTH is a commercial decision
+   this phase was not given: 1× the day rate, 1.5×, a flat unit price, per-hour, capped, or
+   agreed per person. Picking one and quietly adding it to the total would change every figure
+   on the Budget tab on the strength of a guess. So the number is captured and displayed, and
+   the day it should cost something, the multiplier belongs in resolveEntryRate()'s
+   neighbourhood and the factor in the `people` map next to prodSubtotal — one place, gated
+   like every other scope.
+   ⚠️ Stored per ENTRY, like the rate, the buyout and the phase days: the same person can do
+   overtime as a Camera Operator and none as an Editor. Pruned by prunePhaseSchedules(), which
+   is where every entry-keyed project store gets cleaned up. */
+const entryOvertime = (entryId, p) => {
+  const proj = p || currentProject();
+  const v = ((proj||{}).overtime||{})[entryId];
+  return v==null ? null : v;
+};
+async function setEntryOvertime(entryId, rawValue){
+  const p = currentProject(); if(!p) return;
+  if(!entryById(entryId, p)) return;
+  const trimmed = (rawValue||'').trim();
+  let next = null;
+  if(trimmed!==''){
+    const n = Number(trimmed);
+    /* garbage reverts by re-rendering without saving, exactly as saveEntryRate() and
+       setPhaseDays() do — the field visibly returns to the last stored value rather than
+       sitting there holding text nothing accepted */
+    if(isNaN(n) || n < 0){ renderProjectBody(); return; }
+    next = n;
+  }
+  p.overtime = p.overtime || {};
+  /* delete rather than storing 0 or null — "no overtime" is the absence of a record, the same
+     idiom phaseWrite() and saveEntryRate() use, so a project nobody has touched carries no key */
+  if(next==null) delete p.overtime[entryId]; else p.overtime[entryId] = next;
+  if(!Object.keys(p.overtime).length) delete p.overtime;
+  // bulk-select fans out over the selected ENTRIES, like every other row control
+  selectedEditTargets(entryId).forEach(id=>{
+    if(id===entryId) return;
+    if(!entryById(id, p)) return;
+    p.overtime = p.overtime || {};
+    if(next==null) delete p.overtime[id]; else p.overtime[id] = next;
+    if(!Object.keys(p.overtime).length) delete p.overtime;
+  });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
 /* Buyout lives on the ENTRY: it is a fact about this booking, not about the person —
    the same DOP can be on a day rate for one job and a buyout for the next, and can even
    hold a buyout on one role and a day rate on another within one project. */
@@ -8208,6 +8484,13 @@ function prunePhaseSchedules(p, entryIds){
     if(!Array.isArray(p[members])) return;
     p[members] = p[members].filter(id=>!kill.has(id));
   });
+  /* Phase BX — overtime is entry-keyed too, so it is pruned in the same pass. This function is
+     the one place every entry-keyed project store gets cleaned up; a new one added anywhere
+     else and not listed here is a dangling record waiting to be found. */
+  if(p.overtime){
+    kill.forEach(id=>{ delete p.overtime[id]; });
+    if(!Object.keys(p.overtime).length) delete p.overtime;
+  }
 }
 
 /* Days. Written on `onchange`, so it only fires when the value actually changed and
@@ -9710,7 +9993,7 @@ function buildBudgetData(){
        what gates them; prep and post are crew fee alone, which is all a prep or edit day
        has. Never add these to a total — they double everything above. */
     /* ⚠️ Phase BV — `peopleCount` / `daysTotal` on each entry, for the STAGE stack to show
-       when the money is hidden (£££ off on Roles). Same "ignore the on/off flags" rule as the
+       when the money is hidden (Budget off on Roles). Same "ignore the on/off flags" rule as the
        figures beside them: a switched-off phase greys out but still says what it holds.
          peopleCount — DISTINCT HUMANS, counted on crewId, not rows. A person booked twice in
                        one phase is one person; counting entries here would be the Phase AO
@@ -9750,10 +10033,10 @@ function buildBudgetData(){
    the Budget's actual banner is how the two can never quote different figures. It reads
    the same `data` from the same buildBudgetData(), so there is no second arithmetic here
    and nothing to keep in step.
-   o.showTotals      — zone 1 carries the figures (false = Roles with £££ off; the zone
+   o.showTotals      — zone 1 carries the figures (false = Roles with Budget off; the zone
                        stays, see .phase-banner, it just says why it is empty)
    o.showStage       — zone 2 carries the three phase buttons
-   o.showMoneyToggle — the £££ button, the Crew tab's three money-bearing sub-tabs
+   o.showMoneyToggle — the Budget button, the Crew tab's three money-bearing sub-tabs
    o.showModes       — the Stage/Days/Dates picker, Roles only
 
    ⚠️ WHERE EACH ZONE IS HONEST. On Roles and on all three Budget views the STAGE buttons
@@ -9761,7 +10044,7 @@ function buildBudgetData(){
    those tabs are one phase each by definition, and the standing rule that they carry NO
    TOTALS of any kind (see PHASE_TABS) rules the figures out as well. So both tabs render
    this banner with zones 1 and 2 off, carrying the TOOLS cluster alone.
-   ⚠️ That is deliberately not "keep a second £££ in the Crew toolbar for those two tabs".
+   ⚠️ That is deliberately not "keep a second Budget in the Crew toolbar for those two tabs".
    One control, built in one place, wherever it appears — which is the merge Phase BU was
    asked for. A tool row with two empty zones beside it is a smaller cost than two
    implementations of the same button drifting apart. */
@@ -9801,7 +10084,7 @@ function budgetSummaryBarHTML(data, o){
     return budgetVatToggle ? r.ex : r.ex + r.vat;
   };
   /* ⚠️ WITH THE MONEY OFF, THE STACK SAYS WHAT IS IN THE PHASE INSTEAD OF WHAT IT COSTS.
-     It used to print the figure regardless, which quietly defeated £££: the whole point of
+     It used to print the figure regardless, which quietly defeated Budget: the whole point of
      that control is that a rate or a total cannot be read over your shoulder, and three
      phase totals are exactly the numbers you would least want on screen. So the amount is
      replaced — not blanked, since a row with a name and nothing after it reads as broken —
@@ -9825,15 +10108,15 @@ function budgetSummaryBarHTML(data, o){
     </div>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   /* ---- TOTALS, zone 1. "Totaliser or blank" — and blank keeps its column ----
-     `showTotals` is false only on Crew ▸ Roles with £££ off. The zone still renders, with
+     `showTotals` is false only on Crew ▸ Roles with Budget off. The zone still renders, with
      a sentence in it: an empty left third of a banner reads as a screen that failed rather
      than one you switched the money off on. */
   const totalsHTML = o.showTotals
     ? stats.map(([lbl,v,note])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div></div>`).join('')
-    : `<div class="bnr-totals-off">Rates and totals hidden. Turn on <strong>£££</strong> to cost this list — the phase buttons still filter who is on it.</div>`;
+    : `<div class="bnr-totals-off">Rates and totals hidden. Turn on <strong>Budget</strong> to cost this list — the phase buttons still filter who is on it.</div>`;
   /* ---- TOOLS, zone 3 ----
      ⚠️ ONE cluster for everything that changes what this screen SHOWS, as buttons. The
-     mode picker is Roles-only (there are no rows to retype on a Budget rollup) and £££ is
+     mode picker is Roles-only (there are no rows to retype on a Budget rollup) and Budget is
      Roles-only for the opposite reason — the Budget tab exists to show money, so a
      control that hides all of it there would only be a way to get to a blank screen. */
   const toolBtn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}"
@@ -9845,11 +10128,11 @@ function budgetSummaryBarHTML(data, o){
            onclick="setCrewRolesMode('${key}')" title="${esc(title)}">${label}</button>`).join('')}
     </div>` : '';
   const moneyHTML = o.showMoneyToggle
-    ? toolBtn(crewShowMoney, '£££', 'toggleCrewMoney()',
+    ? toolBtn(crewShowMoney, 'Budget', 'toggleCrewMoney()',
         crewShowMoney ? 'Hide rates and totals' : 'Show rates and totals')
     : '';
   /* Itemize VAT / Split kit / Costs PP are meaningless with the money hidden, so on Roles
-     with £££ off they go rather than sitting there doing nothing to a blank column. */
+     with Budget off they go rather than sitting there doing nothing to a blank column. */
   const showMoneyTools = !o.showMoneyToggle || crewShowMoney;
   const moneyToolsHTML = showMoneyTools ? [
       toolBtn(budgetVatToggle, 'Itemize VAT', `toggleBudgetVat(${!budgetVatToggle})`,
@@ -9859,18 +10142,18 @@ function budgetSummaryBarHTML(data, o){
       toolBtn(budgetCostsPP, 'Costs PP', `toggleBudgetCostsPP(${!budgetCostsPP})`,
         "Show what each person costs besides their fee — their hotel, travel and meals")
     ].join('') : '';
-  /* ⚠️ TWO ROWS, AND £££ IS THE LAST THING ON THE SECOND ONE. Both rows are right-aligned
-     and £££ sits at the end of its row, so it holds ONE x whether the three money tools are
+  /* ⚠️ TWO ROWS, AND Budget IS THE LAST THING ON THE SECOND ONE. Both rows are right-aligned
+     and Budget sits at the end of its row, so it holds ONE x whether the three money tools are
      beside it or not — the same rule STAGE follows, applied to the control you reach for
      most. The extras therefore grow LEFTWARD from it: `Itemize VAT · Split kit & labour ·
-     Costs PP · £££`.
-     ⚠️ Do not put £££ first. It was, and turning it on made the three extras appear to its
-     RIGHT — which shoved nothing, but turning it off then pulled £££ from the left end of a
+     Costs PP · Budget`.
+     ⚠️ Do not put Budget first. It was, and turning it on made the three extras appear to its
+     RIGHT — which shoved nothing, but turning it off then pulled Budget from the left end of a
      four-button row to the right end of a one-button row, i.e. the button you had just
      clicked jumped ~290px out from under the pointer.
-     ⚠️ And do not merge the two rows. The mode picker answers "what am I editing"; £££ and
+     ⚠️ And do not merge the two rows. The mode picker answers "what am I editing"; Budget and
      its tools answer "what am I looking at". One wrapping row of seven buttons re-flowed
-     unpredictably as the extras came and went, which is what moved £££ in the first place. */
+     unpredictably as the extras came and went, which is what moved Budget in the first place. */
   return `<div class="phase-banner">
     <div class="bnr-totals">${o.showTotals||o.showStage ? totalsHTML : ''}</div>
     <div class="budget-scope-stack">${o.showStage ? BUDGET_SCOPES.map(scopeRow).join('') : ''}</div>

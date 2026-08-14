@@ -610,32 +610,32 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   Budget views.** One function, two screens — which is what makes it impossible for Roles
   and the Budget to quote different figures; it reads the same `data` from the same
   `buildBudgetData()`. Options: `showTotals` (zone 1 carries the figures — false on Roles
-  with £££ off, when the zone stays and says why it is empty), `showStage` (zone 2's three
-  phase buttons), `showMoneyToggle` (the £££ button), `showModes` (the Stage/Days
+  with Budget off, when the zone stays and says why it is empty), `showStage` (zone 2's three
+  phase buttons), `showMoneyToggle` (the Budget button), `showModes` (the Stage/Days
   picker, Roles only). Pre-Prod/Post pass `showTotals:false, showStage:false` — those tabs
   are one phase each and carry **no totals** by standing rule (see `PHASE_TABS`) — so they
-  get the TOOLS cluster alone rather than a second copy of the £££ button. Its `.num`
+  get the TOOLS cluster alone rather than a second copy of the Budget button. Its `.num`
   figures are Oswald (Phase AN), not Fraunces — a deliberate exception to Phase Fonts'
   "every Oswald label is 11px" rule; see `.budget-stat .num` below — [Budget, Crew]
   - ⚠️ **`.phase-banner` is a GRID with a FIXED first column, and that is load-bearing:
     STAGE must not move between views.** Do not make `--bnr-totals-w` content-sized and do
     not go back to a flex row with `margin-left:auto` — Itemize VAT off drops the headline
-    from three figures to one, and £££ off leaves it with none, each of which slid STAGE
+    from three figures to one, and Budget off leaves it with none, each of which slid STAGE
     hundreds of pixels sideways mid-click. TOOLS takes its own row because `#main` is capped
     at `max-width:840px` and the three zones measure ~1070px: three across cannot fit at
     any window size. Verified at x=788 in all 12 Roles states and all 3 Budget views.
   - ⚠️ **REMOVED in Phase BU: `.budget-summary`, `.budget-headline`, `.budget-vat-toggle`**
     and the three checkbox labels inside the last of them. Itemize VAT / Split kit &
-    labour / Costs PP are `.bnr-tool` buttons now, in one cluster with £££.
-  - ⚠️ **TOOLS IS TWO RIGHT-ALIGNED ROWS, AND £££ IS LAST ON THE SECOND ONE.** Row 1 is the
+    labour / Costs PP are `.bnr-tool` buttons now, in one cluster with Budget.
+  - ⚠️ **TOOLS IS TWO RIGHT-ALIGNED ROWS, AND Budget IS LAST ON THE SECOND ONE.** Row 1 is the
     mode picker ("what am I editing"), row 2 is `Itemize VAT · Split kit & labour · Costs PP
-    · £££` ("what am I looking at"). Being last in a right-aligned row is what pins £££ to
+    · Budget` ("what am I looking at"). Being last in a right-aligned row is what pins Budget to
     ONE x whether its three companions are beside it or not, so the extras grow LEFTWARD
     from it — the same rule STAGE follows, applied to the control reached for most.
-    **Do not put £££ first** (it was): turning it off then pulled it from the left end of a
+    **Do not put Budget first** (it was): turning it off then pulled it from the left end of a
     four-button row to the right end of a one-button row, jumping ~290px out from under the
     pointer that had just clicked it. **Do not merge the two rows** either — one wrapping row
-    of seven re-flowed unpredictably as the extras came and went. Verified: ONE £££ position
+    of seven re-flowed unpredictably as the extras came and went. Verified: ONE Budget position
     (1067..1106) across all 48 Roles states and both phase tabs.
 - `budgetFmt()` (Phase AN) — the one money formatter for every Budget figure: the
   summary bar, all four views and the Copy/Excel export (`budgetExportRows()`).
@@ -4770,9 +4770,9 @@ why it only ever showed up on desktop and survived Phases BO, BP, BQ and BR.
 
 **"Going to crew — the first tab open should be Roles not Production. I'd like to make
 'Roles' almost an exact copy of Budget Per Person. Including the budget totals at the top.
-Merge the tools including the £££ to show or not show money. The Pro Production, Production
+Merge the tools including the Budget to show or not show money. The Pro Production, Production
 and Post buttons work as filters to show the people on different parts of the project as
-well as budget filters (When £££ in on). I'd like to make the 'Shoot' check box tidier
+well as budget filters (When Budget in on). I'd like to make the 'Shoot' check box tidier
 somehow… Perhaps we need a toggle view? Just for checkboxes of (Pre, Prod, Post) where we
 tell the app who is in which stage. Then turning that off — the numbers are taken from the
 corresponding sub tabs. Don't need the days next to those checkboxes."**
@@ -4831,7 +4831,7 @@ measured (430 + 270 + 342 ≈ 1070 into 796), not eyeballed.
 
 - `rolesColumns(data)` — ⚠️ **ONE declaration, three consumers**: the header row, the grid
   template (`--roles-cols` on the `.tablewrap`) and every body cell. The set now has dozens
-  of shapes (£££ × Itemize VAT × Split kit × Costs PP × mode × three phase filters), and a
+  of shapes (Budget × Itemize VAT × Split kit × Costs PP × mode × three phase filters), and a
   template with more tracks than cells silently shifts every column after the gap — a wrong
   number under the wrong heading on a costing screen. `.roles-grid.no-money` is **removed**;
   it was already the second hand-written shape.
@@ -4894,9 +4894,9 @@ the word, no button chrome, same idiom as `.dept-toggle` and `.sd-block-head-tog
   exactly as typing a prep number puts them into prep. The membership write must land BEFORE
   the day write: `toggleCrewOnDay()` re-renders, and a render that still found them off the
   shoot would draw the tick it had just accepted as a dash. Unticking never removes them.
-- Verified: 96 combinations (expanded × £££ × Itemize VAT × Split kit × Costs PP × 3 modes)
+- Verified: 96 combinations (expanded × Budget × Itemize VAT × Split kit × Costs PP × 3 modes)
   with **0 header/body cell mismatches**; widest case 19 columns / 1602px scrolling inside its
-  own container with no sideways body scroll; £££ and STAGE each still hold one x throughout;
+  own container with no sideways body scroll; Budget and STAGE each still hold one x throughout;
   a project with zero shoot days renders a plain "Shoot" header with no caret and 8/8 cells.
 
 - ⚠️ **The Shoot column has no checkbox and no number riding beside it.** `.roles-shoot` and
@@ -5020,7 +5020,7 @@ then which dates. Coarse to fine.
 - Cell behaviour unchanged per mode: Stage → three membership checkboxes; Days → field ·
   read-only count · field; Dates → field+calendar · read-only count · field+calendar
 - Shoot header stays clickable in Days and Dates, never in Stage
-- 96 combinations re-run: 0 header/body cell mismatches, £££ still one x (1067), STAGE still
+- 96 combinations re-run: 0 header/body cell mismatches, Budget still one x (1067), STAGE still
   one x (788)
 - `node --check` clean; CSS untouched
 
@@ -5032,7 +5032,7 @@ Buyout only needs to be in Stage and Totals."**
 
 ### The STAGE stack stopped leaking the money
 
-⚠️ **This was a real hole in £££, not a preference.** The stack printed its three phase
+⚠️ **This was a real hole in Budget, not a preference.** The stack printed its three phase
 totals regardless, so switching the money off left the three numbers you would least want
 read over your shoulder sitting in the banner. With `showTotals` false each row now carries
 `N people · N days` in place of the amount — replaced rather than blanked, because a row with
@@ -5053,8 +5053,8 @@ a name and nothing after it reads as broken.
 - `.budget-scope-count` is body font and muted, deliberately not the amount's Oswald 600 — a
   description of the phase, not a figure standing where a figure was.
 - ⚠️ **The Budget tab is unaffected** and must stay so: it passes `showTotals:true` always,
-  because £££ is a *Crew* control and a Budget view with its own totals hidden would only be
-  a way to reach a blank screen. Verified: £££ off, Budget still reads £109,720 / £8,127 /
+  because Budget is a *Crew* control and a Budget view with its own totals hidden would only be
+  a way to reach a blank screen. Verified: Budget off, Budget still reads £109,720 / £8,127 /
   £117,847.
 
 ### Dates carries the calendar and nothing else
@@ -5078,16 +5078,16 @@ figure that depends on it is unchanged.
 
 ### Verified
 
-- Stack with £££ off: `6 people · 77 days` / `36 people · 140 days` / `1 person · 10 days`,
+- Stack with Budget off: `6 people · 77 days` / `36 people · 140 days` / `1 person · 10 days`,
   each cross-checked against a recomputation from `entryInPhase` + the per-person day keys
-- **Zero `£n.nn` anywhere on the Crew screen with £££ off** (banner and rows, excluding the
-  £££ button's own label) — the leak is closed
+- **Zero `£n.nn` anywhere on the Crew screen with Budget off** (banner and rows, excluding the
+  Budget button's own label) — the leak is closed
 - Per mode: Stage → checkbox/checkbox/checkbox + Buyout; Days → field/count/field + Buyout;
   Dates → calendar/count/calendar, **no Buyout**
 - Prep column 56px in all three modes
 - The Dates calendar still writes: 2 marks stored to `prepSchedule`, the booked number (15)
   untouched, the Pre-Prod tab reads the same marks back, button gains `.has-marks`
-- 96 combinations: 0 header/body mismatches, 0 money leaks, £££ still one x (1067), STAGE one
+- 96 combinations: 0 header/body mismatches, 0 money leaks, Budget still one x (1067), STAGE one
   x (788); 44 renders across 4 projects with 0 errors; `node --check` clean
 
 ## Phase BW — the Dates popup: one person, three phases, one calendar (14 Aug 2026)
@@ -5178,8 +5178,128 @@ number and the calendar are the whole screen, and a badge per row would be noise
   now arrives via `--phase-c`, a property the rule is not simultaneously overwriting
 - Closes on mode switch, sub-tab switch and project-tab switch; renders '' for a missing entry
 - 64 combinations: 0 header/body mismatches, 0 money leaks, no row ending short of its
-  container, £££ one x (1067), STAGE one x (788)
+  container, Budget one x (1067), STAGE one x (788)
 - 85 renders across 4 projects including the popup in all three phases: 0 errors, 0 console
   errors; mobile 375px — box 343px wide, 42px calendar cells, nothing off-screen
 - `node --check` clean; CSS braces balanced 628/628; test marks cleared and totals back to
   £109,720 / £8,127 / £117,847
+
+## Phase BX — frozen panes, collapsible Name/Role, OT, and Budget (14 Aug 2026)
+
+**"add expand / collapse function to 'Name' column. Collapsed it abbreviates names to a
+sensible amount of first name characters and second name initials. Similar rule for Role. Only
+need 'Show as' in Roles. Rename £££ to Budget. Clicking on any of the shoot totals expands the
+view. clicking again collapses. 'Freeze' column up to Role. Freeze titles row. Add a column
+after shoot called 'OT' where we can put overtime which is measured in units / days."**
+
+### Frozen panes
+
+`.roles-tablewrap` / `sizeRolesTablewrap()` — Controls · Name · Role pin to the left of the
+scrollport; the heading row pins to the top. This is the follow-up flagged in Phase BU and
+again in BV: Roles scrolls sideways with the money columns on, and scrolled right you could
+not tell whose VAT you were reading.
+
+- ⚠️ **The freeze needs `width:max-content` on `.roles-grid` / `.dept-group` / `.person-block`,
+  and without it it only HALF works** — the failure is subtle enough to ship by accident. A
+  sticky box is never pushed outside its containing block, which here is the grid container;
+  left at the wrapper's 800px while the template summed to 1415px, Name travelled ~50px and
+  then jammed. `min-width:100%` is the other half of the pair, so a template whose columns DO
+  fit still lets the trailing `minmax(…,1fr)` absorb the slack. Same rule the mobile block has
+  always applied — this is it at desktop, for Roles only.
+- ⚠️ **The box height is measured in JS, not `calc()`.** The banner above it changes height with
+  Budget, Itemize VAT and the mode picker, so any fixed `calc(100vh - Npx)` is wrong in most
+  states — and wrong in the way that matters: too tall, the box runs past the viewport, the
+  PAGE scrolls instead, and the frozen header scrolls away with it. Called after every Crew
+  render and on resize, with a 240px floor.
+- ⚠️ **Released entirely below 900px** (`ROLES_FREEZE_MIN_W` matches the media query). On a
+  phone the tall banner pushes the measured box to its floor and below the fold — a cramped
+  nested scroller inside a page that also scrolls, worse than what it replaced. Mobile keeps
+  the horizontal-only scroll with Controls and Name pinned, as before.
+- Only ROLES gets a scroll box; the other six sub-tabs fit their width and would gain a second
+  scrollbar for nothing.
+
+### Name and Role collapse
+
+`rolesNameCollapsed` / `rolesRoleCollapsed` / `rolesShortName()` / `rolesShortRole()` —
+clicking either heading abbreviates that column. Roles is the app's widest table and its two
+widest columns are text you already know.
+
+- ⚠️ **`rolesShortName`, NOT `abbreviateName` — there is already an `abbreviateName()`** (the
+  hotel summary's, `"T. Cartwright"`: initial + surname, for room lists). Two `function`
+  declarations of one name in a scope do not error; the LAST silently wins. The first cut of
+  this phase did call it `abbreviateName` and got the hotel format on Roles for free — and had
+  it been declared any later in the file it would have rewritten the hotel room list instead.
+  ⚠️ The two rules are both right and must not be "unified": a room list wants the surname
+  (that is what is on the booking), a roster column wants the first name (that is what you call
+  them).
+- `rolesShortName`: first name whole up to 10 chars, then an initial per remaining word —
+  "Tegid Cartwright" → "Tegid C.", "Anne-Marie de Vries" → "Anne-Marie D.V."
+- `rolesShortRole`: **initials, not truncation**, because film roles are conventionally
+  initialised — "Executive Producer" → "EP", "1st AD" → "1AD" (a word that is already an
+  abbreviation contributes itself, not just its first letter), "Colourist" → left whole.
+  Joiners (of/and/the) are dropped. ⚠️ Collisions are possible and accepted: every chip keeps
+  its full role in the title.
+- ⚠️ **Widths are overridden on this tab's own `.tablewrap`**, not on `:root`. `--pb-name-w` /
+  `--pb-role-w` are shared by `.roles-grid`, `.crewgrid` and `.prep-grid` so the lead columns
+  line up across all seven sub-tabs (Phase BO); a global override would knock the other six out
+  of step with each other. Verified: Pre-Prod's name column stays 170px while Roles is
+  collapsed.
+- Roles builds its own lead header cells rather than calling `pbHeadLeadCellsHTML()`, because
+  its Name and Role headings are controls and the other six tabs' are not — same classes and
+  order, so the pinning and left-align rules still key off `.pb-head-name`/`.pb-head-role`.
+
+### The Shoot total is a second trigger
+
+`.roles-shoot-total` — clicking any Shoot day count opens/closes the per-day ticks, the same
+`toggleRolesShootColumn()` the heading drives. It is the number you are looking at when you
+want to know which days made it; the heading alone meant travelling to the top of the list to
+open the detail for a row halfway down. One toggle, two ways in. Not a control in Stage mode,
+where the cell is a membership checkbox.
+
+### OT
+
+`entryOvertime()` / `setEntryOvertime()` / `p.overtime` — units of overtime per ENTRY, in a
+column directly after Shoot (and after the expanded day ticks, so it stays beside its phase).
+A unit is a day-equivalent, so the field takes decimals. Pruned by `prunePhaseSchedules()`,
+which is where every entry-keyed project store is cleaned up.
+
+- ⚠️ **NOT COSTED, DELIBERATELY.** Nothing in `buildBudgetData()` reads `p.overtime`. Overtime is
+  real money, but what a unit is WORTH was not specified: 1× the day rate, 1.5×, a flat unit
+  price, per-hour, capped, or agreed per person. Picking one would change every figure on the
+  Budget tab on the strength of a guess. **Verified**: changing OT from 1.5 to 5 moves
+  `totalExVat` by £0. When it should cost something, the multiplier belongs beside
+  `resolveEntryRate()` and the factor next to `prodSubtotal` in the `people` map — one place,
+  gated like every other scope.
+
+### Budget, not £££
+
+The money toggle is labelled **Budget**. Still not "Costs" — the Budget tab has Est. Costs and
+a Costs PP toggle meaning a person's hotel/travel/food, and a control called Costs that showed
+day rates would collide with both. "Budget" is unambiguous because it names the tab whose
+figures it reveals.
+
+### Left alone — and one question
+
+- **Show as is unchanged**: still the last column in STAGE mode only, on the Roles sub-tab.
+  "Only need Show as in Roles" reads as confirming that, since Roles is the only sub-tab that
+  has ever had it and Phase BW already took it out of the Days mode. Flagged to the user rather
+  than guessed at, because the alternative reading — drop the column and reach Show as through
+  the roles menu or the Edit pencil instead — is a deletion, and deleting on a coin-flip is the
+  one thing not worth doing here.
+
+### Verified
+
+- **128 combinations** (shoot expanded × name collapsed × role collapsed × Budget × Itemize VAT
+  × Costs PP × 2 modes): 0 header/body cell mismatches, 0 money leaks, Budget button one x
+  (1044), STAGE one x (788)
+- Freeze measured by scrolling to the far corner: header, Controls, Name and Role all hold
+- Box fits the viewport in every banner state (Budget on/off, VAT on/off, both modes)
+- Mobile 375px: box released, header `position:static`, Name still pins horizontally, no
+  sideways body scroll
+- Collapse scoped: the other six sub-tabs carry no `.roles-tablewrap` and no max-height, and
+  `--pb-name-w`/`--pb-role-w` stay 170/150 globally while Roles is collapsed
+- OT: 1.5 stores, garbage and negatives revert without saving, clearing deletes the key, and
+  the budget total is unmoved
+- Shoot total toggles open and closed; not a control in Stage mode
+- 93 renders across 4 projects including the Dates popup in all three phases: 0 thrown errors,
+  0 console errors; `node --check` clean; CSS braces balanced 648/648
