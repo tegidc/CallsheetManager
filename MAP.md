@@ -18,6 +18,7 @@ Every screen needs the same handful of records. These are the single place that 
 - `projectDays()` — a project's shoot days, always in day order (defaults to the open project) — [Shared/utility functions]
 - `projectEntries()` / `entryById()` / `entriesForCrew()` / `entryView()` / `projectEntryViews()` — **Phase BF, the crew-entry layer.** A project's roster is `p.crewEntries` (entries, not people); `entryView()` returns the crew record with that entry's id/role/department layered on, which is why almost every existing sort/group/filter/identity helper kept working unchanged — [Crew, Shared/utility functions]
 - `projectCrew()` — the DISTINCT PEOPLE on a project, deduplicated by `crewId`, in roster order. ⚠️ Since Phase BF this is no longer "the roster" — the roster is `projectEntries()`. ⚠️ Since **Phase BK** the Crew tab does NOT use it at all — every sub-tab builds person BLOCKS off `projectEntryViews()` instead (`buildPersonBlocks()`), because a block needs the person's entries, not just the person. Its two remaining callers are `buildTransportSummary()` and `cinematographyCrew()`. Use this one for any "how many humans" question; its `.id` is a CREW id, and role/department come from that person's first entry — [Shared/utility functions]
+- `CREW_PHASES` / `entryInPhase()` / `entryPhases()` / `toggleEntryPhase()` — **Phase BU, who is in which phase.** `CREW_PHASES` is THE ONE BRIDGE between the three vocabularies for the same three things: `budgetScope`'s `preproduction/production/post`, `crewGridView`'s `preprod/days/post`, and Roles' `Prep/Shoot/Post` columns. Chronological, matching `BUDGET_SCOPES` and the sub-tab strip — never hand-order the phases anywhere else; `phaseByScope()`/`phaseByView()` are the two lookups. Membership is an **opt-in list per phase** (`p.onShoot` / `p.preprodMembers` / `p.postMembers`), authoritative, never derived from "do they have days" — that fallback is what made the old shoot toggle unable to remove anyone. `entryOnShoot()`/`toggleEntryOnShoot()` survive as thin aliases for the `production` phase. ⚠️ Membership and days are ORTHOGONAL: unticking keeps every day, tick and date mark, so re-ticking restores the identical figure — which is why **every cost is gated on membership**, not on the stored number (see `buildBudgetData`) — [Crew, Budget, Shared/utility functions]
 - `entryOnDay()` / `entryDayCount()` / `crewOnDay()` / `crewDayCount()` — days on site, at the two grains. ⚠️ The `crew*` pair folds a person's entries together and is what every PERSON-level count must use; the `entry*` pair is per row on Roles/Days on site. Mixing them up is the Phase AO double-count — [Crew, Shared/utility functions]
 - `projectOf()` — the project a given shoot day belongs to — [Shared/utility functions]
 - `selectedDayLocation()` — the location currently picked in the Shoot Day form's primary-location select — [Shoot Days]
@@ -102,6 +103,13 @@ Every screen needs the same handful of records. These are the single place that 
   - `personBlockSelectCbHTML()` / `personBlockDomId()` / `personBlockToggleHTML()` / `togglePersonBlockStack()` / `personBlockWrapHTML()` — the block's shared chrome. The checkbox is "bulk select means the person" expressed in the ONE currency `projectCrewSelected` has ever held (entry ids), routed through the existing `toggleCrewPersonSelected()` — no second selection model. `personBlockToggleHTML()` renders the chevron + muted "+N" and renders NOTHING when nothing is hidden. `personBlockWrapHTML()` takes the crew Edit/View expansion as a parameter rather than deriving it, so Pre-production can keep having no crew-record edit path of its own — [Crew]
   - ⚠️ **`togglePersonBlockStack()` is DOM-only, deliberately. BL keeps NO open/closed state anywhere** — not persisted, not on a record, not even a module-level Set — so every block opens closed on every render and this flips the rows in place rather than re-rendering. Same direct-DOM-instead-of-re-render idiom as `applyBlockState()`/`prepDragApply()`. **The one derived exception**: a Pre-production block renders open when `prepCalendarFor` points at a stacked-away entry, so an open calendar can't be hidden by its own re-render — derived from state that already exists, not new state. ⚠️ **Known consequence, flagged not worked around**: because nearly every field save re-renders the tab body, expanding a stack and editing a stacked-away entry collapses the block again. The edit saves and the fronting correctly does not move; the row just goes back behind the chevron. A module-level open-set would be exactly the "open/closed state anywhere" the brief rules out, so it was left — [Crew]
   - ⚠️ **REMOVED in Phase BM: `roleChipHTML()`** — BK's second, menu-less chip renderer for Days on site / Hotel / Travel / Catering. Do not look for it. Those four tabs now open the roles menu from their chip exactly as Roles and Pre-production always have, so **all six sub-tabs go through the ONE `roleBannerHTML()`** and there is no second chip renderer left to drift. See **Phase BM** — [Crew]
+- ⚠️ **Phase BU rewrote the entry below.** `crewRolesRowHTML(e, spec, data)` takes the
+  `rolesColumns()` spec and the `buildBudgetData()` result, and builds its cells by mapping
+  over `spec.cols` — so the columns it describes are no longer the fixed list this entry
+  lists, and **it computes no money of its own** (`data.byEntry[e.id]` is the Budget's own
+  row for that entry). `phaseCellHTML()` owns the Prep/Shoot/Post cells across all three
+  modes. Read the **Phase BU** section for the current shape; what follows is still accurate
+  on the person-block/entry-grain history and the shared-column tokens.
 - `crewRolesRowHTML()` — ⚠️ **takes a PERSON BLOCK since Phase BK, not an entry view** (the name is kept: it is still the Roles tab's row renderer). Renders one card per person in the same tidy `.roles-grid` columns (Phase S/Z): CONTROLS (block checkbox + Edit pencil) | Name | Show as, PLUS — ⚠️ **since Phase BN** — the FRONTED entry's Role (`roleBannerHTML()`, Phase AZ — one chip, which since Phase BM IS the roles-menu trigger; no separate "+" marker) | Rate, all rendered onto the SAME `.roles-grid.pb-head` div as the name — genuinely one row, not two divs each independently `display:grid` (see **Phase BN**). A stacked-away entry (2+ roles) still gets its own `.roles-grid.pb-role-row.pb-role-extra` div below, sharing the `roleCellsHTML()` helper the head cells are built from. Explicit `grid-column` placement throughout, so the Rate column reads straight down the page whether it's on the head row or a stacked-away one. Department column was dropped in Phase Z — redundant with the group/section headers already showing it; the freed slot became Rate, the same per-project day-rate override as Budget's Per Person view (`resolveCrewRate()`/`saveCrewRateOverride()`/`p.crewRateOverrides[crewId]` — reads/writes that exact field, not a second one), edited inline with the same `.budget-rate-input` control. Since Phase AG the Rate cell also carries the Day Rate Save-to-database icon (`crewRateSaveIconHTML()`, `.rate-with-save` wrap; `.roles-grid`'s Rate column widened 92px→118px to fit it). Lead Company lives only in the Edit/pencil expansion (`crewFormHTML`) or the bulk-edit panel; phone is not shown on this row at all. "Add a saved role" itself is no longer *only* there — Phase BB put a second surface on this exact row, behind the "+" marker's roles menu (see **Phase BA — the roles menu** / **Phase BB**) — but that surface reuses the identical canonical picker (`newRolePickerOptionsHTML()`), not a second implementation. ⚠️ **Phase BO** widened Controls 56px→`var(--pb-controls-w)` and fixed Name/Role to `var(--pb-name-w)`/`var(--pb-role-w)` (were flexible) — same tokens now shared by `.crewgrid` and `.prep-grid`, so Controls/Name/Role start at the same x on all six Crew sub-tabs, not just this one — [Crew, Budget]
 - `roleBannerHTML()` (Phase AZ; restyled Phase BE; marker wired Phase BA; **marker REMOVED and the chip made the trigger in Phase BM**) — ⚠️ **the ONE role-chip renderer for all six Crew sub-tabs.** Renders exactly one chip — the role this row is currently using (`c.role`) — and **the chip itself is the roles-menu trigger**: `onclick="event.stopPropagation();openRolesMenu(c.id)"`. `c.id` is the ENTRY id in every caller, so a collapsed block opens the menu for its fronted entry and an expanded one for that specific row's entry, with no extra lookup. Called from all six row renderers — `crewRolesRowHTML()` (T-2.1), `prepRowHTML()` (T-2.9.1), `crewAssignRowHTML()` (T-2.2 + T-2.3), `crewCateringBlockHTML()` (T-2.5), `crewTravelRowHTML()` (T-2.4) — so every tab gets the menu from this one function, with none of those five renderers carrying chip logic of its own.
   - ⚠️ **Phase BM deleted AZ's separate `.role-add-marker` "+" and the `hasOtherRoles` weighting that fed it, and did NOT replace the signal.** That weighting said "this person has other saved roles worth checking"; BK/BL's chevron + muted "+N" on the block already says it, one level up. Adding a weighting back onto the chip would be the same signal twice — don't. See **Phase BM**
@@ -597,10 +605,28 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   per-department `exVat`/`vat`/`incVat` fields, and the same three on each `perDay`
   row — all of it here, in the one aggregator, so no view computes VAT for itself; see
   **VAT follows the person** above — [Budget]
-- `budgetSummaryBarHTML()` — the three-line/one-line summary bar, driven by
-  `budgetVatToggle`. Its `.num` figures are Oswald (Phase AN), not Fraunces — a
-  deliberate exception to Phase Fonts' "every Oswald label is 11px" rule; see
-  `.budget-stat .num` below — [Budget]
+- `budgetSummaryBarHTML(data, o)` — ⚠️ **since Phase BU this is THE BANNER: `TOTALS | STAGE
+  | TOOLS`, and it is rendered on Crew ▸ Roles / Pre-Prod / Post as well as on all three
+  Budget views.** One function, two screens — which is what makes it impossible for Roles
+  and the Budget to quote different figures; it reads the same `data` from the same
+  `buildBudgetData()`. Options: `showTotals` (zone 1 carries the figures — false on Roles
+  with £££ off, when the zone stays and says why it is empty), `showStage` (zone 2's three
+  phase buttons), `showMoneyToggle` (the £££ button), `showModes` (the Totals/Stage/Days
+  picker, Roles only). Pre-Prod/Post pass `showTotals:false, showStage:false` — those tabs
+  are one phase each and carry **no totals** by standing rule (see `PHASE_TABS`) — so they
+  get the TOOLS cluster alone rather than a second copy of the £££ button. Its `.num`
+  figures are Oswald (Phase AN), not Fraunces — a deliberate exception to Phase Fonts'
+  "every Oswald label is 11px" rule; see `.budget-stat .num` below — [Budget, Crew]
+  - ⚠️ **`.phase-banner` is a GRID with a FIXED first column, and that is load-bearing:
+    STAGE must not move between views.** Do not make `--bnr-totals-w` content-sized and do
+    not go back to a flex row with `margin-left:auto` — Itemize VAT off drops the headline
+    from three figures to one, and £££ off leaves it with none, each of which slid STAGE
+    hundreds of pixels sideways mid-click. TOOLS takes its own row because `#main` is capped
+    at `max-width:840px` and the three zones measure ~1070px: three across cannot fit at
+    any window size. Verified at x=788 in all 12 Roles states and all 3 Budget views.
+  - ⚠️ **REMOVED in Phase BU: `.budget-summary`, `.budget-headline`, `.budget-vat-toggle`**
+    and the three checkbox labels inside the last of them. Itemize VAT / Split kit &
+    labour / Costs PP are `.bnr-tool` buttons now, in one cluster with £££.
 - `budgetFmt()` (Phase AN) — the one money formatter for every Budget figure: the
   summary bar, all four views and the Copy/Excel export (`budgetExportRows()`).
   Adds thousands separators (`toLocaleString('en-GB', …)`), still 2dp — formatting
@@ -793,7 +819,7 @@ coarse information first, finest detail last.
 | T-1.6 | · AI Scan (AI Chat) | Chat + document attachments, proposes shoot dates/locations/crew as tool-use cards (Phase AI Scan). **No longer its own section** — since the Phase Quick Add follow-up it's the "+ AI Chat" fourth button in T-1.8's row; code kept for the chat mechanics themselves | `aiScanChatBodyHTML()` |
 | T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
-| T-2.1 | · Roles | ONE CARD PER PERSON (Phase BK): checkbox / Edit / Name / Show as PLUS the fronted entry's Role / Rate, all on one shared row since Phase BN; a stacked-away entry (2+ roles) gets its own Role/Rate row below | `crewRolesRowHTML()` |
+| T-2.1 | · Roles | **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Totals/Stage/Days mode picker, and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
 | **T-2.0.2** | · · Role chip | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
 | **T-2.0** | · Person block | Phase BK/BL — the shared card every one of the six sub-tabs renders: person-level facts and — since **Phase BN** — the FRONTED entry's own cells all render onto ONE shared row (`.pb-head`), columns aligned across every block; a stacked-away entry still gets a genuine separate row (`.pb-role-row.pb-role-extra`) below. Collapses to the fronted entry + a muted "+N"; no chevron when one entry is visible. Nothing persists — no open/closed state anywhere, no per-person total ever | `buildPersonBlocks()` / `personBlockWrapHTML()` |
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
@@ -826,7 +852,7 @@ coarse information first, finest detail last.
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
 | T-6.0 | · Filter & output | Phase Refinement/R16 — tick shoot days and/or departments to cost part of the shoot, plus the Per Person sort (R4) and the Copy/Export controls (R1). Scopes all four views at once, so it sits above the switcher, not in it. Nothing ticked = whole project. Foot row shared with T-2.6/D-1.2 — see **The filter-panel foot** | `budgetFilterPanelHTML()` / `filterPanelFootHTML()` / `copyBudget()` |
-| T-6.1 | · Summary bar | Total (ex-VAT) / VAT / Total (inc-VAT) when itemized, or a single VAT-inclusive Total when not — always visible above the view switcher | `budgetSummaryBarHTML()` |
+| T-6.1 | · The banner | Phase BU — `TOTALS \| STAGE \| TOOLS`. Total (ex-VAT) / VAT / Total (inc-VAT) when itemized or a single VAT-inclusive Total when not; the three phase buttons with their own figures; then Itemize VAT / Split kit & labour / Costs PP as buttons. Above the view switcher, and **the same component on T-2.1 / T-2.9.1 / T-2.9.2** — STAGE holds one fixed position across all of them | `budgetSummaryBarHTML()` |
 | T-6.2 | · Per Department | Crew day-rate cost by canonical department, plus three project-wide extras rows (Catering/Travel/Hotels) below it | `budgetDepartmentViewHTML()` |
 | T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override) with its Save-to-database icon (Phase AG), VAT checkbox (Phase AH), Days worked, Subtotal | `budgetPersonViewHTML()` |
 | T-6.4 | · Per Day | One collapsed row per shoot day (day number + short location label + total), expanding to that day's own department + extras breakdown | `budgetDayViewHTML()` |
@@ -4644,6 +4670,9 @@ with a different phase key.
   `PHASE_TABS`. Both entry-removal paths (`removeCrewEntries()`, `deleteCrew()`) call it
   unchanged, so a new phase is pruned for free — a hand-named second store here is exactly
   the thing that would have been left dangling.
+  - ⚠️ **Phase BU** made it walk `CREW_PHASES` for the three MEMBERSHIP lists as well
+    (`onShoot` / `preprodMembers` / `postMembers`) — see the Phase BU section. Nothing
+    pruned `p.onShoot` before that.
 - One calendar open at a time **across both tabs**, so the open flag holds `{phase,
   entryId}`, not a bare id — the same entry exists on both, and "open on Pre-production"
   must not render open on Post. `setCrewGridView()` closes it on every switch as well.
@@ -4726,3 +4755,172 @@ why it only ever showed up on desktop and survived Phases BO, BP, BQ and BR.
   their own, and no task-flag nag for an unbooked edit.
 - Post carries no shoot-day dimension and never will — that is the whole reason it is not
   a Days-on-site variant.
+
+## Phase BU — Roles becomes Budget Per Person; the TOTALS | STAGE | TOOLS banner (14 Aug 2026)
+
+**"Going to crew — the first tab open should be Roles not Production. I'd like to make
+'Roles' almost an exact copy of Budget Per Person. Including the budget totals at the top.
+Merge the tools including the £££ to show or not show money. The Pro Production, Production
+and Post buttons work as filters to show the people on different parts of the project as
+well as budget filters (When £££ in on). I'd like to make the 'Shoot' check box tidier
+somehow… Perhaps we need a toggle view? Just for checkboxes of (Pre, Prod, Post) where we
+tell the app who is in which stage. Then turning that off — the numbers are taken from the
+corresponding sub tabs. Don't need the days next to those checkboxes."**
+Then, mid-build: **"Add another mode — Days where we can input the calendars for pre and
+post. Put all the tools 'Drive it' and split kit labour etc. into the same place over to the
+right as buttons. So that banner like section is Totaliser or Blank, Pre-prod, production
+Post buttons and then Tools. TOTALS | Stage | Tools. And the Stage won't move between
+views."**
+
+Budget and Roles "are becoming incredibly close and could be unified". This phase converges
+them without merging them: **one banner and one arithmetic, two tables.** Decided with the
+user against an interactive draft (`roles-budget-draft.html`, kept beside `index.html` with
+the earlier review pages): keep Budget's Per Person view as it is, give Roles the full
+column set, and scope the new row filter to Roles + Budget only.
+
+### The three vocabularies, joined up
+
+- `CREW_PHASES` — the one bridge, and the one order. See **Canonical lookups**. Three names
+  existed for the same three phases (`budgetScope`, `crewGridView`, the column heads) with
+  nothing tying them together; a fourth phase is now one entry rather than a hunt.
+- ⚠️ **Membership became an opt-in list for all three phases.** Production already worked
+  that way (`p.onShoot`); prep and the edit were DERIVED from "do they have days or dates",
+  which is precisely the fallback documented at `entryOnShoot` as *fatal once a toggle has
+  to remove as well as add*. `p.preprodMembers` / `p.postMembers` join it, seeded by
+  `migratePhaseMembers()`.
+- `migratePhaseMembers()` — ⚠️ **seeded from the derivation, not from everyone**, which is
+  the one place it differs from `migrateOnShoot()` and for that function's own reason:
+  "reproduce exactly the behaviour of the moment before". Every person DID appear in the
+  Production grid, so seeding everyone reproduced it there; the phase tabs have never shown
+  everyone, so here the old predicate is what reproduces it. Same marker contract
+  (`preprodMembersInit`/`postMembersInit`) — an empty list means "you unticked everyone",
+  which an absent key cannot be told apart from "never seeded".
+- `prunePhaseSchedules()` now walks `CREW_PHASES` for the membership lists as well as
+  `PHASE_TABS` for the schedules. ⚠️ **Nothing pruned `p.onShoot` before this phase** — a
+  removed entry's id sat there indefinitely, harmless only because every read tested it
+  against entries that still existed. Now that the same list shape drives what a phase tab
+  SHOWS, a stale id would matter.
+- `swapCrewFor()`'s `!keep.prep` / `!keep.post` branches drop membership as well as the
+  schedule record — otherwise the new person landed on Pre-Prod with a blank count, reading
+  as prep nobody had costed.
+- `setPhaseDays()` — **typing a number puts them in the phase.** An explicit write, not a
+  derivation: the bug the lists exist to avoid is *reading* membership off the data.
+  ⚠️ Clearing the field does NOT remove them — "in prep, number not settled" is the state
+  the list was added for; only Stage mode's tick takes anyone out.
+
+### The banner
+
+`TOTALS | STAGE` on row one, `TOOLS` right-aligned on row two. See
+`budgetSummaryBarHTML()` — one function, rendered on Crew ▸ Roles / Pre-Prod / Post and on
+all three Budget views. **STAGE's position is the rule of the layout**: fixed first column,
+verified at x=788 in all 12 Roles states and all 3 Budget views. TOOLS is on its own row
+because `#main`'s `max-width:840px` makes three-across impossible at any window size —
+measured (430 + 270 + 342 ≈ 1070 into 796), not eyeballed.
+
+### Roles' columns
+
+- `rolesColumns(data)` — ⚠️ **ONE declaration, three consumers**: the header row, the grid
+  template (`--roles-cols` on the `.tablewrap`) and every body cell. The set now has dozens
+  of shapes (£££ × Itemize VAT × Split kit × Costs PP × mode × three phase filters), and a
+  template with more tracks than cells silently shifts every column after the gap — a wrong
+  number under the wrong heading on a costing screen. `.roles-grid.no-money` is **removed**;
+  it was already the second hand-written shape.
+- Order is Per Person's with Roles' own three folded in: TOTAL · Prep · Shoot · Post ·
+  Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as.
+- ⚠️ **`crewRolesRowHTML()` no longer computes its own money.** It reads `data.byEntry[id]`
+  — `buildBudgetData().people` indexed by entry id, the SAME objects. It used to compute
+  `rate × (prep + shoot + post)`, which ignored the phase scopes and apportioned a buyout
+  differently from the Budget, so the two screens showed different figures for one person.
+  Verified: 41 rendered rows, zero disagreements. Do not reintroduce a local calculation.
+
+### The three modes
+
+`ROLES_MODES` / `crewRolesMode` / `setCrewRolesMode()` — session state, like `crewGridView`,
+deliberately not persisted. `phaseCellHTML()` renders all three columns in all three modes
+from one function, so Prep/Shoot/Post cannot behave differently from each other again.
+
+| mode | Prep · Post | Shoot |
+|---|---|---|
+| **totals** (default) | typeable day count | ⚠️ **read-only count, nothing beside it** |
+| **stage** | one membership checkbox each | one membership checkbox |
+| **days** | day count + the per-entry calendar | read-only count |
+
+- ⚠️ **The Shoot column has no checkbox and no number riding beside it.** `.roles-shoot` and
+  `.roles-shoot-n` are **removed**. A tick with a small count in the same cell was two
+  answers at once — "is this person on the shoot" and "for how many days" — and the count
+  next to the checkbox is the thing the brief asked to be rid of.
+- Days mode reuses `togglePhaseCalendar()`/`phaseCalendarHTML()`/`.prep-calwrap` — the phase
+  tabs' own calendar, **not a second copy**. One calendar open at a time across the whole
+  app already, which is what stops prep and edit fighting over one row.
+- Shoot has no calendar in any mode: its days are ticks against numbered shoot days, not
+  dates. The asymmetry is real, so the cell states it rather than faking a field.
+
+### The phase buttons as a filter — and the two collisions
+
+`budgetScope` now filters Roles' rows as well as costing the money, so "show me just the
+edit" and "cost me just the edit" are one click. Precedent: the department filter has been
+shared between Crew and Budget since R16. ⚠️ **Roles and Budget only** — Production-only
+leaving the Pre-Prod tab empty would be a trap.
+
+Two rules it lives or dies by, both found by building it, both resolving on *a control you
+are using must never be the thing that disappears*:
+
+- ⚠️ **Somebody in no phase at all is ALWAYS visible**, in every filter state including
+  all-off. They are the freshly-added and the not-yet-booked, and Roles is the one screen
+  that can put them into a phase — hiding them hides the only control that fixes it.
+- ⚠️ **Stage mode suspends the row filter entirely**, and shows all three phase columns
+  whatever the filter says. Otherwise unticking someone made their row vanish and took the
+  undo with it, and switching Production off hid the very box you needed to tick.
+
+### Pre-existing bug found and fixed: a buyout was billed once per shoot day
+
+`buildBudgetData()`'s `perDay` used `pp.rate * prodOn`, but a buyout's `rate` IS the whole
+agreed fee. On the live ROW 2026 data that overstated Per Day by **£24,000** — Brian De
+Carvalho's £5,000 buyout read as £25,000 across five days, Angel Leatherwood's £1,000 as
+£5,000 — and broke `perDay + prep + post === totalExVat` in all four Production-on scope
+states. Everywhere else already apportioned correctly via `share()`, so Per Day and Per
+Person disagreed about one person while every other check passed. **Confirmed pre-existing**
+by running the same invariants against `git show HEAD:index.html` (identical failures).
+Now `perDayShare` = that person's production share over the shoot days they actually work.
+Grand totals are unchanged — only Per Day's internal attribution was wrong.
+
+- ⚠️ **KNOWN REMAINING GAP, deliberately not closed:** a buyout with a fee but NO shoot-day
+  position has production money and no day row to carry it (`buildBudgetData` lands the
+  whole fee on Production in that case), so Per Day would come up short by the fee. Same
+  shape of problem prep and post solve with their own always-open blocks outside the day
+  rows. No such record exists in either project today. Closing it means a third block —
+  a deliberate decision, not a line to slip into a bug fix.
+
+### Verified
+
+- All **8** scope combinations: `dept + extras === totalExVat` ✓, `perDay + prep + post
+  === totalExVat` ✓, `perDayVat + prepVat + postVat === vatTotal` ✓, `ex + vat === inc` ✓;
+  additive to the penny (£34,850 + £70,870 + £4,000 = £109,720, VAT £8,127)
+- Roles vs Budget per person: **41 rows, 0 disagreements** on TOTAL / Subtotal / VAT
+- STAGE at x=788 in all 12 Roles states (money × VAT × 3 modes) and all 3 Budget views
+- Header cells === body cells at the widest column set (13 for 13, no drift)
+- Filter driven by clicking: all phases on 41 rows → Production off 7 rows → Stage mode 41
+  rows with all three columns present → restored 41. An entry taken out of every phase stays
+  visible in all-on, all-off and production-only, and its 5 shoot-day ticks read back
+  unchanged after re-ticking
+- All three modes write by clicking: Stage's tick persists to `postMembers`; typing 7 prep
+  days sets membership AND the days; a marked post date lands in `postSchedule` with
+  `prepSchedule` untouched; opening prep's calendar closes post's; leaving Days closes it
+- 4 projects × every tab × every Crew sub-tab × every Budget view × every mode: **0 thrown
+  errors, 0 console errors**
+- Row geometry 33px on all seven sub-tabs and all three modes, name centred symmetrically;
+  mobile 375px stacks to one column with no sideways body scroll
+- `node --check` clean; CSS braces balanced 581/581
+
+### Left alone
+
+- **Budget's Per Person view stays**, per the user's call against the draft — two tables,
+  both reading `buildBudgetData()`, so the arithmetic cannot diverge even though the markup
+  is separate. The banner IS shared.
+- The phase tabs keep their standing rules: no totals, one rate, marks indicative and
+  unreconciled against the booked number.
+- ⚠️ **Name/Controls are still pinned only on mobile**, and Roles now scrolls sideways at
+  desktop widths with the full column set (the user chose "all of it, as drawn"). Scrolled
+  right, the rightmost columns lose their name. The mobile pinning machinery exists and is
+  tuned to `--pb-pin-w`; extending it to desktop touches classes shared by all seven
+  sub-tabs, so it is flagged rather than slipped in at the end of this phase.
