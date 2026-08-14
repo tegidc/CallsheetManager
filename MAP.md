@@ -611,7 +611,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   and the Budget to quote different figures; it reads the same `data` from the same
   `buildBudgetData()`. Options: `showTotals` (zone 1 carries the figures — false on Roles
   with £££ off, when the zone stays and says why it is empty), `showStage` (zone 2's three
-  phase buttons), `showMoneyToggle` (the £££ button), `showModes` (the Totals/Stage/Days
+  phase buttons), `showMoneyToggle` (the £££ button), `showModes` (the Stage/Days/Dates
   picker, Roles only). Pre-Prod/Post pass `showTotals:false, showStage:false` — those tabs
   are one phase each and carry **no totals** by standing rule (see `PHASE_TABS`) — so they
   get the TOOLS cluster alone rather than a second copy of the £££ button. Its `.num`
@@ -829,7 +829,7 @@ coarse information first, finest detail last.
 | T-1.6 | · AI Scan (AI Chat) | Chat + document attachments, proposes shoot dates/locations/crew as tool-use cards (Phase AI Scan). **No longer its own section** — since the Phase Quick Add follow-up it's the "+ AI Chat" fourth button in T-1.8's row; code kept for the chat mechanics themselves | `aiScanChatBodyHTML()` |
 | T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
-| T-2.1 | · Roles | **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Totals/Stage/Days mode picker, and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
+| T-2.1 | · Roles | **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Stage/Days/Dates mode picker (⚠️ keys `stage`/`totals`/`days` in that on-screen order — the labels and keys deliberately do not match, see Phase BU ▸ The three modes), and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
 | **T-2.0.2** | · · Role chip | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
 | **T-2.0** | · Person block | Phase BK/BL — the shared card every one of the six sub-tabs renders: person-level facts and — since **Phase BN** — the FRONTED entry's own cells all render onto ONE shared row (`.pb-head`), columns aligned across every block; a stacked-away entry still gets a genuine separate row (`.pb-role-row.pb-role-extra`) below. Collapses to the fronted entry + a muted "+N"; no chevron when one entry is visible. Nothing persists — no open/closed state anywhere, no per-person total ever | `buildPersonBlocks()` / `personBlockWrapHTML()` |
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
@@ -4849,11 +4849,23 @@ measured (430 + 270 + 342 ≈ 1070 into 796), not eyeballed.
 deliberately not persisted. `phaseCellHTML()` renders all three columns in all three modes
 from one function, so Prep/Shoot/Post cannot behave differently from each other again.
 
-| mode | Prep · Post | Shoot |
-|---|---|---|
-| **totals** (default) | typeable day count | ⚠️ **read-only count, nothing beside it** |
-| **stage** | one membership checkbox each | one membership checkbox |
-| **days** | day count + the per-entry calendar | read-only count |
+⚠️⚠️ **THE KEYS DO NOT MATCH THE LABELS.** Phase BV relabelled and reordered the picker and
+deliberately did **not** rename the keys — same rule the sub-tab strip carries, *renaming a
+label must never become renaming a key*. Read this table before touching anything that
+switches on `crewRolesMode`:
+
+| on screen (l→r) | key | Prep · Post | Shoot |
+|---|---|---|---|
+| **Stage** | `'stage'` | one membership checkbox each | one membership checkbox |
+| **Days** *(default)* | `'totals'` | typeable day count | ⚠️ **read-only count, nothing beside it** |
+| **Dates** | `'days'` | day count + the per-entry calendar | read-only count |
+
+So `crewRolesMode==='days'` is the **Dates** mode, and the mode labelled "Days" is
+`'totals'`. ⚠️ And `'days'` is a *third* thing again in `crewGridView`, where it is the
+**Production** sub-tab — three keys spelled `days` (this mode, that sub-tab, and
+`CREW_PHASES`' production entry) meaning three different things, none of them the label
+"Days". Check which variable you are switching on. Order is Stage → Days → Dates: who is in
+each phase, then how many days, then which dates — coarse to fine.
 
 ### Shoot expands sideways into its own days
 
@@ -4867,7 +4879,8 @@ the word, no button chrome, same idiom as `.dept-toggle` and `.sd-block-head-tog
   (measured: 0px out on all six). Do **not** render them as a nested flex row inside one wide
   cell; the labels would then need hand-positioning against widths declared elsewhere, which
   is the drift the spec exists to prevent.
-- ⚠️ **Totals and Days modes only, and only when the project has shoot days.** In Stage mode
+- ⚠️ **The Days and Dates modes only (keys `totals`/`days`), and only when the project has
+  shoot days.** In Stage mode
   the Shoot cell is a *membership* checkbox, and a row of day ticks beside it would put two
   different questions in one column — the muddle this phase pulled apart. `rolesShootOpen()`
   is the single guard so the header, the template and the cells cannot disagree.
@@ -4965,3 +4978,48 @@ Grand totals are unchanged — only Per Day's internal attribution was wrong.
   right, the rightmost columns lose their name. The mobile pinning machinery exists and is
   tuned to `--pb-pin-w`; extending it to desktop touches classes shared by all seven
   sub-tabs, so it is flagged rather than slipped in at the end of this phase.
+
+## Phase BV — the mode picker relabelled and reordered (14 Aug 2026)
+
+**"We need to change the tools from Totals - Stage - Days to Totals = Days, Stage = Stage,
+Days = Dates. Then the order to Stage | Days | Dates."**
+
+Labels and order only. `ROLES_MODES` is the one list the picker renders from, so both were a
+single edit there — plus the prose that quotes the labels, since a footnote naming a button
+that no longer exists is worse than no footnote.
+
+| before | after | key (unchanged) |
+|---|---|---|
+| Totals | **Days** | `'totals'` |
+| Stage | **Stage** | `'stage'` |
+| Days | **Dates** | `'days'` |
+
+On-screen order is now **Stage · Days · Dates** — who is in each phase, then how many days,
+then which dates. Coarse to fine.
+
+- ⚠️ **THE KEYS WERE DELIBERATELY NOT RENAMED**, so `crewRolesMode==='days'` is the **Dates**
+  mode and the mode labelled "Days" is `'totals'`. This is the sub-tab strip's own rule —
+  *renaming a label must never become renaming a key* — and the alternative was churning
+  `rolesColumns()`, `phaseCellHTML()`, `rolesFootnoteHTML()`, `setCrewRolesMode()`,
+  `rolesShootOpen()` and every guard between them to buy nothing a reader of the table in
+  **Phase BU ▸ The three modes** doesn't already have. Both that table and the block comment
+  above `ROLES_MODES` now lead with the mismatch.
+- ⚠️ `'days'` now means three different things across three variables — this mode (**Dates**),
+  `crewGridView`'s **Production** sub-tab, and `CREW_PHASES`' production entry — and none of
+  them is the label "Days". Check which variable you are switching on.
+- **The default did not move**: still `'totals'`, i.e. the button now labelled **Days**, which
+  after the reorder is the MIDDLE segment rather than the first. That is intended — it is the
+  resting state, wanted on arrival far more often than assigning people or marking calendars.
+- Prose updated to quote the new labels: the Dates footnote ("**Dates:** the calendar
+  marks…"), the Shoot-expansion hint, and four comments naming the picker.
+
+### Verified
+
+- Picker reads `Stage | Days | Dates` with **Days** active on arrival; clicking each by label
+  selects `'stage'` / `'totals'` / `'days'` respectively
+- Cell behaviour unchanged per mode: Stage → three membership checkboxes; Days → field ·
+  read-only count · field; Dates → field+calendar · read-only count · field+calendar
+- Shoot header stays clickable in Days and Dates, never in Stage
+- 96 combinations re-run: 0 header/body cell mismatches, £££ still one x (1067), STAGE still
+  one x (788)
+- `node --check` clean; CSS untouched

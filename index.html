@@ -572,7 +572,7 @@
      immediately after them because it is what changes their meaning. */
   /* ⚠️ Phase BU — THE TEMPLATE IS A VARIABLE, set as --roles-cols on the enclosing
      .tablewrap by rolesColumns(). It has to be: the column set now depends on £££, Itemize
-     VAT, Split kit, Costs PP, the Totals/Stage/Days mode and the three phase filters, which
+     VAT, Split kit, Costs PP, the Stage/Days/Dates mode and the three phase filters, which
      is far past what a handful of static classes can enumerate — .no-money was already the
      second of them. The fallback keeps the grid sane if a caller forgets to set it. */
   .roles-grid{display:grid; align-items:center; column-gap:10px;
@@ -6001,33 +6001,59 @@ function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody();
    the banner's TOOLS cluster now, built by budgetSummaryBarHTML() — do not look for a
    second copy in the Crew toolbar. The Crew toolbar keeps only what acts on the LIST. */
 
-/* ---- THE THREE ROLES MODES (Phase BU) ----
+/* ---- THE THREE ROLES MODES (Phase BU; relabelled and reordered Phase BV) ----
    What the Prep · Shoot · Post columns are FOR, which is three different questions the one
    set of columns used to try to answer at once. The Shoot column was a checkbox with a day
    count riding beside it in the same cell — "is this person on the shoot" and "for how
    many days" crammed together, which is what read as untidy and is why the count is gone
    from beside the tick.
-     totals — how many days. Prep and Post are typeable; Shoot is a READ-ONLY count,
-              because shoot days are ticked day by day on the Production tab and there is
-              no single number to type. This is the resting state.
-     stage  — WHO IS IN WHICH PHASE. One checkbox per column, writing the membership lists
-              (see CREW_PHASES). The only place membership is set.
-     days   — WHICH days, for prep and the edit: the per-entry calendar the Pre-Prod and
-              Post tabs carry, reachable without leaving Roles. Shoot has no calendar of
-              its own here — its days belong to numbered shoot days, not to dates, and the
-              Production grid is where they are ticked.
+
+   On screen, left to right: STAGE · DAYS · DATES — who is in each phase, then how many days,
+   then which dates. Coarse to fine, and the same reading direction the rest of the app uses.
+
+   ⚠️⚠️ THE KEYS DO NOT MATCH THE LABELS, AND MUST NOT BE RENAMED TO. Read this before
+   touching anything that switches on `crewRolesMode`:
+
+        key         label     what it does
+        'stage'     Stage     WHO IS IN WHICH PHASE. One checkbox per column, writing the
+                              membership lists (see CREW_PHASES). The only place membership
+                              is set.
+        'totals'    Days      HOW MANY days. Prep and Post are typeable; Shoot is a
+                              READ-ONLY count, because shoot days are ticked day by day and
+                              there is no single number to type. The resting state, and
+                              still the default.
+        'days'      Dates     WHICH dates, for prep and the edit: the per-entry calendar the
+                              Pre-Prod and Post tabs carry, reachable without leaving Roles.
+                              Shoot has no calendar here — its days belong to numbered shoot
+                              days, not to dates, and the Production grid is where they are
+                              ticked.
+
+   So `crewRolesMode==='days'` is the **Dates** mode, and the mode LABELLED "Days" is
+   `'totals'`. The labels were changed in Phase BV; the keys were deliberately left alone,
+   under the same rule the sub-tab strip carries — *renaming a label must never become
+   renaming a key*. Renaming them here would touch `rolesColumns()`, `phaseCellHTML()`,
+   `rolesFootnoteHTML()`, `setCrewRolesMode()`, `rolesShootOpen()` and every guard in
+   between, to buy nothing a reader of this table doesn't already have.
+   ⚠️ And `'days'` is a THIRD thing again in `crewGridView`, where it is the **Production**
+   sub-tab. Three keys spelled `days` (this mode, that sub-tab, and `CREW_PHASES`' production
+   entry) mean three different things; none of them is the label "Days". Check which variable
+   you are switching on.
+
    ⚠️ Session state, like crewGridView/budgetView/crewShowMoney — "what am I doing right
    now", not a property of the shoot, so it is deliberately NOT persisted to the project. */
 const ROLES_MODES = [
-  ['totals', 'Totals', 'Day counts — type prep and edit days, read shoot days'],
-  ['stage',  'Stage',  'Tick who is in pre-production, the shoot and the edit'],
-  ['days',   'Days',   'Mark prep and edit dates on a calendar, per person']
+  ['stage',  'Stage', 'Tick who is in pre-production, the shoot and the edit'],
+  ['totals', 'Days',  'Day counts — type prep and edit days, read shoot days'],
+  ['days',   'Dates', 'Mark prep and edit dates on a calendar, per person']
 ];
+/* ⚠️ 'totals' — the mode LABELLED "Days". The resting state: it is what you want on arrival
+   far more often than assigning people or marking calendars. Unchanged by Phase BV's
+   reorder, which moved Stage to the left of it on screen only. */
 let crewRolesMode = 'totals';
 function setCrewRolesMode(mode){
   crewRolesMode = mode;
-  /* leaving Days must not leave a calendar open behind it — the same reason
-     setCrewGridView() closes it on every tab switch */
+  /* leaving the DATES mode (key 'days') must not leave a calendar open behind it — the same
+     reason setCrewGridView() closes it on every tab switch */
   if(mode!=='days') closePhaseCalendar();
   renderProjectBody();
 }
@@ -6036,9 +6062,10 @@ function setCrewRolesMode(mode){
    not a number you type. Clicking its header opens those ticks inline: one narrow column per
    shoot day, D1…Dn, exactly the grid the Production sub-tab holds — so the answer to "which
    days" is reachable without leaving the screen you are costing on.
-   ⚠️ Totals and Days modes only. In Stage mode the Shoot cell is a MEMBERSHIP checkbox
-   ("is this person on the shoot at all"), and a row of day ticks beside it would be two
-   different questions in one column — the exact muddle Phase BU pulled apart.
+   ⚠️ The DAYS and DATES modes only — keys 'totals' and 'days', see ROLES_MODES for why those
+   two words don't line up. In STAGE mode the Shoot cell is a MEMBERSHIP checkbox ("is this
+   person on the shoot at all"), and a row of day ticks beside it would be two different
+   questions in one column — the exact muddle Phase BU pulled apart.
    ⚠️ The count STAYS when expanded rather than being replaced. An empty cell under a "Shoot"
    header reads as missing data, and the total is the thing you scan for; the day ticks are
    the detail behind it, not a substitute.
@@ -6528,7 +6555,9 @@ function rolesFootnoteHTML(data){
   if(crewRolesMode==='stage'){
     parts.push('<strong>Stage:</strong> tick who is in pre-production, on the shoot and in the edit. Unticking never deletes their days or dates — it takes them out, and ticking them back brings the same figures with them. Every row is listed here whatever the phase buttons say, because this is where you assign them.');
   } else if(crewRolesMode==='days'){
-    parts.push('<strong>Days:</strong> the calendar marks prep and edit dates, the same marks the Pre-Prod and Post tabs hold. Marks are indicative — they don’t have to match the booked number. Shoot days have no calendar here: they belong to numbered shoot days, and the Production tab is where you tick them.');
+    /* ⚠️ key 'days', label "Dates" — see ROLES_MODES. The prose must quote the LABEL, since
+       it tells the user which button they are standing on. */
+    parts.push('<strong>Dates:</strong> the calendar marks prep and edit dates, the same marks the Pre-Prod and Post tabs hold. Marks are indicative — they don’t have to match the booked number. Shoot days have no calendar here: they belong to numbered shoot days, and the Production tab is where you tick them.');
   } else {
     parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase.');
   }
@@ -9386,7 +9415,7 @@ function buildBudgetData(){
                        stays, see .phase-banner, it just says why it is empty)
    o.showStage       — zone 2 carries the three phase buttons
    o.showMoneyToggle — the £££ button, the Crew tab's three money-bearing sub-tabs
-   o.showModes       — the Totals/Stage/Days picker, Roles only
+   o.showModes       — the Stage/Days/Dates picker, Roles only
 
    ⚠️ WHERE EACH ZONE IS HONEST. On Roles and on all three Budget views the STAGE buttons
    both cost and (on Roles) filter, so they belong. On Pre-Prod and Post they do NEITHER —
