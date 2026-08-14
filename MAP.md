@@ -4855,6 +4855,37 @@ from one function, so Prep/Shoot/Post cannot behave differently from each other 
 | **stage** | one membership checkbox each | one membership checkbox |
 | **days** | day count + the per-entry calendar | read-only count |
 
+### Shoot expands sideways into its own days
+
+`rolesShootExpanded` / `toggleRolesShootColumn()` / `rolesShootOpen()` /
+`shootDayCellHTML()` / `toggleRolesShootDay()` — clicking the **Shoot** header opens one
+narrow column per shoot day, `D1…Dn`, inline. The header is the control: a `.dept-caret` and
+the word, no button chrome, same idiom as `.dept-toggle` and `.sd-block-head-toggle`.
+
+- ⚠️ **The day columns are emitted into `rolesColumns()`' spec, one entry each** — which is
+  what puts every D-number header exactly over its own checkbox off the single grid template
+  (measured: 0px out on all six). Do **not** render them as a nested flex row inside one wide
+  cell; the labels would then need hand-positioning against widths declared elsewhere, which
+  is the drift the spec exists to prevent.
+- ⚠️ **Totals and Days modes only, and only when the project has shoot days.** In Stage mode
+  the Shoot cell is a *membership* checkbox, and a row of day ticks beside it would put two
+  different questions in one column — the muddle this phase pulled apart. `rolesShootOpen()`
+  is the single guard so the header, the template and the cells cannot disagree.
+- ⚠️ **The count stays when expanded** rather than being replaced. An empty cell under a
+  "Shoot" header reads as missing data, and the total is what you scan for; the ticks are the
+  detail behind it.
+- `shootDayCellHTML()` writes through the Production grid's own `toggleCrewOnDay()` — same
+  `d.positions`, same bulk fan-out, same save path — so a tick made here is indistinguishable
+  from one made there. `.crewgrid-check` is reused for the same reason.
+- ⚠️ `toggleRolesShootDay()` — ticking a day for someone NOT on the shoot **puts them on it**,
+  exactly as typing a prep number puts them into prep. The membership write must land BEFORE
+  the day write: `toggleCrewOnDay()` re-renders, and a render that still found them off the
+  shoot would draw the tick it had just accepted as a dash. Unticking never removes them.
+- Verified: 96 combinations (expanded × £££ × Itemize VAT × Split kit × Costs PP × 3 modes)
+  with **0 header/body cell mismatches**; widest case 19 columns / 1602px scrolling inside its
+  own container with no sideways body scroll; £££ and STAGE each still hold one x throughout;
+  a project with zero shoot days renders a plain "Shoot" header with no caret and 8/8 cells.
+
 - ⚠️ **The Shoot column has no checkbox and no number riding beside it.** `.roles-shoot` and
   `.roles-shoot-n` are **removed**. A tick with a small count in the same cell was two
   answers at once — "is this person on the shoot" and "for how many days" — and the count

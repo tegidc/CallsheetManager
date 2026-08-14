@@ -585,6 +585,19 @@
      this column is wider than the other two (see rolesColumns) */
   .roles-phase-days{display:flex; align-items:center; gap:3px; min-width:0;}
   .roles-phase-days .budget-rate-input{width:100%; min-width:0; text-align:center;}
+  /* the Shoot header, when it is a disclosure control. Inherits the header row's own
+     uppercase Oswald — this is a heading that happens to be clickable, not a button dropped
+     into a header, so it grows a caret and a pointer and nothing else. Same idiom as
+     .dept-toggle and .sd-block-head-toggle. */
+  .roles-shoot-head{cursor:pointer; user-select:none; display:inline-flex; align-items:center;
+    gap:2px; white-space:nowrap;}
+  .roles-shoot-head:hover{color:var(--text);}
+  .roles-shoot-head:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .roles-shoot-head .dept-caret{font-size:9px; line-height:1;}
+  /* the expanded day ticks. .crewgrid-check already centres a checkbox in a day column on
+     the Production/Hotel grids; this only pins the width, since these columns are narrower
+     (30px) than that grid's own. */
+  .roles-shootday{min-width:0;}
   /* ⚠️ REMOVED in Phase BU: .roles-shoot and .roles-shoot-n, and the checkbox they wrapped.
      The Shoot column is a plain read-only day count now — a tick with a small number riding
      beside it was two answers in one cell, and the count next to the checkbox is the thing
@@ -6018,6 +6031,24 @@ function setCrewRolesMode(mode){
   if(mode!=='days') closePhaseCalendar();
   renderProjectBody();
 }
+/* ---- SHOOT EXPANDS SIDEWAYS INTO ITS OWN DAYS ----
+   The Shoot column is a plain count because a shoot day is a tick against a numbered day,
+   not a number you type. Clicking its header opens those ticks inline: one narrow column per
+   shoot day, D1…Dn, exactly the grid the Production sub-tab holds — so the answer to "which
+   days" is reachable without leaving the screen you are costing on.
+   ⚠️ Totals and Days modes only. In Stage mode the Shoot cell is a MEMBERSHIP checkbox
+   ("is this person on the shoot at all"), and a row of day ticks beside it would be two
+   different questions in one column — the exact muddle Phase BU pulled apart.
+   ⚠️ The count STAYS when expanded rather than being replaced. An empty cell under a "Shoot"
+   header reads as missing data, and the total is the thing you scan for; the day ticks are
+   the detail behind it, not a substitute.
+   Session state, like the mode itself — not persisted. */
+let rolesShootExpanded = false;
+function toggleRolesShootColumn(){ rolesShootExpanded = !rolesShootExpanded; renderProjectBody(); }
+/* whether the column can be open at all: the modes that show a count, and a project that
+   actually has days to show. Guarded in one place so the header, the template and the cells
+   cannot disagree about it. */
+const rolesShootOpen = () => rolesShootExpanded && crewRolesMode!=='stage' && projectDays().length>0;
 function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
   return `<div class="crew-header-row">
       <div class="crew-header-left">${selectAllHTML||''}${filterHTML||''}</div>
@@ -6446,8 +6477,31 @@ function rolesColumns(data){
      column is a control you cannot reach. */
   CREW_PHASES.forEach(ph=>{
     if(crewRolesMode!=='stage' && !budgetScope[ph.scope]) return;
-    push(ph.head, crewRolesMode==='days' && ph.view!=='days' ? '86px' : '56px',
-      {key:'phase', phase:ph, title:ph.headTitle});
+    const isShoot = ph.view==='days';
+    /* the Shoot header is a CONTROL in the modes that show a count — clicking it opens the
+       per-day ticks to its right. `chev` is the whole cue: a caret and the word, no button
+       chrome, matching the app's other disclosure headers (dept-caret, sd-block-head). */
+    const canOpen = isShoot && crewRolesMode!=='stage' && projectDays().length>0;
+    push(canOpen
+        ? `<span class="roles-shoot-head" role="button" tabindex="0"
+             onclick="event.stopPropagation();toggleRolesShootColumn()"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRolesShootColumn();}"
+             aria-expanded="${rolesShootOpen()?'true':'false'}"
+             ><span class="dept-caret">${rolesShootOpen()?'▾':'▸'}</span>${ph.head}</span>`
+        : ph.head,
+      crewRolesMode==='days' && !isShoot ? '86px' : '56px',
+      {key:'phase', phase:ph,
+       title: canOpen ? (rolesShootOpen()?'Click to close the day ticks':'Click to tick which shoot days') : ph.headTitle});
+    /* ⚠️ ONE COLUMN PER SHOOT DAY, emitted straight into the same spec — which is what gets
+       each D-number header sitting exactly over its own checkbox, for free, off the one grid
+       template. Do not render these as a nested flex row inside a single wide cell; the
+       header labels then have to be positioned by hand against widths declared elsewhere,
+       which is the drift this spec exists to prevent. */
+    if(isShoot && rolesShootOpen()){
+      projectDays().forEach(d=>push(`D${esc(d.dayNum||'?')}`, '30px',
+        {key:'shootday', day:d,
+         title:`Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`}));
+    }
   });
   push('Buyout', '60px', {key:'buyout', title:'One agreed fee for the whole job — the day counts only split it across the phases'});
   if(money){
@@ -6476,7 +6530,15 @@ function rolesFootnoteHTML(data){
   } else if(crewRolesMode==='days'){
     parts.push('<strong>Days:</strong> the calendar marks prep and edit dates, the same marks the Pre-Prod and Post tabs hold. Marks are indicative — they don’t have to match the booked number. Shoot days have no calendar here: they belong to numbered shoot days, and the Production tab is where you tick them.');
   } else {
-    parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase. Shoot days are ticked day by day on the Production tab — switch to <strong>Stage</strong> to add or remove someone.');
+    parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase.');
+  }
+  /* said in both modes that can open it, because the caret alone does not tell you what is
+     behind it — and once it IS open, that it writes the same ticks as the Production tab is
+     the thing you need to know before touching it */
+  if(crewRolesMode!=='stage' && projectDays().length){
+    parts.push(rolesShootOpen()
+      ? 'The day ticks are the <strong>Production</strong> tab\'s own — a tick here is a tick there. Ticking a day for someone off the shoot puts them on it. Click <strong>Shoot</strong> again to close them.'
+      : 'Click <strong>Shoot</strong> to open the day ticks, or switch to <strong>Stage</strong> to add and remove people.');
   }
   const off = BUDGET_SCOPES.filter(([k])=>!budgetScope[k]).map(([,l])=>l);
   if(off.length && crewRolesMode!=='stage'){
@@ -6506,6 +6568,7 @@ function crewRolesRowHTML(e, spec, data){
       case 'total':
         return `<div class="roles-grid-cell roles-total" data-label="Total">${pp&&pp.hasRate?`<strong>${budgetFmt(pp.display)}</strong>`:dash}</div>`;
       case 'phase':  return phaseCellHTML(e, c.phase, pp);
+      case 'shootday': return shootDayCellHTML(e, c.day);
       case 'buyout':
         return `<div class="roles-grid-cell roles-buyout" data-label="Buyout"><input type="checkbox" ${buyout?'checked':''} onclick="event.stopPropagation()" onchange="toggleEntryBuyout('${e.id}', this.checked)" title="One agreed fee for the whole job"></div>`;
       case 'rate':
@@ -6543,6 +6606,33 @@ function crewRolesRowHTML(e, spec, data){
     ${openCal ? `<div class="prep-calwrap">${phaseCalendarHTML(openCal.view, e.id)}</div>` : ''}
   </div>`;
   return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
+}
+/* ONE shoot-day tick, in the expanded Shoot column. ⚠️ Writes through the Production grid's
+   OWN toggleCrewOnDay() — the same d.positions array, the same bulk-selection fan-out, the
+   same save path — so a tick made here is indistinguishable from one made there and the two
+   screens cannot drift. The checkbox markup is .crewgrid-check, the same class the Production
+   / Hotel grids use, for the same reason.
+   ⚠️ Ticking a day for someone NOT on the shoot puts them on it, exactly as typing a prep
+   number puts them into prep (see setPhaseDays). Refusing the click would be the more
+   consistent-looking choice and the more useless one: the tick says plainly that they are
+   working that day, and the alternative is a dead checkbox with no clue that Stage mode is
+   where you unlock it. Unticking never removes them — only Stage mode's tick does that. */
+function shootDayCellHTML(e, d){
+  const on = entryOnDay(e.id, d);
+  const label = `Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`;
+  return `<div class="crewgrid-check roles-shootday" data-day="D${esc(d.dayNum||'?')}">
+    <input type="checkbox" ${on?'checked':''} onclick="event.stopPropagation()"
+      onchange="toggleRolesShootDay('${e.id}','${d.id}', this.checked)" title="${label}"></div>`;
+}
+/* Ticking a day for a non-member has to do two things in one go, and the membership write
+   must land BEFORE the day write: toggleCrewOnDay() re-renders, and a render that finds them
+   still off the shoot would draw the tick it just accepted as a dash. */
+async function toggleRolesShootDay(entryId, dayId, checked){
+  const p = currentProject();
+  if(checked && p && !entryInPhase('production', entryId, p)){
+    await toggleEntryPhase('production', entryId, true);
+  }
+  await toggleCrewOnDay(entryId, dayId, checked);
 }
 /* ONE phase cell, whichever of the three columns and whichever mode — so Prep, Shoot and
    Post cannot end up behaving differently in the same mode, which is what made Shoot the
