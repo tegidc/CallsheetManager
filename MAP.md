@@ -611,7 +611,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
   and the Budget to quote different figures; it reads the same `data` from the same
   `buildBudgetData()`. Options: `showTotals` (zone 1 carries the figures — false on Roles
   with £££ off, when the zone stays and says why it is empty), `showStage` (zone 2's three
-  phase buttons), `showMoneyToggle` (the £££ button), `showModes` (the Stage/Days/Dates
+  phase buttons), `showMoneyToggle` (the £££ button), `showModes` (the Stage/Days
   picker, Roles only). Pre-Prod/Post pass `showTotals:false, showStage:false` — those tabs
   are one phase each and carry **no totals** by standing rule (see `PHASE_TABS`) — so they
   get the TOOLS cluster alone rather than a second copy of the £££ button. Its `.num`
@@ -829,7 +829,7 @@ coarse information first, finest detail last.
 | T-1.6 | · AI Scan (AI Chat) | Chat + document attachments, proposes shoot dates/locations/crew as tool-use cards (Phase AI Scan). **No longer its own section** — since the Phase Quick Add follow-up it's the "+ AI Chat" fourth button in T-1.8's row; code kept for the chat mechanics themselves | `aiScanChatBodyHTML()` |
 | T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
-| T-2.1 | · Roles | **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Stage/Days/Dates mode picker (⚠️ keys `stage`/`totals`/`days` in that on-screen order — the labels and keys deliberately do not match, see Phase BU ▸ The three modes), and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
+| T-2.1 | · Roles | **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Stage/Days mode picker (⚠️ keys `stage`/`totals` — the mode labelled "Days" is key `'totals'`, see Phase BU ▸ The three modes), and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
 | **T-2.0.2** | · · Role chip | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
 | **T-2.0** | · Person block | Phase BK/BL — the shared card every one of the six sub-tabs renders: person-level facts and — since **Phase BN** — the FRONTED entry's own cells all render onto ONE shared row (`.pb-head`), columns aligned across every block; a stacked-away entry still gets a genuine separate row (`.pb-role-row.pb-role-extra`) below. Collapses to the fronted entry + a muted "+N"; no chevron when one entry is visible. Nothing persists — no open/closed state anywhere, no per-person total ever | `buildPersonBlocks()` / `personBlockWrapHTML()` |
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
@@ -4854,18 +4854,19 @@ deliberately did **not** rename the keys — same rule the sub-tab strip carries
 label must never become renaming a key*. Read this table before touching anything that
 switches on `crewRolesMode`:
 
-| on screen (l→r) | key | Prep · Post | Shoot |
-|---|---|---|---|
-| **Stage** | `'stage'` | one membership checkbox each | one membership checkbox |
-| **Days** *(default)* | `'totals'` | typeable day count | ⚠️ **read-only count, nothing beside it** |
-| **Dates** | `'days'` | ⚠️ **the calendar icon ALONE** — no number field (Phase BV) | read-only count |
+| on screen (l→r) | key | Prep · Post | Shoot | last column |
+|---|---|---|---|---|
+| **Stage** | `'stage'` | one membership checkbox each | one membership checkbox | Show as |
+| **Days** *(default)* | `'totals'` | typeable day count | ⚠️ **read-only count, nothing beside it** | Dates |
 
-So `crewRolesMode==='days'` is the **Dates** mode, and the mode labelled "Days" is
-`'totals'`. ⚠️ And `'days'` is a *third* thing again in `crewGridView`, where it is the
+⚠️ **Phase BW deleted the third mode** (label "Dates", key `'days'`) — marking dates moved into
+the Dates popup. `crewRolesMode==='days'` is now ALWAYS FALSE; nothing reads it and new code
+must not test for it.
+
+The mode labelled "Days" is `'totals'`. ⚠️ And `'days'` still means other things elsewhere: in `crewGridView` it is the
 **Production** sub-tab — three keys spelled `days` (this mode, that sub-tab, and
 `CREW_PHASES`' production entry) meaning three different things, none of them the label
-"Days". Check which variable you are switching on. Order is Stage → Days → Dates: who is in
-each phase, then how many days, then which dates — coarse to fine.
+"Days". Check which variable you are switching on.
 
 ### Shoot expands sideways into its own days
 
@@ -4879,8 +4880,7 @@ the word, no button chrome, same idiom as `.dept-toggle` and `.sd-block-head-tog
   (measured: 0px out on all six). Do **not** render them as a nested flex row inside one wide
   cell; the labels would then need hand-positioning against widths declared elsewhere, which
   is the drift the spec exists to prevent.
-- ⚠️ **The Days and Dates modes only (keys `totals`/`days`), and only when the project has
-  shoot days.** In Stage mode
+- ⚠️ **The Days mode only (key `totals`), and only when the project has shoot days.** In Stage mode
   the Shoot cell is a *membership* checkbox, and a row of day ticks beside it would put two
   different questions in one column — the muddle this phase pulled apart. `rolesShootOpen()`
   is the single guard so the header, the template and the cells cannot disagree.
@@ -5089,3 +5089,97 @@ figure that depends on it is unchanged.
   untouched, the Pre-Prod tab reads the same marks back, button gains `.has-marks`
 - 96 combinations: 0 header/body mismatches, 0 money leaks, £££ still one x (1067), STAGE one
   x (788); 44 renders across 4 projects with 0 errors; `node --check` clean
+
+## Phase BW — the Dates popup: one person, three phases, one calendar (14 Aug 2026)
+
+**"I'm going to move calendar date entry into Days. Swap out 'show as' column for Dates.
+Design of Dates pop-up: top of popup name and role. Prep - Shoot - Post Circles beneath in
+different colour to differentiate. With Prep selected - you can highlight days the person may
+do that prep. The Days selected are not bound to their written days in that stage as maximums.
+For instance someone may work 5 days over 6. It is worth flagging if they don't have the
+minimum amount of days. Same for Post. Shoot Days are allocated and marked automatically by
+the shoot days entries."**
+
+### Structure
+
+- **The DATES MODE is gone** — `ROLES_MODES` is `Stage | Days`. A whole row-shape existed to
+  hold two calendar icons; the popup does what a 56px cell never could.
+  ⚠️ `crewRolesMode==='days'` is now always false. `'days'` still means the **Production**
+  sub-tab in `crewGridView` and the production view key in `CREW_PHASES`.
+- **DAYS mode's last column is DATES; STAGE's is SHOW AS.** Dates replaced Show as rather than
+  joining it — the row is already the app's widest table, and the two are wanted at different
+  moments. Show as keeps its home in Stage, so nothing became unreachable.
+- ⚠️ **REMOVED: Roles' inline `.prep-calwrap` band**, `.roles-phase-days` and
+  `.roles-phase-cal`. The Pre-Prod and Post TABS keep their own inline calendars — only Roles'
+  went, and their machinery is what the popup reuses.
+
+### The popup
+
+`openDatesDialog()` / `closeDatesDialog()` / `setDatesDialogPhase()` /
+`shiftDatesDialogMonth()` / `datesDialogHTML()` / `datesCellHTML()` — [Crew]
+
+- Name and role at the top, then three `.dates-phase` circles in the phase colours. The
+  selected phase is editable on the calendar; **the other two render as coloured dots under
+  the date**, which is the point of the popup — prep butting into the shoot is exactly what
+  you are looking for and no single-phase calendar could show it.
+- `--phase-prep` / `--phase-shoot` / `--phase-post` — ochre, the brand green, indigo. Chosen
+  to differ in lightness as well as hue so they survive greyscale and red-green colour
+  blindness (ochre-vs-green being the risky pair). ⚠️ Colour is never the only carrier: the
+  circles are labelled, the selected phase is named, and every cell's title lists its phases.
+- ⚠️ **SHOOT IS READ-ONLY AND DERIVED** — its dates are the shoot days the entry holds a
+  position on (`d.positions`), which the Production grid owns. There is nowhere to store a
+  "shoot date" that isn't a shoot day, so the grid refuses the click and says why.
+  `datesPhaseMarks()` is the ONE reader that knows this, so the derived phase cannot end up
+  computed two ways.
+- ⚠️ **Its own state, not `phaseCalendarFor`** — that flag belongs to the phase tabs' inline
+  calendars, and sharing it would have let this popup render one of those tabs expanded
+  underneath. Lives on `#globalOverlay` like the roles menu and the two role dialogs, so it
+  survives the re-render every edit inside it triggers — which is why `commitPhaseDates()` now
+  calls `renderGlobalOverlay()` as well as `renderProjectBody()`.
+- Closed by `goProjectTab()`, `setCrewGridView()` and `setCrewRolesMode()`: it sits outside
+  `#main`, so navigation alone would leave it floating.
+- ⚠️ `datesAnchorMonth()` exists because `phaseCalAnchorMonth()` **cannot take the shoot**: it
+  reads `PHASE_TABS[phase]`, and `PHASE_TABS` holds only the two real tabs, so `'days'` threw
+  on `.store` of undefined. Found by driving the phase switch, not by reading.
+- Drag-to-mark is the phase tabs' own `phaseDayDown`/`phaseDayEnter`/`prepDragApply` and the
+  shared document `mouseup` — not reimplemented. ⚠️ Safe only because ONE calendar is ever in
+  the DOM (Roles' inline band went, and the phase tabs are a different tab body);
+  `prepDragApply()`'s document-wide `querySelector` depends on it.
+
+### The shortfall flag — a deliberate reversal
+
+⚠️ **`PHASE_TABS` said "NO warning, NO validation, NO reconciliation, NO colour change and NO
+badge for a mismatch, in either direction. Do not add one."** The user asked for the under case
+to be flagged. That comment is amended in place rather than contradicted:
+
+| | |
+|---|---|
+| marked **>** booked | still silent, still valid — the five-days-over-six case from the brief |
+| marked **<** booked | **flagged**: a booking with nowhere to sit |
+
+`datesPhaseTally()` returns `{booked, marked, short}`; `datesEntryShort()` sums it across prep
+and post for the row's button, which turns amber and reads "N to place ⚠" so a shortfall is
+findable without opening all 41 rows. Amber, advisory, blocks nothing, clamps nothing, and the
+state stays saveable. ⚠️ **The shoot cannot be short by construction** — its booked figure and
+its marks are the same set of shoot days. ⚠️ The two phase TABS still show no flag: there the
+number and the calendar are the whole screen, and a badge per row would be noise.
+
+### Verified
+
+- Popup driven by clicking: opens with the person's name/role, Prep selected, the phase circles
+  carrying each phase's mark count; a 4-day drag stores 4 dates, the popup refreshes itself,
+  the count line and the row's button both follow (`15 to place ⚠` → `11 to place ⚠`)
+- Shoot phase: `readonly`, **0** cells carrying a mousedown handler, marks derived
+  (5 cells in April + 1 in May for a shoot spanning the month boundary; the count line
+  correctly reads 6), no shortfall possible, hint names the Production tab
+- Overlap dots render on the phases you are not editing, in their own colours
+- Colour bug caught and fixed: `background:currentColor` in a rule that also sets `color:#fff`
+  resolves the background to WHITE, so every marked day rendered as a blank box. Phase colour
+  now arrives via `--phase-c`, a property the rule is not simultaneously overwriting
+- Closes on mode switch, sub-tab switch and project-tab switch; renders '' for a missing entry
+- 64 combinations: 0 header/body mismatches, 0 money leaks, no row ending short of its
+  container, £££ one x (1067), STAGE one x (788)
+- 85 renders across 4 projects including the popup in all three phases: 0 errors, 0 console
+  errors; mobile 375px — box 343px wide, 42px calendar cells, nothing off-screen
+- `node --check` clean; CSS braces balanced 628/628; test marks cleared and totals back to
+  £109,720 / £8,127 / £117,847

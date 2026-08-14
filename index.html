@@ -48,6 +48,18 @@
     --tint-4:rgba(1,119,86,.14);   /* active controls — must stay distinct from tint-3 */
     /* Phase Q: the two former hand-written one-offs are tokens too, so a brand-colour
        change in Settings reaches every tinted surface rather than leaving these behind. */
+    /* ---- the three phases, as colour (Phase BW) ----
+       One hue each, so a mark in the Dates popup says WHICH phase it belongs to without a
+       label on every cell. Shoot keeps the brand green — it is the main event and the colour
+       the app already means by "live". Prep is an ochre and the edit an indigo: chosen to sit
+       either side of the green in hue AND to differ in lightness, so they stay separable in
+       greyscale and for red-green colour blindness, where ochre-vs-green is the risky pair.
+       ⚠️ Colour is never the ONLY carrier: the phase circles are labelled, the selected phase
+       is named above the calendar, and every marked cell's title says which phases it holds.
+       All three are dark enough to take white text at the contrast the rest of the app uses. */
+    --phase-prep:#8A5A0B; --phase-shoot:#017756; --phase-post:#4A3C8C;
+    --phase-prep-soft:rgba(138,90,11,.13); --phase-shoot-soft:rgba(1,119,86,.13);
+    --phase-post-soft:rgba(74,60,140,.13);
     --tint-5:rgba(1,119,86,.35);   /* sidebar active-project gradient */
     --tint-6:rgba(1,119,86,.28);   /* selected saved-role pill / Head of Department pill */
     /* Default box: white fill, 8px radius, 10px padding (Style Review) */
@@ -581,10 +593,10 @@
   .roles-total{font-variant-numeric:tabular-nums; white-space:nowrap; text-align:center;}
   .roles-num{min-width:0; text-align:center; font-variant-numeric:tabular-nums;}
   .roles-num .budget-rate-input{width:100%; text-align:center;}
-  /* ⚠️ REPLACED in Phase BV: .roles-phase-days, which laid a number field and a calendar
-     button side by side in one cell. The DATES mode carries the icon alone now, so the cell
-     just centres it — and the phase columns are one width across all three modes again. */
-  .roles-phase-cal{display:flex; align-items:center; justify-content:center; min-width:0;}
+  /* ⚠️ REMOVED in Phase BW: .roles-phase-days (a number field + calendar button side by side,
+     Phase BU) and .roles-phase-cal (the icon alone, Phase BV). Both belonged to the DATES
+     mode, which no longer exists — dates are marked in the Dates popup. A phase cell is a
+     plain number in both remaining modes, so .roles-num covers it. */
   /* the Shoot header, when it is a disclosure control. Inherits the header row's own
      uppercase Oswald — this is a heading that happens to be clickable, not a button dropped
      into a header, so it grows a caret and a pointer and nothing else. Same idiom as
@@ -733,6 +745,84 @@
   .prep-cal-day.marked{background:var(--text); color:#fff; font-weight:600; border-color:var(--text);}
   .prep-cal-day.empty{visibility:hidden; cursor:default;}
   .prep-cal .hint{margin-top:8px;}
+  /* ============ THE DATES POPUP (Phase BW) ============
+     One person, all three phases, one calendar. Uses the app's own .modal-overlay/.modal-box
+     shell and the .prep-cal-* grid the phase tabs already have, so the calendar itself is one
+     implementation — only the chrome around it and the phase colouring are new. */
+  .dates-box{max-width:400px;}
+  .dates-head{margin-bottom:12px;}
+  .dates-name{font-family:var(--body); font-weight:600; font-size:15px; line-height:1.25;}
+  .dates-role{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--tape); margin-top:2px;}
+  /* the phase picker: three circles, one per phase, in their own colours */
+  .dates-phases{display:flex; gap:8px; margin-bottom:12px;}
+  .dates-phase{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
+    padding:8px 4px 7px; border:1px solid var(--line); border-radius:var(--box-radius);
+    cursor:pointer; user-select:none; background:transparent;}
+  .dates-phase:hover{border-color:var(--field-line);}
+  .dates-phase:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .dates-dot{width:16px; height:16px; border-radius:50%; flex:0 0 auto;
+    border:2px solid currentColor; background:transparent;}
+  .dates-phase-lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px;
+    text-transform:uppercase; line-height:1;}
+  .dates-phase-n{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);
+    line-height:1; letter-spacing:0; text-transform:none;}
+  .dates-phase.prep{color:var(--phase-prep);} .dates-phase.shoot{color:var(--phase-shoot);}
+  .dates-phase.post{color:var(--phase-post);}
+  /* selected: the circle fills and the card takes the phase's own faint wash, so which phase
+     you are editing is readable from the card and not only from the ring */
+  .dates-phase.on .dates-dot{background:currentColor;}
+  .dates-phase.on{border-color:currentColor; font-weight:600;}
+  .dates-phase.prep.on{background:var(--phase-prep-soft);}
+  .dates-phase.shoot.on{background:var(--phase-shoot-soft);}
+  .dates-phase.post.on{background:var(--phase-post-soft);}
+  /* the calendar, tinted to whichever phase is selected. .marked is the class the shared
+     drag machinery toggles (prepDragApply), so the colour has to come from the CONTAINER
+     rather than from a per-phase class on the cell — otherwise a live drag would paint in
+     the wrong colour until the next render. */
+  /* ⚠️ --phase-c, NOT currentColor, and this is not a style preference. `background:
+     currentColor` resolves against the element's OWN color — and this rule sets `color:#fff`
+     on the same element, so the background came out WHITE: a marked day rendered as a blank
+     box with white text on it. The phase colour has to arrive through a property the rule
+     isn't simultaneously overwriting. */
+  .dates-cal{--phase-c:var(--tape);}
+  .dates-cal.prep{--phase-c:var(--phase-prep); color:var(--phase-prep);}
+  .dates-cal.shoot{--phase-c:var(--phase-shoot); color:var(--phase-shoot);}
+  .dates-cal.post{--phase-c:var(--phase-post); color:var(--phase-post);}
+  .dates-cal .prep-cal-day.marked{background:var(--phase-c); border-color:var(--phase-c); color:#fff;}
+  .dates-cal{border:none; padding:0; margin:0;}
+  /* a day the OTHER phases hold: a dot under the number, in that phase's colour, so a clash
+     between prep and the shoot is visible while you are marking either */
+  .prep-cal-day{position:relative;}
+  .dates-others{position:absolute; bottom:2px; left:0; right:0; display:flex;
+    justify-content:center; gap:2px; pointer-events:none;}
+  .dates-others i{width:4px; height:4px; border-radius:50%; display:block;}
+  .prep-cal-day.marked .dates-others i{outline:1px solid rgba(255,255,255,.7);}
+  /* read-only: the shoot's dates are the shoot days' own, so the grid says so rather than
+     accepting clicks that could not be stored anywhere */
+  .dates-cal.readonly .prep-cal-day{cursor:default;}
+  .dates-cal.readonly .prep-cal-day:not(.empty):hover{border-color:var(--line);}
+  .dates-foot{margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .dates-count{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);}
+  /* the shortfall flag — fewer dates marked than days booked. Amber, not red: nothing is
+     broken and nothing is blocked, there is just a booking not yet placed on the calendar. */
+  .dates-short{display:flex; align-items:flex-start; gap:7px; margin-top:10px;
+    padding:8px 10px; border-radius:6px; background:rgba(138,90,11,.09);
+    border:1px solid rgba(138,90,11,.28);
+    font-family:var(--body); font-size:var(--fs-meta); color:#7A4F09; line-height:1.45;}
+  .dates-short strong{color:#7A4F09;}
+  /* the row's own button. .short is the same signal at list scale, so a shortfall is findable
+     without opening all 41 rows. */
+  .dates-cell{display:flex; align-items:center; justify-content:center; min-width:0;}
+  .dates-btn{display:inline-flex; align-items:center; gap:4px; cursor:pointer;
+    border:1px solid var(--line); border-radius:5px; background:transparent; padding:3px 7px;
+    font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px; color:var(--muted);
+    white-space:nowrap;}
+  .dates-btn:hover{border-color:var(--tape); color:var(--tape);}
+  .dates-btn:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .dates-btn.has-marks{color:var(--text);}
+  .dates-btn.short{border-color:rgba(138,90,11,.5); color:#7A4F09;}
+  .dates-btn svg{flex:0 0 auto;}
   .modal-overlay{position:fixed; inset:0; background:rgba(17,10,8,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
   .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:var(--box-radius); padding:16px; max-width:420px; width:100%; box-shadow:0 12px 40px rgba(17,10,8,.25);}
   .modal-box h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;
@@ -2318,7 +2408,9 @@ async function confirmAddRoleDialog(){
    its own state is null) is enough — no need to pick between them. */
 function renderGlobalOverlay(){
   const el = document.getElementById('globalOverlay');
-  if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML() + rolesMenuHTML();
+  /* Phase BW — the Dates popup joins them, for the same reason: every edit inside it commits
+     through commitPhaseDates(), which re-renders the tab body underneath. */
+  if(el) el.innerHTML = addRoleDialogHTML() + removeRoleDialogHTML() + rolesMenuHTML() + datesDialogHTML();
 }
 /* ---- Dietary (general) ----
    ⚠️ THE SELECT MUST BE ABLE TO REPRESENT WHAT IS STORED. It could not: the options were
@@ -3582,7 +3674,9 @@ function mostRecentProject(){
   return projectsDB.slice().sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0))[0];
 }
 function goRecentProject(){ const p=mostRecentProject(); if(p) openProject(p.id); }
-function goProjectTab(tab){ currentProjectTab=tab; renderMain(); window.scrollTo(0,0); }
+/* ⚠️ Phase BW — closes the Dates popup. It lives on #globalOverlay, outside #main, so a tab
+   change alone would leave it floating over a screen that has nothing to do with it. */
+function goProjectTab(tab){ currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
 
 function renderMain(){
   const m = document.getElementById('main');
@@ -5336,7 +5430,7 @@ function toggleAllProjectDeptsCollapsed(deptsCSV){
 /* Phase BT — closing the open date-marks calendar is part of switching tabs: Pre-production
    and Post render the same entries, so a calendar left open on one would reappear open on
    the other against a different phase's marks. */
-function setCrewGridView(view){ crewGridView = view; resetFrontedEntryCache(); closePhaseCalendar(); renderProjectBody(); }
+function setCrewGridView(view){ crewGridView = view; resetFrontedEntryCache(); closePhaseCalendar(); closeDatesDialog(); renderProjectBody(); }
 
 /* ============ .filter-panel-foot — shared by all three filter panels ============
    Crew database (D-1.2), Crew on this project (T-2.6) and Budget (T-6.0) each
@@ -6006,50 +6100,42 @@ function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody();
    the banner's TOOLS cluster now, built by budgetSummaryBarHTML() — do not look for a
    second copy in the Crew toolbar. The Crew toolbar keeps only what acts on the LIST. */
 
-/* ---- THE THREE ROLES MODES (Phase BU; relabelled and reordered Phase BV) ----
-   What the Prep · Shoot · Post columns are FOR, which is three different questions the one
-   set of columns used to try to answer at once. The Shoot column was a checkbox with a day
-   count riding beside it in the same cell — "is this person on the shoot" and "for how
-   many days" crammed together, which is what read as untidy and is why the count is gone
-   from beside the tick.
+/* ---- THE ROLES MODES (Phase BU; relabelled BV; cut to two in BW) ----
+   What the Prep · Shoot · Post columns are FOR. The Shoot column was once a checkbox with a
+   day count riding beside it in the same cell — "is this person on the shoot" and "for how
+   many days" crammed together — and pulling those two questions apart is what these modes
+   are. On screen, left to right: STAGE · DAYS. Who is in each phase, then how many days.
 
-   On screen, left to right: STAGE · DAYS · DATES — who is in each phase, then how many days,
-   then which dates. Coarse to fine, and the same reading direction the rest of the app uses.
-
-   ⚠️⚠️ THE KEYS DO NOT MATCH THE LABELS, AND MUST NOT BE RENAMED TO. Read this before
-   touching anything that switches on `crewRolesMode`:
+   ⚠️⚠️ THE KEYS DO NOT MATCH THE LABELS. Read this before touching anything that switches on
+   `crewRolesMode`:
 
         key         label     what it does
         'stage'     Stage     WHO IS IN WHICH PHASE. One checkbox per column, writing the
                               membership lists (see CREW_PHASES). The only place membership
-                              is set.
-        'totals'    Days      HOW MANY days. Prep and Post are typeable; Shoot is a
-                              READ-ONLY count, because shoot days are ticked day by day and
-                              there is no single number to type. The resting state, and
-                              still the default.
-        'days'      Dates     WHICH dates, for prep and the edit: the per-entry calendar the
-                              Pre-Prod and Post tabs carry, reachable without leaving Roles.
-                              Shoot has no calendar here — its days belong to numbered shoot
-                              days, not to dates, and the Production grid is where they are
-                              ticked.
+                              is set. Also the only mode with the Show as column.
+        'totals'    Days      HOW MANY days. Prep and Post are typeable; Shoot is a READ-ONLY
+                              count that expands sideways into per-day ticks. The resting
+                              state and the default. Carries the DATES column, whose button
+                              opens the Dates popup — WHICH dates, all three phases at once.
 
-   So `crewRolesMode==='days'` is the **Dates** mode, and the mode LABELLED "Days" is
-   `'totals'`. The labels were changed in Phase BV; the keys were deliberately left alone,
-   under the same rule the sub-tab strip carries — *renaming a label must never become
-   renaming a key*. Renaming them here would touch `rolesColumns()`, `phaseCellHTML()`,
-   `rolesFootnoteHTML()`, `setCrewRolesMode()`, `rolesShootOpen()` and every guard in
-   between, to buy nothing a reader of this table doesn't already have.
-   ⚠️ And `'days'` is a THIRD thing again in `crewGridView`, where it is the **Production**
-   sub-tab. Three keys spelled `days` (this mode, that sub-tab, and `CREW_PHASES`' production
-   entry) mean three different things; none of them is the label "Days". Check which variable
-   you are switching on.
+   So the mode labelled "Days" is `'totals'`. The labels changed in Phase BV and the keys were
+   deliberately left alone, under the rule the sub-tab strip carries — *renaming a label must
+   never become renaming a key*; renaming would touch `rolesColumns()`, `phaseCellHTML()`,
+   `rolesFootnoteHTML()`, `setCrewRolesMode()` and `rolesShootOpen()` to buy nothing this table
+   doesn't already give.
+
+   ⚠️ THERE IS NO 'days' MODE ANY MORE. Phase BW deleted the third mode (label "Dates") when
+   marking dates moved into the popup: a whole row-shape to hold two calendar icons, when the
+   popup can show all three phases on one month in colour, which a 56px cell never could.
+   `crewRolesMode==='days'` is now ALWAYS FALSE — nothing reads it, and new code must not test
+   for it. `'days'` still means two other things elsewhere: `crewGridView`'s **Production**
+   sub-tab, and `CREW_PHASES`' production view key. Check which variable you are on.
 
    ⚠️ Session state, like crewGridView/budgetView/crewShowMoney — "what am I doing right
    now", not a property of the shoot, so it is deliberately NOT persisted to the project. */
 const ROLES_MODES = [
   ['stage',  'Stage', 'Tick who is in pre-production, the shoot and the edit'],
-  ['totals', 'Days',  'Day counts — type prep and edit days, read shoot days'],
-  ['days',   'Dates', 'Mark prep and edit dates on a calendar, per person']
+  ['totals', 'Days',  'Day counts, and the calendar for each person’s prep and edit dates']
 ];
 /* ⚠️ 'totals' — the mode LABELLED "Days". The resting state: it is what you want on arrival
    far more often than assigning people or marking calendars. Unchanged by Phase BV's
@@ -6059,7 +6145,10 @@ function setCrewRolesMode(mode){
   crewRolesMode = mode;
   /* leaving the DATES mode (key 'days') must not leave a calendar open behind it — the same
      reason setCrewGridView() closes it on every tab switch */
-  if(mode!=='days') closePhaseCalendar();
+  closePhaseCalendar();
+  /* the Dates popup belongs to the DAYS mode's own column; leaving that mode must not leave it
+     hanging over a screen that no longer offers it */
+  closeDatesDialog();
   renderProjectBody();
 }
 /* ---- SHOOT EXPANDS SIDEWAYS INTO ITS OWN DAYS ----
@@ -6559,7 +6648,19 @@ function rolesColumns(data){
     push('VAT reg.', '62px', {key:'vatreg', title:'Charges VAT'});
     if(budgetVatToggle) push('VAT', '84px', {key:'vat'});
   }
-  push('Show as', 'minmax(110px,1fr)', {key:'showas', left:true});
+  /* ⚠️ THE LAST COLUMN IS DATES IN THE DAYS MODE, SHOW AS IN STAGE (Phase BW). Dates replaced
+     Show as rather than joining it — the row was already the widest table in the app, and the
+     two are wanted at different moments: Show as is a call-sheet display name you set once,
+     Dates is something you work through person by person while scheduling. Show as keeps a
+     home in Stage mode, so nothing became unreachable; the Edit pencil still holds the crew
+     record either way. */
+  if(crewRolesMode==='totals'){
+    /* minmax, not a fixed width: the LAST column has to absorb the slack or the grid ends
+       short of its container and the rows stop reaching the right-hand rule. */
+    push('Dates', 'minmax(96px,1fr)', {key:'dates', title:'Mark which dates this person works in prep and the edit'});
+  } else {
+    push('Show as', 'minmax(110px,1fr)', {key:'showas', left:true});
+  }
   const template = ['var(--pb-controls-w)','var(--pb-name-w)','var(--pb-role-w)']
     .concat(cols.map(c=>c.width)).join(' ');
   return {cols, template, showSplit};
@@ -6569,14 +6670,12 @@ function rolesColumns(data){
    how the old one ended up describing a Shoot checkbox that no longer exists. */
 function rolesFootnoteHTML(data){
   const parts = ['One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records.'];
+  /* ⚠️ Phase BW — two modes, so two branches. Do not add a third for `'days'`; that key is no
+     longer a mode (see ROLES_MODES). */
   if(crewRolesMode==='stage'){
     parts.push('<strong>Stage:</strong> tick who is in pre-production, on the shoot and in the edit. Unticking never deletes their days or dates — it takes them out, and ticking them back brings the same figures with them. Every row is listed here whatever the phase buttons say, because this is where you assign them.');
-  } else if(crewRolesMode==='days'){
-    /* ⚠️ key 'days', label "Dates" — see ROLES_MODES. The prose must quote the LABEL, since
-       it tells the user which button they are standing on. */
-    parts.push('<strong>Dates:</strong> one calendar per phase — the same marks the Pre-Prod and Post tabs hold. Marks are indicative: they don’t have to match the booked number, which lives in <strong>Days</strong>. Shoot has no calendar because its days are numbered shoot days rather than dates — open <strong>Shoot</strong> to tick them.');
   } else {
-    parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase.');
+    parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase. <strong>Dates</strong> opens that person’s calendar — all three phases on one month, so you can see where prep runs into the shoot.');
   }
   /* said in both modes that can open it, because the caret alone does not tell you what is
      behind it — and once it IS open, that it writes the same ticks as the Production tab is
@@ -6638,18 +6737,19 @@ function crewRolesRowHTML(e, spec, data){
         return `<div class="roles-grid-cell roles-total" data-label="VAT">${pp&&pp.vat?budgetFmt(pp.vat):dash}</div>`;
       case 'showas':
         return `<div class="roles-grid-cell" data-label="Show as">${showAsQuickEditHTML(e)}</div>`;
+      case 'dates':  return datesCellHTML(e);
     }
     return '<div class="roles-grid-cell"></div>';
   };
-  /* an open calendar (Days mode) is a full-width band under the row, the same
-     .prep-calwrap grid-column:1/-1 the phase tabs use — one class, one behaviour. */
-  const openCal = CREW_PHASES.find(ph=>ph.view!=='days' && phaseCalOpen(ph.view, e.id));
-  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}${openCal?' prep-grid-row-open':''}" id="role-row-${e.id}">
+  /* ⚠️ REMOVED in Phase BW: the inline .prep-calwrap band this row used to expand into. Dates
+     are marked in the Dates POPUP now, which can show all three phases at once — the inline
+     calendar could only ever show the one phase whose icon you clicked. The Pre-Prod and Post
+     TABS keep their inline calendars; only Roles' went. */
+  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
     <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${esc(e.name)}${repeatStarHTML(e.crewId)}</div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
     ${spec.cols.map(cellHTML).join('')}
-    ${openCal ? `<div class="prep-calwrap">${phaseCalendarHTML(openCal.view, e.id)}</div>` : ''}
   </div>`;
   return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
 }
@@ -6707,30 +6807,14 @@ function phaseCellHTML(e, ph, pp){
       title="${member?'Days on the shoot — ticked day by day on the Production tab':'Not on the shoot — switch to Stage to add them'}">${n||dash}</div>`;
   }
   const days = phaseDaysOf(ph.view, e.id, p);
-  const marks = phaseDatesOf(ph.view, e.id, p);
   const value = member && days!=null ? days : '';
-  /* Days mode: the number keeps its field and gains the calendar button beside it — the
-     phase tabs' own control (togglePhaseCalendar/phaseCalendarHTML), not a second copy.
-     One calendar is open at a time across the whole app, which is what stops prep and edit
-     fighting over the same row. */
   const dayField = `<input type="text" inputmode="numeric" class="budget-rate-input" value="${value}" placeholder="—"
       onclick="event.stopPropagation()" onchange="setPhaseDays('${ph.view}','${e.id}', this.value)"
       title="${esc(ph.headTitle)}">`;
-  /* ⚠️ DATES: THE CALENDAR ICON ALONE — no number field beside it (Phase BV). The two modes
-     ask different questions and each should offer one answer: DAYS is where you type how
-     many, DATES is where you say which. Carrying the field into both meant the same number
-     had two homes one click apart, and the wider cell it needed knocked the phase columns out
-     of line with the other modes.
-     The number is not lost — it is one click away in DAYS, and marks stay indicative and
-     unreconciled against it exactly as the Pre-Prod/Post tabs have it. The button still shows
-     whether anything IS marked (.has-marks) and how many, in its tooltip. */
-  if(crewRolesMode==='days'){
-    return `<div class="roles-grid-cell roles-phase-cal" data-label="${ph.head}">
-      <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
-        onclick="event.stopPropagation();togglePhaseCalendar('${ph.view}','${e.id}')"
-        title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked — ${esc(ph.head.toLowerCase())}` : 'No dates marked — click to mark '+esc(ph.head.toLowerCase())+' days'}"
-        aria-label="${ph.head} date marks">${icon('calendar')}</button></div>`;
-  }
+  /* ⚠️ Phase BW — no calendar branch here any more. The DATES mode is gone; dates are marked
+     in the Dates popup, reached from the row's own Dates column, which can show all three
+     phases at once where a 56px cell could only ever offer the one. This cell is the NUMBER
+     and nothing else, in both remaining modes. */
   return `<div class="roles-grid-cell roles-num" data-label="${ph.head}">${dayField}</div>`;
 }
 /* the bulk-select checkbox for ONE entry. The person-block version had to work out which
@@ -8013,8 +8097,21 @@ async function removeCrewFromProject(id){
 
    ⚠️ MARKS ARE INDICATIVE AND NOT BOUND TO THE DAYS NUMBER. "Booked 5, marked 7" is a
    VALID state — someone spreading five days' work across seven. There is deliberately
-   NO warning, NO validation, NO reconciliation, NO colour change and NO badge for a
-   mismatch, in either direction. Do not add one.
+   NO warning, NO validation, NO reconciliation, NO colour change and NO badge for it, and
+   the number is never clamped to the marks or the marks to the number.
+   ⚠️ AMENDED IN PHASE BW, IN ONE DIRECTION ONLY. The rule above said "no badge for a
+   mismatch, in either direction". The user asked for the UNDER case to be flagged: "it is
+   worth flagging if they don't have the minimum amount of days". So:
+     marked > booked — still silent, still valid, still the five-over-six case above.
+     marked < booked — FLAGGED, because it is a booking with nowhere to sit: days you are
+                       paying for that have not been placed on a calendar.
+   The flag is amber, advisory, and blocks nothing; it lives in the Dates popup and on the
+   Dates column's button (see datesPhaseTally / datesEntryShort). ⚠️ It is a WARNING, not
+   validation — nothing reconciles, nothing is clamped, and the state is still saveable. Do
+   not extend it into the over direction, and do not make it refuse anything.
+   ⚠️ These two TABS still show no flag of any kind. It belongs to the Roles screen, where the
+   booked number and the calendar are in the same row; here they are the whole point of the
+   screen and a badge on every row would be noise.
 
    ---- why a parallel structure and not a field on the entry ----
    p.crewEntries' shape was settled deliberately by Phase BF; these are parallel, not
@@ -8175,6 +8272,10 @@ async function commitPhaseDates(phase, entryId, isoList){
   phaseWrite(phase, p, entryId, rec=>{ rec.dates = isoList||[]; });
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
+  /* ⚠️ Phase BW — the Dates popup lives on #globalOverlay, which renderProjectBody() does not
+     touch. Without this every mark made in the popup would save and then not appear until you
+     closed it. Harmless when nothing is open — the dialog builders each return '' . */
+  renderGlobalOverlay();
 }
 async function clearPhaseDates(phase, entryId){ await commitPhaseDates(phase, entryId, []); }
 
@@ -8207,6 +8308,196 @@ document.addEventListener('mouseup', ()=>{
 
 const PREP_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const PREP_WEEKDAYS = ['M','T','W','T','F','S','S'];
+
+/* ============================ THE DATES POPUP (Phase BW) ============================
+   One person, all three phases, one calendar. Opened from the Dates column on Roles (DAYS
+   mode) and replaces the inline single-phase calendar that column used to expand into.
+
+   WHY A POPUP. The inline version could only ever show the phase whose icon you clicked, in
+   a 56px cell. The question being answered is "when is this person actually here", and that
+   is not answerable one phase at a time: prep butting into the shoot, or an edit starting
+   before the shoot wraps, are exactly what you are looking for. So all three render at once —
+   the one you are editing filled in its colour, the other two as dots under the date.
+
+   ⚠️ SHOOT IS READ-ONLY, AND DERIVED. Its dates are the shoot days this entry holds a
+   position on (d.positions), which the Production grid owns. There is nowhere to store a
+   "shoot date" against a person that isn't a shoot day, so the grid refuses the click and
+   says why rather than accepting an edit it would have to throw away.
+
+   ⚠️ Its own state, NOT phaseCalendarFor. That flag belongs to the Pre-Prod/Post tabs' inline
+   calendars; sharing it would mean opening this popup could render one of those tabs expanded
+   underneath, and closing one would close the other. They are never on screen together, and
+   they stay independent so it can't matter.
+   ⚠️ Lives on #globalOverlay, like the roles menu and the two role dialogs, so it survives the
+   re-render that every edit inside it triggers. */
+let datesDialogFor = null;     // entry id, or null
+let datesDialogPhase = 'preprod';
+let datesDialogMonth = null;   // 'YYYY-MM'
+/* ⚠️ THE POPUP NEEDS ITS OWN ANCHOR, because it can be sitting on the SHOOT phase and
+   phaseCalAnchorMonth() cannot: that function reads PHASE_TABS[phase], and PHASE_TABS holds
+   only the two tabs that exist — preprod and post. Passing 'days' to it throws on
+   `.store` of undefined. The shoot anchors on the person's own first shoot date, else the
+   project's first shoot day, else the project start. */
+function datesAnchorMonth(phase, entryId){
+  const marks = datesPhaseMarks(phase, entryId);
+  if(marks.length) return marks[0].slice(0,7);
+  if(phase!=='days') return phaseCalAnchorMonth(phase, entryId);
+  const p = currentProject();
+  const first = projectDays(p && p.id)[0];
+  const iso = (first && first.date) || (p && p.startDate) || '';
+  return /^\d{4}-\d{2}/.test(iso) ? iso.slice(0,7) : new Date().toISOString().slice(0,7);
+}
+function openDatesDialog(entryId, phase){
+  datesDialogFor = entryId;
+  datesDialogPhase = phase || 'preprod';
+  datesDialogMonth = datesAnchorMonth(datesDialogPhase, entryId);
+  renderGlobalOverlay();
+}
+function closeDatesDialog(){ datesDialogFor = null; datesDialogMonth = null; renderGlobalOverlay(); }
+function setDatesDialogPhase(phase){
+  datesDialogPhase = phase;
+  /* re-anchor on the phase you have just switched to, but only when the month you are
+     looking at holds nothing for it — otherwise switching phases to compare two of them in
+     the same month would jump you somewhere else mid-comparison. */
+  const inView = datesPhaseMarks(phase, datesDialogFor).some(iso=>iso.slice(0,7)===datesDialogMonth);
+  if(!inView) datesDialogMonth = datesAnchorMonth(phase, datesDialogFor);
+  renderGlobalOverlay();
+}
+function shiftDatesDialogMonth(delta){
+  if(!datesDialogMonth) return;
+  const [y,m] = datesDialogMonth.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m-1+delta, 1));
+  datesDialogMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  renderGlobalOverlay();
+}
+/* ⚠️ THE ONE READER for "which dates does this entry hold in this phase", and the only place
+   that knows the shoot is derived rather than stored. Everything in the popup — the marks, the
+   counts, the shortfall flag — goes through it, so the read-only phase cannot end up computed
+   two different ways. */
+function datesPhaseMarks(phase, entryId){
+  const p = currentProject(); if(!p || !entryId) return [];
+  if(phase==='days'){
+    return projectDays(p.id).filter(d=>entryOnDay(entryId, d) && /^\d{4}-\d{2}-\d{2}/.test(d.date||''))
+      .map(d=>d.date.slice(0,10)).sort();
+  }
+  return phaseDatesOf(phase, entryId, p);
+}
+/* booked days vs dates marked, per phase.
+   ⚠️ THE SHOOT CANNOT BE SHORT, by construction: its booked figure and its marks are the same
+   set of shoot days, so `booked` reads from the marks rather than from a stored number. */
+function datesPhaseTally(phase, entryId){
+  const p = currentProject();
+  const marked = datesPhaseMarks(phase, entryId).length;
+  const booked = phase==='days' ? marked : (phaseDaysOf(phase, entryId, p) || 0);
+  return { booked, marked, short: Math.max(0, booked - marked) };
+}
+/* any phase on this entry with dates still to place — what the row's button reports */
+const datesEntryShort = entryId =>
+  CREW_PHASES.filter(ph=>ph.view!=='days').reduce((n,ph)=>n + datesPhaseTally(ph.view, entryId).short, 0);
+const datesEntryMarks = entryId =>
+  CREW_PHASES.reduce((n,ph)=>n + datesPhaseMarks(ph.view, entryId).length, 0);
+
+/* the row's cell: one button, carrying how many dates are marked and whether any phase is
+   short — so a shortfall is findable without opening all 41 rows. */
+function datesCellHTML(e){
+  const marks = datesEntryMarks(e.id);
+  const short = datesEntryShort(e.id);
+  const label = short ? `${short} to place` : marks ? `${marks} date${marks===1?'':'s'}` : 'Dates';
+  const title = short
+    ? `${short} booked day${short===1?'':'s'} not yet on the calendar — click to place them`
+    : marks ? `${marks} date${marks===1?'':'s'} marked across prep, the shoot and the edit` : 'No dates marked yet';
+  return `<div class="roles-grid-cell dates-cell" data-label="Dates">
+    <button type="button" class="dates-btn${marks?' has-marks':''}${short?' short':''}"
+      onclick="event.stopPropagation();openDatesDialog('${e.id}')" title="${esc(title)}">
+      ${icon('calendar')}${esc(label)}${short?' <span aria-hidden="true">⚠</span>':''}
+    </button></div>`;
+}
+function datesDialogHTML(){
+  if(!datesDialogFor) return '';
+  const p = currentProject(); if(!p) return '';
+  const e = entryById(datesDialogFor, p); if(!e) return '';
+  const person = crewById(e.crewId) || {};
+  const phases = CREW_PHASES.map(ph=>({
+    ph, cls: ph.view==='preprod' ? 'prep' : ph.view==='days' ? 'shoot' : 'post',
+    tally: datesPhaseTally(ph.view, datesDialogFor)
+  }));
+  const sel = phases.find(x=>x.ph.view===datesDialogPhase) || phases[0];
+  const readonly = sel.ph.view==='days';
+  const ym = datesDialogMonth || datesAnchorMonth(sel.ph.view, datesDialogFor);
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m-1, 1)).getUTCDay() + 6) % 7;   // Monday-first
+  const mine = new Set(datesPhaseMarks(sel.ph.view, datesDialogFor));
+  // the other two phases, for the dots — computed once, not per cell
+  const others = phases.filter(x=>x.ph.view!==sel.ph.view)
+    .map(x=>({cls:x.cls, head:x.ph.head, set:new Set(datesPhaseMarks(x.ph.view, datesDialogFor))}));
+  const cells = [];
+  for(let i=0;i<lead;i++) cells.push('<span class="prep-cal-day empty"></span>');
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hits = others.filter(o=>o.set.has(iso));
+    const dots = hits.length
+      /* `cls` IS the token suffix — prep / shoot / post — so the dot's colour comes straight
+         from the same variable the phase circle and the calendar tint use. */
+      ? `<span class="dates-others">${hits.map(o=>`<i style="background:var(--phase-${o.cls})"></i>`).join('')}</span>` : '';
+    const holds = [mine.has(iso)?sel.ph.head:null].concat(hits.map(o=>o.head)).filter(Boolean);
+    const title = holds.length ? `${fmtDate(iso)||iso} — ${holds.join(' + ')}` : (fmtDate(iso)||iso);
+    /* ⚠️ Same class and the same handlers as the inline calendar, so the click-and-drag
+       machinery (phaseDayDown/phaseDayEnter/prepDragApply and the document mouseup) is shared
+       rather than reimplemented. Safe because only ONE calendar is ever in the DOM: Roles'
+       inline band was removed in this phase, and the Pre-Prod/Post tabs are a different tab
+       body. prepDragApply()'s document-wide querySelector depends on that. */
+    cells.push(`<span class="prep-cal-day${mine.has(iso)?' marked':''}" data-iso="${iso}" title="${esc(title)}"
+      ${readonly?'':`onmousedown="phaseDayDown('${sel.ph.view}','${datesDialogFor}','${iso}',event)" onmouseenter="phaseDayEnter('${iso}')"`}>${d}${dots}</span>`);
+  }
+  const phaseBtn = x => `<button type="button" class="dates-phase ${x.cls}${x.ph.view===sel.ph.view?' on':''}"
+      onclick="setDatesDialogPhase('${x.ph.view}')" aria-pressed="${x.ph.view===sel.ph.view?'true':'false'}">
+      <span class="dates-dot"></span>
+      <span class="dates-phase-lbl">${x.ph.head}</span>
+      <span class="dates-phase-n">${x.tally.marked||'—'}${x.tally.short?' ⚠':''}</span>
+    </button>`;
+  /* ⚠️ THE SHORTFALL FLAG, and it is deliberately ONE-DIRECTIONAL. Marking MORE dates than
+     booked days is a normal, valid state and gets no comment: five days' work spread over six
+     is exactly the case the brief gave. Marking FEWER means a booking with nowhere to be —
+     that is worth saying, so it is said. See PHASE_TABS for the rule this replaced. */
+  const shortHTML = (!readonly && sel.tally.short) ? `<div class="dates-short">
+      <span aria-hidden="true">⚠</span>
+      <span><strong>${sel.tally.short} of ${sel.tally.booked} booked ${sel.ph.head.toLowerCase()} day${sel.tally.booked===1?'':'s'} not on the calendar yet.</strong>
+        Marking more days than booked is fine — five days' work can spread over six — but fewer means a booking with nowhere to sit.</span>
+    </div>` : '';
+  const countHTML = readonly
+    ? `<span class="dates-count">${sel.tally.marked} shoot day${sel.tally.marked===1?'':'s'} — set on the Production tab</span>`
+    : `<span class="dates-count">${sel.tally.booked||'No'} day${sel.tally.booked===1?'':'s'} booked · ${sel.tally.marked} marked</span>`;
+  return `<div class="modal-overlay" onclick="if(event.target===this) closeDatesDialog()">
+    <div class="modal-box dates-box" onclick="event.stopPropagation()">
+      <div class="dates-head">
+        <div class="dates-name">${esc(person.name||'—')}</div>
+        <div class="dates-role">${esc(e.showAs||e.role||'')}</div>
+      </div>
+      <div class="dates-phases">${phases.map(phaseBtn).join('')}</div>
+      <div class="prep-cal dates-cal ${sel.cls}${readonly?' readonly':''}">
+        <div class="prep-cal-head">
+          <span class="prep-cal-nav" onclick="shiftDatesDialogMonth(-1)" title="Previous month">‹</span>
+          <span class="prep-cal-title">${PREP_MONTH_NAMES[m-1]} ${y}</span>
+          <span class="prep-cal-nav" onclick="shiftDatesDialogMonth(1)" title="Next month">›</span>
+          ${(!readonly && mine.size) ? `<span class="prep-cal-clear" onclick="clearPhaseDates('${sel.ph.view}','${datesDialogFor}')">Clear ${esc(sel.ph.head.toLowerCase())}</span>` : ''}
+        </div>
+        <div class="prep-cal-grid">
+          ${PREP_WEEKDAYS.map(w=>`<span class="prep-cal-wd">${w}</span>`).join('')}
+          ${cells.join('')}
+        </div>
+      </div>
+      ${shortHTML}
+      <div class="dates-foot">
+        ${countHTML}
+        <button class="small" style="margin-left:auto;" onclick="closeDatesDialog()">Done</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">${readonly
+        ? 'Shoot dates come from the shoot days this person is on — tick those on the Production tab, or from the Shoot column on Roles.'
+        : 'Click or drag to mark the days. Dots under a date are the other phases, so you can see where they overlap.'}</div>
+    </div>
+  </div>`;
+}
 function phaseCalendarHTML(phase, entryId){
   const ym = phaseCalMonth || phaseCalAnchorMonth(phase, entryId);
   const [y, m] = ym.split('-').map(Number);
