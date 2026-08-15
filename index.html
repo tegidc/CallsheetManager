@@ -3591,6 +3591,32 @@ function filterToggleHTML({open=false, count=0, onToggle='', inverted=false} = {
       inverted ? ` <span class="filter-inverted" title="Showing everyone who does NOT match the filter">inverted</span>` : ''}
   </span>`;
 }
+/* ---- ONE FILTER PANEL (D8, 15 Aug 2026) ----
+   Every filter panel — Crew tab, Budget, Crew Database — renders through this one
+   component, modelled on the Crew tab's panel. Position and features stay in step
+   across tabs by construction; a future tab's filter is a new spec, not a new panel. */
+const roleNameOf = rp => rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+function filterChipsHTML(items, emptyHint){
+  if(!items || !items.length) return `<span class="hint">${emptyHint||'—'}</span>`;
+  return items.map(i=>`<label><input type="checkbox" ${i.checked?'checked':''} onchange="${i.onchange}"> ${i.label}</label>`).join('');
+}
+function filterPanelHTML(spec){
+  const selects = (spec.selects||[]).filter(Boolean);
+  const selectsRow = selects.length ? `<div class="grid g${Math.min(selects.length,3)}">${selects.map(sel=>
+    `<div><label${sel.id?` for="${sel.id}"`:''}>${sel.label}</label><select ${sel.id?`id="${sel.id}" `:''}onchange="${sel.onchange}">${
+      sel.options.map(o=>`<option value="${o.v}" ${o.selected?'selected':''}>${o.label}</option>`).join('')}</select></div>`).join('')}</div>` : '';
+  const sections = (spec.sections||[]).filter(Boolean).map((sec,i)=>{
+    const mt = (i===0 && !selects.length) ? '' : ' style="margin-top:10px;"';
+    if(sec.collapsible){
+      return `<div${mt}>
+        <div class="hint" style="margin-bottom:4px;cursor:pointer;" onclick="${sec.collapsible.onToggle}"><span class="dept-caret">${sec.collapsible.open?'▾':'▸'}</span> ${sec.title}${sec.collapsible.countLabel||''}</div>
+        ${sec.collapsible.open ? `<div class="filter-chips">${sec.body}</div>` : ''}
+      </div>`;
+    }
+    return `<div${mt}><div class="hint" style="margin-bottom:4px;">${sec.title}</div>${sec.raw ? sec.body : `<div class="filter-chips">${sec.body}</div>`}</div>`;
+  }).join('');
+  return `<div class="filter-panel">${selectsRow}${sections}${filterPanelFootHTML(spec.foot||{})}</div>`;
+}
 
 let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:true, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
 let projectCrewFilterOpen = false;
@@ -3751,58 +3777,41 @@ function projectCrewActiveFilterCount(){
 }
 function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
-  const activeCount = projectCrewActiveFilterCount();   // gates the shared foot's Clear link
+  const activeCount = projectCrewActiveFilterCount();
   const rolesInUse = [...new Set(assignedAll.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
-  const deptChecks = DEPARTMENTS.filter(d=>assignedAll.some(c=>deptBucketKey(c.department)===d))
-    .map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleProjectFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
-  const roleChecks = rolesInUse.length ? rolesInUse.map(rp=>{
-      const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
-      return `<label><input type="checkbox" ${f.roles.has(rp)?'checked':''} onchange="toggleProjectFilterRole('${esc(rp)}', this.checked)"> ${esc(name)}</label>`;
-    }).join('') : '<span class="hint">No saved roles on this project yet.</span>';
-  const dayChecks = (days||[]).length ? (days||[]).map(d=>
-      `<label><input type="checkbox" ${f.days.has(d.id)?'checked':''} onchange="toggleProjectFilterDay('${d.id}', this.checked)"> Day ${esc(d.dayNum||'?')}</label>`
-    ).join('') : '<span class="hint">No shoot days yet.</span>';
-  return `<div class="filter-panel">
-    <div class="grid g2">
-      <div><label>Group by</label><select onchange="setProjectFilterField('groupBy', this.value)">
-        <option value="dept" ${f.groupBy==='dept'?'selected':''}>Department</option>
-        <option value="deptCompany" ${f.groupBy==='deptCompany'?'selected':''}>Department &amp; company</option>
-        <option value="role" ${f.groupBy==='role'?'selected':''}>Role</option>
-        <option value="personType" ${f.groupBy==='personType'?'selected':''}>Crew / Talent / Client</option>
-        <option value="hotel" ${f.groupBy==='hotel'?'selected':''}>Has hotel / No hotel</option>
-        <option value="travel" ${f.groupBy==='travel'?'selected':''}>Travel method</option>
-        <option value="vat" ${f.groupBy==='vat'?'selected':''}>VAT registered</option>
-        <option value="catering" ${f.groupBy==='catering'?'selected':''}>Catering / dietary type</option>
-        <option value="seniority" ${f.groupBy==='seniority'?'selected':''}>Seniority</option>
-        <option value="daysOnSite" ${f.groupBy==='daysOnSite'?'selected':''}>Shoot day on site</option>
-        <option value="none" ${f.groupBy==='none'?'selected':''}>None (flat list)</option>
-      </select></div>
-      <div><label>Sort</label><select onchange="setProjectFilterField('sort', this.value)">
-        <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
-        <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
-        <option value="role" ${f.sort==='role'?'selected':''}>By role</option>
-        <option value="seniority" ${f.sort==='seniority'?'selected':''}>By seniority</option>
-        <option value="company" ${f.sort==='company'?'selected':''}>By company</option>
-        <option value="daysCount" ${f.sort==='daysCount'?'selected':''}>By days on site (most first)</option>
-        <option value="added" ${f.sort==='added'?'selected':''}>By date added to project</option>
-      </select></div>
-    </div>
-    <div style="margin-top:14px;"><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks||'<span class="hint">—</span>'}</div></div>
-    <div style="margin-top:10px;">
-      <div class="hint" style="margin-bottom:4px;cursor:pointer;" onclick="toggleProjectFilterRolesSection()"><span class="dept-caret">${projectCrewFilterRolesOpen?'▾':'▸'}</span> Roles${f.roles.size?` (${f.roles.size} selected)`:''}</div>
-      ${projectCrewFilterRolesOpen ? `<div class="filter-chips">${roleChecks}</div>` : ''}
-    </div>
-    <div style="margin-top:10px;">
-      <div class="hint" style="margin-bottom:4px;">Days <span style="text-transform:none;">(who's on which shoot day)</span></div>
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-        <div class="filter-chips">${dayChecks}</div>
+  const opt = (v, label, cur) => ({v, label, selected: cur===v});
+  const dayChips = filterChipsHTML((days||[]).map(d=>({checked:f.days.has(d.id), onchange:`toggleProjectFilterDay('${d.id}', this.checked)`, label:`Day ${esc(d.dayNum||'?')}`})), 'No shoot days yet.');
+  return filterPanelHTML({
+    selects: [
+      { label:'Group by', onchange:"setProjectFilterField('groupBy', this.value)", options: [
+        opt('dept','Department',f.groupBy), opt('deptCompany','Department &amp; company',f.groupBy),
+        opt('role','Role',f.groupBy), opt('personType','Crew / Talent / Client',f.groupBy),
+        opt('hotel','Has hotel / No hotel',f.groupBy), opt('travel','Travel method',f.groupBy),
+        opt('vat','VAT registered',f.groupBy), opt('catering','Catering / dietary type',f.groupBy),
+        opt('seniority','Seniority',f.groupBy), opt('daysOnSite','Shoot day on site',f.groupBy),
+        opt('none','None (flat list)',f.groupBy) ] },
+      { label:'Sort', onchange:"setProjectFilterField('sort', this.value)", options: [
+        opt('dept','By department (HoD first)',f.sort), opt('name','By name',f.sort),
+        opt('role','By role',f.sort), opt('seniority','By seniority',f.sort),
+        opt('company','By company',f.sort), opt('daysCount','By days on site (most first)',f.sort),
+        opt('added','By date added to project',f.sort) ] },
+    ],
+    sections: [
+      { title:'Departments', body: filterChipsHTML(DEPARTMENTS.filter(d=>assignedAll.some(c=>deptBucketKey(c.department)===d))
+          .map(d=>({checked:f.depts.has(d), onchange:`toggleProjectFilterDept('${d}', this.checked)`, label:esc(d)}))) },
+      { title:'Roles', collapsible:{ open:projectCrewFilterRolesOpen, onToggle:'toggleProjectFilterRolesSection()',
+          countLabel: f.roles.size?` (${f.roles.size} selected)`:'' },
+        body: rolesInUse.length ? filterChipsHTML(rolesInUse.map(rp=>({checked:f.roles.has(rp), onchange:`toggleProjectFilterRole('${esc(rp)}', this.checked)`, label:esc(roleNameOf(rp))}))) : '<span class="hint">No saved roles on this project yet.</span>' },
+      { title:'Days <span style="text-transform:none;">(who\'s on which shoot day)</span>', raw:true,
+        body: `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div class="filter-chips">${dayChips}</div>
         ${f.days.size>1 ? `<select onchange="setProjectFilterField('daysMode', this.value)" style="width:auto;">
           <option value="or" ${f.daysMode==='or'?'selected':''}>Any of these days</option>
           <option value="and" ${f.daysMode==='and'?'selected':''}>All of these days</option>
         </select>` : ''}
-      </div>
-    </div>
-    ${filterPanelFootHTML({
+      </div>` },
+    ],
+    foot: {
       controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
       <label title="Show everyone who does NOT match the filter above, instead of everyone who does"><input type="checkbox" ${f.inverse?'checked':''} onchange="toggleProjectFilterFlag('inverse', this.checked)"> Inverse</label>`,
@@ -3810,8 +3819,8 @@ function projectCrewFilterPanelHTML(assignedAll, days){
                         : 'Showing everyone on this project. Tick anything above to narrow the list.',
       active: activeCount>0,
       onClear: 'clearProjectCrewFilter()'
-    })}
-  </div>`;
+    }
+  });
 }
 function toggleSelectAllFilteredCrew(idsCSV, checked){
   const ids = idsCSV ? idsCSV.split(',') : [];
@@ -6867,44 +6876,34 @@ function budgetScopeParts(){
 
 function budgetFilterPanelHTML(){
   const all = projectDays();
-  const chips = all.length ? all.map(d=>
-      `<label><input type="checkbox" ${budgetDayFilter.has(d.id)?'checked':''} onchange="toggleBudgetFilterDay('${d.id}', this.checked)"> Day ${esc(d.dayNum||'?')}</label>`
-    ).join('') : '<span class="hint">No shoot days yet.</span>';
-  // Only departments actually present on this project — same rule as the Crew panel.
   const p = currentProject();
+  const f = projectCrewFilter;   // ⚠️ dept/exclude boxes write the SHARED crew filter, deliberately
+  const opt = (v, label, cur) => ({v, label, selected: cur===v});
   const present = DEPARTMENTS.filter(d=>projectEntryViews(p).some(c=>deptBucketKey(c.department)===d));
-  /* ⚠️ These write projectCrewFilter — the Crew tab's own state — not a budget-local
-     copy. Same boxes, same effect, whichever screen you tick them on. */
-  const deptChips = present.length ? present.map(d=>
-      `<label><input type="checkbox" ${projectCrewFilter.depts.has(d)?'checked':''} onchange="toggleProjectFilterDept('${d}', this.checked); renderProjectBody();"> ${esc(d)}</label>`
-    ).join('') : '<span class="hint">No crew on this project yet.</span>';
-  const excludeChips = `<label><input type="checkbox" ${projectCrewFilter.excludeTalent?'checked':''} onchange="projectCrewFilter.excludeTalent=this.checked; renderProjectBody();"> Exclude Talent</label>
-    <label><input type="checkbox" ${projectCrewFilter.excludeOtherCompanies?'checked':''} onchange="projectCrewFilter.excludeOtherCompanies=this.checked; renderProjectBody();"> Exclude other companies</label>`;
-  const dn = projectCrewFilter.depts.size;
+  const dn = f.depts.size;
   const scope = budgetScopeParts();
   if(dn) scope.push(`${dn} department${dn>1?'s':''}`);
-  return `<div class="filter-panel">
-    <div><div class="hint" style="margin-bottom:4px;">Shoot days</div><div class="filter-chips">${chips}</div></div>
-    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Departments <span style="opacity:.7;">— shared with the Crew tab's filter</span></div><div class="filter-chips">${deptChips}</div></div>
-    <div style="margin-top:10px;"><div class="filter-chips">${excludeChips}</div></div>
-    <div class="grid g3" style="margin-top:10px;">
-      <div><label for="budgetSortPick">Sort (Per Person)</label>
-        <select id="budgetSortPick" onchange="setBudgetSort(this.value)">
-          <option value="dept"     ${budgetSort==='dept'?'selected':''}>By department (HoD first)</option>
-          <option value="name"     ${budgetSort==='name'?'selected':''}>By name</option>
-          <option value="cost"     ${budgetSort==='cost'?'selected':''}>By cost (highest first)</option>
-          <option value="rate"     ${budgetSort==='rate'?'selected':''}>By day rate (highest first)</option>
-          <option value="days"     ${budgetSort==='days'?'selected':''}>By days worked (most first)</option>
-          <option value="noRate"   ${budgetSort==='noRate'?'selected':''}>Missing a day rate first</option>
-        </select></div>
-    </div>
-    ${filterPanelFootHTML({
+  return filterPanelHTML({
+    selects: [
+      { label:'Sort (Per Person)', id:'budgetSortPick', onchange:'setBudgetSort(this.value)', options: [
+        opt('dept','By department (HoD first)',budgetSort), opt('name','By name',budgetSort),
+        opt('cost','By cost (highest first)',budgetSort), opt('rate','By day rate (highest first)',budgetSort),
+        opt('days','By days worked (most first)',budgetSort), opt('noRate','Missing a day rate first',budgetSort) ] },
+    ],
+    sections: [
+      { title:'Shoot days', body: filterChipsHTML(all.map(d=>({checked:budgetDayFilter.has(d.id), onchange:`toggleBudgetFilterDay('${d.id}', this.checked)`, label:`Day ${esc(d.dayNum||'?')}`})), 'No shoot days yet.') },
+      { title:'Departments <span style="opacity:.7;">— shared with the Crew tab\'s filter</span>',
+        body: filterChipsHTML(present.map(d=>({checked:f.depts.has(d), onchange:`toggleProjectFilterDept('${d}', this.checked); renderProjectBody();`, label:esc(d)})), 'No crew on this project yet.') },
+    ],
+    foot: {
+      controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="projectCrewFilter.excludeTalent=this.checked; renderProjectBody();"> Exclude Talent</label>
+      <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="projectCrewFilter.excludeOtherCompanies=this.checked; renderProjectBody();"> Exclude other companies</label>`,
       hint: scope.length ? `Costing ${scope.join(' · ')} — every figure below is for those only.`
                          : 'Whole project. Tick any day or department to narrow it.',
-      active: budgetActiveFilterCount()>0,   // === scope.length; this panel's gating is unchanged
+      active: budgetActiveFilterCount()>0,
       onClear: 'clearBudgetFilter()'
-    })}
-  </div>`;
+    }
+  });
 }
 
 function buildBudgetData(){
@@ -7753,6 +7752,8 @@ function shootDayReductionPanelHTML(days){
 
 let crewDbFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, sort:'dept' };
 let crewDbFilterOpen = false;
+let crewDbFilterRolesOpen = false;
+function toggleCrewDbFilterRolesSection(){ crewDbFilterRolesOpen = !crewDbFilterRolesOpen; refreshCrewDatabase(); }
 let crewSearchQuery = '';   // kept outside the DOM so filter-panel re-renders don't clear the search box
 function personMatchesCrewDbFilter(c){ return matchesCrewFilterState(c, crewDbFilter); }
 function toggleCrewDbFilterPanel(){ crewDbFilterOpen = !crewDbFilterOpen; refreshCrewDatabase(); }
@@ -7776,36 +7777,32 @@ function crewDbActiveFilterCount(){
 }
 function crewDbFilterPanelHTML(){
   const f = crewDbFilter;
-  const activeCount = crewDbActiveFilterCount();        // gates the shared foot's Clear link
+  const activeCount = crewDbActiveFilterCount();
+  const opt = (v, label, cur) => ({v, label, selected: cur===v});
   const companies = [...new Set(crewDB.map(c=>c.coProductionCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const rolesInUse = [...new Set(crewDB.flatMap(c=>c.roles||[]))].sort((a,b)=>a.localeCompare(b));
-  const deptChecks = DEPARTMENTS.map(d=>`<label><input type="checkbox" ${f.depts.has(d)?'checked':''} onchange="toggleCrewDbFilterDept('${d}', this.checked)"> ${esc(d)}</label>`).join('');
-  const roleChecks = rolesInUse.length ? rolesInUse.map(rp=>{
-      const name = rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
-      return `<label><input type="checkbox" ${f.roles.has(rp)?'checked':''} onchange="toggleCrewDbFilterRole('${esc(rp)}', this.checked)"> ${esc(name)}</label>`;
-    }).join('') : '<span class="hint">No saved roles yet.</span>';
-  return `<div class="filter-panel">
-    <div><div class="hint" style="margin-bottom:4px;">Departments</div><div class="filter-chips">${deptChecks}</div></div>
-    <div class="grid g2" style="margin-top:10px;">
-      <div><label>Lead company</label><select onchange="setCrewDbFilterField('company', this.value)">
-        <option value="">All companies</option>
-        ${companies.map(co=>`<option value="${esc(co)}" ${f.company===co?'selected':''}>${esc(co)}</option>`).join('')}
-      </select></div>
-      <div><label>Sort</label><select onchange="setCrewDbFilterField('sort', this.value)">
-        <option value="dept" ${f.sort==='dept'?'selected':''}>By department (HoD first)</option>
-        <option value="name" ${f.sort==='name'?'selected':''}>By name</option>
-      </select></div>
-    </div>
-    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Roles</div><div class="filter-chips">${roleChecks}</div></div>
-    ${filterPanelFootHTML({
+  return filterPanelHTML({
+    selects: [
+      { label:'Lead company', onchange:"setCrewDbFilterField('company', this.value)", options:
+        [ {v:'', label:'All companies', selected:!f.company} ].concat(companies.map(co=>opt(co, esc(co), f.company))) },
+      { label:'Sort', onchange:"setCrewDbFilterField('sort', this.value)", options: [
+        opt('dept','By department (HoD first)',f.sort), opt('name','By name',f.sort) ] },
+    ],
+    sections: [
+      { title:'Departments', body: filterChipsHTML(DEPARTMENTS.map(d=>({checked:f.depts.has(d), onchange:`toggleCrewDbFilterDept('${d}', this.checked)`, label:esc(d)}))) },
+      { title:'Roles', collapsible:{ open:crewDbFilterRolesOpen, onToggle:'toggleCrewDbFilterRolesSection()',
+          countLabel: f.roles.size?` (${f.roles.size} selected)`:'' },
+        body: rolesInUse.length ? filterChipsHTML(rolesInUse.map(rp=>({checked:f.roles.has(rp), onchange:`toggleCrewDbFilterRole('${esc(rp)}', this.checked)`, label:esc(roleNameOf(rp))}))) : '<span class="hint">No saved roles yet.</span>' },
+    ],
+    foot: {
       controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleCrewDbFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleCrewDbFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>`,
       hint: activeCount ? `${activeCount} filter${activeCount>1?'s':''} active — the list below is narrowed.`
                         : 'Showing the whole database. Tick anything above to narrow the list.',
       active: activeCount>0,
       onClear: 'clearCrewDbFilter()'
-    })}
-  </div>`;
+    }
+  });
 }
 const isCrewDbTalent  = c => deptBucketKey(c.department)==='Talent';
 const isCrewDbClient  = c => deptBucketKey(c.department)==='Client';
