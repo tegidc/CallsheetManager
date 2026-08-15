@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15 Aug Cleanup — what was done &amp; what needs your call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --disp:'Fraunces',Georgia,serif; --label:'Oswald',sans-serif; --body:'Jost',system-ui,sans-serif;
+    --tape:#017756; --tape-light:#0FA47A; --text:#110A08; --muted:#6b625e;
+    --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05);
+    --tint-3:rgba(1,119,86,.10); --tint-4:rgba(1,119,86,.14);
+    --warn:#a33; --warn-tint:rgba(170,51,51,.07);
+    --paper:#FBFAF8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--text); font-family:var(--body); font-size:14px; line-height:1.55;}
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 20px 80px;}
+  h1{font-family:var(--disp); font-weight:700; font-size:26px; text-transform:uppercase; margin:0 0 4px; letter-spacing:.3px;}
+  .eyebrow{color:var(--muted); font-size:13px; margin-bottom:22px;}
+  h2{font-family:var(--disp); font-weight:700; font-size:17px; color:var(--tape);
+     display:flex; align-items:center; gap:10px; margin:38px 0 6px;}
+  h2 .n{font-family:var(--label); font-size:11px; letter-spacing:1.5px; background:var(--tint-3);
+     border-radius:4px; padding:2px 8px; text-transform:uppercase;}
+  .sub{color:var(--muted); margin:0 0 14px; max-width:860px;}
+  .card{border:1px solid var(--line); border-radius:10px; background:#fff; padding:16px 18px; margin-bottom:12px;}
+  .card h3{font-family:var(--label); font-size:12px; letter-spacing:1.4px; text-transform:uppercase; margin:0 0 6px; color:var(--tape);}
+  .card p{margin:6px 0; max-width:900px;}
+  .done-list{list-style:none; padding:0; margin:0;}
+  .done-list li{padding:10px 0; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:flex-start;}
+  .done-list li:last-child{border-bottom:none;}
+  .tick{flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--tint-3); color:var(--tape);
+     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; margin-top:1px;}
+  .done-list strong{font-weight:600;}
+  .done-list .why{color:var(--muted); display:block; margin-top:2px;}
+  .warnbox{border:1px solid rgba(170,51,51,.35); background:var(--warn-tint); border-radius:10px; padding:14px 18px; margin:10px 0 16px; max-width:960px;}
+  .warnbox strong{color:var(--warn);}
+  .bars{max-width:760px; margin:14px 0;}
+  .bar{display:flex; align-items:center; gap:10px; margin-bottom:7px;}
+  .bar .lbl{flex:0 0 240px; font-size:13px; text-align:right; color:var(--muted);}
+  .bar .track{flex:1; background:var(--tint-1); border-radius:4px; height:20px; position:relative;}
+  .bar .fill{position:absolute; inset:0 auto 0 0; background:var(--tape-light); opacity:.75; border-radius:4px;}
+  .bar .val{flex:0 0 120px; font-size:12px; color:var(--muted);}
+  table.dec{width:100%; border-collapse:collapse; margin-top:10px;}
+  table.dec th{font-family:var(--label); font-size:11px; letter-spacing:1.3px; text-transform:uppercase;
+     color:var(--muted); text-align:left; padding:8px 10px; border-bottom:2px solid var(--field-line);}
+  table.dec td{padding:14px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr.done td{background:var(--tint-1);}
+  .dec .id{font-family:var(--label); font-size:12px; letter-spacing:1px; color:var(--tape); white-space:nowrap;}
+  .dec .what strong{font-weight:600;}
+  .dec .what .why{color:var(--muted); display:block; margin-top:4px; max-width:640px;}
+  .dec .what .aside{display:block; margin-top:6px; font-size:12.5px; color:var(--tape); background:var(--tint-2); border-radius:6px; padding:6px 9px; max-width:640px;}
+  .size{font-family:var(--label); font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); white-space:nowrap;}
+  .pick{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+     border:1px solid var(--field-line); background:#fff; border-radius:5px; padding:5px 11px; cursor:pointer; margin:0 4px 4px 0;}
+  .pick.on{background:var(--tape); border-color:var(--tape); color:#fff;}
+  .pick.on.later{background:#8a6d1a; border-color:#8a6d1a;}
+  .pick.on.no{background:var(--warn); border-color:var(--warn);}
+  td textarea{width:100%; min-height:34px; border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+     font-family:var(--body); font-size:13px; resize:vertical; background:var(--paper);}
+  .toolbar{display:flex; align-items:center; gap:14px; margin:18px 0 8px; flex-wrap:wrap;}
+  .toolbar button{font-family:var(--label); font-size:12px; letter-spacing:1.2px; text-transform:uppercase;
+     border:1px solid var(--tape); background:var(--tape); color:#fff; border-radius:6px; padding:9px 16px; cursor:pointer;}
+  .toolbar button.ghost{background:#fff; color:var(--tape);}
+  #count,#count2{color:var(--muted); font-size:13px;}
+  #out{display:none; width:100%; min-height:220px; margin-top:12px; border:1px solid var(--field-line);
+     border-radius:8px; padding:12px; font:12.5px/1.5 ui-monospace,Menlo,monospace; background:#fff;}
+  @media(max-width:760px){ .bar .lbl{flex-basis:130px;} .dec .sizecol{display:none;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>15 Aug Cleanup review</h1>
+<div class="eyebrow">Full-site audit &amp; safe cleanup · everything below happened on a local branch (<code>cleanup-audit</code>) — the live site is untouched until you approve · answer the decisions at the bottom and press <b>Export</b>, then paste the result back to Claude</div>
+
+<h2><span class="n">Part 1</span> What was already done (safe changes, live after you approve the branch)</h2>
+<p class="sub">None of these change how the app looks or behaves day-to-day — with three tiny exceptions flagged below. Every change was verified by loading the app and clicking through every tab afterwards.</p>
+
+<div class="card">
+<ul class="done-list">
+  <li><span class="tick">✓</span><div><strong>Old review pages moved to an <code>/archive</code> folder.</strong><span class="why">The eight mockup/review pages from earlier sessions (style audits, gate 1, sort-group…) now live in <code>/archive</code> so the repo root is just the app. They still open at their new address; nothing in the app linked to them.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>A data-loss trap was closed — this is the most important change.</strong><span class="why">Before: if the app failed to <em>read</em> your data at startup (bad hotel wi-fi, a database blip), it couldn't tell that apart from "brand new empty database" — so it could quietly overwrite your real crew, projects and shoot days with the built-in sample data, or save an empty list over a full one, all while showing "Saved". Now a failed read switches saving off for that data, shows a clear red banner, and tells you to reload. Your stored data can no longer be overwritten by a connection hiccup.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>The app starts faster.</strong><span class="why">The nine pieces of stored data used to load one-after-another (nine round trips to the database before anything appeared). They now load all at once — on slow connections this cuts the wait to roughly one round trip.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>Tablet scrolling on Roles is fixed.</strong><span class="why">The Roles table sat inside its own scrolling box that deliberately stopped scrolling "escaping" to the page — fine with a mouse, but on a tablet your finger could never scroll the page from inside the table. On touch screens the table now flows down the page normally (sideways swiping within it still works). This was your reported issue.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>Verified dead code removed (~150 lines).</strong><span class="why">A leftover Budget department filter that no button could reach, two unused display options, five unused icons, seven dead styling rules, nine leftover element labels, and two never-called blocks in Catering/Travel. All verified unreachable before removal; the code map (MAP.md) was corrected to match.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>Three small bug fixes</strong> — the visible exceptions:<span class="why">1) A <em>negative</em> day rate (e.g. −500) was accepted in the Roles rate box and flowed straight into Budget totals; it's now rejected like every other money field. 2) Rates in the crew form showed as "£1200.00" while everywhere else shows "£1,200.00" — now consistent. 3) The weather "fetched" date could show American-style on some devices — now matches every other date in the app.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>The database library is pinned to an exact version.</strong><span class="why">The site used to load "whatever the latest version is" of the Supabase library — a bad release or tampered file would reach your live site instantly. It's now locked to the exact version you're already running, with a fingerprint check.</span></div></li>
+  <li><span class="tick">✓</span><div><strong>The AI-chat server function is hardened (written, not yet deployed).</strong><span class="why">Size limits so a stranger can't run huge prompts on your Anthropic key, a timeout, and cleaner error messages that no longer leak internal details. Takes effect only when deployed — see decision D2.</span></div></li>
+</ul>
+</div>
+
+<h2><span class="n">Part 2</span> Where the 13,800 lines actually go</h2>
+<p class="sub">You asked whether the site is really "a few datasets and lookup tables plus styling" carrying accumulated baggage. Measured answer: your instinct is right, but the weight isn't where you'd guess. The actual lookup tables are ~135 lines — one percent. The app's genuine brain (budget arithmetic, the crew-entry model, the save/merge system) is ~1,700 lines and is <em>good</em> — worth keeping exactly as is. The rest:</p>
+
+<div class="card">
+<div class="bars">
+  <div class="bar"><span class="lbl">Explanatory notes &amp; history</span><span class="track"><span class="fill" style="width:33%"></span></span><span class="val">~4,600 · 33%</span></div>
+  <div class="bar"><span class="lbl">Hand-built screens &amp; UI bookkeeping</span><span class="track"><span class="fill" style="width:31%"></span></span><span class="val">~4,300 · 31%</span></div>
+  <div class="bar"><span class="lbl">The app's real brain</span><span class="track"><span class="fill" style="width:14%"></span></span><span class="val">~1,900 · 14%</span></div>
+  <div class="bar"><span class="lbl">Styling</span><span class="track"><span class="fill" style="width:7%"></span></span><span class="val">~1,000 · 7%</span></div>
+  <div class="bar"><span class="lbl">Built-in sample project</span><span class="track"><span class="fill" style="width:4%"></span></span><span class="val">~580 · 4%</span></div>
+  <div class="bar"><span class="lbl">One-time data converters (spent)</span><span class="track"><span class="fill" style="width:2%"></span></span><span class="val">~240 · 2%</span></div>
+  <div class="bar"><span class="lbl">Lookup tables</span><span class="track"><span class="fill" style="width:1%"></span></span><span class="val">~135 · 1%</span></div>
+  <div class="bar"><span class="lbl">Everything else (startup, icons, undo…)</span><span class="track"><span class="fill" style="width:8%"></span></span><span class="val">~1,050 · 8%</span></div>
+</div>
+<p><strong>The single biggest weight is prose:</strong> a third of the file is written history of its own construction ("in Phase X this moved because…"), maintained in parallel with MAP.md — which already records the same reasoning and is where it belongs.</p>
+<p><strong>The baggage you suspected is real and is the second biggest weight:</strong> the same jobs built independently several times — <b>11</b> hand-built tables/grids (Roles has the best one; the others each reinvent it), <b>5</b> separate "estimate with an override" systems (crew rates, location costs, tech specs, cameras, day overrides), <b>3</b> filter panels (why the filter changes shape between tabs), <b>2</b> calendars, and <b>5</b> different routes to create a shoot day. That's ~1,800 lines that could be ~700 — and it's also why tabs drift apart visually: each copy evolves alone.</p>
+<p>A lean rebuild with identical features would be roughly <b>3,500 lines — a quarter of today's size</b>. That's not a recommendation to rebuild (your iterative approach is working); it's the honest measure of how much of the file is baggage versus brain.</p>
+</div>
+
+<h2><span class="n">Part 3</span> One thing you should know about before anything else</h2>
+<div class="warnbox">
+<p><strong>The database is currently open to the public, and so is the AI chat.</strong> This isn't a bug from this week — it's how the project was originally set up. The site is a public page, and the key it uses to talk to the database is (by design, for this kind of setup) visible to anyone who views the page source. What's supposed to make that safe is rules on the database itself saying who can read and write. I checked the live rules: they currently say <em>everyone</em> may read and write everything.</p>
+<p>In practice: anyone who found the site could read — or change — the whole crew database (phone numbers, home addresses, day rates, dietary needs, car registrations), every project and every budget. Notably, your .gitignore already keeps day-rate exports out of the public repo for exactly this reason — but the live database serves the same information to anyone who asks. The same applies to the AI chat: anyone could use it as a free door to your Anthropic account.</p>
+<p><strong>The fix is a proper login</strong> (email + password for you, and later maybe a second user), plus database rules that say "only signed-in users". That's decision <b>D1</b> below — it needs your go-ahead because it changes how you open the app (one sign-in, remembered on your devices) and it touches the live database, which I won't do without you.</p>
+</div>
+
+<h2><span class="n">Part 4</span> Decisions</h2>
+<p class="sub">Click <b>Yes</b> / <b>Later</b> / <b>No</b> on each and add notes where you have opinions. Nothing here has been done — these are proposals. "Size" is roughly how much re-testing it puts on you.</p>
+
+<div class="toolbar">
+  <span id="count"></span>
+  <button class="ghost" onclick="clearAll()">Clear all</button>
+</div>
+
+<table class="dec" id="tbl">
+<tr><th style="width:52px">#</th><th>Proposal</th><th class="sizecol" style="width:90px">Size</th><th style="width:190px">Your call</th><th style="width:230px">Notes</th></tr>
+</table>
+
+<div class="toolbar">
+  <button onclick="exportDecisions()">Export my answers</button>
+  <span id="count2"></span>
+</div>
+<textarea id="out" readonly></textarea>
+
+<script>
+const RECS = [
+ {id:'D1', area:'Security', size:'Medium', what:'Add a login and lock the database to signed-in users.',
+  why:'Closes the open-database and open-AI-chat issues in Part 3. You would sign in once per device; sharing later (e.g. a producer) becomes possible properly. I would build and test it on the branch, and only touch the live database rules with you present.',
+  aside:'Strongly recommended first — every other improvement matters less while the data is publicly writable.'},
+ {id:'D2', area:'Backend', size:'Tiny', what:'Deploy the already-written hardening of the AI chat function.',
+  why:'The size limits, timeout and cleaner errors from Part 1 sit in the repo until deployed. If D1 is a yes, best deployed together with the login check added; if D1 is later, deploying the caps alone still helps.'},
+ {id:'D3', area:'Budget', size:'Small', what:'Make the Budget extras rows (Travel, Catering, Hotels, Locations) respect the crew filter, like the per-person rows already do.',
+  why:'Today, if you filter people out of Budget (and by default Talent and other-company people are excluded), their day-rate costs leave the totals — but their travel/catering/hotel costs stay in. The comments in the code claim otherwise; the code disagrees. Fixing it changes displayed totals on live projects, which is why it needs your yes.',
+  aside:'Alternative if you prefer current behaviour: I make the on-screen wording honest about extras ignoring the filter.'},
+ {id:'D4', area:'Speed', size:'Small', what:'Load the Excel and Word libraries only when actually needed.',
+  why:'Two of the three libraries the page loads (Excel export ~900KB, Word reading for AI-chat attachments) are needed only when you export or attach — but every visitor downloads them before the page appears. Loading them on first use would make first load noticeably lighter, especially on set.'},
+ {id:'D5', area:'Weight', size:'Medium', what:'Slim the in-file commentary (the 33%) down to short pointers, with MAP.md as the single home of the reasoning.',
+  why:'Cuts roughly 4,000 lines and a third of the download without touching a single line of behaviour. The reasoning is not lost — MAP.md already holds it and would stay maintained. Riskless to the app itself; the cost is that future sessions read MAP.md alongside the code (which they already should).'},
+ {id:'D6', area:'Weight', size:'Small', what:'Move the built-in sample project out of the app file.',
+  why:'580 lines (4%) is a demo dataset every visitor downloads. It only ever runs on a completely empty database. It can live in a separate file fetched just for that first-run case — same behaviour, lighter page.'},
+ {id:'D7', area:'Weight', size:'Small', what:'Retire the six one-time data converters.',
+  why:'~240 lines that reshaped old data into new shapes (e.g. crew entries). They run silently on every load, forever, doing nothing once all data is converted. I would first verify your live data is fully converted, then remove them.'},
+ {id:'D8', area:'Consistency', size:'Medium', what:'One filter panel everywhere, modelled on the one you like best.',
+  why:'The filter differing between tabs is built-in today: three separate implementations. This makes them one, so position and features stop drifting — and future tabs get filtering for free. Tell me in the notes which tab’s filter feels right (Crew? Budget? Crew Database?) and that becomes the model.'},
+ {id:'D9', area:'Consistency', size:'Large', what:'One table engine everywhere, modelled on Roles.',
+  why:'Roles has the best-built table (movable columns, frozen panes, tidy layout) — and it’s the tab you said feels right. The other ten tables each reinvent their own. Rebuilding them on the Roles machinery is the single biggest consistency win and where the drifting fonts/spacing between tabs actually gets fixed — but it touches many screens, so it would go tab by tab with your review between each.'},
+ {id:'D10', area:'Foundations', size:'Medium', what:'Unify the five "estimate with an override" systems into one — the foundation for Vendors and quotes.',
+  why:'Crew rates, location costs, tech specs, cameras and day overrides each have their own separately-built version of "use the standard value unless overridden here". Your vendors plan (Keira’s quote overriding the catering estimate, flowing into Budget) is exactly this pattern again. Building it once, well, means Vendors arrives on solid ground instead of as implementation number six.',
+  aside:'This is preparation only — Vendors itself, the BBC budget view and Deliverables stay untouched until you drive them.'},
+ {id:'D11', area:'Tidy', size:'Tiny', what:'Make the Company dropdown’s empty option say the same thing everywhere.',
+  why:'The same dropdown shows "Little Film Productions" as its empty label in one place and "— Lead company —" in two others. Pick one wording (note it if you care which) and I’ll align them.'},
+ {id:'D12', area:'AI chat', size:'Tiny', what:'Give the AI chat more room to think on long documents.',
+  why:'The newer AI model behind your chat now "thinks" before answering, and thinking shares the same word budget as the reply — on a long call-sheet document the reply can get cut off mid-sentence. Options: raise the budget (slightly higher cost per message) or turn thinking off (snappier, as it behaved before). My suggestion: raise it.'},
+ {id:'D13', area:'Mobile', size:'Medium', what:'A fuller phone/tablet polish pass.',
+  why:'The tablet scroll trap is fixed and the main tabs render respectably at phone and tablet sizes. A proper pass would go through every tab and dialog at both sizes fixing the smaller frictions (cramped controls, popups, the drawer). Best done after D8/D9 so it polishes the unified versions rather than each copy.'},
+];
+const state = {};
+const tbl = document.getElementById('tbl');
+RECS.forEach(r=>{
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="id">${r.id}<div class="size" style="margin-top:4px">${r.area}</div></td>
+    <td class="what"><strong>${r.what}</strong><span class="why">${r.why}</span>${r.aside?`<span class="aside">${r.aside}</span>`:''}</td>
+    <td class="sizecol"><span class="size">${r.size}</span></td>
+    <td><button class="pick" data-v="yes">Yes</button><button class="pick" data-v="later">Later</button><button class="pick" data-v="no">No</button></td>
+    <td><textarea placeholder="notes / preferences…"></textarea></td>`;
+  tr.querySelectorAll('.pick').forEach(b=>{
+    b.onclick = ()=>{
+      const v = b.dataset.v;
+      if(state[r.id]?.pick === v){ delete state[r.id].pick; }
+      else { state[r.id] = {...(state[r.id]||{}), pick:v}; }
+      paint(tr, r.id); tally();
+    };
+  });
+  tr.querySelector('textarea').oninput = e=>{
+    state[r.id] = {...(state[r.id]||{}), note:e.target.value}; tally();
+  };
+  tbl.appendChild(tr);
+  tr._id = r.id;
+});
+function paint(tr, id){
+  const pick = state[id]?.pick;
+  tr.querySelectorAll('.pick').forEach(b=>{
+    b.className = 'pick' + (b.dataset.v===pick ? ' on '+(b.dataset.v==='no'?'no':b.dataset.v==='later'?'later':'') : '');
+  });
+  tr.classList.toggle('done', !!pick);
+}
+function tally(){
+  const n = Object.values(state).filter(s=>s.pick).length;
+  const t = `${n} of ${RECS.length} answered`;
+  document.getElementById('count').textContent = t;
+  document.getElementById('count2').textContent = t;
+}
+function clearAll(){
+  Object.keys(state).forEach(k=>delete state[k]);
+  [...tbl.rows].slice(1).forEach(tr=>{ paint(tr, tr._id); tr.querySelector('textarea').value=''; });
+  tally();
+  document.getElementById('out').style.display='none';
+}
+function exportDecisions(){
+  const L = ['15 AUG CLEANUP — decisions', ''];
+  const by = v => RECS.filter(r=>state[r.id]?.pick===v);
+  [['yes','GO AHEAD'],['later','LATER / MAYBE'],['no','NOT WANTED']].forEach(([v,heading])=>{
+    const rows = by(v);
+    if(!rows.length) return;
+    L.push(heading, '-'.repeat(heading.length));
+    rows.forEach(r=>{
+      L.push(`${r.id} [${r.area}, ${r.size}] ${r.what}`);
+      const n = state[r.id]?.note?.trim();
+      if(n) L.push(`    note: ${n}`);
+    });
+    L.push('');
+  });
+  const unanswered = RECS.filter(r=>!state[r.id]?.pick);
+  if(unanswered.length){
+    L.push('NO ANSWER GIVEN', '---------------');
+    unanswered.forEach(r=>{
+      const n = state[r.id]?.note?.trim();
+      L.push(`${r.id} ${r.what}${n?`  — note: ${n}`:''}`);
+    });
+    L.push('');
+  }
+  const out = document.getElementById('out');
+  out.value = L.join('\n');
+  out.style.display = 'block';
+  out.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  out.scrollIntoView({behavior:'smooth', block:'center'});
+}
+tally();
+</script>
+</div>
+</body>
+</html>
