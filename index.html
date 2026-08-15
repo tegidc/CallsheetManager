@@ -8316,7 +8316,12 @@ async function saveCateringCosts(){
 /* delivery is charged once per meal occasion (breakfast/lunch/dinner) per day, and only
    when that meal's count is >0 that day — a day with zero breakfasts pays no breakfast
    delivery fee, even though a delivery cost is set */
-function buildCateringSummaryGrid(){
+/* personOk (D3, 15 Aug 2026) — optional per-person scope. The Catering tab passes
+   nothing (the caterer feeds everyone on the shoot, filtered or not); Budget passes
+   its crew-filter predicate so the extras row counts the same people as every other
+   Budget figure. */
+function buildCateringSummaryGrid(personOk){
+  personOk = personOk || (()=>true);
   const p = currentProject(); if(!p) return null;
   const days = projectDays();
   if(!days.length) return null;
@@ -8329,7 +8334,7 @@ function buildCateringSummaryGrid(){
     const meals = d.cateringMeals || {};
     let b=0, l=0, dd=0;
     Object.entries(meals).forEach(([crewId,m])=>{
-      if(!crewOnShoot(crewId, p)) return;
+      if(!crewOnShoot(crewId, p) || !personOk(crewId)) return;
       if(m.b) b++; if(m.l) l++; if(m.d) dd++;
     });
     const deliveryFee = (b>0?costs.delivery:0) + (l>0?costs.delivery:0) + (dd>0?costs.delivery:0);
@@ -8355,7 +8360,7 @@ function buildCateringSummaryGrid(){
   const OMNI = 'Omnivore / eats everything';
   const dietOf = c => (c && c.dietaryGeneral) ? c.dietaryGeneral : OMNI;
   const fedPerDay = days.map(d=>Object.entries(d.cateringMeals||{})
-    .filter(([crewId,m])=>m && (m.b||m.l||m.d) && crewOnShoot(crewId, p))
+    .filter(([crewId,m])=>m && (m.b||m.l||m.d) && crewOnShoot(crewId, p) && personOk(crewId))
     .map(([crewId])=>crewById(crewId))
     .filter(Boolean));
   const dietLabels = [...new Set(fedPerDay.flat().map(dietOf))]
@@ -8568,7 +8573,9 @@ async function saveTransportCosts(){
   };
   await saveDB('db:projects', projectsDB);
 }
-function buildTransportSummary(){
+/* personOk (D3) — same optional per-person scope as buildCateringSummaryGrid(). */
+function buildTransportSummary(personOk){
+  personOk = personOk || (()=>true);
   const p = currentProject(); if(!p) return null;
   const days = projectDays();
   if(!days.length) return null;
@@ -8580,7 +8587,7 @@ function buildTransportSummary(){
      site that day" — and a person holding two entries that both cover Day 3 satisfies
      that twice. projectCrew() is the distinct-people list and crewOnDay() folds a
      person's entries together, so both halves count each human once. */
-  const assigned = projectCrew(p).map(c=>c.id);
+  const assigned = projectCrew(p).map(c=>c.id).filter(personOk);
   // only show methods actually chosen by someone on this project, in travelMethodsList order
   const usedMethods = travelMethodsList.filter(m=>assigned.some(id=>travelMethods[id]===m));
   if(!usedMethods.length) return null;
@@ -10662,6 +10669,12 @@ function buildBudgetData(){
      Budget figure — that is the point, but it means the grand total now depends on a
      control that lives on another tab. The filter row says what is in scope. */
   const crewInScope = crew.filter(personMatchesProjectFilter);
+  /* D3 (15 Aug 2026) — the PERSON-level version of the same scope, for the three
+     person-based extras (travel, catering, hotel). A person is in scope if any of
+     their entries is. Location fees are deliberately NOT person-scoped: a venue
+     invoices the production, not a crew member — they follow the day filter only. */
+  const costedCrewIds = new Set(crewInScope.map(c=>c.crewId));
+  const personInScope = id => costedCrewIds.has(id);
   /* ⚠️ Phase BF — travel is charged ONCE PER PERSON, not once per entry, and over the
      DEDUPLICATED union of that person's days. Attributing it to whichever of their
      entries is in scope first keeps AO's reconciliation exact in both directions:
@@ -10928,8 +10941,8 @@ function buildBudgetData(){
   /* follows prodOn exactly as the fee it is charged on does */
   const locationVatTotal = (locationVatForDays(days) + locationExtrasVat) * prodOn;
 
-  const cateringGrid = buildCateringSummaryGrid();
-  const transportSummary = buildTransportSummary();
+  const cateringGrid = buildCateringSummaryGrid(personInScope);
+  const transportSummary = buildTransportSummary(personInScope);
   // Both grids are the Catering/Travel tabs' OWN summaries, always built for the
   // whole shoot, so their .totalCost is project-wide by definition. Sum their
   // per-day columns against the days actually in scope instead — with no day
@@ -10959,8 +10972,8 @@ function buildBudgetData(){
   // still days[0] — which keeps the `i===0` fold-in below correct either way.
   const firstProjectDay = projectDays()[0];
   const preNightRooms = (firstProjectDay && days.some(d=>d.id===firstProjectDay.id))
-    ? (p.hotelNightBefore||[]).filter(id=>crewOnShoot(id, p)).length : 0;
-  const onShootRooms = list => (list||[]).filter(id=>crewOnShoot(id, p)).length;
+    ? (p.hotelNightBefore||[]).filter(id=>crewOnShoot(id, p) && personInScope(id)).length : 0;
+  const onShootRooms = list => (list||[]).filter(id=>crewOnShoot(id, p) && personInScope(id)).length;
   const dayHotelRooms = days.map(d=>onShootRooms(d.hotelNights));
   const hotelRaw = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
   const hotelTotal = hotelRaw * prodOn;
