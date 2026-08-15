@@ -17,6 +17,14 @@ const ANTHROPIC_VERSION = "2023-06-01";
 // at judging when to propose vs. ask a clarifying question).
 const MODEL = "claude-sonnet-5";
 const MAX_TOKENS = 4096;
+// Abuse/cost guards. The frontend keeps chats short and summaries compact, so
+// legitimate traffic sits far below these; they exist to stop a stranger using
+// this endpoint as a free general-purpose Claude proxy (it is reachable without
+// login — see the auth note below) from running huge prompts on our key.
+const MAX_MESSAGES = 40;
+const MAX_BODY_BYTES = 400_000; // ~100k tokens of input, worst case
+const MAX_SUMMARY_ITEMS = 500;
+const UPSTREAM_TIMEOUT_MS = 55_000;
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -140,9 +148,14 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  let rawBody: string;
   let body: { messages?: unknown[]; crewSummary?: unknown[]; locationSummary?: unknown[] };
   try {
-    body = await req.json();
+    rawBody = await req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return jsonResponse({ error: "Request too large" }, 413);
+    }
+    body = JSON.parse(rawBody);
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
@@ -151,11 +164,29 @@ Deno.serve(async (req: Request) => {
   if (!messages.length) {
     return jsonResponse({ error: "No messages provided" }, 400);
   }
+  if (messages.length > MAX_MESSAGES) {
+    return jsonResponse({ error: "Conversation too long — start a new chat" }, 400);
+  }
+  // Each message must be {role: 'user'|'assistant', content: string|array} —
+  // the two shapes the frontend actually sends. Anything else is rejected
+  // rather than forwarded blind to the Anthropic API.
+  for (const m of messages) {
+    const msg = m as { role?: unknown; content?: unknown };
+    const roleOk = msg?.role === "user" || msg?.role === "assistant";
+    const contentOk = typeof msg?.content === "string" || Array.isArray(msg?.content);
+    if (!roleOk || !contentOk) {
+      return jsonResponse({ error: "Malformed message in conversation" }, 400);
+    }
+  }
+
+  const crewSummary = Array.isArray(body.crewSummary) ? body.crewSummary.slice(0, MAX_SUMMARY_ITEMS) : [];
+  const locationSummary = Array.isArray(body.locationSummary) ? body.locationSummary.slice(0, MAX_SUMMARY_ITEMS) : [];
 
   let anthropicRes: Response;
   try {
     anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       headers: {
         "content-type": "application/json",
         "x-api-key": apiKey,
@@ -164,19 +195,35 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        system: buildSystemPrompt(body.crewSummary || [], body.locationSummary || []),
+        system: buildSystemPrompt(crewSummary, locationSummary),
         tools: TOOLS,
         messages,
       }),
     });
   } catch (err) {
-    return jsonResponse({ error: "Could not reach the Anthropic API: " + String(err) }, 502);
+    const timedOut = err instanceof DOMException && err.name === "TimeoutError";
+    return jsonResponse(
+      { error: timedOut ? "The AI took too long to reply — try again" : "Could not reach the Anthropic API" },
+      timedOut ? 504 : 502,
+    );
   }
 
-  const data = await anthropicRes.json();
+  // A gateway 502/504 can hand back HTML, not JSON — that must become a clean
+  // JSON error WITH CORS headers, or the browser reports an opaque CORS
+  // failure and the app shows nothing useful.
+  let data: { error?: { message?: string }; content?: unknown; stop_reason?: unknown };
+  try {
+    data = await anthropicRes.json();
+  } catch {
+    console.error("Non-JSON response from Anthropic, status", anthropicRes.status);
+    return jsonResponse({ error: "Unexpected reply from the AI service — try again" }, 502);
+  }
   if (!anthropicRes.ok) {
+    // Log the full payload server-side; return only the human message. The raw
+    // error object carries request ids / account metadata that callers don't need.
+    console.error("Anthropic API error", anthropicRes.status, JSON.stringify(data));
     return jsonResponse(
-      { error: data?.error?.message || "Anthropic API error", detail: data },
+      { error: data?.error?.message || "Anthropic API error" },
       anthropicRes.status,
     );
   }
