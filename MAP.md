@@ -5217,6 +5217,10 @@ not tell whose VAT you were reading.
   the horizontal-only scroll with Controls and Name pinned, as before.
 - Only ROLES gets a scroll box; the other six sub-tabs fit their width and would gain a second
   scrollbar for nothing.
+- ⚠️ **Phase BZ widened the box itself** (`.roles-widezone`), so there is less sideways scroll to
+  do — on a 1920 monitor a full column set fits outright. The panes still matter at every width
+  below that, and BZ kept its gutters generous partly *because* they exist. ⚠️ **Phase CB then
+  narrowed when that happens at all**: the wide zone is Budget's, not Roles' — see that phase.
 
 ### Name and Role collapse
 
@@ -5352,3 +5356,958 @@ roles, and where the units are entered. Not shown at all on a job with no overti
 - Test overtime cleared; totals back to £109,720 / £8,127 / £117,847 and no project carries an
   `overtime` key
 - 84 renders across 4 projects: 0 thrown errors, 0 console errors; `node --check` clean
+
+## Phase BZ — Roles runs wide, and OT leaves Stage (14 Aug 2026)
+
+**"On Desktop widen the view on Roles to allow for all the inputs. Keep the rest slim and
+paperlike… leave the top — extend the input section. Keep a margin of kind."** and **"don't
+need overtime on stage view"**.
+
+### The wide zone
+
+⚠️ **Phase CB narrowed the trigger: this applies on Roles WITH BUDGET ON, not on Roles.** Read
+that phase alongside this one — everything below is still how the bleed works, but "on the
+Roles sub-tab only" became "when the money columns are showing".
+
+`.roles-widezone` — the div `renderProjectCrew()` wraps the toolbar, the bulk bar and
+`assignedHTML` in, **on the Roles sub-tab only**. Everything above it — the sub-tab strip, the
+totals/Stage/tools banner, the section heading — stays in the 840px paper column, so the page
+still reads as a document with one wide table in it.
+
+- ⚠️ **The toolbar and bulk bar are inside the zone with the table, deliberately.** Select all
+  sits over the first column and Collapse all over the last; a toolbar left at 840px while the
+  table ran to 1310px would have both controls pointing at nothing.
+- ⚠️ **Symmetric negative margins, not a width.** The zone is a block, so widening it is one
+  calculation applied to both sides and it cannot end up off-centre from the column above:
+  `max(0px, (100vw - --sidew - --mainw)/2 + --main-pad - --roles-gutter)`.
+- ⚠️ **`--mainw` / `--main-pad` are now `:root` tokens** (were the literals `840px` and `22px`
+  inside `.main`), because the bleed has to know both. Change the paper width there, not in
+  `.main`.
+- ⚠️ **`max(0px, …)` is what makes it self-disabling** — below ~1070px of viewport there is no
+  desk either side of the paper, the bleed computes to 0 and the zone sits in the column like
+  every other screen. There is no second breakpoint to keep in step with the layout; the sum
+  reaches zero on its own. (The `@media(min-width:901px)` gate is only there because under it
+  `.side` leaves the flow and becomes a drawer, so `100vw - --sidew` is not the available
+  width at all.)
+- ⚠️ **The gutter is `clamp(40px, 5vw, 110px)`, and it is deliberately generous.** The point of
+  the zone is to use the desk, not to run the table into the window edge: a table stopping a
+  hair short of the frame reads as an overflow, where the same table with an inch of margin
+  still reads as a wide sheet of paper — which is what the rest of the app is. `5vw` keeps the
+  margin looking the same on a 1280 laptop (64px) and a 1920 monitor (96px). ⚠️ **It costs
+  columns and that is the accepted trade** — at 1600px the full Budget + Itemize VAT set is
+  ~110px wider than the zone and scrolls, where a tight 30px gutter had it just fitting. The
+  frozen panes are exactly what makes that acceptable.
+- ⚠️ **`100vw` includes the scrollbar** where the platform draws a classic one, so the bleed
+  can overshoot by ~7px per side — absorbed by a gutter this size. The zone still stays centred
+  (it is measured off `.main`, which is centred in the real content box).
+- The frozen panes are untouched and still earn their keep, on more screens than before rather
+  than fewer: Controls/Name/Role still pin whenever the columns outrun the zone.
+
+### OT is not a Stage column
+
+`rolesColumns()` gains `crewRolesMode!=='stage'` on the OT push. Stage answers one question —
+is this person in this phase at all — with three checkboxes; a typeable overtime figure in the
+middle of them is a different kind of question in the same row, the same muddle the old Shoot
+checkbox-plus-count was.
+
+- ⚠️ **View only.** `buildBudgetData()` never reads `crewRolesMode`, so the units are untouched
+  and still cost exactly as Phase BY set out; the column is back the moment you switch to Days.
+
+### Verified
+
+- 1920px: zone 1498 wide, 96px of gutter either side, and the full Budget + Itemize VAT column
+  set (Total · Prep · Shoot · OT · Post · Buyout · Day rate · Subtotal · VAT reg. · VAT ·
+  Dates) fits with no sideways scroll
+- 1600px: zone 1210, gutters 80/80 — same set is 1326px, so it scrolls behind the frozen panes
+- 1280px: zone 922 (paper is 796), gutters 64/64
+- 980px: bleed 0 — zone back in the paper column, table scrolls sideways as before
+- 375px (mobile): bleed 0, `margin-left: 0px`, layout unchanged
+- Page `scrollWidth === clientWidth` at every width above; gutters measured equal on both sides
+- Costs PP + expanded day ticks: 1660px of columns in the box, scrolled 346px — Name/Role still
+  pinned left, heading row still pinned top
+- Production sub-tab still 840px; Stage mode shows Prep/Shoot/Post with no OT column
+- 0 console errors
+
+## Phase CA — the last column stops stretching, and you can reorder them (14 Aug 2026)
+
+**"Can we unify it so Dates doesn't behave so oddly?"** and **"Can we add a feature so I can
+just click and drag / reorder the columns?"** — one phase, because the first is a precondition
+for the second: you cannot sanely drag a column whose width depends on where it lands.
+
+### The slack got a track of its own
+
+`rolesColumns()` — Dates is `112px` and Show as is `160px`, both fixed, and the template ends
+in a trailing `minmax(0,1fr)` **with no cell in it**. ⚠️ **Do not give that track a cell.**
+
+- Both used to be `minmax(…,1fr)`, on the sound reasoning that the last column has to absorb
+  the slack or the rows stop reaching the right-hand rule. The side effect was that the last
+  column was the only elastic thing on the screen — and Phase BZ's wider table turned that from
+  invisible into a fault: **Dates measured 96px and hung off the right edge at 1600px, and
+  282px — a chip floating in an acre of nothing — at 1920px**, purely as a function of window
+  width. It also moved when you switched modes, since Stage swaps Dates for Show as at a
+  different minimum.
+- An empty trailing track absorbs exactly what the 1fr absorbed, without a column having to do
+  it. Verified: at 1920px the 15th track resolves to 160px and the row rule still spans 1502px;
+  where the columns overflow it resolves to 0 and nothing else moves.
+- 112px is measured, not guessed — the widest chip Dates renders is "25 to place ⚠" at 106px.
+- ⚠️ **The first thirteen tracks are now identical in both modes**, so switching Stage↔Days
+  moves nothing except the column that actually differs (OT) and the last one.
+
+### Drag a heading to move the column
+
+`appSettings.rolesColumnOrder` / `applyRolesColumnOrder()` / `reorderRolesColumns()` /
+`rolesHeadCellHTML()` — the order is the user's, persisted site-wide in `db:settings` beside
+the fonts and the brand colour. Not per project: it is a preference about how you read this
+screen, not a fact about a job.
+
+- ⚠️ **This is cheap only because rows map `spec.cols` in order and nothing on a Roles row
+  places itself by track number.** Reordering the spec reorders the header, the template and
+  every cell in one move — the payoff from Phase BU's "one declaration, three consumers".
+  **Do not add a `grid-column:` to a Roles cell**; it would pin that cell to a track while its
+  heading moved.
+- ⚠️ **Ids are assigned in ONE place**, after the pushes, not per push: `key` alone will not do
+  (`phase` occurs three times, `shootday` once per day), and a column whose id came from a
+  different expression than its neighbours is a column the order silently forgets.
+- ⚠️ **The shoot-day ticks are not movable columns.** They are the Shoot column expanded, so
+  they travel with it as one unit and carry no id. Verified: with Shoot dragged to the front,
+  D1–D6 came with it and header and body still agreed cell-for-cell.
+- ⚠️ **A column the saved order has never seen rides behind its default predecessor**, rather
+  than falling to the end. Verified: reorder with Budget off, then switch Budget on — Total
+  lands first and Day rate / Subtotal / VAT reg. / VAT land after Buyout, their default slot,
+  with the user's own move intact. This is also what stops a column added to `rolesColumns()`
+  in future from appearing in the wrong place for everyone who has ever dragged a heading.
+- ⚠️ **The saved order keeps columns that are not on screen.** Reordering with VAT switched off
+  must not drop VAT out of the list, or it returns in the wrong place — so the stored order is
+  merged with what is visible before the dragged id is moved.
+- The three phase columns ARE draggable. `CREW_PHASES` still owns the DEFAULT order — that
+  invariant is about code not hand-ordering them in a second place — but a user who wants Post
+  beside Prep may say so, and the footnote's "put them back" is one click away.
+- **Alt+←/→ on a focused heading does the same move**, and focus follows the column. Not a
+  nicety: HTML5 drag does not work on touch, so this is the path on a phone and the accessible
+  path everywhere. Nothing is reachable only by dragging.
+- The footnote changes once you have used it — "drag a heading to reorder" becomes "these are
+  in your own order … put them back". A column order you don't remember setting reads as a bug.
+
+### Verified
+
+- Drag Prep onto the right half of Dates → Prep lands last; header, template and every body
+  cell agree; `appSettings.rolesColumnOrder` written
+- Alt+→ on Total → one step right, focus stays on Total
+- Reset → default order back, `rolesColumnOrder` null, footnote flips back to the invitation
+- Dates 112px / Show as 160px at every width; slack track 160px at 1920, 0px when the columns
+  overflow
+- Edit-pencil form still spans the wrapper and does not scroll sideways
+- `node --check` clean on both inline scripts; 0 console errors
+
+## Phase CB — the wide zone is Budget's, and the last few pixels are the right margin's (14 Aug 2026)
+
+**"In this kind of view (no budget) I'd like it to stay aligned with the banner above. When we
+add Budget is when we get way more rows than we can see at once in the 'paper' view. And it
+currently feels correct."**
+
+### Budget is the trigger, not Roles
+
+`renderProjectCrew()` — the wrapper is `.roles-zone` on Roles always, and gains
+`.roles-widezone` only when `crewShowMoney` is on. ⚠️ **Phase BZ widened Roles unconditionally
+and that was too broad.** With Budget off, Roles is six narrow columns; a table floating 200px
+wider than the banner, the heading and every other screen for no gain reads as a layout fault,
+which is what it was called. Turning Budget on is what adds Total, Day rate, Subtotal, VAT and
+friends — the moment the table stops being a roster and becomes a costing sheet with more
+columns than 840px can hold. That is the honest trigger, and it is the one the user names.
+
+### `fitRolesZone()` — the last few pixels, on the RIGHT only
+
+Aligning the Budget-off view exposed a second thing: **the six columns still come to 858px
+against the paper column's 800px**, so Dates was cut in half. (Not new — before Phase CA gave
+Dates a fixed width it compressed to its 96px minimum and overflowed by 42px. Phase BZ had been
+hiding it.) A Dates chip cut in half is not "aligned", it is broken.
+
+So the box takes **exactly its overflow, to the right**, where there is nothing to line up
+against, and never past a 40px window gutter.
+
+- ⚠️ **Measured, not declared.** The number depends on the column set, the Name/Role collapse
+  state and the user's own column order — there is no constant to write. It rides in
+  `sizeRolesTablewrap()`, which already runs after every Crew render and on resize.
+- ⚠️ **The left edge is never touched.** Growing leftwards is what the wide zone does,
+  deliberately and only with Budget on. Doing a little of it here would read as a near-miss
+  rather than as a decision. Verified: zone left 517px === banner left 517px.
+- ⚠️ **No feedback loop, so it is safe on every render**: it clears its own margin before
+  measuring, and the grid's natural width does not depend on its container (every track is
+  fixed and the trailing slack track resolves to 0 under max-content).
+- `documentElement.clientWidth`, not `innerWidth` — `innerWidth` counts the scrollbar and would
+  spend the gutter on it, which is the one thing the gutter exists to stop.
+- Where there is not enough room it takes what there is and the rest scrolls behind the frozen
+  panes, exactly as before.
+
+### Verified (1600×1000 unless stated)
+
+- Budget OFF: zone left 517 === banner left 517; `margin-right:-58px`; Dates fully visible;
+  wrapper overflow 0; page `scrollWidth === clientWidth`
+- Budget ON: `.roles-widezone` back, symmetric 80px gutters, JS margin cleared — the view the
+  user signed off unchanged
+- Budget OFF + Shoot ticks expanded: needs 298px, room allows 247px → takes 247, right gutter
+  lands on exactly 40px, remaining 51px scrolls; left edge still 517
+- 1000px wide: no room, no nudge, scrolls as before
+- 375px (mobile): no nudge, layout unchanged
+- `node --check` clean on both inline scripts; 0 console errors
+
+## Phase CC — one way into the form, the pill back, and a flat list (14 Aug 2026)
+
+Five asks in one pass, all on Roles: drop the row pencil in favour of select-then-Edit, bring
+back the department pills, open with Name and Role collapsed, slim the number fields, and make
+the default a flat list with no section headers.
+
+### Select, then Edit — `openCrewBulkEdit()` / `crewEditModalHTML()`
+
+⚠️ **REMOVED: the per-row Edit pencil on Roles, and the inline band it opened.** There were two
+ways to reach one form, and the pencil was the worse of them: a 22px control repeated 41 times
+down the densest table in the app, opening a full crew form *inside* the grid — which the
+frozen panes then had to be taught not to scroll sideways (`.pb-editform`'s `100cqw` sticky
+rule existed for it). Tick the row, press Edit; the same form opens in a modal.
+
+- ⚠️ **The other five sub-tabs never had a pencil** (`crewControlsHTML` renders a checkbox and
+  the caller supplies it), so this is Roles coming into line with them, not a new idea. Their
+  inline expansions are untouched.
+- ⚠️ **`editingCrewId` and `crewExpansionHTML()` are reused exactly as the pencil used them**,
+  so `saveCrew()` / `closeCrewForm()` already null it out and re-render, and the modal closes
+  itself. No new lifecycle to keep in step. The form itself did not change — only where it
+  appears and how you ask for it.
+- The Edit button **branches on how many are ticked**, because the two cases are different
+  jobs: one → that person's whole record; two or more → `bulkEditFieldsHTML()`.
+- ⚠️ **The modal renders from `renderProjectCrew()`'s body, NOT from the bulk bar** — the bar
+  disappears the moment the selection clears, and a modal that vanishes mid-edit because
+  something deselected underneath it is a lost form.
+- ⚠️ **Bulk edit is still ONE field (Lead company), and that is a decision.** Name, phone,
+  email, rate and role are per person by definition; department is per person in practice —
+  it is half of every saved role path, so writing it here and not there would put someone in
+  one department wearing another's role. More bulk fields are a real ask; each needs its own
+  write and its own undo, which is why none were smuggled in behind this one.
+- `--pb-controls-w` **56px → 34px** — the column was that wide to fit checkbox + pencil, and
+  all six tabs are checkbox-only now. 22px of the table back.
+
+### The department pill is back, in a slot of its own
+
+`deptLabelHTML(e)` in the Roles name cell — the same three-letter code every other screen
+shows, not a second pill that could drift from it. It went away when the list was grouped by
+department and the subhead said it; with the flat list as the default nothing else on the row
+does.
+
+- ⚠️ **The pill is a FIXED 56px, so the codes read as a column.** "CAT/TRA" is twice the width
+  of "SET", and left to itself every name on the page starts at a different x. Verified: all
+  41 pills 56px, every name starting at the same pixel.
+- ⚠️ **It is inside the Name cell, not a fourth lead column**, because those three columns are
+  shared with five other sub-tabs (Phase BO) and only Roles wants a pill.
+- ⚠️ **`--pb-name-w` is now overridden on the Roles wrapper in BOTH states**, not only when
+  collapsed: `(collapsed ? 104 : 170) + 62`. The 62 is the pill's 56px plus its 6px gap, so the
+  pill costs exactly its own width and takes nothing from the name — the 104/170 behind it are
+  Phase BX's measured numbers, unchanged. The name text got its own `.roles-name-text` span so
+  the ellipsis lands on the NAME and never on the code.
+
+### Name and Role open collapsed
+
+`rolesNameCollapsed` / `rolesRoleCollapsed` now start `true`. Roles is a screen you arrive at to
+TYPE, and the two widest columns are the two you already know. Full text stays in every cell's
+`title`, one click on either heading brings it back, and it is still session state — a reload
+returns to the abbreviated default rather than to whatever you last did.
+
+### Slimmer number fields
+
+Phase columns **56px → 46px**, OT **52px → 46px**. They hold a day count: two digits nearly
+always, three at the outside. ⚠️ **The floor is the HEADING, not the number** — "Shoot" with its
+caret is what stops this going smaller.
+
+- Worth noting what this bought with the controls column: at 1600px the full Budget + Itemize
+  VAT set now fits the wide zone with **no sideways scroll at all** (it was 1326px against
+  1210px before this phase).
+
+### The default list is flat — `buildProjectCrewGroups()`'s `'none'` branch
+
+`projectCrewFilter.groupBy` opens on `'none'`, and `groupHeaderHTML` returns nothing for the
+single `'all'` group.
+
+- ⚠️ **"None" MEANS NO HEADERS, NOT NO ORDER.** The list is still department by department in
+  the canonical `DEPARTMENTS` order and still sorted inside each department by whatever Sort by
+  says — exactly the sequence the `'dept'` grouper produces, with the subheads taken out.
+  Working down a column of day counts, a subhead every four rows is a row you have to skip, and
+  the department is on the row as a pill now.
+- ⚠️ **Do NOT "simplify" this to `bySort(list)`.** Sorting the whole list by seniority alone
+  interleaves the departments — every department's lead, then every department's number two —
+  which is not a list anybody reads. Verified: the flat list runs PROD · CLIENT · CIN · AUD ·
+  GRIP · SET · HMUC · POST · —, each department appearing exactly once.
+- Grouping by Department is one pick away in the Filter panel and still renders its subheads.
+- The Expand/Collapse-all control needed no change: it is already gated on `groups.length>1`,
+  so a flat list hides it on its own.
+
+### Verified
+
+- Tick one → Edit → that person's full crew form in a modal titled with their name; Cancel
+  closes it; tick two → Edit → "Edit 2 crew records" with the Lead company field
+- 41 pills all 56px, every name starting at the same x, no name clipped
+- Flat list: 0 subheads, departments in canonical order, no interleaving; Group by Department
+  still gives "▾ PROD Production (10)" etc.
+- Budget on at 1600px: whole column set fits, table overflow 0
+- All six sub-tabs render with the 34px controls column; mobile lead columns end at 328px
+  (under the 335px limit the mobile block sets, so the day-column scroll cue survives)
+- `node --check` clean; 0 console errors
+
+## Phase CD — arrow keys move between fields, and focus survives the save (14 Aug 2026)
+
+**"When I've selected an entry I'd like it so I can press left right up or down to get the next
+input. On a checkbox — spacebar. Tab already works well for going across, but I need a down
+option."**
+
+### `onRolesGridKey()` — the navigation
+
+Arrow keys move between the controls in the Roles rows. Tab is untouched and still does what it
+did; **space is deliberately not intercepted at all** — ticking a focused checkbox is the
+browser's own behaviour and the moment you handle the key you own every edge case of it.
+
+- ⚠️ **ARROWS ALWAYS LEAVE A NUMBER FIELD.** These cells hold two digits, occasionally three,
+  so there is nothing inside one to walk a caret through — you retype it. Arriving selects the
+  contents so the next digit replaces what is there. **Free-text cells (Show as) are the
+  exception** and are edge-aware: the arrow moves the caret until it reaches the end of the
+  text and only then moves on, because a display name IS something you edit in place. Verified
+  both ways.
+- ⚠️ **Cells with nothing focusable are skipped, not stopped on** — Total, Subtotal and the
+  Shoot count are read-only, and landing on one would be a dead keypress mid-row.
+- ⚠️ **Rows inside a collapsed department are skipped** (`offsetParent`), so Down lands on the
+  next row you can SEE rather than walking invisibly through a folded group.
+- ⚠️ **Any modifier bails out** — Alt+Arrow is Phase CA's column reorder, and one keypress must
+  not do both.
+- The key is only swallowed when it actually moved, so at the edge of the table an arrow still
+  scrolls the page as it would anywhere else.
+
+### `rolesFocusMark` / `restoreRolesFocus()` — and this is the half that makes it work
+
+⚠️ **WITHOUT THIS THE NAVIGATION IS USELESS, and the failure is invisible until you try to type
+two numbers in a row.** Moving off a changed field fires its `onchange`, and every one of those
+handlers — `setPhaseDays`, `saveEntryRate`, `setEntryOvertime`, `toggleEntryBuyout`,
+`toggleCrewPersonSelected` — ends in `renderProjectBody()`, which replaces the whole tab body.
+The element you just arrowed into is destroyed a few milliseconds later and focus falls back to
+`<body>`: you type 15, press Down, and the next keystroke goes nowhere.
+
+- ⚠️ **The mark is an ADDRESS, not an element** — entry id plus which cell of that row — because
+  the element itself does not survive to be re-focused.
+- ⚠️ **Recorded on `focusin`, not inside the arrow handler**, so it also covers a checkbox
+  ticked with space, a field clicked with the mouse, and Tab — all of which lost focus to the
+  same re-render before this existed. Verified: ticking a select box re-renders and focus comes
+  back to that same box, still checked.
+- ⚠️ **The 3s window and the `activeElement` check are what stop it STEALING focus.** A render
+  caused by something else entirely (switching sub-tab, toggling Budget) must not yank the caret
+  back into a table the user has left.
+- Restored from the same post-render hook that sizes the frozen-pane box, so there is one place
+  that runs after a Crew render, not two.
+
+### Verified
+
+- Type `6` into Heather B's Post, press Down → focus lands on Sam C's Post, the 6 saves, and
+  focus is still on Sam C's Post after the two renders the save triggers (`restoreRolesFocus`
+  called twice, `activeElement` was `BODY` both times)
+- Down · Down · Right · Right · Up · Left walks Prep → Prep → Prep → Post → OT → OT → Post,
+  skipping the read-only Shoot count in between
+- Show as: caret mid-text → arrow stays in the field; caret at position 0 + Left → moves to
+  Buyout
+- Space on a focused checkbox ticks it (untouched native behaviour) and focus survives the
+  re-render
+- ⚠️ **Testing note:** the browser-automation harness sends `keydown` with an empty `key`, so
+  arrows cannot be driven through it — the navigation was exercised with dispatched
+  `KeyboardEvent`s carrying the real key names, after a genuine typed edit to set the input's
+  dirty flag. Do not conclude from a harness run that this is broken.
+- Test data written into ROW 2026 London during this (Heather B's Post days and her
+  `postMembers` entry) was reverted; the banner reads "Post · 1 person · 10 days" as before
+
+## Phase CE — Shoot is a stop on the keyboard route (14 Aug 2026)
+
+**"When it goes to Shoot I want it to work checkbox style — highlight the number, press space
+to expand, move across with arrows for check boxes and fill in with space bar."**
+
+### `rolesNavTarget()` — the cell can BE the control
+
+⚠️ **The Shoot count was already a `div[role=button][tabindex=0]` with its own `onkeydown` that
+opens the day ticks on Space or Enter** (Phase BX's `.roles-shoot-total`). Nothing about it
+needed building. What was wrong is that Phase CD's navigation only ever looked for a focusable
+CHILD of a cell — so it walked straight past the one cell the whole expand-and-tick flow starts
+from, and the count was unreachable by keyboard even though it was focusable by Tab.
+
+`rolesNavTarget(cell)` asks the cell first, then its children, and both the arrow move and the
+post-render restore go through it. That is the entire change.
+
+- ⚠️ **The day ticks needed nothing.** Once open they are ordinary checkbox cells to the right
+  of Shoot, so arrows reach them and space fills them exactly as they do Buyout or VAT reg.
+  Resist adding a special case for them.
+- ⚠️ **The Shoot cell keeps its index when the ticks open** — D1…D6 are inserted AFTER it — so
+  the focus mark still points at the same cell and Space lands you back where you pressed it,
+  with the ticks now to your right. Do not "fix" the mark's index for the new columns.
+- The focus ring is `.roles-shoot-total:focus-visible`, which already existed; arriving by
+  arrow key is a keyboard focus, so it highlights.
+
+### The route, end to end
+
+`… → Prep → Shoot` · **space** → ticks open, focus still on Shoot · `→ D1 → D2 …` · **space**
+on each → ticked, focus stays on the box · `→ OT → Post …`
+
+### Verified
+
+- Right off Prep lands on Shoot (`DIV`, not skipped); space expands (`rolesShootOpen()` true)
+  and focus is restored to that same Shoot cell; Right → D1 checkbox, Right → D2 checkbox
+- Space on a day tick writes through `toggleRolesShootDay` and focus comes back to that box
+  after the re-render — verified by toggling one of Sabrina Goreeba's days off and on again,
+  ending on her original 6 days
+- ⚠️ **Testing note, and it cost an hour**: `element.focus()` fires NO focus/focusin events when
+  `document.hasFocus()` is false, which is the state the browser pane drops into whenever it
+  loses OS focus. Everything focus-related then reads as broken — the mark stays null, nothing
+  restores — while being perfectly fine for a real user. Check `document.hasFocus()` before
+  concluding anything about focus behaviour from an automated run; a real click on the page
+  restores it.
+
+## Phase CF — Stage removed, membership derived, Dates centred on the person (14 Aug 2026)
+
+**"We can lose the Stage toggle, checkboxes and feature. Now that Roles/Days is more capable…
+if a person has 0 in prep, shoot or post they can be auto populated in the corresponding
+sub-pages. So we don't need the stages/Days toggle at all."** and **"Dates should collate the
+Person's information — Sabrina in Pre and Post, her Shoot dates can be auto populated from her
+other role on shoot."**
+
+### Membership is derived again — `entryInPhase()`
+
+⚠️ **THIS IS A DELIBERATE REVERSAL OF PHASE BU.** Read BU's note before reversing it back. BU
+built the opt-in lists (`p.onShoot` / `p.preprodMembers` / `p.postMembers`) because membership
+had a UI of its own — Stage's checkboxes — and a checkbox that cannot remove anybody is broken:
+derived membership read straight back as `true` the moment someone had data, so unticking did
+nothing. **That UI is gone**, which removes the thing derivation could not express. In a phase
+now means having days in it: a number in Prep or Post, at least one ticked day on the shoot.
+
+- ⚠️ **What this loses is "booked, days not settled yet."** An entry with no number is simply
+  not in that phase. Accepted on request.
+- ⚠️ **The stored arrays are left in place and NO LONGER READ.** Nothing may start reading them
+  again without bringing Stage back with it. `migratePhaseMembers()` still runs and still seeds
+  them — inert, and deleting a migration is riskier than leaving one.
+- **REMOVED:** `ROLES_MODES`, `crewRolesMode`, `setCrewRolesMode()`, the `.bnr-modes` picker,
+  `toggleEntryPhase()`, `toggleEntryOnShoot()`, Stage's branch in `phaseCellHTML()`,
+  `addCrewEntry()`'s default `p.onShoot` push, and `setPhaseDays()`'s membership write. Do not
+  test `crewRolesMode` in new code.
+- ⚠️ **The Show as column went with Stage**, which was its only home. The field is still on the
+  crew record (tick a row → Edit), `showAsQuickEditHTML()` and the `showas` case in `cellHTML`
+  are deliberately left intact, so restoring the column is one `push()`.
+
+### ⚠️ The Production grid had to stop filtering by membership — a closed loop
+
+`renderProjectCrew()` filtered Days on site / Hotel / Travel / Catering to people on the shoot.
+With membership derived from the very ticks that grid sets, that is **a person with no ticked
+day is not on the shoot → never appears on the grid → can never be given their first day.**
+`'days'` is out of that list; the grid is the assignment surface for shoot days exactly as
+Roles is for prep and edit numbers, and an assignment surface has to list the unassigned.
+Hotel/Travel/Catering are genuinely downstream and stay filtered.
+
+### ⚠️ It moved ROW 2026's total: £109,720 → £108,500 ex-VAT
+
+**No crew fee changed** — verified per person, every subtotal identical. The £1,220 is
+**catering (−£540) and hotel (−£680)** for the 13 entries that were ticked on to the shoot with
+**zero shoot days ticked** (Tegid EP, Matt Wells Producer, both editors, both security, grip,
+kit tech, set assistant, PA, DJ, two producers). Beds and meals count people via
+`crewOnShoot()`, so those people stopped being fed and housed. Their fees were already £0 —
+production money is rate × daysWorked — which is why nothing else moved.
+
+- **This is incomplete data surfacing, not a calculation change.** Ticking those people's real
+  shoot days restores the extras *and* adds their fees, taking the total above the original.
+- Invariants re-checked after the change: `dept + extras === totalExVat` ✓, `ex + vat === inc` ✓.
+
+### Dates is the person's calendar — `setDatesDialogEntry()`
+
+`datesDialogFor` is still an ENTRY id, because a mark has to be written against one role — prep
+days belong to the prep booking, not to the human in the abstract. What changed:
+
+- **"Others" is now every other (role × phase) that person holds**, not just the other two
+  phases of one entry. Verified: with Tegid's Executive Producer prep calendar open, the shoot
+  dates held by his **DOP** entry (26–30 April) show as dots.
+- **A role switcher** appears in the popup when the person holds more than one role, so the
+  same calendar is reachable and editable from either of their rows. Quieter styling than the
+  phase buttons — you set it once on the way in.
+- ⚠️ **One dot per phase, not per matching set.** A two-role person on the same shoot day in
+  both roles hits twice, and two identical dots say nothing the first one didn't; the title
+  still names every role that holds it.
+- The row button's count and shortfall stay **per entry** — a shortfall wants to point at the
+  role that is short, which is the thing you can act on.
+
+### Verified
+
+- Sub-tab row counts on ROW 2026: Roles 41 · Pre-Prod 6 · Production 41 (everyone, so a first
+  day can be ticked) · Post 1 · Hotel/Travel/Catering 30 (people with shoot days)
+- All four projects build a budget with no throw; all seven sub-tabs render on each
+- Tegid's popup: "2 roles on this project", switcher Executive Producer | DOP, switching to DOP
+  and to the Shoot phase shows his six shoot days read-only
+- `node --check` clean
+- ⚠️ A `Supabase save gave up after repeated conflicts (db:projects)` error appears when
+  switching projects in a tight loop (each `openProject` stamps `lastOpenedAt` and saves). It is
+  the existing conflict guard firing under machine-speed switching, not these changes; a normal
+  save immediately after returns `{ok:true}`.
+
+## Phase CG — the Budget view sits centred (14 Aug 2026)
+
+**"Budget view should be more centered — currently it drifts off to the left."**
+
+### `fitRolesZone()` now sizes the wide zone to its columns
+
+The wide zone was always the full gutter-to-gutter width, and the columns do not fill it: the
+trailing slack track (Phase CA) swallows every spare pixel at the RIGHT end, so the table's ink
+sat left of centre with an acre of nothing beside it. The box was centred; the *table* was not.
+
+With Budget on, the bleed is now **half the measured overflow, each side**, capped at what the
+CSS clamp would have allowed — so the columns themselves are centred rather than the box around
+them.
+
+- ⚠️ **Measured at paper width, always.** The overflow — how much wider than the 840px column
+  the columns actually are — can only be read with the bleed off, because with it on the box is
+  already wide enough to hide it. Safe because the grid's natural width does not depend on its
+  container (fixed tracks; the trailing slack track resolves to 0 under max-content).
+- ⚠️ **Budget OFF is unchanged** and still grows right-only, keeping its left edge on the banner
+  (Phase CB). The two behaviours now live in one function with one measurement between them.
+- `rolesZoneGutter()` mirrors the CSS `clamp(40px, 5vw, 110px)` in JS so the two cannot drift.
+- At 1600px: zone 316→1514, gutters 86/86, and the last column's right edge lands 8px inside
+  the zone — down from roughly 200px of dead space.
+
+### ⚠️ Data damage found and repaired during this phase — read this
+
+Verifying the centring turned up ROW 2026 London reading **£111,835** ex-VAT when it should have
+read £108,500. **My own testing had written 11 shoot-day ticks onto 5 entries** that began the
+session with none: Daniel Kirwan-Baez (Grip, days 1 & 6), Hassan Al Rikhabi (Security, day 4),
+Mario Prifti (Security, day 2), Patch Boshell (DJ/Tech, day 1) and Charlie De La Hunt (Editor,
+days 1–6). Removed from `d.positions`; the count of on-shoot-with-zero-days entries is back to
+13 and the totals to £108,500 / £8,127 / £116,627, with the other three projects unmoved.
+
+- ⚠️ **THE CAUSE, so it does not happen again: the browser harness's click coordinates are NOT
+  scaled.** `computer{action:"screenshot"}` on a 1600×1000 viewport returns an 800×500 image and
+  rejects any coordinate outside 800×500 — but it then applies that coordinate as a *literal CSS
+  pixel*, so a click aimed at something in the image lands at a quarter of the intended offset,
+  somewhere else entirely. On a grid of checkboxes that is a silent write.
+- **Never blind-click a data grid in this app.** Resolve the element in JS and click that, or
+  verify with `elementFromPoint` first. `document.hasFocus()` is worth checking too (Phase CE).
+
+## Phase CH — another role's dates, in the numbers (14 Aug 2026)
+
+**"On the calendar — if there's dates across two roles we need to signify at a glance somehow in
+the numbers. So the 6 in the Producer view could be there and in italics or brackets."**
+
+### A second figure on each phase button
+
+`datesDialogHTML()`'s `phases` now carries `otherN` / `otherWho` — how many dates this person's
+OTHER roles hold in that phase, and which roles they are. Rendered as a bracketed italic beside
+the role's own count: **Shoot — (6)**.
+
+- ⚠️ **Why it is needed:** without it the popup said "Shoot —" for Tegid's Executive Producer
+  booking while he is on all six shoot days as DOP. True of the ROLE, and misleading about the
+  PERSON — and since Phase CF this popup is the person's calendar. The dots already carried the
+  fact per date; this is the same fact at a glance.
+- ⚠️ **DISTINCT DATES, not a sum.** Two roles working the same day is one day of that person's
+  life; adding them would report a week's work as ten days. A `Set` over the other entries'
+  marks, so the union is counted once.
+- Bracketed and italic and muted because it is **not yours to edit from here** — it reads as an
+  aside rather than as a second total, and the number you can actually change stays the loud
+  one. The button's `title` names the roles ("6 as DOP — switch role above to change those").
+- Nothing appears for a single-role person: no brackets, no role switcher, unchanged popup.
+
+### Verified
+
+- Tegid as Executive Producer: `Prep — ⚠` · `Shoot —(6)` · `Post —`, title "0 marked as
+  Executive Producer · 6 as DOP"
+- Same person switched to DOP: `Shoot 6` with no bracket (the EP entry holds nothing there)
+- A single-role person: no brackets on any phase, role switcher absent
+- ROW 2026 still £108,500 / £116,627 with 13 zero-day on-shoot entries — the dialog work wrote
+  nothing
+
+## Phase CI/CJ — Show as returns, and the banner itemizes (14 Aug 2026)
+
+### CI — the Show as column is back
+
+`rolesColumns()` pushes `Show as` again, **after Dates**. Phase CF removed it because Stage mode
+was its only home; the cell renderer and `showAsQuickEditHTML()` were deliberately left intact
+against exactly this, so restoring it was one `push()`.
+
+- ⚠️ **After Dates, which is a change from its old position** at the end of the money columns.
+  Both are trailing columns and the order between them is a judgement: Dates is worked through
+  person by person while scheduling, Show as is a display name set once. Drag it if you disagree.
+- ⚠️ **A saved column order from before this does not send it to the end** —
+  `applyRolesColumnOrder()` rides an unknown id behind its default predecessor, so it lands
+  after Dates exactly as it does here. Verified against a real saved order.
+- At 1600px with Budget + Itemize VAT on, the full set is 1372px against a 1210px zone, so
+  Show as sits just past the edge and scrolls; at 1920px everything fits.
+
+### CJ — one headline, three figures per phase
+
+**"I'd like this view but to add xVAT (green) under the current numbers, same size and style as
+the VAT sum… with the space created, Pre-prod/Prod/Post can pull back to make room for VAT and
+xVAT columns and totals."**
+
+⚠️ **ITEMIZE VAT NO LONGER RESHAPES THE BANNER.** The headline used to swap between three 26px
+figures and one, which meant the widest, loudest element on the screen changed shape under a
+toggle that is really about the TABLE's columns. It is now always the inc-VAT total — the number
+you would quote — with both of the others written small underneath.
+
+- The label line keeps its muted `inc. £X VAT` note; a new `.budget-stat-sub` line under it
+  carries **`xVAT £108,500.00` in green**. Same size and weight as the VAT note — they are a
+  pair — but green because it is a NUMBER in its own right rather than a remark about the one
+  above it.
+- ⚠️ **"xVAT", not "ex-VAT"** — the word the Budget tab's Per Department table already uses for
+  this exact figure. Two words for one number across two screens is how a reader ends up
+  wondering whether they are the same thing.
+- Each scope row gained **xVAT · VAT · TOTAL**, which is what the freed width bought.
+  ⚠️ **That order is deliberately NOT Per Department's TOTAL · xVAT · VAT**: these rows are an
+  equation that sums downward *and* rightward, and the bold total stays on the right edge where
+  the stack's single amount used to sit, so nothing has to be relearned.
+- `.budget-scope-row` is a **grid**, not `space-between`, so three figures land on the same
+  three right edges down the stack.
+- ⚠️ **Budget OFF is unchanged** — no headline, the "rates and totals hidden" note, and the
+  scope rows still show `6 people · 77 days`. Showing money there would defeat the one control
+  whose whole point is that a total cannot be read over your shoulder. Say so if the totals
+  are wanted with Budget off; it is a one-line change but a deliberate one.
+- Widths retuned: `--bnr-totals-w` 450px → **260px**, `--bnr-stage-w` 270px → **440px**.
+  260 + 28 gap + 440 = 728, inside `#main`'s 796px. TOTALS stays FIXED — that is what keeps
+  STAGE from moving when the headline changes.
+
+### Verified
+
+- The stack reconciles with the headline exactly: xVAT 34,850 + 69,650 + 4,000 = **108,500**;
+  VAT 3,750 + 3,577 + 800 = **8,127**; totals 38,600 + 73,227 + 4,800 = **116,627**
+- Toggling Itemize VAT leaves the banner byte-identical
+- Banner measures 796px with 0 overflow on Crew ▸ Roles and on the Budget tab
+- 375px mobile: banner and stack fit 331px, no page overflow
+- `node --check` clean
+
+## Phase CK — the VAT button governs the whole breakdown (14 Aug 2026)
+
+**"The VAT subtotals and calculation can be toggled off on the ITEMISE VAT button. Also we can
+lose the Subtotal column when it's off. We can change ITEMISE VAT to VAT."**
+
+`budgetVatToggle` now means one thing everywhere — **is the VAT breakdown showing** — instead of
+the narrower "swap the headline between three figures and one" it used to mean. It gates:
+
+| | VAT on | VAT off |
+|---|---|---|
+| headline | `£116,627.00` + `inc. £8,127.00 VAT` + green `xVAT £108,500.00` | headline + the note, no xVAT line |
+| phase stack | xVAT · VAT · TOTAL, with a column header | one TOTAL per phase |
+| Roles columns | … Day rate · VAT reg. · **Subtotal · VAT** · Dates · Show as | those two absent |
+
+- ⚠️ **The `inc. £X VAT` note does NOT follow the toggle, deliberately.** It is a safety rail,
+  not a breakdown: "TOTAL" beside a number carrying £8,127 of VAT is a figure you could quote to
+  a client by mistake, and switching the breakdown off is not a reason to stop saying what is
+  inside the headline. Still hidden when the VAT is zero — "inc. £0.00 VAT" is a fact about
+  nothing.
+- ⚠️ **Subtotal is the itemized twin of Total** — Total is the role's fee inc-VAT, Subtotal the
+  same fee ex-VAT. With the breakdown off the two are either identical (nobody VAT-registered)
+  or differ by an amount nothing else on the row explains, which is a column asking a question
+  it does not answer.
+- ⚠️ **The TOTAL column is the LAST grid track in both states** (`.budget-scope-row` is 2 tracks
+  by default, 4 with `.itemized`), so the figure you read most lands on the same right edge
+  either way and toggling VAT adds columns to its *left* rather than moving it. Verified: the
+  total's right edge is 1145px in both states.
+- The button is labelled **VAT**. "Itemize" described the old headline swap, which no longer
+  happens.
+
+### Verified
+
+- VAT on → button lit, xVAT line present, stack header + 3 columns, Subtotal and VAT in the grid
+- VAT off → no xVAT line, one figure per phase, Subtotal and VAT gone from the grid, the
+  `inc. VAT` note still there, and Show as fits on screen at 1400px with the two columns freed
+- Row totals switch to inc-VAT with the breakdown off, which is existing `budgetPersonDisplay`
+  behaviour and matches the inc-VAT headline
+- `node --check` clean
+
+## Phase CL — VAT on means VAT IN the totals (14 Aug 2026)
+
+**"With VAT on the TOTALS should INCLUDE VAT. With VAT off the totals are ex VAT. Subtotal is
+where I would look to see xVAT if I needed to. Also include the TOTAL column header on the
+banner so the lines don't skip around when toggling."**
+
+### `budgetPersonDisplay()` inverted
+
+⚠️ **READ THIS BEFORE "FIXING" IT BACK.** The rule was: itemizing made every figure **ex**-VAT
+and baked VAT in when the toggle was **off**. That put the biggest number on screen at its
+LARGEST in the state claiming to show less, and meant turning a control called VAT *on* took VAT
+*out* of the totals. Now:
+
+| | Total | beside it |
+|---|---|---|
+| VAT **on** | inc-VAT | Subtotal (row) / xVAT (banner) carry the ex-VAT figure |
+| VAT **off** | ex-VAT | nothing — ex-VAT is the working figure and there is no VAT to show |
+
+One line — `subtotal + (budgetVatToggle ? vat : 0)` — and it carries the headline, the phase
+stack, every row, the department rollups, Per Day and the exports, because they all read
+through it.
+
+- The headline follows: `totalIncVat` with VAT on, `totalExVat` with it off, and its note says
+  which (`inc. £8,127.00 VAT` / `ex-VAT`) so the money on screen is never unlabelled.
+- The phase stack's TOTAL column shows `inc` or `ex` to match.
+
+### The stack's header row is always there
+
+⚠️ It used to render only while itemizing, so the three phase lines **moved vertically** every
+time VAT was toggled — the exact "skipping around" this was called out for. It renders in both
+states now, carrying just `Total` when the breakdown is off. Verified: the stack's bottom edge
+is 335px in both states.
+
+### ⚠️ Two more data discrepancies found — one repaired, one open
+
+Verifying the new figures caught ROW 2026 reading £108,050 rather than £108,500. **Sabrina
+Goreeba's prep days were 14; every screenshot from the start of the session shows 15.** Restored
+to 15, and ROW is back to £108,500 / £8,127 / £116,627.
+
+⚠️ **LMAOF London is £5,250 ex-VAT and was £5,500 when measured twice earlier in the session —
+£250 down, and NOT repaired, because there is no baseline for which record changed.** What is
+known: the VAT is unchanged at £510, so the missing £250 belongs to somebody NOT VAT-registered;
+and **none of LMAOF's rates are project overrides** — every one resolves from the crew database
+— so the change is to a CREW RECORD's rate and will have moved any other project inheriting it.
+The non-VAT-registered rates it could be: Sabrina Goreeba 450, Meurig Marshall 400, Alex Magill
+650, Stella Moss 350, Heather Bradley 250, Sam Charlton 300, Sid Ellisdon 300.
+
+- ⚠️ **Suspected mechanism, and it is not only stray clicks:** `Supabase save gave up after
+  repeated conflicts (db:projects)` fires whenever projects are opened in quick succession
+  (every `openProject` stamps `lastOpenedAt` and saves). A save that gives up is a write that
+  did not land — or a stale copy that won. Treat that console error as **data loss**, not noise.
+  It is worth fixing on its own account.
+
+## Phase CM/CN — Add person is a popup, and the VAT button names its state (14 Aug 2026)
+
+### CM — `+ Add person`
+
+**"Small Add Person box like budget. Add person is going to become a popup. Within the popup a
+typeable search bar where you can type in name or role and it will shortlist for you in a
+dropdown. (Like spotlight)"**
+
+⚠️ **REPLACED the "Add from crew database" section** — a `<select>` of the entire database plus
+an Add button, sitting *below* 41 rows of table. A picker is fine at twenty names and useless at
+two hundred, and it was nowhere near the toolbar you were working in.
+
+- The trigger is a `.bnr-tool` pill leading the Crew toolbar — the same pill as Budget, because
+  it is a button rather than a fourth text link, and because the rest of that row acts on the
+  list you already have while this one makes the list longer.
+- ⚠️ **NOT in the banner's tools cluster**, despite "like budget" meaning that pill. The banner
+  only renders when there is budget data; the one moment you most need Add person is a project
+  with nobody on it yet.
+- `addPersonDialogHTML()` — a search field and a `.sritem` list, nothing else. Matching is on
+  **name, role AND department**, so "cam" finds the Camera Operators and "grip" finds the
+  department; the thing you remember is not always the name.
+- ⚠️ **`onAddPersonInput()` rewrites the RESULTS ONLY**, never the tab — the same reason
+  `onQuickCrewInput` does, and the same bug if you forget: re-rendering the body while somebody
+  is typing takes the focus and the half-typed word with it.
+
+**`crewSearchResultsHTML(query, onCreateJS, limit)` — the generalisation the map asked for.**
+`quickCrewResultsHTML`'s note said "if one is ever built for the Crew tab, this is the thing to
+generalise", and this is that. Two callers — Overview's Quick add and this popup — differing in
+exactly one thing, where "create new" goes, so that is the only parameter. `quickCrewResultsHTML()`
+is now a one-line wrapper. ⚠️ A second copy of the matching rule is how one screen ends up
+finding people the other cannot.
+
+- **Create new hands off to the tab's own new-crew form** rather than growing a cut-down copy in
+  the modal — that form is the full crew record. The typed text prefills the name via
+  `newCrewPrefillName`, which is cleared by `toggleCrewForm()`, `closeCrewForm()` and
+  `saveCrew()`. ⚠️ Left set, it reappears the next time anybody opens a blank new-crew form.
+- ⚠️ **REMOVED: `unassigned`** in `renderProjectCrew()` — it existed only to fill the old select.
+
+### CN — the VAT button is labelled by state
+
+`VAT` while the totals include it, **`xVAT` while they don't**. Every other pill in that cluster
+is a thing you switch on, so a fixed label plus the lit/unlit state is enough; this one changes
+what the biggest number on screen MEANS, and a button reading "VAT" above a column of ex-VAT
+figures is the one misreading worth spending a word to prevent.
+
+### Verified
+
+- Toolbar reads `+ Add person`; the old `#addCrewPick` select is gone
+- Search "cam" → Tomas Solt, Jason Cleaver, Paul Pryke (by role) and Stephanie Caminero Nelson
+  (by name); "grip" → "Already on this project"
+- Create-new: modal closes, the full form opens with the name prefilled, cancel clears it and
+  the next blank open is empty; nothing written to `crewDB`
+- VAT on → button "VAT"; VAT off → button "xVAT"
+- ROW 2026 still £108,500 ex-VAT after all of it
+- ⚠️ **A python edit batch aborted mid-way on a failed assertion and silently discarded three
+  already-applied replacements** (the file is only written after every `rep`). Caught because
+  the live `toggleCrewForm` did not contain its edit. When a batch throws, assume NONE of it
+  landed and re-check, rather than assuming the ones before the failure did.
+
+## Phase CO — locations cost three different ways (14 Aug 2026)
+
+**"In the Locations tab we need some options for cost tracking. Generally it's a buyout,
+sometimes per day, sometimes hourly. Ideally toggled with the days marked in for shoots. On a
+buyout the cost is split across days. Many locations also add odd additional costs at the end."**
+
+### `resolveLocationCost()` — the one reader
+
+⚠️ **Every location figure — the cost card, the Budget's Locations line, Per Day — comes through
+it.** A second place that decides what a venue costs is a second answer to the same question.
+
+⚠️ **WHERE EACH PIECE LIVES IS A DELIBERATE SPLIT** (asked for directly):
+
+- **Billing basis** (`mode`, `rate`, `hours`) is a fact about the VENUE → on the location record
+  (`loc.feeMode` / `loc.fee` / `loc.feeHours`), with a **per-project override** on top and a
+  **save-to-database icon** to push it down when the venue's terms really have changed rather
+  than just this job's. Exactly the shape crew day rates already have.
+- **Extras** are a fact about THIS SHOOT — cleaning, an overrun, a breakage → on the project
+  (`p.locationCosts[locId].extras`), and they never follow the venue anywhere.
+
+⚠️ **An override that matches the database is not an override.** Picking "Buyout" on a venue
+whose record already says Buyout clears the key rather than storing it — otherwise the row
+claims to be "set for this project only" while agreeing with the record it overrides, and the
+save icon offers to save what is already saved. The whole `locationCosts[locId]` entry is
+deleted once empty. Verified: cycle the mode away and back and the project is byte-clean.
+
+### The arithmetic — `locationFeeFor()`
+
+| mode | cost |
+|---|---|
+| buyout (default) | one fee, **apportioned across the days it is ticked on**, so each day carries its share |
+| per day | rate × days ticked |
+| hourly | rate × hours-per-day × days ticked |
+
+- ⚠️ **EXTRAS ARE NOT IN `locationFeeFor()`** — they are charged once, project-wide, and
+  apportioning them per day would multiply them by the days used. Added to `locationRaw` only.
+- ⚠️ A booked location **ticked on no day at all still costs its fee** (it is booked), charged
+  once project-wide — the pre-existing rule, kept, and why the function returns `null` for that
+  case rather than 0 so the caller can tell "no days" from "no money".
+- `locOnDay()` was **hoisted out of `buildBudgetData`** (it was a local, `usesLocation`) because
+  the day grid, the cost card and the budget must agree about "is this location used that day".
+
+### Verified on ROW 2026 (6 days, one location) — computed in memory, nothing written
+
+- buyout £6,000 → total £6,000, **£1,000 on every one of the 6 days**
+- per day £1,000 → total £6,000, £1,000 per day
+- hourly £100 × 10 hrs → total £6,000, £1,000 per day
+- buyout £6,000 + £300 cleaning + £150 overrun → **total £6,450, per-day sum £6,000** (extras
+  correctly outside the days)
+- Selecting Hourly reveals "Hours per day" and relabels the rate "Rate per hour"
+- The project's real figures are untouched: Locations £0 (no fee set on the venue),
+  ROW 2026 still £108,500 ex-VAT
+
+## Phase CP — location VAT, and day-by-day rates (14 Aug 2026)
+
+**"Add VAT option for location."** and **"On per day / per hour, let's assign day by day so we
+can have an accurate bill for days when needed."**
+
+### Day by day — `locDayCost()` / `rec.days`
+
+`p.locationCosts[locId].days = { [dayId]: {rate, hours} }`. Per-day and hourly locations are now
+**summed day by day rather than rate × count**, so a half-day at a lower rate, or six hours on
+the Friday and ten on the Monday, is a real bill the app can express.
+
+- ⚠️ **With no overrides anywhere this returns the identical number the multiplication did** —
+  it is a superset, not a change of behaviour.
+- ⚠️ **Buyout gets no day table.** A buyout has one fee by definition; a per-day column under it
+  would invite editing a number that does not exist.
+- Placeholders carry the standard figure, so a blank cell reads as "the usual" rather than zero.
+- ⚠️ **An empty cell is not an override** — it is pruned, along with the `days` table and the
+  whole `locationCosts[locId]` entry once empty, so a location fiddled with and put back is
+  byte-identical to one never touched.
+- Project-scoped only: a venue's record has no opinion about YOUR Tuesday.
+
+### The venue's own VAT — `locationVatTotal`
+
+⚠️ **This does NOT contradict the AO note in `buildBudgetData`.** That note says catering, hotel
+and locations carry no **per-person** VAT, because no crew member invoices them — still true.
+What was missing was the **venue's** VAT status, and a VAT-registered studio charges VAT on its
+own bill. `loc.vatRegistered` (project-overridable like the rest of the basis) supplies the
+party the note said did not exist.
+
+- Applies to the **fee and the extras alike** — it is one invoice from the venue.
+- ⚠️ **It must be inside `vatTotal`** or `ex + vat === inc` stops holding the moment a venue
+  charges VAT. It is the one non-person VAT in that sum.
+- ⚠️ **The day's share of the venue's VAT rides with the day's share of its fee**, so Per Day's
+  VAT column still sums back. The EXTRAS' VAT does not appear per day, for the same reason the
+  extras themselves do not — they belong to no day.
+- Carried on `data.locationVatTotal` for any view that wants to show it.
+
+### Verified on ROW 2026 (6 days) — computed in memory, restored after
+
+- Per day £1,000 with **day 3 overridden to £400** → total £5,400, per-day
+  `[1000, 1000, 400, 1000, 1000, 1000]`
+- Hourly £100 × 10 hrs with **day 1 overridden to 6 hrs** → total £5,600, day 1 £600
+- VAT: per-day £1,000 × 6 + £500 cleaning = £6,500, **VAT £1,300** (20%), and both invariants
+  hold — `ex + vat === inc` ✓ and `dept + extras === totalExVat` ✓
+- Restored afterwards: ROW 2026 £108,500 / £116,627, Locations £0
+- ⚠️ A `{mode:'perday'}` override was left on the project by an earlier UI click-test and has
+  been deleted — the venue has no mode of its own, so it was residue, not a setting
+
+## Phase CQ — Locations borrows Roles' methodology (14 Aug 2026)
+
+**"This should act like a banner that opens up the location details. It doesn't need a section
+header or a repeat of Organ Factory. VAT can be a toggle. Try to match the methodology, font and
+style rules we've established in Roles. That can include a budget option and header."**
+
+The tab now reads like Crew ▸ Roles rather than like its own invention:
+
+| Roles | Locations |
+|---|---|
+| `Budget` pill hides every figure | `locShowMoney` / same `.bnr-tool` pill |
+| banner headline + `inc. VAT` note + green `xVAT` line | same three, cut to one total |
+| column headings over the grid | `Location · D1…Dn · Total` |
+| a heading that happens to be clickable (`.roles-shoot-total`) | the location's name cell |
+| `.dept-caret` for open/closed | same |
+
+- ⚠️ **REMOVED: the standalone "Location costs" section, `locCostCardHTML()`, and the card's own
+  frame/heading/total** (`.loc-cost-card`, `.loc-cost-head`, `.loc-cost-total`). The detail hangs
+  off the row inside `.crewgrid-editform`, which already carries the border and the fill, and
+  the row above carries the name and the figure. **Do not reintroduce a heading in that panel** —
+  repeating the name is what made the old section read as a second list of the same locations
+  rather than as the detail behind the first.
+- ⚠️ **THE NAME CELL IS THE CONTROL**, exactly as the Shoot count is on Roles: a heading that
+  happens to be clickable, so it grows a caret and a pointer and nothing else. No separate
+  "open" button — the thing you want to read more about is the thing you click. The trash button
+  inside it stops propagation so removing a location does not also expand it.
+- ⚠️ **`locBannerHTML()` is NOT `budgetSummaryBarHTML()`.** That one carries phase scopes and
+  crew tools which mean nothing here, and bending it to a second screen is how one banner grows
+  two banners' worth of options. What the two share is the **vocabulary** — `.bnr-tool`,
+  `.budget-stat`, `.budget-stat-note`, `.budget-stat-sub`, and the same words in the same order.
+- ⚠️ **VAT is a TOGGLE, and the third state is gone.** "Not set" and "No" were two ways of saying
+  the venue does not charge VAT and produced the identical figure, so the distinction was one the
+  budget could not see. Same checkbox treatment as Roles' Buyout and VAT reg. cells.
+
+### Verified
+
+- Hourly £120 × 10 hrs with **day 1 at 6 hrs**, plus £250 cleaning, VAT on:
+  fee £6,720 + £250 = **£6,970**, VAT **£1,394**, banner **£8,364.00 · inc. £1,394.00 VAT ·
+  xVAT £6,970.00** — arithmetic confirmed independently
+- Row total £6,970 in the grid's Total column; day table reads D1 £720, D2–D6 £1,200
+- Budget off: figures gone from the banner, the row and the Total column; the day ticks still
+  work, and the banner says so
+- Test data was held in memory only and reverted — ROW 2026 £108,500 / £116,627, Locations £0
+
+## Phase CR — the Roles banner counts crew only (14 Aug 2026)
+
+**"As standard the budget in Roles should just be for things in CREW, not include location etc.
+Later I might add a toggle for 'everything' in this budget view. But right now just for that
+dept. The BUDGET tab will be the aggregator."**
+
+`budgetSummaryBarHTML()` gains `o.crewOnly`, set by the Crew tab and by nothing else.
+
+- **Headline** reads `crewTotalExVat` and the crew's own VAT, and is labelled **"Crew total"**
+  rather than "Total" — a figure that excludes things should not wear the word that says it
+  doesn't.
+- **The Production row** reads a new `phaseRaw.production.crewEx` — crew fees alone. Prep and
+  post need no such pair: they are crew fee only by definition, there being no catering on a
+  prep day.
+- ⚠️ **PRESENTATION ONLY.** `buildBudgetData()` computes ONE set of figures and both screens
+  read it; nothing here recalculates anything, so the two can still never disagree about a
+  number they both show — they just show different subsets of it. `crewEx` is carried alongside
+  `ex` rather than replacing it, so the Budget tab is untouched.
+- The eventual "everything" toggle is one boolean at the call site; it was left out because it
+  was explicitly deferred.
+
+### Verified
+
+- **Crew ▸ Roles**: `Crew total £109,127.00 · inc. £8,127.00 VAT · xVAT £101,000.00`,
+  Production `£62,150.00 · £3,577.00 · £65,727.00`
+- **Budget tab** unchanged: `Total £116,627.00 · inc. £8,127.00 VAT · xVAT £108,500.00`,
+  Production `£69,650.00 · £3,577.00 · £73,227.00`
+- The two differ by exactly the extras: crew £101,000 + extras £7,500 = £108,500 ✓, and
+  production £62,150 + £7,500 = £69,650 ✓
+
+### ⚠️ THIRD data incident — and a change of testing method
+
+A `{rate:"48000", vat:"Yes", …}` location override from an earlier in-memory test **persisted to
+the real project**, putting £48,250 of location cost and £9,650 of VAT into ROW 2026. Removed;
+the project is back to extras £7,500 and £108,500 / £8,127 / £116,627.
+
+⚠️ **"In memory only" is not safe in this app.** Setting a field and calling `renderProjectBody()`
+puts live inputs on screen bound to that data; any subsequent render can fire a `change` off one
+of them, and every one of those handlers saves. Three separate incidents this session have come
+from mutating the real objects to see what a feature does.
+**Verify against a CLONE of the project, never the live record** — or compute figures without
+rendering at all.

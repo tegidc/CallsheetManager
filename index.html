@@ -75,9 +75,11 @@
        Crew sub-tab. Each grid keeps its own columns after Role (Rate/Show as on
        Roles, rate+days fields on Pre-production, day checkboxes on the other four) —
        only the shared leading columns needed to agree. */
-    --pb-controls-w:56px;    /* fits a checkbox + Edit pencil (Roles); the other five
-                                 tabs' checkbox-only controls just sit in the same
-                                 width, left-aligned */
+    --pb-controls-w:34px;    /* a bulk-select checkbox, and nothing else. ⚠️ Was 56px, to
+                                 fit Roles' Edit pencil beside it — Phase CC took that
+                                 pencil out (selecting and pressing Edit is the one way in
+                                 now), so all six tabs are checkbox-only and the column is
+                                 the width of a checkbox again. 22px of the table back. */
     --pb-name-w:170px;       /* fixed, not flexible — a flexible Name column is what
                                  let Role drift depending on how long a name was.
                                  170px (was 220px, Phase BO follow-up — narrowed to
@@ -93,13 +95,24 @@
        STAGE is 270px: "Pre-production" beside a 9-character amount, with the amount
        right-aligned. TOTALS is FIXED on purpose — it is what keeps STAGE from moving when
        the headline changes shape. See .phase-banner. */
-    --bnr-totals-w:450px;
-    --bnr-stage-w:270px;
+    /* ⚠️ Phase CJ retuned both. TOTALS was 450px for three 26px figures side by side; it is
+       one figure with two small lines under it now, so 260px covers the widest of them
+       ("£116,627.00" plus the "inc. £8,127.00 VAT" note on its label line). Everything it
+       gave up went to STAGE, which grew from one amount per phase to three — 440px fits
+       "Pre-production" beside three right-aligned 9-character figures. They still sum inside
+       #main's 796px: 260 + 28 gap + 440 = 728. TOTALS stays FIXED, which is what keeps STAGE
+       from moving when the headline changes — see .phase-banner. */
+    --bnr-totals-w:260px;
+    --bnr-stage-w:440px;
     --pb-phase-fields-w:130px; /* Pre-production/Post only: the rate+days column, sized
                                  to the two inputs (60 + 10 gap + 60). Was a flat 200px
                                  sized to the removed "N days booked" counter. Retuned
                                  for mobile below, where the inputs themselves grow. */
     --sidew:230px;
+    /* ⚠️ The page's paper width and its side padding, as TOKENS rather than two numbers
+       inside .main — Roles' wide zone (see .roles-widezone) has to compute how far it may
+       break out of that column, which means knowing both. Change them here, not in .main. */
+    --mainw:840px; --main-pad:22px;
     --side-bg:#110A08; --side-text:#FFFFF5; --side-line:rgba(255,255,245,.14); --side-hover:rgba(255,255,245,.08);
   }
   *{box-sizing:border-box;}
@@ -109,7 +122,7 @@
   .app{display:flex; min-height:100vh;}
   .side{width:var(--sidew); flex:0 0 var(--sidew); background:var(--side-bg); border-right:1px solid var(--side-line);
     padding:16px 12px; position:sticky; top:0; height:100vh; overflow-y:auto;}
-  .main{flex:1; min-width:0; padding:20px 22px 90px; max-width:840px; margin:0 auto;}
+  .main{flex:1; min-width:0; padding:20px var(--main-pad) 90px; max-width:var(--mainw); margin:0 auto;}
 
   /* top bar + scrim: only ever visible on mobile */
   .topbar{display:none;}
@@ -734,7 +747,55 @@
      max-content width and scroll sideways as 700px of text fields */
   .roles-tablewrap{container-type:inline-size;}
   .roles-tablewrap .pb-editform{position:sticky; left:0; width:100cqw;}
+  /* ============ ROLES RUNS WIDE (desktop only) ============
+     Every other screen in this app is a sheet of paper 840px wide, and should stay one. Roles
+     is the exception: it is a table of INPUTS whose column set grows with Budget, Itemize VAT,
+     Split kit and Costs PP, and on a wide monitor it was scrolling sideways inside an 800px
+     box with empty desk either side of it. The zone below the toolbar breaks out of the paper
+     column to use that room; everything above it — the tab strip, the totals banner, the tool
+     buttons — stays exactly where it was, so the page still reads as a document with one wide
+     table in it rather than as a full-bleed spreadsheet.
+     ⚠️ SYMMETRIC NEGATIVE MARGINS, not a width: the zone is a block, so widening it is the
+     same calculation on both sides and it cannot end up off-centre from the column above.
+       (avail - paper)/2   how much desk there is on ONE side of the paper
+       + --main-pad        .main's own padding, which the zone starts inside of
+       - --roles-gutter    the margin kept from the window edge (the "margin of kind")
+     max(0px, …) is what makes this self-disabling: below ~1070px of viewport the desk is gone,
+     the bleed computes to 0 and the zone sits in the paper column like everything else. There
+     is no breakpoint to keep in step with the layout — the sum reaches zero on its own.
+     ⚠️ THE GUTTER IS GENEROUS AND IT GROWS WITH THE WINDOW — clamp(40px, 5vw, 110px), not a
+     token 30px. The point of this zone is to use the desk, not to run the table into the
+     window edge: a table that stops a hair short of the frame reads as an overflow, whereas
+     the same table with an inch of margin still reads as a wide sheet of paper, which is what
+     the rest of the app is. 5vw keeps that margin looking the same on a 1280 laptop and a
+     1920 monitor rather than growing tight on one and vast on the other.
+     ⚠️ 100vw INCLUDES the scrollbar where the platform draws a classic one, so the bleed can
+     overshoot by half a scrollbar per side — about 7px, absorbed by a gutter this size. The
+     zone still stays centred (it is measured from .main, which is centred in the real content
+     box) rather than sliding under the scrollbar.
+     ⚠️ Gated at 901px to match the mobile block below, where .side leaves the flow and becomes
+     a drawer — under that breakpoint `100vw - --sidew` is not the available width at all. */
+  .roles-widezone{--roles-bleed:0px;}
+  @media(min-width:901px){
+    .roles-widezone{
+      --roles-gutter:clamp(40px, 5vw, 110px);
+      --roles-bleed:max(0px, (100vw - var(--sidew) - var(--mainw))/2 + var(--main-pad) - var(--roles-gutter));
+      margin-left:calc(-1 * var(--roles-bleed));
+      margin-right:calc(-1 * var(--roles-bleed));
+    }
+  }
   .roles-grid-header, .prep-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
+  /* ---- drag a heading to move the column (Phase CA) ----
+     The grab cursor is the whole affordance at rest; anything louder would put a permanent
+     handle in every heading of the app's densest row for something you do once a month. */
+  .roles-head-drag{cursor:grab;}
+  .roles-head-drag:active{cursor:grabbing;}
+  .roles-head-drag:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .roles-col-dragging{opacity:.4;}
+  /* ⚠️ inset box-shadow, not a border: a border would add 2px to a heading whose width IS the
+     column's, so every cue would nudge the whole grid sideways as you dragged across it */
+  .roles-col-dropbefore{box-shadow:inset 2px 0 0 var(--tape);}
+  .roles-col-dropafter{box-shadow:inset -2px 0 0 var(--tape);}
   /* Phase BR — RATE and DAYS over Pre-production's two bare number fields. One header
      CELL (column 4 holds both inputs), laid out on the same flex row and the same field
      width as .prep-fields-row below it so each label lands over its own input. */
@@ -902,6 +963,19 @@
     border:1px solid var(--line); border-radius:5px; background:transparent; padding:3px 7px;
     font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px; color:var(--muted);
     white-space:nowrap;}
+  /* ---- Phase CF: which ROLE you are marking, when a person holds more than one ----
+     Deliberately quieter than .dates-phase (no colour dot, no count): the phase buttons are
+     what you move between constantly, this is a thing you set once on the way in. */
+  /* another role's count, beside this role's own. Italic and bracketed so the two never read
+     as one figure, and muted so the number you can actually edit stays the loud one. */
+  .dates-phase-other{font-style:italic; font-weight:400; opacity:.65; margin-left:3px;}
+  .dates-roles{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px;}
+  .dates-role-btn{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px;
+    text-transform:uppercase; padding:5px 10px; border:1px solid var(--line); border-radius:20px;
+    background:transparent; color:var(--muted); cursor:pointer; white-space:nowrap;}
+  .dates-role-btn:hover{border-color:var(--tape); color:var(--tape);}
+  .dates-role-btn.on{border-color:var(--tape); background:var(--tint-3); color:var(--tape); font-weight:600;}
+  .dates-role-btn:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .dates-btn:hover{border-color:var(--tape); color:var(--tape);}
   .dates-btn:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .dates-btn.has-marks{color:var(--text);}
@@ -912,6 +986,75 @@
   .modal-box h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 14px;
     display:flex; align-items:center; gap:8px;}
   .modal-box h3::after{content:''; flex:1; height:1px; background:var(--line);}
+  /* the crew form is a real form, not a confirm dialog — .modal-box's 420px would put two
+     fields per line and then scroll forever, and the page behind it is 840px of paper */
+  .crew-edit-box{max-width:620px; max-height:88vh; overflow:auto;}
+  /* ---- Add person (Phase CM): a search field and a list, nothing else ---- */
+  /* ---- Location costs (Phase CO; folded into the row in CQ) ----
+     ⚠️ REMOVED in Phase CQ: .loc-cost-card / .loc-cost-head / .loc-cost-total — the standalone
+     card's own frame, heading and total. The panel hangs inside .crewgrid-editform now, which
+     already carries the border and the fill, and the row above it carries the name and the
+     figure. Do not reintroduce a heading here. */
+  /* the row, as a disclosure — the .dept-caret idiom Crew uses, nothing louder */
+  .loc-name-cell{cursor:pointer; user-select:none; display:flex; align-items:baseline; gap:6px;}
+  .loc-name-cell:hover{color:var(--tape);}
+  .loc-name-cell:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
+  .loc-name-cell .dept-caret{flex:0 0 auto;}
+  .loc-name-text{min-width:0;}
+  .loc-row-total{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;
+    font-weight:600; align-self:center;}
+  .loc-row-open{background:var(--tint-1);}
+  .loc-cost-panel{margin-top:8px;}
+  /* the banner: the same grid as .phase-banner, minus the phase stack it has no use for */
+  .loc-banner{grid-template-columns:minmax(0,1fr); grid-template-areas:"totals" "tools";}
+  .loc-banner .bnr-toolrow{justify-content:flex-end;}
+  /* VAT as a toggle, sized and spaced like the other fields on the row */
+  .loc-vat-field .loc-vat-toggle{display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    font-family:var(--body); font-size:var(--fs-meta); color:var(--text); padding:6px 0;}
+  .loc-cost-fields{display:flex; flex-wrap:wrap; gap:10px 18px; align-items:flex-end;}
+  .loc-cost-fields > div{min-width:0;}
+  .loc-cost-fields select{width:130px;}
+  .loc-cost-fields .budget-rate-input{width:96px;}
+  /* one charge per line — these are things you read down a list and total in your head, not
+     a wrapping row of pills */
+  .loc-extras{margin-top:10px; border-top:1px solid var(--line); padding-top:8px;}
+  .loc-extra-row{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .loc-extra-label{flex:1 1 auto; min-width:0;}
+  .loc-extra-row .budget-rate-input{width:96px;}
+  /* ---- day-by-day rates/hours (Phase CP) ---- */
+  .loc-days{margin-top:10px; border-top:1px solid var(--line); padding-top:8px;}
+  .loc-day-head, .loc-day-row{display:grid; grid-template-columns:44px repeat(var(--locday-cols,2), 96px) minmax(0,1fr);
+    align-items:center; gap:8px;}
+  .loc-day-head{font-family:var(--label); font-size:10px; letter-spacing:1.1px; text-transform:uppercase;
+    color:var(--muted); margin-bottom:4px;}
+  .loc-day-head span:last-child, .loc-day-cost{text-align:right;}
+  .loc-day-row{margin-bottom:4px;}
+  .loc-day-num{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1px; color:var(--tape);}
+  .loc-day-cost{font-variant-numeric:tabular-nums; white-space:nowrap;}
+  @media(max-width:900px){
+    .loc-cost-fields select, .loc-cost-fields .budget-rate-input{width:100%;}
+    .loc-cost-fields > div{flex:1 1 100%;}
+  }
+  .add-person-box{max-width:520px;}
+  .add-person-search{width:100%; font-size:15px; padding:10px 12px;}
+  /* tall enough to show the shortlist without the modal growing and shrinking as you type —
+     a list that changes height under the cursor is a list you mis-click */
+  .add-person-results{margin-top:10px; max-height:46vh; overflow:auto;}
+  .crew-add-person{margin-right:4px;}
+  .crew-edit-box .crew-edit-form{margin:0;}
+  /* ---- Phase CC: the department pill, left of the name ----
+     The name cell is a row now, not a text node: pill, then the name, which is why the name
+     got a span of its own. min-width:0 + the ellipsis stay on the TEXT, so a long name is what
+     truncates — never the three letters that say which department you are looking at. */
+  .roles-grid-name{display:flex; align-items:center; gap:6px; min-width:0;}
+  /* ⚠️ FIXED WIDTH, so the codes read as a COLUMN rather than as a ragged edge — "CAT/TRA" is
+     twice the width of "SET", and left to itself every name on the page starts at a different
+     x. 56px is the widest code plus its padding. This is a track in all but name; it is done
+     inside the Name cell rather than as a real fourth lead column because those three columns
+     are shared with five other sub-tabs (Phase BO) and only Roles wants a pill. */
+  .roles-grid-name .pill.dept{flex:0 0 56px; display:inline-flex; justify-content:center;
+    padding-left:0; padding-right:0;}
+  .roles-name-text{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
   /* ⚠️ REMOVED in Phase BM: .role-add-marker (+ .has-roles, :hover) — AZ's separate "+"
      marker beside the chip. The chip itself is the roles-menu trigger now, and the
@@ -1220,20 +1363,52 @@
      letter-spaced type — it is a sentence about the number, not a second heading for it. */
   .budget-stat-note{font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--muted); margin-left:8px;}
+  /* the ex-VAT line under the headline. Same size and weight as the VAT note beside the
+     label — they are a pair — but green, because it is a NUMBER in its own right rather
+     than a remark about the one above it. */
+  .budget-stat-sub{font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
+    letter-spacing:0; text-transform:none; color:var(--tape); margin-top:3px;
+    font-variant-numeric:tabular-nums;}
   /* ---- STAGE: the phase stack, zone 2 of the banner ----
      Phase BU gave it a zone of its own rather than letting it ride at the end of the
      headline's flex row, which is what made it move when the headline changed shape. */
   .budget-scope-stack{display:flex; flex-direction:column; gap:1px; min-width:0;}
   .bnr-zone-head{font-family:var(--label); font-size:10px; letter-spacing:1.3px;
     text-transform:uppercase; color:var(--muted); margin-bottom:3px;}
-  .budget-scope-row{display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+  /* ⚠️ Phase CJ — A GRID, NOT space-between, because there are three figures per row now and
+     they have to land on the same three right edges down the stack. The name takes the slack;
+     each amount gets a fixed track wide enough for a 9-character figure.
+     ⚠️ THE ORDER IS xVAT · VAT · TOTAL, which is deliberately NOT Per Department's
+     TOTAL · xVAT · VAT. These rows are an equation that sums downward AND rightward — the two
+     small figures add to the bold one — and the bold total stays on the right edge where the
+     stack's single amount used to sit, so nothing has to be relearned. Per Department is a
+     table you scan by total first; this is three lines that add up. */
+  /* ⚠️ TWO TRACKS BY DEFAULT, FOUR WHILE ITEMIZING, and the TOTAL column is the last track
+     in both — so the figure you read most lands on the same right edge whether the breakdown
+     is showing or not, and toggling VAT adds columns to its left rather than moving it. */
+  .budget-scope-row{display:grid; grid-template-columns:minmax(0,1fr) 84px;
+    align-items:baseline; gap:0 10px;
     padding:3px 0; cursor:pointer; border-bottom:1px solid var(--line);
     font-family:var(--body); font-size:var(--fs-meta);}
+  .budget-scope-row.itemized{grid-template-columns:minmax(0,1fr) 84px 68px 84px;}
+  /* the counts row (money off) has one cell where the figures go, so it spans them */
+  .budget-scope-row .budget-scope-count{grid-column:2 / -1; text-align:right;}
+  .budget-scope-ex, .budget-scope-vat{text-align:right; white-space:nowrap; color:var(--muted);
+    font-variant-numeric:tabular-nums;}
+  /* ex-VAT is the figure you work from, so it carries the brand colour the headline's own
+     ex-VAT line does — the two are the same fact at two scales */
+  .budget-scope-ex{color:var(--tape);}
+  /* the column headings: the same uppercase label type the rest of the banner uses, and not
+     a control — clicking a scope row is a toggle, and this row must not look like one */
+  .budget-scope-head{cursor:default; font-family:var(--label); font-size:10px;
+    letter-spacing:1.1px; text-transform:uppercase; color:var(--muted); padding-bottom:2px;}
+  .budget-scope-head:hover{color:var(--muted);}
   .budget-scope-row:last-child{border-bottom:none;}
   .budget-scope-row:hover{color:var(--tape);}
   .budget-scope-row:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .budget-scope-name{white-space:nowrap;}
-  .budget-scope-amt{font-weight:600; white-space:nowrap;}
+  .budget-scope-amt{font-weight:600; white-space:nowrap; text-align:right;
+    font-variant-numeric:tabular-nums;}
   /* what the row says with the money hidden. Body font and muted, NOT the amount's Oswald
      600 — it is a description of the phase, not a figure standing where a figure was, and
      matching the money's weight would invite reading it as one. */
@@ -1743,8 +1918,12 @@ const FONT_CHOICES = {
    had (Fraunces display / Oswald label / Jost body); settings just makes each one
    choosable instead of only the first. `headerFont` keeps its original key so
    settings saved before R15 still load. */
+/* ⚠️ `rolesColumnOrder` is null, NOT [] — the default is shared by every Object.assign that
+   builds appSettings, so an array here would be one array handed to every caller and a
+   push() anywhere would rewrite the default. Nothing mutates it in place (every save
+   assigns a fresh array), and null reads as "no custom order" without a length check. */
 const SETTINGS_DEFAULTS = { headerFont:'fraunces', labelFont:'oswald', bodyFont:'jost',
-                            brand:'#017756', brandLight:'#0FA47A' };
+                            brand:'#017756', brandLight:'#0FA47A', rolesColumnOrder:null };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -2339,20 +2518,13 @@ async function confirmSwap(entryId){
   // ---- the booking: ONE field, because everything else is keyed to the entry ----
   e.crewId = newId;
   if(!keep.rate){ delete e.rate; delete e.buyout; }
-  /* ⚠️ Phase BU — dropping a phase means dropping its MEMBERSHIP as well as its days.
-     Leaving the entry in p.preprodMembers with its prepSchedule record deleted would put
-     the new person on the Pre-Prod tab with a blank count, as though they had been booked
-     for prep nobody had costed yet. Same for the edit. */
-  if(!keep.prep){
-    if(p.prepSchedule) delete p.prepSchedule[entryId];
-    p.preprodMembers = (p.preprodMembers||[]).filter(id=>id!==entryId);
-  }
-  if(!keep.post){
-    if(p.postSchedule) delete p.postSchedule[entryId];
-    p.postMembers = (p.postMembers||[]).filter(id=>id!==entryId);
-  }
+  /* ⚠️ Phase CF simplified this: dropping a phase is dropping its DAYS, full stop. It used to
+     have to drop the membership list entry as well, or the new person turned up on the
+     Pre-Prod tab with a blank count as though they had been booked for prep nobody had
+     costed. With membership derived from the days, deleting the days IS taking them out. */
+  if(!keep.prep && p.prepSchedule) delete p.prepSchedule[entryId];
+  if(!keep.post && p.postSchedule) delete p.postSchedule[entryId];
   if(!keep.shoot){
-    p.onShoot = (p.onShoot||[]).filter(id=>id!==entryId);
     days.forEach(d=>{ if(Array.isArray(d.positions)) d.positions = d.positions.filter(pos=>pos[0]!==entryId); });
   }
   // ---- person-keyed logistics: moved by hand, never over the new person's own ----
@@ -2929,11 +3101,10 @@ function addCrewEntry(p, crewId, force){
   const e = { id: uid(), crewId,
     role: (c&&c.role)||'', department: (c&&c.department)||'' };
   p.crewEntries.push(e);
-  /* new bookings join the shoot by default: putting someone on a project has always put
-     them in the Production grid, and starting them off it would hide the person you just
-     added. Untick to take them out. */
-  p.onShoot = p.onShoot || [];
-  if(!p.onShoot.includes(e.id)) p.onShoot.push(e.id);
+  /* ⚠️ REMOVED in Phase CF: the p.onShoot push that put every new booking on the shoot by
+     default. Membership is derived from ticked days now, so "on the shoot" is something the
+     Production grid says, not something adding a person asserts. They still appear on every
+     Crew sub-tab the moment they exist — the sub-tabs list the roster, not the members. */
   return e;
 }
 /* remove entries and everything keyed to THEM — the entry-id equivalent of what
@@ -4776,13 +4947,21 @@ function onQuickCrewInput(q){
   const el = document.getElementById('quickCrewResults');
   if(el) el.innerHTML = quickCrewResultsHTML();   // results only — re-rendering the tab would steal focus mid-word
 }
-function quickCrewResultsHTML(){
+/* ⚠️ THE ONE crew search-and-add result list, and generalising it is what the note on
+   quickCrewResultsHTML always asked for ("if one is ever built for the Crew tab, this is the
+   thing to generalise"). Two callers now: Overview's Quick add row, and the Crew tab's Add
+   person popup. They differ in ONE thing — where "create new" goes — so that is the only
+   parameter. A second copy of the matching rule is how one screen ends up finding people the
+   other cannot. */
+function crewSearchResultsHTML(query, onCreateJS, limit){
   const p = currentProject(); if(!p) return '';
   const assignedIds = projectEntries(p).map(e=>e.crewId);
-  const q = quickCrewQuery.trim();
+  const q = (query||'').trim();
   const ql = q.toLowerCase();
+  /* name, role AND department all match, so "cam" finds the Camera Operators and "grip"
+     finds the department — the thing you remember is not always the name */
   const blob = c => (c.name+' '+(c.role||'')+' '+(c.department||'')).toLowerCase();
-  const matches = crewDB.filter(c=>!assignedIds.includes(c.id)).filter(c=>!ql || blob(c).includes(ql)).slice(0,8);
+  const matches = crewDB.filter(c=>!assignedIds.includes(c.id)).filter(c=>!ql || blob(c).includes(ql)).slice(0, limit||8);
   const rows = matches.map(c=>`<div class="sritem" onclick="addCrewToProject('${c.id}')">
       <strong>${esc(c.name)}</strong>${(c.role||c.department)?`<div class="hint">${esc([c.role,c.department].filter(Boolean).join(' — '))}</div>`:''}
     </div>`).join('');
@@ -4794,8 +4973,59 @@ function quickCrewResultsHTML(){
       : q ? `No saved crew member matches “${esc(q)}”.`
       : 'Everyone in the database is already on this project.'}</div>`;
   }
-  return rows + note + `<div class="sritem" style="color:var(--tape);" onclick="startNewCrewFromSearch()">${
+  return rows + note + `<div class="sritem" style="color:var(--tape);" onclick="${onCreateJS}">${
     q ? `+ Create new crew member “${esc(q)}”` : '+ Create a new crew member'}</div>`;
+}
+function quickCrewResultsHTML(){ return crewSearchResultsHTML(quickCrewQuery, 'startNewCrewFromSearch()'); }
+
+/* ============ ADD PERSON — the Crew tab's own popup (Phase CM) ============
+   ⚠️ REPLACED the "Add from crew database" section at the bottom of the tab: a <select> of
+   every crew member in the database, which you scrolled. A picker is fine at twenty names and
+   useless at two hundred, and it sat below 41 rows of table where you could not see it from
+   the toolbar you were working in. This is the same job as one small button and a search box.
+   ⚠️ It reuses addCrewToProject() and the shared result list — it adds nothing of its own, so
+   a person added here is indistinguishable from one added any other way. */
+let addPersonOpen = false;
+let addPersonQuery = '';
+function openAddPerson(){
+  addPersonOpen = true; addPersonQuery = '';
+  renderProjectBody();
+  document.getElementById('addPersonSearch')?.focus();
+}
+function closeAddPerson(){ addPersonOpen = false; addPersonQuery = ''; renderProjectBody(); }
+/* ⚠️ RESULTS ONLY, never a tab re-render — the same reason onQuickCrewInput does it: replacing
+   the body while somebody is typing takes the focus and the half-typed word with it. */
+function onAddPersonInput(q){
+  addPersonQuery = q;
+  const el = document.getElementById('addPersonResults');
+  if(el) el.innerHTML = crewSearchResultsHTML(addPersonQuery, 'startNewCrewFromAddPerson()', 12);
+}
+/* "create new" hands off to the tab's OWN new-crew form rather than growing a second one in
+   the popup — that form is the full crew record, and a cut-down copy of it in a modal is how
+   two ways to create a person start disagreeing about what a person needs. */
+function startNewCrewFromAddPerson(){
+  const name = addPersonQuery.trim();
+  addPersonOpen = false; addPersonQuery = '';
+  newCrewPrefillName = name;
+  addingCrewNew = true;
+  renderProjectBody();
+  document.getElementById('ncName')?.focus();
+}
+let newCrewPrefillName = '';
+function addPersonDialogHTML(){
+  if(!addPersonOpen) return '';
+  return `<div class="modal-overlay" onclick="if(event.target===this) closeAddPerson()">
+    <div class="modal-box add-person-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
+      <h3>Add person</h3>
+      <input type="text" id="addPersonSearch" class="add-person-search" placeholder="Search by name, role or department…"
+        value="${esc(addPersonQuery)}" oninput="onAddPersonInput(this.value)"
+        onkeydown="if(event.key==='Escape'){event.preventDefault();closeAddPerson();}"
+        autocomplete="off" spellcheck="false">
+      <div class="searchres add-person-results" id="addPersonResults">${
+        crewSearchResultsHTML(addPersonQuery, 'startNewCrewFromAddPerson()', 12)}</div>
+      <div class="toolbar" style="margin:12px 0 0;"><button onclick="closeAddPerson()">Done</button></div>
+    </div>
+  </div>`;
 }
 function startNewCrewFromSearch(){
   quickCrewNewOpen = true;
@@ -5596,7 +5826,11 @@ function filterToggleHTML({open=false, count=0, onToggle='', inverted=false} = {
    whole roster. The Filter chip shows 2 on load, which is honest — two filters ARE on.
    ⚠️ THIS ALSO SCOPES THE BUDGET, which shares this filter. The opening total therefore
    excludes Talent and other-company crew unless you clear it. */
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:true, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'dept', days:new Set(), daysMode:'or' };
+/* ⚠️ Phase CC — groupBy OPENS ON 'none', which is a flat list still ordered department by
+   department and by seniority inside each; see buildProjectCrewGroups' 'none' branch for why
+   that is an order and not a heap. 'dept' (the old default) is one pick away in the panel for
+   anyone who wants the subheads. */
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:true, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
 let projectCrewFilterOpen = false;
 let projectCrewFilterRolesOpen = false;
 function toggleProjectFilterRolesSection(){ projectCrewFilterRolesOpen = !projectCrewFilterRolesOpen; renderProjectBody(); }
@@ -5756,8 +5990,22 @@ function buildProjectCrewGroups(list, p, days){
     const keys = (days||[]).map(d=>`Day ${d.dayNum||'?'}`).filter(k=>buckets[k]).concat(notOn.length?['Not on any shoot day']:[]);
     return keys.map(key=>({key, label:key, code:'', items:bySort(buckets[key])}));
   }
+  /* ⚠️ Phase CC — "None" MEANS NO HEADERS, NOT NO ORDER, and it is the default now. The list
+     is still department by department in the canonical DEPARTMENTS order, and still sorted
+     inside each department by whatever Sort by says (seniority by default) — exactly the
+     sequence the 'dept' grouper produces, with the subheads taken out. That is the point:
+     working down a column of day-counts, a subhead every four rows is a row you have to skip
+     over, and the department is already on the row as a pill. Grouping by Department is still
+     there in the picker for anyone who wants the headers back.
+     ⚠️ Do NOT "simplify" this to bySort(list). Sorting the whole list by seniority alone
+     interleaves the departments — every department's lead, then every department's number
+     two — which is not a list anybody reads. */
   if(gb==='none'){
-    return [{key:'all', label:'All crew', code:'', items:bySort(list)}];
+    const buckets = bucketOf(c => deptBucketKey(c.department));
+    const known = DEPARTMENTS.filter(d=>buckets[d]&&buckets[d].length);
+    const rest = Object.keys(buckets).filter(d=>!DEPARTMENTS.includes(d)).sort();
+    const items = known.concat(rest).reduce((out,d)=>out.concat(bySort(buckets[d])), []);
+    return [{key:'all', label:'All crew', code:'', items}];
   }
   // default: 'dept'
   const buckets = bucketOf(c => deptBucketKey(c.department));
@@ -5782,7 +6030,7 @@ function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = che
    because those aren't filters and clearing them would be a different, unasked-for
    change; drops every actual exclusion. */
 function clearProjectCrewFilter(){
-  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'dept', days:new Set(), daysMode:'or' };
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
   renderProjectBody();
 }
 function projectCrewActiveFilterCount(){
@@ -6127,17 +6375,55 @@ async function bulkRemoveSelectedFromProject(){
    applyBulkEdit together if more bulk-editable fields are needed later. */
 let bulkEditOpen = false;
 function toggleBulkEdit(){ bulkEditOpen = !bulkEditOpen; renderProjectBody(); }
-function bulkEditPanelHTML(){
-  if(!bulkEditOpen) return '';
+/* ============ ONE WAY INTO THE CREW FORM: SELECT, THEN EDIT (Phase CC) ============
+   ⚠️ The Edit button on the bulk bar branches on HOW MANY are ticked, because the two cases
+   are genuinely different jobs and pretending otherwise is how you get a form that offers to
+   set forty people's phone number to the same digits:
+     one ticked   — that person's own crew record, the whole form, in a modal
+     two or more  — only the fields that can honestly be written to several records at once
+   ⚠️ The single case reuses `editingCrewId` and `crewExpansionHTML()` exactly as the pencil
+   did, so saveCrew()/closeCrewForm() already null it out and re-render, and the modal closes
+   itself with no new lifecycle to keep in step. */
+function openCrewBulkEdit(){
+  if(projectCrewSelected.size===1){ editCrew([...projectCrewSelected][0]); return; }
+  toggleBulkEdit();
+}
+/* ⚠️ Rendered from renderProjectCrew's body, NOT from the bulk bar — the bar disappears the
+   moment the selection is cleared, and a modal that vanishes mid-edit because something
+   deselected underneath it is a lost form. */
+function crewEditModalHTML(){
+  const shell = (title, body, onClose) => `<div class="modal-overlay crew-edit-modal" onclick="${onClose}">
+      <div class="modal-box crew-edit-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
+        <h3>${esc(title)}</h3>${body}
+      </div>
+    </div>`;
+  if(bulkEditOpen && projectCrewSelected.size>1){
+    return shell(`Edit ${projectCrewSelected.size} crew records`, bulkEditFieldsHTML(), 'toggleBulkEdit()');
+  }
+  if(!editingCrewId) return '';
+  /* the selection holds ENTRY ids, and the form wants the entry view so its two
+     project-scoped controls (day rate, role chips) act on the right role */
+  const v = (projectEntryViews(currentProject())||[]).find(x=>x.id===editingCrewId);
+  if(!v) return '';
+  return shell(v.name || 'Edit crew record', crewExpansionHTML(v, 'crew-edit-form'), 'closeCrewForm()');
+}
+/* ⚠️ ONE FIELD, and it is not an oversight — Lead company is the only thing on a crew record
+   that is safely the same for several people at once. Name, phone, email, rate and role are
+   per person by definition; department is per person in practice (it is half of every saved
+   role path, so writing it here and not there would put someone in one department wearing
+   another's role). More bulk fields are a real ask; each one needs its own write and its own
+   undo, which is why they are not smuggled in behind this one. */
+function bulkEditFieldsHTML(){
   const inUse = crewDB.map(x=>x.coProductionCompany).filter(Boolean);
   const known = [...new Set(coProCompaniesList.concat(inUse))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
   const opts = ['<option value="">— Lead company —</option>']
     .concat(known.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`))
     .concat(['<option value="__add__">+ Add company…</option>']).join('');
-  return `<div class="bulk-edit-panel">
-    <div class="grid g3" style="align-items:end;">
-      <div><label>Lead company</label><select id="bulkLeadCompany">${opts}</select></div>
-      <div class="toolbar" style="margin-bottom:0;"><button class="primary" onclick="applyBulkLeadCompany()">Apply to ${projectCrewSelected.size} selected</button></div>
+  return `<div>
+    <label>Lead company</label><select id="bulkLeadCompany">${opts}</select>
+    <div class="toolbar" style="margin:14px 0 0;">
+      <button class="primary" onclick="applyBulkLeadCompany()">Apply to ${projectCrewSelected.size} selected</button>
+      <button onclick="toggleBulkEdit()">Cancel</button>
     </div>
   </div>`;
 }
@@ -6164,11 +6450,11 @@ function bulkActionBarHTML(){
     ? `<span class="hint">Editing a field for one selected person applies it to all ${projectCrewSelected.size}</span>` : '';
   return `<div class="bulk-action-bar">
     <strong>${projectCrewSelected.size} selected</strong>
-    <button class="small" onclick="toggleBulkEdit()">Edit</button>
+    <button class="small" onclick="openCrewBulkEdit()">Edit</button>
     <button class="small danger" onclick="bulkRemoveSelectedFromProject()">Remove from project</button>
     <span class="hint" style="cursor:pointer;" onclick="clearCrewSelection()">Clear selection</span>
     ${propagateHint}
-  </div>${bulkEditPanelHTML()}`;
+  </div>`;
 }
 /* ---- Crew toolbar (Phase Detail) --------------------------------------------
    The bar used to be four loose string variables concatenated at the point of use,
@@ -6197,66 +6483,28 @@ function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody();
    the banner's TOOLS cluster now, built by budgetSummaryBarHTML() — do not look for a
    second copy in the Crew toolbar. The Crew toolbar keeps only what acts on the LIST. */
 
-/* ---- THE ROLES MODES (Phase BU; relabelled BV; cut to two in BW) ----
-   What the Prep · Shoot · Post columns are FOR. The Shoot column was once a checkbox with a
-   day count riding beside it in the same cell — "is this person on the shoot" and "for how
-   many days" crammed together — and pulling those two questions apart is what these modes
-   are. On screen, left to right: STAGE · DAYS. Who is in each phase, then how many days.
-
-   ⚠️⚠️ THE KEYS DO NOT MATCH THE LABELS. Read this before touching anything that switches on
-   `crewRolesMode`:
-
-        key         label     what it does
-        'stage'     Stage     WHO IS IN WHICH PHASE. One checkbox per column, writing the
-                              membership lists (see CREW_PHASES). The only place membership
-                              is set. Also the only mode with the Show as column.
-        'totals'    Days      HOW MANY days. Prep and Post are typeable; Shoot is a READ-ONLY
-                              count that expands sideways into per-day ticks. The resting
-                              state and the default. Carries the DATES column, whose button
-                              opens the Dates popup — WHICH dates, all three phases at once.
-
-   So the mode labelled "Days" is `'totals'`. The labels changed in Phase BV and the keys were
-   deliberately left alone, under the rule the sub-tab strip carries — *renaming a label must
-   never become renaming a key*; renaming would touch `rolesColumns()`, `phaseCellHTML()`,
-   `rolesFootnoteHTML()`, `setCrewRolesMode()` and `rolesShootOpen()` to buy nothing this table
-   doesn't already give.
-
-   ⚠️ THERE IS NO 'days' MODE ANY MORE. Phase BW deleted the third mode (label "Dates") when
-   marking dates moved into the popup: a whole row-shape to hold two calendar icons, when the
-   popup can show all three phases on one month in colour, which a 56px cell never could.
-   `crewRolesMode==='days'` is now ALWAYS FALSE — nothing reads it, and new code must not test
-   for it. `'days'` still means two other things elsewhere: `crewGridView`'s **Production**
-   sub-tab, and `CREW_PHASES`' production view key. Check which variable you are on.
-
-   ⚠️ Session state, like crewGridView/budgetView/crewShowMoney — "what am I doing right
-   now", not a property of the shoot, so it is deliberately NOT persisted to the project. */
-const ROLES_MODES = [
-  ['stage',  'Stage', 'Tick who is in pre-production, the shoot and the edit'],
-  ['totals', 'Days',  'Day counts, and the calendar for each person’s prep and edit dates']
-];
-/* ⚠️ 'totals' — the mode LABELLED "Days". The resting state: it is what you want on arrival
-   far more often than assigning people or marking calendars. Unchanged by Phase BV's
-   reorder, which moved Stage to the left of it on screen only. */
-let crewRolesMode = 'totals';
-function setCrewRolesMode(mode){
-  crewRolesMode = mode;
-  /* leaving the DATES mode (key 'days') must not leave a calendar open behind it — the same
-     reason setCrewGridView() closes it on every tab switch */
-  closePhaseCalendar();
-  /* the Dates popup belongs to the DAYS mode's own column; leaving that mode must not leave it
-     hanging over a screen that no longer offers it */
-  closeDatesDialog();
-  renderProjectBody();
-}
+/* ⚠️ REMOVED in Phase CF: THE ROLES MODES — `ROLES_MODES`, `crewRolesMode`,
+   `setCrewRolesMode()`, and the STAGE | DAYS picker in the banner. Do not look for them, and
+   do not test `crewRolesMode` in new code.
+   What they were: two shapes for the Prep · Shoot · Post columns. STAGE made each one a
+   checkbox and was the only place phase membership could be set; DAYS (key 'totals', because
+   the labels changed in Phase BV and the keys deliberately did not) made Prep and Post
+   typeable numbers with Shoot a read-only count expanding into per-day ticks.
+   Why they went: Stage only existed to maintain the opt-in membership lists, and Phase CF
+   derives membership from the days instead — a number in Prep or Post, a ticked day on the
+   shoot. With nothing left for Stage to set, a two-button picker that changed the meaning of
+   three columns was a mode to learn for no gain. Roles is one shape now.
+   ⚠️ WHAT WENT WITH IT: the **Show as** column, which only ever appeared in Stage mode. It is
+   not lost — it is on the crew record, reachable by ticking a row and pressing Edit — but
+   there is no longer an inline quick-edit for it on the grid. Say so if that is wanted back;
+   it is a column, and columns are cheap now that they can be reordered. */
 /* ---- SHOOT EXPANDS SIDEWAYS INTO ITS OWN DAYS ----
    The Shoot column is a plain count because a shoot day is a tick against a numbered day,
    not a number you type. Clicking its header opens those ticks inline: one narrow column per
    shoot day, D1…Dn, exactly the grid the Production sub-tab holds — so the answer to "which
    days" is reachable without leaving the screen you are costing on.
-   ⚠️ The DAYS and DATES modes only — keys 'totals' and 'days', see ROLES_MODES for why those
-   two words don't line up. In STAGE mode the Shoot cell is a MEMBERSHIP checkbox ("is this
-   person on the shoot at all"), and a row of day ticks beside it would be two different
-   questions in one column — the exact muddle Phase BU pulled apart.
+   ⚠️ Phase CF: there are no modes any more, so the old "DAYS and DATES modes only" caveat is
+   gone with them — the Shoot cell is always a count that expands.
    ⚠️ The count STAYS when expanded rather than being replaced. An empty cell under a "Shoot"
    header reads as missing data, and the total is the thing you scan for; the day ticks are
    the detail behind it, not a substitute.
@@ -6290,13 +6538,186 @@ function sizeRolesTablewrap(){
   /* ⚠️ Below the mobile breakpoint the CSS releases the scroll box entirely (see the
      @media(max-width:900px) rule), so an inline max-height here would fight it and win. Clear
      it rather than compute one. */
-  if(window.innerWidth < ROLES_FREEZE_MIN_W){ el.style.maxHeight = ''; return; }
+  if(window.innerWidth < ROLES_FREEZE_MIN_W){ el.style.maxHeight = ''; fitRolesZone(); return; }
   const top = el.getBoundingClientRect().top;
   el.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 24)) + 'px';
+  fitRolesZone();
+}
+/* ---- the last few pixels, on the RIGHT only (Phase CB) ----
+   With Budget OFF, Roles sits in the 840px paper column so its left edge lines up with the
+   banner above it — that is the alignment you read the page by, and a table floating wider
+   than everything else for no gain is what got this called a fault. But the six columns still
+   come to ~58px more than 840px allows, and a Dates chip cut in half is not "aligned", it is
+   broken. So the box takes EXACTLY its overflow, to the RIGHT, where there is nothing to line
+   up against — and never past the window gutter.
+   ⚠️ MEASURED, NOT DECLARED, and it has to be: the number depends on the column set, the
+   Name/Role collapse state and the user's own column order, so there is no constant to write.
+   ⚠️ Left edge is never touched. Growing leftwards is what the wide zone does, deliberately
+   and only when Budget is on; doing a little of it here would read as a near-miss rather than
+   as a decision.
+   ⚠️ Safe to run every render: it clears its own margin before measuring, and the grid's
+   natural width does not depend on the width of its container (every track is fixed, and the
+   trailing slack track resolves to 0 under max-content), so there is no feedback loop. */
+const ROLES_ZONE_MIN_GUTTER = 40;   // the floor of .roles-widezone's own clamp()
+/* the same gutter .roles-widezone's CSS clamp() resolves to, in JS, so the two cannot drift */
+const rolesZoneGutter = () =>
+  Math.min(110, Math.max(ROLES_ZONE_MIN_GUTTER, document.documentElement.clientWidth * 0.05));
+function fitRolesZone(){
+  const zone = document.querySelector('.roles-zone');
+  const el = document.querySelector('.roles-tablewrap');
+  if(!zone) return;
+  zone.style.marginLeft = zone.style.marginRight = '';
+  if(!el || window.innerWidth < ROLES_FREEZE_MIN_W) return;   // mobile has always just scrolled
+  const wide = zone.classList.contains('roles-widezone');
+  /* ⚠️ MEASURE AT PAPER WIDTH, ALWAYS. The overflow is the only thing worth knowing — how much
+     wider than the 840px column the columns actually are — and it can only be read with the
+     bleed off, because with it on the box is already wide enough to hide it. The grid's natural
+     width does not depend on its container (fixed tracks, and the trailing slack track resolves
+     to 0 under max-content), so removing the margin cannot change the answer. */
+  zone.style.marginLeft = zone.style.marginRight = '0px';
+  const overflow = el.scrollWidth - el.clientWidth;
+  if(overflow <= 0) return;                                    // fits the paper column: leave it there
+  const gutter = rolesZoneGutter();
+  const box = zone.getBoundingClientRect();
+  if(!wide){
+    /* Budget OFF — grow RIGHT only, so the left edge stays on the banner. See the note above. */
+    const room = document.documentElement.clientWidth - box.right - ROLES_ZONE_MIN_GUTTER;
+    const take = Math.min(overflow, Math.max(0, room));
+    if(take > 0) zone.style.marginRight = -take + 'px';
+    return;
+  }
+  /* ⚠️ Budget ON — SYMMETRIC, AND ONLY AS WIDE AS THE COLUMNS NEED (Phase CG). The CSS bleed
+     alone always took the full gutter-to-gutter width, and the columns do not fill it: the
+     trailing slack track swallows every spare pixel at the RIGHT end, so the table's ink sat
+     left of centre with an acre of nothing beside it and read as drifting left. Half the
+     overflow each side centres the columns themselves rather than the box around them.
+     Capped at what the CSS would have given, so the generous gutter is still the limit. */
+  const maxBleed = Math.max(0, Math.min(box.left, document.documentElement.clientWidth - box.right) - gutter);
+  const bleed = Math.min(Math.ceil(overflow / 2), maxBleed);
+  if(bleed > 0) zone.style.marginLeft = zone.style.marginRight = -bleed + 'px';
 }
 window.addEventListener('resize', sizeRolesTablewrap);
-let rolesNameCollapsed = false;
-let rolesRoleCollapsed = false;
+/* ============ ARROW KEYS MOVE BETWEEN FIELDS (Phase CD) ============
+   Roles is where a day count gets typed for forty people, and Tab alone only goes across —
+   the motion this screen is actually made of is DOWN a column, the same field for the next
+   person. Arrow keys move between the row cells' controls; Tab is untouched and still does
+   what it did; space still ticks a focused checkbox, which is the browser's own behaviour and
+   is deliberately not intercepted here.
+
+   ⚠️ ARROWS ALWAYS LEAVE A NUMBER FIELD, and that is the decision worth defending: these
+   cells hold two digits, occasionally three, so there is nothing inside one to walk a caret
+   through — you retype it. That is also why arriving selects the contents, so the next digit
+   you press replaces what is there. FREE-TEXT cells (Show as) are the exception and are
+   edge-aware: the arrow moves the caret until it reaches the end of the text, and only then
+   moves on, because a display name IS something you edit in place.
+
+   ⚠️ Alt+Arrow is NOT ours — that is the column reorder (Phase CA), so any modifier bails out
+   of this handler entirely rather than doing both. */
+const ROLES_NAV_SEL = 'input:not([type=hidden]), button, select, textarea';
+/* ⚠️ THE CELL ITSELF CAN BE THE CONTROL, and the Shoot count is the one that is (Phase CE).
+   It is a `div[role=button][tabindex=0]` whose own onkeydown opens the day ticks on Space or
+   Enter — a heading-style disclosure, not a field — so a nav that only ever looked for a
+   focusable CHILD walked straight past the one cell the whole expand-and-tick flow starts
+   from. Ask the cell first, then its children. */
+const rolesNavTarget = cell => {
+  if(!cell) return null;
+  if(cell.matches('[tabindex]:not([tabindex="-1"])')) return cell;
+  const el = cell.querySelector(ROLES_NAV_SEL);
+  return (el && !el.disabled) ? el : null;
+};
+const rolesNavRows = () => {
+  const wrap = document.querySelector('.roles-tablewrap');
+  /* offsetParent filters out rows inside a collapsed department — arrowing down should
+     land on the next row you can SEE, not walk invisibly through a folded group */
+  return wrap ? [...wrap.querySelectorAll('.roles-grid.pb-head')].filter(r=>r.offsetParent!==null) : [];
+};
+function rolesNavFocus(cell){
+  const el = rolesNavTarget(cell);
+  if(!el) return false;
+  el.focus();
+  if(el.tagName==='INPUT' && el.type==='text' && el.select) el.select();
+  el.scrollIntoView({block:'nearest', inline:'nearest'});
+  return true;
+}
+function onRolesGridKey(ev){
+  const key = ev.key;
+  if(key!=='ArrowUp' && key!=='ArrowDown' && key!=='ArrowLeft' && key!=='ArrowRight') return;
+  if(ev.altKey || ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+  const el = ev.target;
+  const cell = el && el.closest && el.closest('.roles-grid.pb-head > *');
+  if(!cell) return;
+  /* the day ticks that Space opens are ordinary checkbox cells to the right of Shoot, so
+     nothing special is needed for them — they are reached, and filled, exactly like Buyout */
+  const row = cell.parentElement;
+  const horizontal = key==='ArrowLeft' || key==='ArrowRight';
+  /* the free-text exception — see the note above. A number cell (.roles-num / the rate) is
+     not asked; it always moves. */
+  if(horizontal && el.tagName==='INPUT' && el.type==='text' && !cell.matches('.roles-num, .roles-grid-rate')){
+    const at = el.selectionStart;
+    if(at!==el.selectionEnd) return;                       // a selection: let the arrow collapse it
+    if(key==='ArrowLeft'  && at>0) return;
+    if(key==='ArrowRight' && at<(el.value||'').length) return;
+  }
+  const cells = [...row.children];
+  const i = cells.indexOf(cell);
+  const step = (key==='ArrowRight' || key==='ArrowDown') ? 1 : -1;
+  let moved = false;
+  if(horizontal){
+    /* skip cells with nothing to focus — Total, Subtotal and the Shoot count are read-only,
+       and stopping on them would be a dead keypress in the middle of a row */
+    for(let j=i+step; j>=0 && j<cells.length && !moved; j+=step) moved = rolesNavFocus(cells[j]);
+  } else {
+    const rows = rolesNavRows(), r = rows.indexOf(row);
+    for(let j=r+step; j>=0 && j<rows.length && !moved; j+=step) moved = rolesNavFocus(rows[j].children[i]);
+  }
+  /* only swallow the key if it actually moved — at the edge of the table the arrow should
+     still scroll the page, as it would anywhere else */
+  if(moved) ev.preventDefault();
+}
+document.addEventListener('keydown', onRolesGridKey);
+/* ---- and focus has to SURVIVE THE SAVE ----
+   ⚠️ WITHOUT THIS THE NAVIGATION IS USELESS, and the failure is invisible until you try to
+   type two numbers in a row: moving off a changed field fires its `onchange`, and every one
+   of those handlers (setPhaseDays, saveEntryRate, setEntryOvertime, toggleEntryBuyout…) ends
+   in renderProjectBody(), which replaces the whole tab body. The element you just arrowed
+   into is destroyed a few milliseconds later and focus falls back to <body> — so you type 15,
+   press Down, and the next keystroke goes nowhere.
+   The mark is an ADDRESS, not an element (entry id + which cell of that row), because the
+   element itself does not survive to be re-focused. Recorded on focusin rather than inside
+   the arrow handler so it also covers a checkbox ticked with space, a field clicked with the
+   mouse, and Tab — all of which lost focus to the same re-render before this existed.
+   ⚠️ The 3s window and the activeElement check are what stop it STEALING focus: a render
+   triggered by something else entirely (switching sub-tab, toggling Budget) must not yank the
+   caret back into a table the user has left. */
+let rolesFocusMark = null;
+document.addEventListener('focusin', ev=>{
+  const cell = ev.target && ev.target.closest && ev.target.closest('.roles-grid.pb-head > *');
+  if(!cell) return;
+  const row = cell.parentElement, id = (row.id||'').replace('role-row-','');
+  if(id) rolesFocusMark = {entryId:id, i:[...row.children].indexOf(cell), at:Date.now()};
+});
+function restoreRolesFocus(){
+  const m = rolesFocusMark;
+  if(!m || Date.now()-m.at > 3000) return;
+  const ae = document.activeElement;
+  if(ae && ae!==document.body && ae.closest && ae.closest('.roles-tablewrap')) return;  // never left
+  const row = document.getElementById('role-row-'+m.entryId);
+  /* ⚠️ The Shoot cell keeps its index when the day ticks open — they are inserted AFTER it —
+     so expanding with Space lands focus back on the same cell it was pressed from, and the
+     next Right steps onto D1. Do not "fix" the index for the new columns. */
+  const el = rolesNavTarget(row && row.children[m.i]);
+  if(!el) return;
+  el.focus();
+  if(el.tagName==='INPUT' && el.type==='text' && el.select) el.select();
+}
+/* ⚠️ BOTH START COLLAPSED (Phase CC). Roles is a screen you arrive at to TYPE — days into
+   Prep, Shoot and Post — and the two widest columns are the two you already know, so the
+   abbreviations are the sensible opening state and the full text is the thing you ask for.
+   Every cell keeps its full name/role in its `title`, and one click on either heading brings
+   it back. Session state, like every other view choice here — not persisted, so a page reload
+   returns to the abbreviated default rather than to whatever you last did. */
+let rolesNameCollapsed = true;
+let rolesRoleCollapsed = true;
 function toggleRolesNameColumn(){ rolesNameCollapsed = !rolesNameCollapsed; renderProjectBody(); }
 function toggleRolesRoleColumn(){ rolesRoleCollapsed = !rolesRoleCollapsed; renderProjectBody(); }
 /* "Tegid Cartwright" → "Tegid C."  ·  "Anne-Marie de Vries" → "Anne-Marie d.V."
@@ -6345,10 +6766,18 @@ function rolesShortRole(role){
 /* whether the column can be open at all: the modes that show a count, and a project that
    actually has days to show. Guarded in one place so the header, the template and the cells
    cannot disagree about it. */
-const rolesShootOpen = () => rolesShootExpanded && crewRolesMode!=='stage' && projectDays().length>0;
+const rolesShootOpen = () => rolesShootExpanded && projectDays().length>0;
+/* ⚠️ Phase CM — ADD PERSON LEADS THE ROW, and it is a `.bnr-tool` pill rather than one of the
+   row's plain text controls. The rest of this toolbar acts on the list you already have
+   (select it, filter it, collapse it); this makes the list longer, which is a different kind
+   of thing and the one you reach for most on a new project. Same pill as Budget so it reads as
+   a button and not a fourth link. */
 function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
   return `<div class="crew-header-row">
-      <div class="crew-header-left">${selectAllHTML||''}${filterHTML||''}</div>
+      <div class="crew-header-left">
+        <button type="button" class="bnr-tool crew-add-person" onclick="openAddPerson()"
+          title="Search the crew database and add someone to this project">+ Add person</button>
+        ${selectAllHTML||''}${filterHTML||''}</div>
       <div class="crew-header-right">${rightHTML||''}</div>
     </div>`;
 }
@@ -6415,31 +6844,38 @@ function renderProjectCrew(body){
      line are unaffected — they are keyed to crewId and never filtered by role. */
   const assigned = projectEntryViews(p);
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
-  const unassigned = crewDB.filter(c=>!onProject.has(c.id));
+  /* ⚠️ REMOVED in Phase CM: `unassigned` — it existed only to fill the retired "Add from crew
+     database" <select>. The Add person popup filters crewDB against the roster itself, in
+     crewSearchResultsHTML(), where the matching rule lives. */
   let filtered = buildPersonBlocks(assigned.filter(personMatchesProjectFilter));
-  /* ⚠️ THE FOUR SHOOT-LOGISTICS TABS ONLY SHOW PEOPLE ON THE SHOOT. Days on site, Hotel,
-     Travel and Catering are all "what does this person need while we're shooting", so
-     someone taken off the shoot drops out of them — which is the point of the toggle.
-     Roles, Pre-Prod and Post are NOT shoot tabs and keep everyone: taking a person off
-     the shoot is done ON Roles, so removing them from it would delete the control you
-     just used, and being cut from the shoot says nothing about the edit.
-     ⚠️ FILTERS THE VIEW, NEVER THE DATA. Their day ticks, meals and hotel nights stay
-     exactly where they are — see toggleEntryOnShoot. */
-  if(['days','hotel','travel','catering'].includes(crewGridView)){
+  /* ⚠️ THE THREE SHOOT-LOGISTICS TABS ONLY SHOW PEOPLE ON THE SHOOT. Hotel, Travel and
+     Catering are all "what does this person need while we're shooting", so someone with no
+     shoot days drops out of them. Roles, Pre-Prod and Post are not shoot tabs and keep
+     everyone: being off the shoot says nothing about the edit.
+     ⚠️ PRODUCTION ('days') IS NOT IN THIS LIST ANY MORE, and Phase CF is why. It used to be:
+     membership was an opt-in list that every new booking joined by default, so everybody
+     appeared on the Production grid and you ticked their days there. With membership DERIVED
+     from those very ticks, filtering this tab by it is a closed loop — a person with no ticked
+     day is not on the shoot, so they never appear on the grid, so they can never be given
+     their first day. The grid is the assignment surface for shoot days exactly as Roles is
+     for prep and edit numbers, and an assignment surface has to list the people who have not
+     been assigned yet. Hotel/Travel/Catering are genuinely downstream of that decision and
+     stay filtered.
+     ⚠️ FILTERS THE VIEW, NEVER THE DATA. Meals and hotel nights stay exactly where they are;
+     ticking a shoot day brings the person, and their bed, straight back. */
+  if(['hotel','travel','catering'].includes(crewGridView)){
     filtered = filtered
       .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryOnShoot(e.id, p))}))
       .filter(b=>b.entries.length);
   }
   /* ⚠️ A PHASE TAB LISTS ONLY WHO IS BOOKED IN THAT PHASE — which is what makes Roles the
-     one place you put someone into a stage, rather than every tab showing all 66 people
-     and you hunting for the four who matter.
-     ⚠️ Phase BU — membership is now the OPT-IN LIST (entryInPhase), not "do they have days
-     or date marks". migratePhaseMembers() seeds the list from exactly that old predicate,
-     so this shows the identical people on the day it ships; what changes is that somebody
-     can now be booked into a phase BEFORE anyone knows how many days it runs, which is
-     the whole point of Roles' Stage mode — and that unticking them here can actually
-     remove them, which a derived test could never do. Their days and date marks are kept
-     either way; see CREW_PHASES. */
+     one place you put someone into a phase, rather than every tab showing all 66 people and
+     you hunting for the four who matter.
+     ⚠️ Phase CF — membership is DERIVED again (see entryInPhase): booked in prep means having
+     a prep number. So this tab shows whoever has one, and the way to add somebody is to type
+     their number in Prep on Roles — at which point they appear here, which is exactly the
+     "auto populated in the corresponding sub-pages" behaviour this was asked for. Unlike the
+     Production grid above, that is not a closed loop: the number is typed somewhere else. */
   if(isPhaseTab(crewGridView)){
     const ph = phaseByView(crewGridView);
     filtered = filtered
@@ -6461,11 +6897,11 @@ function renderProjectCrew(body){
      freshly-added and the not-yet-booked, and Roles is the ONE screen that can put them
      into a phase — filtering them out would hide the row that holds the only control that
      fixes it, with no way back to them.
-     ⚠️ STAGE MODE SUSPENDS IT ENTIRELY. Stage mode exists to assign membership, and a row
-     that vanishes the instant you untick it takes the undo with it — you would have to
-     switch phases back on to find the person you just mis-clicked. So Stage mode lists
-     everyone and the filter bites again the moment you leave it. */
-  if(crewGridView==='roles' && crewRolesMode!=='stage'){
+     ⚠️ Phase CF removed the Stage-mode suspension of this rule (Stage listed everyone, so a
+     row could not vanish under the click that was assigning it). There is no assigning click
+     any more — you type a number — and a row cannot vanish under a number you have just
+     typed, because typing it puts them IN the phase you are looking at. */
+  if(crewGridView==='roles'){
     const inSelectedPhase = e => {
       const mine = entryPhases(e.id, p);
       return !mine.length || mine.some(scope=>budgetScope[scope]);
@@ -6561,7 +6997,10 @@ function renderProjectCrew(body){
        budgetSummaryBarHTML). This row keeps only what acts on the LIST: Select all,
        Filter, Summary, Expand/Collapse all. Do not add a second Budget here. */
     rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
-    const groupHeaderHTML = g => deptHeaderHTML(
+    /* ⚠️ THE FLAT LIST HAS NO HEAD, and that is the whole of what "None (flat list)" buys —
+       one group called "All crew" wearing a subhead that says "All crew (41)" would be a row
+       of chrome above every screen for no information. Every other grouper still gets one. */
+    const groupHeaderHTML = g => g.key==='all' ? '' : deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
       `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
 
@@ -6614,7 +7053,7 @@ function renderProjectCrew(body){
           <div class="roles-grid-header pb-head-blank"></div>
           ${leadHead('pb-head-name', 'Name', rolesNameCollapsed, 'toggleRolesNameColumn()')}
           ${leadHead('pb-head-role', 'Role', rolesRoleCollapsed, 'toggleRolesRoleColumn()')}
-          ${spec.cols.map(c=>`<div class="roles-grid-header${c.left?'':' roles-head-c'}"${c.title?` title="${esc(c.title)}"`:''}>${c.head}</div>`).join('')}
+          ${spec.cols.map(c=>rolesHeadCellHTML(c)).join('')}
         </div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
@@ -6628,7 +7067,13 @@ function renderProjectCrew(body){
          rolesShortRole ("Producer", "Colourist") as well as a 2–3 letter initialism. 62px
          looked tighter but CSS-truncated exactly the roles the abbreviation had deliberately
          left alone, which reads as a bug rather than as a setting. */
-      const collapseVars = (rolesNameCollapsed ? '--pb-name-w:104px;' : '')
+      /* ⚠️ Phase CC — NAME IS OVERRIDDEN IN BOTH STATES NOW, not only when collapsed, because
+         the department pill lives in this cell on Roles and nowhere else. 62px is the pill's
+         56px track plus its 6px gap; the numbers behind it are unchanged (104px fits
+         "Anne-Marie D.V.", 170px fits every full name), so the pill costs exactly its own
+         width and takes nothing from the name. The other five sub-tabs keep the shared 170px
+         because none of them renders a pill. */
+      const collapseVars = `--pb-name-w:${(rolesNameCollapsed ? 104 : 170) + 62}px;`
                          + (rolesRoleCollapsed ? '--pb-role-w:72px;' : '');
       /* .roles-tablewrap adds the frozen panes — Roles only; see the CSS for why the other
          six sub-tabs deliberately don't get a scroll box of their own. */
@@ -6694,7 +7139,7 @@ function renderProjectCrew(body){
       showTotals: crewShowMoney,
       showStage:  crewGridView==='roles',
       showMoneyToggle: true,
-      showModes:  crewGridView==='roles'
+      crewOnly: true
     })}</div>` : '';
 
   body.innerHTML = `
@@ -6702,27 +7147,39 @@ function renderProjectCrew(body){
       <h2>Crew on this project</h2>
       ${viewSwitcher}
       ${bannerHTML}
-      ${headerRow}
-      ${bulkActionBarHTML()}
-      ${assignedHTML}
+      ${/* ⚠️ ROLES WITH BUDGET ON, and the zone starts BELOW the banner — see .roles-widezone.
+            The toolbar and the bulk bar are inside it with the table on purpose: Select all
+            sits over the first column and Collapse all over the last, so a toolbar left at
+            840px while the table ran to 1200px would have both controls pointing at nothing.
+            ⚠️ BUDGET IS THE TRIGGER, and it is the honest one: turning Budget on is what adds
+            Total, Day rate, Subtotal, VAT and friends, i.e. the moment the table stops being
+            a roster and starts being a costing sheet with more columns than the paper column
+            can hold. With it off, Roles is six narrow columns and belongs in the same 840px
+            as the banner above it — a table floating 200px wider than everything else on the
+            page for no gain reads as a layout fault, which is exactly what it was called. */''}
+      <div class="${crewGridView==='roles' ? 'roles-zone' : ''}${crewGridView==='roles' && crewShowMoney ? ' roles-widezone' : ''}">
+        ${headerRow}
+        ${bulkActionBarHTML()}
+        ${assignedHTML}
+      </div>
     </div>
+    ${crewGridView==='roles' ? crewEditModalHTML() : ''}
     ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
     ${crewGridView==='catering' ? cateringSummaryHTML() : ''}
     ${crewGridView==='travel' ? transportSummaryHTML() : ''}
-    <div class="section">
-      <h2>Add from crew database</h2>
-      ${unassigned.length ? `
-        <select id="addCrewPick"><option value="">— Select crew member —</option>
-          ${groupedCrewOptionsHTML(unassigned)}
-        </select>
-        <div class="toolbar" style="margin-top:8px;"><button class="primary" onclick="addCrewToProject()">Add to project</button></div>
-      ` : '<div class="empty-note">Everyone in your database is already on this project.</div>'}
-      <div class="hint">Need someone new? <span style="color:var(--tape);cursor:pointer" onclick="toggleCrewForm()">Add them here</span> — they'll be saved to the Crew database and assigned to this project.</div>
-      ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:10px;">${crewFormHTML()}</div>` : ''}
-    </div>`;
+    ${/* ⚠️ REMOVED in Phase CM: the "Add from crew database" section — a <select> of the whole
+          database plus an Add button, sitting below 41 rows of table. Adding someone is
+          `+ Add person` in the toolbar now (see addPersonDialogHTML). What stayed is the NEW
+          CREW form: it is the full crew record, and the popup hands off to it rather than
+          growing a cut-down copy of its own. It only renders while you are creating someone. */''}
+    ${addingCrewNew ? `<div class="section">
+      <h2>New crew member</h2>
+      <div class="inline-form-card" id="crewFormWrap">${crewFormHTML({name:newCrewPrefillName})}</div>
+    </div>` : ''}
+    ${addPersonDialogHTML()}`;
   // Phase BX — after this render's innerHTML lands, so the box can measure where it started.
   // Same idiom as renderMain()'s refreshTabScrollCues().
-  setTimeout(sizeRolesTablewrap, 0);
+  setTimeout(() => { sizeRolesTablewrap(); restoreRolesFocus(); }, 0);
   body.oninput = crewGridView==='catering'
     ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); refreshCateringSummaryFigures(); })
     : crewGridView==='travel'
@@ -6769,6 +7226,11 @@ const repeatStarHTML = crewId => repeatedInView.has(crewId)
    after the gap, which is a wrong number under the wrong heading on a costing screen.
    Same reasoning as budgetPersonViewHTML's countCols, one step further.
 
+   ⚠️ PHASE CA MADE THIS THE DEFAULT ORDER, NOT THE ORDER. A user can drag any heading, and
+   applyRolesColumnOrder() reshuffles the spec before the template is built — see that block
+   below. What follows is still why the default is what it is, and it is what "put them back"
+   returns to.
+
    COLUMN ORDER, and it is deliberate — it is Per Person's order with Roles' own three
    folded in: TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] ·
    [Est. Costs] · VAT reg. · [VAT] · Show as.
@@ -6799,12 +7261,12 @@ function rolesColumns(data){
      where all three always show: they are the control you assign with there, and a hidden
      column is a control you cannot reach. */
   CREW_PHASES.forEach(ph=>{
-    if(crewRolesMode!=='stage' && !budgetScope[ph.scope]) return;
+    if(!budgetScope[ph.scope]) return;
     const isShoot = ph.view==='days';
     /* the Shoot header is a CONTROL in the modes that show a count — clicking it opens the
        per-day ticks to its right. `chev` is the whole cue: a caret and the word, no button
        chrome, matching the app's other disclosure headers (dept-caret, sd-block-head). */
-    const canOpen = isShoot && crewRolesMode!=='stage' && projectDays().length>0;
+    const canOpen = isShoot && projectDays().length>0;
     push(canOpen
         ? `<span class="roles-shoot-head" role="button" tabindex="0"
              onclick="event.stopPropagation();toggleRolesShootColumn()"
@@ -6817,7 +7279,12 @@ function rolesColumns(data){
          that mode is for, and the number is what the DAYS mode is for), so the icon alone sits
          in the standard width and the three phase columns finally line up across all three
          modes. */
-      '56px',
+      /* ⚠️ Phase CC — 46px, down from 56px. These hold a day count: two digits nearly always,
+         three at the outside ("140"), and a 56px box around "6" reads as a field waiting for
+         something longer. Three of them plus OT is 40px back across the row, which on the
+         widest table in the app is a column's worth. The floor is the HEADING, not the number
+         — "Shoot" with its caret is what stops this going smaller. */
+      '46px',
       {key:'phase', phase:ph,
        title: canOpen ? (rolesShootOpen()?'Click to close the day ticks':'Click to tick which shoot days') : ph.headTitle});
     /* ⚠️ ONE COLUMN PER SHOOT DAY, emitted straight into the same spec — which is what gets
@@ -6834,22 +7301,27 @@ function rolesColumns(data){
        next to the phase it belongs to rather than being pushed away from it when the column
        opens. Overtime is a shoot fact: there is no prep or edit overtime column, and the
        Production scope is what gates it. */
+    /* ⚠️ NOT IN STAGE MODE. Stage answers one question — is this person in this phase at all —
+       with three checkboxes; a typeable overtime figure in the middle of them is a different
+       kind of question in the same row, the same muddle the old Shoot checkbox-plus-count was.
+       View only: the units are untouched and still cost exactly as before (buildBudgetData
+       never reads the mode), and the column is back the moment you switch to Days. */
     if(isShoot && budgetScope.production){
-      push('OT', '52px', {key:'overtime',
+      push('OT', '46px', {key:'overtime',
         title:'Overtime, in units — a unit is one day’s equivalent, so 0.5 is half a day, costed at the day rate. Not costed on a buyout (no day rate to multiply) or with no shoot days.'});
     }
   });
-  /* ⚠️ Phase BV — NOT IN THE DATES MODE. Buyout is a fact about the DEAL ("one agreed fee
-     rather than a day rate"), so it belongs beside the things that describe the booking —
-     which phases someone is in (Stage) and how many days (Days). Dates answers "which days
-     of the calendar", where a tick box about how the fee is structured is just a column you
-     have to scroll past. Its state is untouched either way; only the column is absent. */
-  if(crewRolesMode!=='days'){
-    push('Buyout', '60px', {key:'buyout', title:'One agreed fee for the whole job — the day counts only split it across the phases'});
-  }
+  /* Buyout is a fact about the DEAL — one agreed fee rather than a day rate — so it sits
+     beside the day counts whose meaning it changes. (Phase BV kept it out of the old DATES
+     mode; there are no modes to be in or out of since Phase CF.) */
+  push('Buyout', '60px', {key:'buyout', title:'One agreed fee for the whole job — the day counts only split it across the phases'});
   if(money){
     push('Day rate', '104px', {key:'rate'});
-    push('Subtotal', '92px', {key:'subtotal', title:'This role’s fee ex-VAT'});
+    /* ⚠️ Phase CK — SUBTOTAL IS THE ITEMIZED TWIN OF TOTAL and goes with the VAT toggle. Total
+       is this role's fee inc-VAT, Subtotal the same fee ex-VAT; with the breakdown off the two
+       are either identical (nobody VAT-registered) or a difference nothing else on the row
+       explains, which is a column asking a question it does not answer. */
+    if(budgetVatToggle) push('Subtotal', '92px', {key:'subtotal', title:'This role’s fee ex-VAT'});
     if(showSplit){
       push('Kit', '78px', {key:'kit', title:'Equipment portion of the day rate, across every day being costed'});
       push('Labour', '78px', {key:'labour', title:'What is left of the day rate once kit comes out'});
@@ -6858,55 +7330,237 @@ function rolesColumns(data){
     push('VAT reg.', '62px', {key:'vatreg', title:'Charges VAT'});
     if(budgetVatToggle) push('VAT', '84px', {key:'vat'});
   }
-  /* ⚠️ THE LAST COLUMN IS DATES IN THE DAYS MODE, SHOW AS IN STAGE (Phase BW). Dates replaced
-     Show as rather than joining it — the row was already the widest table in the app, and the
-     two are wanted at different moments: Show as is a call-sheet display name you set once,
-     Dates is something you work through person by person while scheduling. Show as keeps a
-     home in Stage mode, so nothing became unreachable; the Edit pencil still holds the crew
-     record either way. */
-  if(crewRolesMode==='totals'){
-    /* minmax, not a fixed width: the LAST column has to absorb the slack or the grid ends
-       short of its container and the rows stop reaching the right-hand rule. */
-    push('Dates', 'minmax(96px,1fr)', {key:'dates', title:'Mark which dates this person works in prep and the edit'});
-  } else {
-    push('Show as', 'minmax(110px,1fr)', {key:'showas', left:true});
-  }
+  /* ⚠️ Phase CA — FIXED WIDTHS, AND THE SLACK GOT A TRACK OF ITS OWN. These two used to be
+     `minmax(96px,1fr)` / `minmax(110px,1fr)`, on the reasoning that the LAST column has to
+     absorb the slack or the grid ends short of its container and the rows stop reaching the
+     right-hand rule. True, but it made the last column the only elastic thing on the screen,
+     and once Phase BZ widened the table that read as a fault: Dates measured 96px and hung off
+     the right edge at 1600px, and 282px — a chip floating in an acre of nothing — at 1920px,
+     purely as a function of window width. It also moved when you switched modes, since Stage
+     swapped Dates for Show as at a different minimum. Now every column is the width it says it
+     is, and the slack sits in a trailing track with no cell in it, which absorbs exactly what
+     the 1fr used to absorb without a column having to do it. ⚠️ Do not give that track a cell.
+     112px fits the widest chip Dates renders ("25 to place ⚠", measured at 106px); Show as
+     takes 160px, a little over Role's 150px because it holds a text field rather than a chip.
+     ⚠️ Phase CI — SHOW AS IS BACK, and it is a plain column now rather than a mode's. It used
+     to appear only in Stage mode, so Phase CF's removal of the modes took it with it; the cell
+     renderer and showAsQuickEditHTML() were deliberately left intact against exactly this, and
+     restoring it was this one push.
+     ⚠️ IT SITS AFTER DATES, which is a change from its old position at the end of the money
+     columns. Both are trailing columns and the order between them is a judgement: Dates is
+     something you work through person by person while scheduling, Show as is a display name you
+     set once and rarely look at again, so the thing you use most sits nearer the numbers. Anyone
+     who disagrees can drag it — that is what Phase CA is for.
+     ⚠️ A saved column order from before this phase has no `showas` in it. It does not fall to
+     the end: applyRolesColumnOrder() rides an unknown id behind its default predecessor, so it
+     lands just after Dates exactly as it does here. */
+  push('Dates', '112px', {key:'dates', title:'Mark which dates this person works in prep and the edit'});
+  push('Show as', '160px', {key:'showas', left:true,
+    title:'The name this person is called on the call sheet, if it should differ from their own'});
+  /* ⚠️ THE ID IS ASSIGNED IN ONE PLACE, not at each push — it is what the saved column order
+     is keyed by, so a column that gets its id from a different expression than its neighbours
+     is a column the order silently forgets. `key` alone will not do: `phase` occurs three
+     times and `shootday` once per shoot day. */
+  cols.forEach(c=>{
+    c.id = c.key==='phase' ? 'phase:'+c.phase.scope
+         : c.key==='shootday' ? 'day:'+c.day.id
+         : c.key;
+  });
+  const ordered = applyRolesColumnOrder(cols);
   const template = ['var(--pb-controls-w)','var(--pb-name-w)','var(--pb-role-w)']
-    .concat(cols.map(c=>c.width)).join(' ');
-  return {cols, template, showSplit};
+    .concat(ordered.map(c=>c.width)).concat('minmax(0,1fr)').join(' ');
+  return {cols:ordered, template, showSplit};
+}
+/* ONE heading cell. ⚠️ Everything except the shoot-day ticks is draggable, including the three
+   phase columns — CREW_PHASES still owns the DEFAULT order (that invariant is about code not
+   hand-ordering them in a second place), but a user who wants Post beside Prep is allowed to
+   say so, and "reset the columns" in the footnote is one click away.
+   ⚠️ The title says how to move it. A heading that can be dragged with nothing saying so is a
+   feature only the person who built it knows about. */
+function rolesHeadCellHTML(c){
+  const cls = `roles-grid-header${c.left?'':' roles-head-c'}${c.key==='shootday'?'':' roles-head-drag'}`;
+  if(c.key==='shootday') return `<div class="${cls}"${c.title?` title="${esc(c.title)}"`:''}>${c.head}</div>`;
+  const hint = (c.title ? c.title + ' · ' : '') + 'Drag to move this column, or Alt+←/→';
+  return `<div class="${cls}" draggable="true" data-colid="${esc(c.id)}" tabindex="0"
+      title="${esc(hint)}"
+      ondragstart="onRolesColDragStart(event,'${esc(c.id)}')"
+      ondragover="onRolesColDragOver(event,'${esc(c.id)}')"
+      ondragleave="onRolesColDragLeave(event)"
+      ondrop="onRolesColDrop(event,'${esc(c.id)}')"
+      ondragend="onRolesColDragEnd()"
+      onkeydown="onRolesColKey(event,'${esc(c.id)}')">${c.head}</div>`;
+}
+/* ============ THE COLUMN ORDER IS THE USER'S (Phase CA) ============
+   Drag a heading, the table reorders, and the order is remembered site-wide in
+   `appSettings.rolesColumnOrder` (`db:settings`, same store as the fonts and the brand
+   colour) — not per project, because it is a preference about how you read this screen
+   rather than a fact about a job.
+
+   ⚠️ THIS WORKS BECAUSE ROWS MAP `spec.cols` IN ORDER and nothing on the row places itself
+   by track number. Reordering the spec reorders the header, the template and every cell in
+   one move — which is the whole reason Phase BU's "one declaration, three consumers" shape
+   was worth having. Do not add a `grid-column:` to a Roles cell; it would pin that cell to a
+   track while its heading moved.
+
+   ⚠️ THE SHOOT DAY TICKS ARE NOT COLUMNS YOU CAN MOVE. They are the Shoot column expanded,
+   so they travel with it as one unit and carry no id in the order. Dragging them apart from
+   the count they explain would be a table nobody could read. */
+function applyRolesColumnOrder(cols){
+  const order = appSettings.rolesColumnOrder;
+  if(!order || !order.length) return cols;
+  /* a unit is a column plus whatever must travel with it */
+  const units = [];
+  cols.forEach(c=>{
+    if(c.key==='shootday' && units.length) units[units.length-1].cols.push(c);
+    else units.push({id:c.id, cols:[c]});
+  });
+  /* ⚠️ A COLUMN THE SAVED ORDER HAS NEVER SEEN RIDES BEHIND ITS DEFAULT PREDECESSOR rather
+     than falling to the end. Toggling Split kit on for the first time after reordering should
+     put Kit and Labour back beside Subtotal where they belong, not in a heap after Show as —
+     and this is also what stops a future column added to rolesColumns() from appearing in the
+     wrong place for everyone who has ever dragged a heading. */
+  let rank = -1;
+  return units.map((u,i)=>{
+    const r = order.indexOf(u.id);
+    if(r>=0){ rank = r; return {u, r, tie:0, i}; }
+    return {u, r:rank, tie:1, i};
+  }).sort((a,b)=> a.r-b.r || a.tie-b.tie || a.i-b.i)
+    .reduce((out,k)=>out.concat(k.u.cols), []);
+}
+/* the ids currently on screen, in the order they are on screen — read from the DOM rather
+   than rebuilt, so the thing being reordered is exactly the thing you are looking at */
+function rolesVisibleColIds(){
+  return [...document.querySelectorAll('.roles-grid-header-row [data-colid]')].map(el=>el.dataset.colid);
+}
+/* ⚠️ THE SAVED ORDER KEEPS COLUMNS THAT ARE NOT ON SCREEN. Reordering with VAT switched off
+   must not drop VAT out of the order — it would come back in the wrong place. So the stored
+   list is merged with what is visible (anything new inserted behind its visible predecessor),
+   and only then is the dragged id moved. */
+function reorderRolesColumns(visibleIds, dragId, targetId, after){
+  const out = (appSettings.rolesColumnOrder || []).slice();
+  visibleIds.forEach((id,i)=>{
+    if(out.includes(id)) return;
+    const prev = visibleIds.slice(0,i).reverse().find(x=>out.includes(x));
+    out.splice(prev ? out.indexOf(prev)+1 : 0, 0, id);
+  });
+  const next = out.filter(id=>id!==dragId);
+  const t = next.indexOf(targetId);
+  if(t<0) return out;
+  next.splice(after ? t+1 : t, 0, dragId);
+  return next;
+}
+async function saveRolesColumnOrder(order, focusId){
+  appSettings.rolesColumnOrder = order;
+  await saveAppSettings();
+  renderProjectBody();
+  /* the heading you just moved keeps the focus, so a second Alt+Arrow lands on the same
+     column instead of the top of the document */
+  if(focusId){
+    const el = document.querySelector(`.roles-grid-header-row [data-colid="${focusId}"]`);
+    if(el) el.focus();
+  }
+}
+async function resetRolesColumnOrder(){
+  appSettings.rolesColumnOrder = null;
+  await saveAppSettings();
+  renderProjectBody();
+}
+/* ---- the drag itself ----
+   ⚠️ Pointer only, and deliberately not reimplemented with pointer events: this is the one
+   interaction in the app where the platform's own drag (ghost image, drop cursor, escape to
+   cancel) is better than anything hand-rolled. The cost is that it does not work on touch —
+   which is why Alt+Arrow on a focused heading does the same job, and why nothing is only
+   reachable by dragging. */
+let rolesDragColId = null;
+function rolesClearDropCues(){
+  document.querySelectorAll('.roles-col-dropbefore,.roles-col-dropafter')
+    .forEach(el=>el.classList.remove('roles-col-dropbefore','roles-col-dropafter'));
+}
+const rolesDropAfter = (ev, el) => {
+  const r = el.getBoundingClientRect();
+  return ev.clientX > r.left + r.width/2;
+};
+function onRolesColDragStart(ev, id){
+  rolesDragColId = id;
+  ev.dataTransfer.effectAllowed = 'move';
+  /* Firefox refuses to start a drag with no payload; the id is also the payload */
+  try{ ev.dataTransfer.setData('text/plain', id); }catch(_){}
+  ev.currentTarget.classList.add('roles-col-dragging');
+}
+function onRolesColDragOver(ev, id){
+  if(!rolesDragColId || rolesDragColId===id) return;
+  ev.preventDefault();                      // without this the drop never fires
+  ev.dataTransfer.dropEffect = 'move';
+  const el = ev.currentTarget;
+  const after = rolesDropAfter(ev, el);
+  rolesClearDropCues();
+  el.classList.add(after ? 'roles-col-dropafter' : 'roles-col-dropbefore');
+}
+function onRolesColDragLeave(ev){
+  ev.currentTarget.classList.remove('roles-col-dropbefore','roles-col-dropafter');
+}
+function onRolesColDragEnd(){
+  rolesDragColId = null;
+  rolesClearDropCues();
+  document.querySelectorAll('.roles-col-dragging').forEach(el=>el.classList.remove('roles-col-dragging'));
+}
+function onRolesColDrop(ev, id){
+  ev.preventDefault();
+  const drag = rolesDragColId, after = rolesDropAfter(ev, ev.currentTarget);
+  const ids = rolesVisibleColIds();
+  onRolesColDragEnd();
+  if(!drag || drag===id) return;
+  saveRolesColumnOrder(reorderRolesColumns(ids, drag, id, after));
+}
+/* Alt+←/→ — the same move without a mouse, and the reason the drag can stay pointer-only */
+function onRolesColKey(ev, id){
+  if(!ev.altKey || (ev.key!=='ArrowLeft' && ev.key!=='ArrowRight')) return;
+  ev.preventDefault();
+  const ids = rolesVisibleColIds();
+  const j = ids.indexOf(id) + (ev.key==='ArrowLeft' ? -1 : 1);
+  if(j<0 || j>=ids.length) return;
+  saveRolesColumnOrder(reorderRolesColumns(ids, id, ids[j], ev.key==='ArrowRight'), id);
 }
 /* The line under the table. One place, because what it has to say depends on the mode and
    on which phases are on, and three near-identical sentences competing under one grid is
    how the old one ended up describing a Shoot checkbox that no longer exists. */
 function rolesFootnoteHTML(data){
   const parts = ['One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records.'];
-  /* ⚠️ Phase BW — two modes, so two branches. Do not add a third for `'days'`; that key is no
-     longer a mode (see ROLES_MODES). */
-  if(crewRolesMode==='stage'){
-    parts.push('<strong>Stage:</strong> tick who is in pre-production, on the shoot and in the edit. Unticking never deletes their days or dates — it takes them out, and ticking them back brings the same figures with them. Every row is listed here whatever the phase buttons say, because this is where you assign them.');
-  } else {
-    parts.push('Prep and Post are the same numbers those tabs hold, and typing one puts the person into that phase. <strong>Dates</strong> opens that person’s calendar — all three phases on one month, so you can see where prep runs into the shoot.');
-  }
-  /* said in both modes that can open it, because the caret alone does not tell you what is
-     behind it — and once it IS open, that it writes the same ticks as the Production tab is
-     the thing you need to know before touching it */
-  if(crewRolesMode!=='stage' && projectDays().length){
+  parts.push('Prep and Post are the same numbers those tabs hold, and <strong>the numbers are what put someone in a phase</strong> — type one and they are in it, clear it and they are out. <strong>Dates</strong> opens that person’s calendar — every role they hold, all three phases on one month.');
+  /* the caret alone does not tell you what is behind it — and once it IS open, that it writes
+     the same ticks as the Production tab is the thing you need to know before touching it */
+  if(projectDays().length){
     parts.push(rolesShootOpen()
-      ? 'The day ticks are the <strong>Production</strong> tab\'s own — a tick here is a tick there. Ticking a day for someone off the shoot puts them on it. Click <strong>Shoot</strong> again to close them.'
-      : 'Click <strong>Shoot</strong> to open the day ticks, or switch to <strong>Stage</strong> to add and remove people.');
+      ? 'The day ticks are the <strong>Production</strong> tab\'s own — a tick here is a tick there, and ticking one puts that person on the shoot. Click <strong>Shoot</strong> again to close them.'
+      : 'Click <strong>Shoot</strong> to open the day ticks.');
   }
+  /* said on the one screen it applies to, and it changes once you have used it — "you can do
+     this" is worth saying once, "you have done this, here is the way back" is worth saying
+     every time, because a column order you don't remember setting reads as a bug */
+  parts.push('<strong>Arrow keys</strong> move between fields — down a column for the same field on the next person — and space ticks a box.');
+  parts.push(appSettings.rolesColumnOrder && appSettings.rolesColumnOrder.length
+    ? 'These columns are in <strong>your own order</strong> — drag a heading to move one, or <span class="filter-clear" role="button" tabindex="0" onclick="resetRolesColumnOrder()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();resetRolesColumnOrder();}">put them back</span>.'
+    : '<strong>Drag a column heading</strong> to reorder the table — the order is kept for every project.');
   const off = BUDGET_SCOPES.filter(([k])=>!budgetScope[k]).map(([,l])=>l);
-  if(off.length && crewRolesMode!=='stage'){
+  if(off.length){
     parts.push(`<strong>${off.join(' and ')} ${off.length>1?'are':'is'} switched off</strong>, so ${off.length>1?'those phases’':'that phase’s'} crew ${off.length>1?'are':'is'} hidden and uncosted. Anyone in no phase at all still shows.`);
   }
   return `<div class="hint" style="margin-top:8px;">${parts.join(' ')}</div>`;
 }
 function crewRolesRowHTML(e, spec, data){
   const p = currentProject();
-  const isEditing = editingCrewId===e.id;
   const rate = resolveEntryRate(e.id, p);
   const buyout = entryIsBuyout(e.id);
-  const editBtn = `<button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${e.id}')" title="${isEditing?'Close':'Edit'}" aria-label="Edit">${isEditing?icon('close'):icon('edit')}</button>`;
+  /* ⚠️ REMOVED in Phase CC: the per-row Edit pencil that sat beside the checkbox, and the
+     inline band it opened below the row. There were two ways to reach one form — a pencil on
+     every row, and the Edit button on the bulk bar — and the pencil was the worse of them: a
+     22px control repeated 41 times down the densest table in the app, opening a full crew form
+     INSIDE the grid, which the frozen panes then had to be taught not to scroll sideways. Tick
+     the row, press Edit; the same form opens in a modal. `editingCrewId` is untouched and still
+     what the modal reads — see crewEditModalHTML() — so nothing about the form itself changed,
+     only where it appears and how you ask for it.
+     ⚠️ The other five sub-tabs never had the pencil (their controls cell has only ever been a
+     checkbox), so this is Roles coming into line with them rather than a new idea. */
   /* ⚠️ THE ROW'S MONEY COMES FROM buildBudgetData(), NOT FROM THIS FUNCTION. It used to
      compute its own `rate × (prep + shoot + post)`, which ignored the phase scopes
      entirely and apportioned a buyout differently from the Budget — so Roles and the
@@ -6973,13 +7627,18 @@ function crewRolesRowHTML(e, spec, data){
      are marked in the Dates POPUP now, which can show all three phases at once — the inline
      calendar could only ever show the one phase whose icon you clicked. The Pre-Prod and Post
      TABS keep their inline calendars; only Roles' went. */
-  const row = `<div class="roles-grid pb-head${isEditing?' person-block-editing':''}" id="role-row-${e.id}">
-    <div class="roles-grid-controls">${entrySelectCbHTML(e)}${editBtn}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</div>
+  /* ⚠️ Phase CC — THE DEPARTMENT PILL IS BACK, left of the name. It went away when the list
+     was grouped by department and the subhead said it; with the flat list as the default
+     (see buildProjectCrewGroups' 'none' branch) nothing else on the row does. Same
+     deptLabelHTML() every other screen uses — the three-letter code, full department in the
+     title — not a second pill that could drift from it. */
+  const row = `<div class="roles-grid pb-head" id="role-row-${e.id}">
+    <div class="roles-grid-controls">${entrySelectCbHTML(e)}</div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${deptLabelHTML(e)}<span class="roles-name-text">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</span></div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e, {abbreviate:rolesRoleCollapsed})}</span></div>
     ${spec.cols.map(cellHTML).join('')}
   </div>`;
-  return `<div class="person-block${isEditing?' person-block-editing':''}">${row}${isEditing?crewExpansionHTML(e, 'pb-editform'):''}</div>`;
+  return `<div class="person-block">${row}</div>`;
 }
 /* ONE shoot-day tick, in the expanded Shoot column. ⚠️ Writes through the Production grid's
    OWN toggleCrewOnDay() — the same d.positions array, the same bulk-selection fan-out, the
@@ -6998,14 +7657,12 @@ function shootDayCellHTML(e, d){
     <input type="checkbox" ${on?'checked':''} onclick="event.stopPropagation()"
       onchange="toggleRolesShootDay('${e.id}','${d.id}', this.checked)" title="${label}"></div>`;
 }
-/* Ticking a day for a non-member has to do two things in one go, and the membership write
-   must land BEFORE the day write: toggleCrewOnDay() re-renders, and a render that finds them
-   still off the shoot would draw the tick it just accepted as a dash. */
+/* ⚠️ Phase CF made this a one-liner. It used to write membership first and the day second —
+   ticking a day for someone off the shoot had to put them on it, and in that order, or the
+   re-render drew the tick it had just accepted as a dash. Ticking the day IS putting them on
+   the shoot now, so there is nothing to sequence. Kept as a named function because the day
+   cells call it and the name says what a tick means. */
 async function toggleRolesShootDay(entryId, dayId, checked){
-  const p = currentProject();
-  if(checked && p && !entryInPhase('production', entryId, p)){
-    await toggleEntryPhase('production', entryId, true);
-  }
   await toggleCrewOnDay(entryId, dayId, checked);
 }
 /* ONE phase cell, whichever of the three columns and whichever mode — so Prep, Shoot and
@@ -7020,27 +7677,21 @@ function phaseCellHTML(e, ph, pp){
   const isShoot = ph.view==='days';
   const member = entryInPhase(ph.scope, e.id, p);
   const dash = '<span class="budget-noRate">—</span>';
-  if(crewRolesMode==='stage'){
-    return `<div class="roles-grid-cell roles-buyout" data-label="${ph.head}">
-      <input type="checkbox" ${member?'checked':''} onclick="event.stopPropagation()"
-        onchange="toggleEntryPhase('${ph.scope}','${e.id}', this.checked)"
-        title="${member?`In ${ph.head.toLowerCase()} — untick to take them out; their days and dates are kept`:`Not in ${ph.head.toLowerCase()} — tick to add them`}"></div>`;
-  }
-  /* Shoot is READ-ONLY in every mode: the plain count the brief asked for, and nothing
-     beside it. Not a member = a dash, not their stale count — the ticks are kept but they
-     are not on the shoot, exactly the contract entryOnShoot has always had. */
+  /* ⚠️ REMOVED in Phase CF: the Stage-mode branch, a membership checkbox per phase. There is
+     no membership to tick — the number in the cell IS the answer. */
+  /* Shoot is READ-ONLY: the plain count, and nothing beside it. */
   if(isShoot){
     const n = member ? entryDayCount(e.id, projectDays()) : 0;
     /* ⚠️ Phase BX — THE COUNT IS A SECOND TRIGGER for the same expansion the header drives.
        It is the number you are looking at when you want to know which days made it, so it is
        the natural thing to click; the header alone meant travelling to the top of the list to
        open the detail for a row halfway down. One toggle, two ways in — not two behaviours. */
-    const canOpen = crewRolesMode!=='stage' && projectDays().length>0;
+    const canOpen = projectDays().length>0;
     const openTitle = rolesShootOpen() ? 'Click to close the day ticks' : 'Click to open the day ticks';
     return `<div class="roles-grid-cell roles-num${canOpen?' roles-shoot-total':''}" data-label="Shoot"
       ${canOpen?`role="button" tabindex="0" onclick="event.stopPropagation();toggleRolesShootColumn()"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRolesShootColumn();}"`:''}
-      title="${member?(canOpen?openTitle+' — days on the shoot are ticked day by day':'Days on the shoot — ticked day by day on the Production tab'):'Not on the shoot — switch to Stage to add them'}">${n||dash}</div>`;
+      title="${member?(canOpen?openTitle+' — days on the shoot are ticked day by day':'Days on the shoot — ticked day by day on the Production tab'):'Not on the shoot — tick a day here or on the Production tab to put them on it'}">${n||dash}</div>`;
   }
   const days = phaseDaysOf(ph.view, e.id, p);
   const value = member && days!=null ? days : '';
@@ -7100,31 +7751,43 @@ const CREW_PHASES = [
 const phaseByScope = scope => CREW_PHASES.find(ph=>ph.scope===scope);
 const phaseByView  = view  => CREW_PHASES.find(ph=>ph.view===view);
 
-/* ⚠️ AUTHORITATIVE, all three phases. No fallback to "do they have data" — see the note
-   above for why that is fatal once a toggle has to remove as well as add. */
+/* ⚠️ PHASE CF — DERIVED FROM THE DAYS AGAIN, and the opt-in lists are gone from the read
+   path entirely. Being in a phase means having days in it: a number in Prep or Post, at
+   least one ticked day on the shoot. Nothing else.
+   ⚠️ THIS IS A DELIBERATE REVERSAL OF PHASE BU, so the note above it is worth reading before
+   reversing it back. BU built the opt-in lists because membership had a UI of its own — the
+   Stage mode's checkboxes — and a checkbox that cannot remove anybody is broken; derived
+   membership read straight back as true the moment someone had data, so unticking did
+   nothing. That UI is gone (there is one way to say "she does six days" now: type it), which
+   removes the thing derivation could not express. What it also removes is "booked, days not
+   settled yet" — an entry with no number is simply not in that phase. Accepted on request.
+   ⚠️ COSTS FOLLOW THIS, because buildBudgetData gates every phase on it. That is safe here
+   only because a phase with no days already cost nothing: production is rate × daysWorked,
+   prep and post are rate × their own number. Verified against the 13 entries on ROW 2026
+   that were ticked on to the shoot with zero days — every one already cost £0.
+   ⚠️ p.onShoot / p.preprodMembers / p.postMembers are NO LONGER READ. The stored arrays are
+   left alone rather than deleted (they cost nothing and a delete is a one-way door), but
+   nothing may start reading them again without bringing Stage back with it. */
 function entryInPhase(scope, entryId, p){
   const ph = phaseByScope(scope); if(!ph) return false;
   const proj = p || currentProject(); if(!proj) return false;
-  return (proj[ph.members]||[]).includes(entryId);
+  if(ph.view==='days'){
+    /* deliberately NOT projectDays() — this runs once per entry per phase inside the budget
+       build, and that helper sorts a filtered copy of every shoot day each time it is asked */
+    return (shootDaysDB||[]).some(d=>d.projectId===proj.id && entryOnDay(entryId, d));
+  }
+  const n = phaseDaysOf(ph.view, entryId, proj);
+  return n!=null && n>0;
 }
 /* the phases an entry is booked into, as scope keys — for the Roles row filter, which
    has to tell "in none of them" (always visible) apart from "in one you've switched off". */
 const entryPhases = (entryId, p) =>
   CREW_PHASES.filter(ph=>entryInPhase(ph.scope, entryId, p)).map(ph=>ph.scope);
 
-/* the ONE write path. Fans out over the bulk selection exactly as every other row
-   control does, and creates no days record — membership only. */
-async function toggleEntryPhase(scope, entryId, on){
-  const ph = phaseByScope(scope); if(!ph) return;
-  const p = currentProject(); if(!p) return;
-  p[ph.members] = p[ph.members] || [];
-  selectedEditTargets(entryId).forEach(id=>{
-    if(on){ if(!p[ph.members].includes(id)) p[ph.members].push(id); }
-    else { p[ph.members] = p[ph.members].filter(x=>x!==id); }
-  });
-  await saveDB('db:projects', projectsDB);
-  renderProjectBody();
-}
+/* ⚠️ REMOVED in Phase CF: toggleEntryPhase() and toggleEntryOnShoot(). They were the ONE
+   write path for membership, and their only callers were Stage mode's checkboxes and the
+   shoot-day tick's "put them on the shoot first" guard — both gone. Do not look for them;
+   there is nothing to write, because there is nothing stored. */
 /* ---- on the shoot: the named readers the rest of the app already uses ----
    Thin aliases over the generic layer, so there is still exactly one implementation.
    Kept rather than renamed: entryOnShoot/crewOnShoot/toggleEntryOnShoot have callers
@@ -7137,7 +7800,6 @@ function crewOnShoot(crewId, p){
   const proj = p || currentProject(); if(!proj) return false;
   return entriesForCrew(crewId, proj).some(e=>entryOnShoot(e.id, proj));
 }
-const toggleEntryOnShoot = (entryId, on) => toggleEntryPhase('production', entryId, on);
 /* "Show as" — a purely cosmetic override shown on the call sheet instead of the role
    label. The saved role/department stay untouched.
    It is just a field (Phase Detail): type in it or leave it blank. No pencil,
@@ -8514,18 +9176,11 @@ async function setPhaseDays(phase, entryId, rawValue){
     next = n;
   }
   phaseWrite(phase, p, entryId, rec=>{ rec.days = next; });
-  /* ⚠️ Phase BU — TYPING A NUMBER PUTS THEM IN THE PHASE. Membership is its own list now
-     (see CREW_PHASES), and without this you could type 15 prep days for somebody who was
-     not in prep and watch the field clear itself on the next render, with no clue why.
-     An explicit write, not a derivation — the bug the lists exist to avoid is READING
-     membership off the data; writing it alongside the data is exactly how a checkbox would.
-     ⚠️ Clearing the field does NOT remove them. "In prep, number not settled yet" is a real
-     state and the one the list was added for; only Stage mode's tick takes anyone out. */
-  const ph = phaseByView(phase);
-  if(ph && next!=null && !entryInPhase(ph.scope, entryId, p)){
-    p[ph.members] = p[ph.members] || [];
-    if(!p[ph.members].includes(entryId)) p[ph.members].push(entryId);
-  }
+  /* ⚠️ Phase CF — NOTHING TO WRITE HERE ANY MORE. Typing a number still puts them in the
+     phase and clearing it still takes them out, but both are now consequences of the number
+     itself (see entryInPhase) rather than a second write alongside it. This block used to
+     add them to p[ph.members] and deliberately never removed them on clear — that asymmetry
+     is exactly what "days decide it" replaces. */
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
@@ -8643,6 +9298,20 @@ function openDatesDialog(entryId, phase){
   renderGlobalOverlay();
 }
 function closeDatesDialog(){ datesDialogFor = null; datesDialogMonth = null; renderGlobalOverlay(); }
+/* ⚠️ Phase CF — THE POPUP IS THE PERSON'S CALENDAR, and this is how you move around inside it.
+   `datesDialogFor` is still an ENTRY id, because a mark has to be written against one role —
+   prep days belong to the prep booking, not to the human in the abstract. What changed is
+   that the calendar SHOWS every role that person holds; this switches which one you are
+   writing to, without closing and reopening from another row. */
+function setDatesDialogEntry(entryId){
+  if(!entryId || entryId===datesDialogFor) return;
+  datesDialogFor = entryId;
+  /* keep the month you are looking at if this role has anything there, otherwise go to where
+     its own dates are — the same rule setDatesDialogPhase() uses when you change phase */
+  const inView = datesPhaseMarks(datesDialogPhase, entryId).some(iso=>iso.slice(0,7)===datesDialogMonth);
+  if(!inView) datesDialogMonth = datesAnchorMonth(datesDialogPhase, entryId);
+  renderGlobalOverlay();
+}
 function setDatesDialogPhase(phase){
   datesDialogPhase = phase;
   /* re-anchor on the phase you have just switched to, but only when the month you are
@@ -8706,10 +9375,26 @@ function datesDialogHTML(){
   const p = currentProject(); if(!p) return '';
   const e = entryById(datesDialogFor, p); if(!e) return '';
   const person = crewById(e.crewId) || {};
-  const phases = CREW_PHASES.map(ph=>({
-    ph, cls: ph.view==='preprod' ? 'prep' : ph.view==='days' ? 'shoot' : 'post',
-    tally: datesPhaseTally(ph.view, datesDialogFor)
-  }));
+  const personEntries = entriesForCrew(e.crewId, p);
+  const multi = personEntries.length > 1;
+  /* ⚠️ Phase CH — EACH PHASE CARRIES A SECOND NUMBER: what this person's OTHER roles hold in
+     it. Without it the popup could say "Shoot —" for Tegid's Executive Producer booking while
+     he is on all six shoot days as DOP, which is true of the ROLE and misleading about the
+     PERSON — and this popup is the person's calendar now. The dots in the grid already carry
+     it per date; this is the same fact at a glance, in the numbers.
+     ⚠️ DISTINCT DATES, not a sum: two roles working the same day is one day of that person's
+     life, and adding them would report a week of work as ten days. */
+  const phases = CREW_PHASES.map(ph=>{
+    const elsewhere = personEntries.filter(en=>en.id!==datesDialogFor)
+      .map(en=>({role: en.role||'no role', marks: datesPhaseMarks(ph.view, en.id)}))
+      .filter(x=>x.marks.length);
+    return {
+      ph, cls: ph.view==='preprod' ? 'prep' : ph.view==='days' ? 'shoot' : 'post',
+      tally: datesPhaseTally(ph.view, datesDialogFor),
+      otherN: new Set(elsewhere.flatMap(x=>x.marks)).size,
+      otherWho: elsewhere.map(x=>`${x.marks.length} as ${x.role}`).join(' · ')
+    };
+  });
   const sel = phases.find(x=>x.ph.view===datesDialogPhase) || phases[0];
   const readonly = sel.ph.view==='days';
   const ym = datesDialogMonth || datesAnchorMonth(sel.ph.view, datesDialogFor);
@@ -8717,19 +9402,38 @@ function datesDialogHTML(){
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const lead = (new Date(Date.UTC(y, m-1, 1)).getUTCDay() + 6) % 7;   // Monday-first
   const mine = new Set(datesPhaseMarks(sel.ph.view, datesDialogFor));
-  // the other two phases, for the dots — computed once, not per cell
-  const others = phases.filter(x=>x.ph.view!==sel.ph.view)
-    .map(x=>({cls:x.cls, head:x.ph.head, set:new Set(datesPhaseMarks(x.ph.view, datesDialogFor))}));
+  /* ⚠️ Phase CF — "OTHERS" IS NOW EVERY OTHER (ROLE × PHASE) THIS PERSON HOLDS, not just the
+     other two phases of this one entry. That is the whole point of the change: Sabrina is Line
+     Producer in prep and post and a different role on the shoot, and placing her prep dates
+     without being able to see the shoot dates her OTHER role holds is how you book someone
+     twice. Computed once here, not per cell — it is up to nine sets on a two-role person. */
+  const others = [];
+  personEntries.forEach(en=>{
+    CREW_PHASES.forEach(ph2=>{
+      if(en.id===datesDialogFor && ph2.view===sel.ph.view) return;   // that pair IS `mine`
+      const set = new Set(datesPhaseMarks(ph2.view, en.id));
+      if(!set.size) return;
+      others.push({
+        cls: ph2.view==='preprod' ? 'prep' : ph2.view==='days' ? 'shoot' : 'post',
+        head: ph2.head + (multi ? ' · ' + (en.role || 'no role') : ''),
+        set
+      });
+    });
+  });
   const cells = [];
   for(let i=0;i<lead;i++) cells.push('<span class="prep-cal-day empty"></span>');
   for(let d=1; d<=daysInMonth; d++){
     const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const hits = others.filter(o=>o.set.has(iso));
+    /* ⚠️ ONE DOT PER PHASE, not per matching set. A two-role person on the same shoot day in
+       both roles hits twice, and two identical dots under one date says nothing the first one
+       didn't. The TITLE still names every role that holds it. */
     const dots = hits.length
       /* `cls` IS the token suffix — prep / shoot / post — so the dot's colour comes straight
          from the same variable the phase circle and the calendar tint use. */
-      ? `<span class="dates-others">${hits.map(o=>`<i style="background:var(--phase-${o.cls})"></i>`).join('')}</span>` : '';
-    const holds = [mine.has(iso)?sel.ph.head:null].concat(hits.map(o=>o.head)).filter(Boolean);
+      ? `<span class="dates-others">${[...new Set(hits.map(o=>o.cls))].map(cls=>`<i style="background:var(--phase-${cls})"></i>`).join('')}</span>` : '';
+    const holds = [mine.has(iso)?(sel.ph.head + (multi ? ' · ' + (e.role||'no role') : '')):null]
+      .concat(hits.map(o=>o.head)).filter(Boolean);
     const title = holds.length ? `${fmtDate(iso)||iso} — ${holds.join(' + ')}` : (fmtDate(iso)||iso);
     /* ⚠️ Same class and the same handlers as the inline calendar, so the click-and-drag
        machinery (phaseDayDown/phaseDayEnter/prepDragApply and the document mouseup) is shared
@@ -8739,11 +9443,16 @@ function datesDialogHTML(){
     cells.push(`<span class="prep-cal-day${mine.has(iso)?' marked':''}" data-iso="${iso}" title="${esc(title)}"
       ${readonly?'':`onmousedown="phaseDayDown('${sel.ph.view}','${datesDialogFor}','${iso}',event)" onmouseenter="phaseDayEnter('${iso}')"`}>${d}${dots}</span>`);
   }
+  /* the bracketed figure is ANOTHER ROLE'S — bracketed and italic because it is not yours to
+     edit from here, and reads as an aside rather than as a second total */
   const phaseBtn = x => `<button type="button" class="dates-phase ${x.cls}${x.ph.view===sel.ph.view?' on':''}"
-      onclick="setDatesDialogPhase('${x.ph.view}')" aria-pressed="${x.ph.view===sel.ph.view?'true':'false'}">
+      onclick="setDatesDialogPhase('${x.ph.view}')" aria-pressed="${x.ph.view===sel.ph.view?'true':'false'}"
+      title="${esc(`${x.tally.marked} marked as ${e.role||'no role'}`)}${x.otherN?esc(` · ${x.otherWho} — switch role above to change those`):''}">
       <span class="dates-dot"></span>
       <span class="dates-phase-lbl">${x.ph.head}</span>
-      <span class="dates-phase-n">${x.tally.marked||'—'}${x.tally.short?' ⚠':''}</span>
+      <span class="dates-phase-n">${x.tally.marked||'—'}${
+        x.otherN ? `<span class="dates-phase-other">(${x.otherN})</span>` : ''
+      }${x.tally.short?' ⚠':''}</span>
     </button>`;
   /* ⚠️ THE SHORTFALL FLAG, and it is deliberately ONE-DIRECTIONAL. Marking MORE dates than
      booked days is a normal, valid state and gets no comment: five days' work spread over six
@@ -8761,8 +9470,15 @@ function datesDialogHTML(){
     <div class="modal-box dates-box" onclick="event.stopPropagation()">
       <div class="dates-head">
         <div class="dates-name">${esc(person.name||'—')}</div>
-        <div class="dates-role">${esc(e.showAs||e.role||'')}</div>
+        <div class="dates-role">${multi ? `${personEntries.length} roles on this project` : esc(e.showAs||e.role||'')}</div>
       </div>
+      ${multi ? `<div class="dates-roles" role="group" aria-label="Which role you are marking">
+        ${personEntries.map(en=>`<button type="button" class="dates-role-btn${en.id===datesDialogFor?' on':''}"
+            aria-pressed="${en.id===datesDialogFor?'true':'false'}"
+            onclick="setDatesDialogEntry('${en.id}')"
+            title="${en.id===datesDialogFor?'You are marking dates for this role':'Mark dates for this role instead'}"
+          >${esc(en.role||'no role')}</button>`).join('')}
+      </div>` : ''}
       <div class="dates-phases">${phases.map(phaseBtn).join('')}</div>
       <div class="prep-cal dates-cal ${sel.cls}${readonly?' readonly':''}">
         <div class="prep-cal-head">
@@ -8783,7 +9499,8 @@ function datesDialogHTML(){
       </div>
       <div class="hint" style="margin-top:8px;">${readonly
         ? 'Shoot dates come from the shoot days this person is on — tick those on the Production tab, or from the Shoot column on Roles.'
-        : 'Click or drag to mark the days. Dots under a date are the other phases, so you can see where they overlap.'}</div>
+        : `Click or drag to mark the days. Dots under a date are ${multi?'this person’s other roles and phases':'the other phases'}, so you can see where they overlap.`}${
+        multi ? ' You are marking <strong>'+esc(e.role||'no role')+'</strong> — a bracketed <em>(n)</em> above is days held by their other role; use the buttons to switch to it.' : ''}</div>
     </div>
   </div>`;
 }
@@ -8897,7 +9614,9 @@ function renderProjectLocations(body){
   body.innerHTML = `
     <div class="section">
       <h2>Locations on this project</h2>
-      ${assigned.length ? locDayGridHTML(assigned, days) : '<div class="empty-note">No locations assigned to this project yet.</div>'}
+      ${assigned.length ? locBannerHTML(assigned, days) + locDayGridHTML(assigned, days) + `
+        <div class="hint" style="margin-top:8px;">Click a location to set what it costs. A buyout is split across the days it is ticked on, so each day carries its share; per-day and hourly follow the ticks directly. Additional charges are counted once for the project, and all of it feeds the <strong>Locations</strong> line in the Budget.</div>`
+        : '<div class="empty-note">No locations assigned to this project yet.</div>'}
     </div>
     <div class="section">
       <h2>Add location</h2>
@@ -8925,6 +9644,19 @@ function renderProjectLocations(body){
    an existing pick goes through addLocToProject(), and a new one through the same
    locFormHTML()/saveLocation() form with locFormContext set to this project, which
    is what attaches it to p.locationIds on save. */
+/* ⚠️ Phase CQ — the Locations tab borrows Roles' methodology wholesale rather than inventing
+   its own: a money toggle that hides every figure (locShowMoney ≡ crewShowMoney), a header row
+   over the grid, and rows that are DISCLOSURES — click one and its costs open underneath it,
+   the same `.dept-caret` + expansion idiom Crew uses. There is no separate "Location costs"
+   section any more and no second copy of the location's name; the row you clicked is the
+   heading. Session state, like every other view choice in the app. */
+let locShowMoney = false;
+function toggleLocMoney(){ locShowMoney = !locShowMoney; renderProjectBody(); }
+let locExpanded = new Set();
+function toggleLocExpanded(locId){
+  if(locExpanded.has(locId)) locExpanded.delete(locId); else locExpanded.add(locId);
+  renderProjectBody();
+}
 let locAddOpen = false;
 let locAddQuery = '';
 function toggleLocAdd(){
@@ -8970,6 +9702,274 @@ function startNewLocationFromSearch(){
 /* Day-checkbox grid for project locations — same pattern as Crew tab's Days on site.
    Ticking a day for a location sets it as that day's primary location if the day has
    none yet, otherwise adds it to that day's additional locations. */
+/* ============ WHAT A LOCATION COSTS (Phase CO) ============
+   ⚠️ THE ONE READER — every figure on the Locations tab, in the Budget and in the Per Day
+   breakdown comes through resolveLocationCost(). A second place that decides what a venue
+   costs is a second answer to the same question.
+
+   ⚠️ WHERE EACH PIECE LIVES, and it is deliberately split:
+     · the BILLING BASIS (mode, rate, hours) is a fact about the VENUE, so it lives on the
+       location record and follows it to every project — with a per-project override on top,
+       exactly the shape crew day rates already have (p.crewRateOverrides over the crew record),
+       and a save-to-database icon to push the override back down when the venue's terms have
+       actually changed rather than just this job's.
+     · the EXTRAS are a fact about THIS SHOOT — a cleaning charge, an overrun, a breakage — so
+       they live on the project and never follow the venue anywhere. */
+const LOCATION_FEE_MODES = [
+  ['buyout', 'Buyout',  'One agreed fee for the venue, split across the days it is used'],
+  ['perday', 'Per day', 'The fee is charged for each day the location is used'],
+  ['hourly', 'Hourly',  'The fee is charged per hour, for the hours below, on each day used']
+];
+const locFeeModeLabel = m => (LOCATION_FEE_MODES.find(x=>x[0]===m)||LOCATION_FEE_MODES[0])[1];
+/* ⚠️ HOISTED from inside buildBudgetData, where it was a local called usesLocation. The day
+   grid, the cost card and the budget all have to agree about "is this location used that day",
+   and they were about to be three copies of one expression. Primary or additional counts. */
+const locOnDay = (locId, d) => !!d && (d.locationId===locId
+  || (d.additionalLocationIds||[]).some(pair=>pair[0]===locId));
+const locDaysUsed = (locId, p) => projectDays(p ? p.id : undefined).filter(d=>locOnDay(locId, d));
+function resolveLocationCost(locId, p){
+  const proj = p || currentProject() || {};
+  const loc = locById(locId) || {};
+  const rec = ((proj.locationCosts||{})[locId]) || {};
+  const has = v => v!=null && v!=='';
+  const mode = has(rec.mode) ? rec.mode : (loc.feeMode || 'buyout');
+  const rate = has(rec.rate) ? parseRateNumber(rec.rate) : parseRateNumber(loc.fee);
+  const hours = has(rec.hours) ? (Number(rec.hours)||0) : (Number(loc.feeHours)||0);
+  const extras = (rec.extras||[]).filter(x=>x);
+  return {
+    mode, rate, hours, extras,
+    /* ⚠️ Phase CP — PER-DAY OVERRIDES, keyed by shoot-day id: `{[dayId]:{rate,hours}}`. A
+       half-day at a lower rate, or six hours on the Friday and ten on the Monday, is a real
+       bill and "rate × number of days" cannot express it. Project-scoped only — a venue's
+       record has no opinion about YOUR Tuesday. Absent = use the standard figure above, so a
+       location nobody has fiddled with still costs rate × days. */
+    days: rec.days || {},
+    /* the venue's own VAT status, not a person's — see the AO note in buildBudgetData for why
+       that distinction is the whole reason locations had no VAT before */
+    vat: has(rec.vat) ? rec.vat : (loc.vatRegistered || ''),
+    extrasTotal: extras.reduce((sum,x)=>sum + (parseRateNumber(x.amount)||0), 0),
+    /* true when THIS PROJECT is saying something different from the venue's own record —
+       what the save-to-database icon offers to reconcile */
+    isOverride: has(rec.mode) || has(rec.rate) || has(rec.hours) || has(rec.vat)
+  };
+}
+/* one day's figure for a per-day or hourly location: its own override if it has one, the
+   standard figure if not. ⚠️ Read through these two and nothing else, or a day's cost on the
+   card and the same day's cost in the budget will drift. */
+const locDayOverride = (c, dayId, field) => {
+  const v = ((c.days||{})[dayId]||{})[field];
+  return (v!=null && v!=='') ? v : null;
+};
+function locDayCost(c, d){
+  const r = locDayOverride(c, d.id, 'rate');
+  const rate = r!=null ? parseRateNumber(r) : c.rate;
+  if(c.mode!=='hourly') return rate;
+  const h = locDayOverride(c, d.id, 'hours');
+  return rate * (h!=null ? (Number(h)||0) : c.hours);
+}
+/* the FEE for a given set of days, mode by mode. ⚠️ Extras are NOT in here — they are charged
+   once, project-wide, and adding them per day would multiply them by the days used. */
+function locationFeeFor(locId, dayList, p, allDaysUsed){
+  const c = resolveLocationCost(locId, p);
+  const {mode, rate} = c;
+  const usedDays = (dayList||[]).filter(d=>locOnDay(locId, d));
+  /* ⚠️ Phase CP — SUMMED DAY BY DAY, not rate × count, so a day carrying its own rate or its
+     own hours is billed at what it actually cost. With no overrides anywhere this returns the
+     identical number the multiplication did. */
+  if(mode==='perday' || mode==='hourly') return usedDays.reduce((sum,d)=>sum + locDayCost(c, d), 0);
+  if(!rate) return 0;
+  const usedHere = usedDays.length;
+  /* buyout: ONE fee, apportioned across the days it is actually used on, so Per Day can carry
+     its share. ⚠️ A location ticked on no day at all still costs its fee — it is booked — and
+     is charged project-wide only, which is why the caller passes allDaysUsed. */
+  const totalUsed = allDaysUsed!=null ? allDaysUsed : locDaysUsed(locId, p).length;
+  if(!totalUsed) return null;                 // caller decides: project-wide charge, or nothing
+  return (rate / totalUsed) * usedHere;
+}
+/* ---- the writers. All project-scoped except saveLocationFeeToDatabase(). ---- */
+function locCostRec(locId, p){
+  const proj = p || currentProject();
+  proj.locationCosts = proj.locationCosts || {};
+  proj.locationCosts[locId] = proj.locationCosts[locId] || {};
+  return proj.locationCosts[locId];
+}
+async function setLocationCostField(locId, field, value){
+  const rec = locCostRec(locId);
+  const v = (value||'').trim();
+  /* ⚠️ AN OVERRIDE THAT MATCHES THE DATABASE IS NOT AN OVERRIDE. Picking "Buyout" on a venue
+     whose record already says Buyout must clear the key, not store it — otherwise the row
+     claims to be "set for this project only" while agreeing with the record it is overriding,
+     and the save-to-database icon offers to save something that is already saved. */
+  const loc = locById(locId) || {};
+  const ownValue = field==='mode' ? (loc.feeMode||'buyout')
+                 : field==='rate' ? String(loc.fee||'')
+                 : field==='vat'  ? String(loc.vatRegistered||'')
+                 : String(loc.feeHours||'');
+  /* delete rather than storing '' — an absent override is what makes the venue's own record
+     show through again, the same contract p.crewRateOverrides has */
+  if(v==='' || v===ownValue) delete rec[field]; else rec[field] = v;
+  if(!Object.keys(rec).length) delete (currentProject().locationCosts||{})[locId];
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+async function setLocationDayField(locId, dayId, field, value){
+  const rec = locCostRec(locId);
+  rec.days = rec.days || {};
+  const cell = rec.days[dayId] = rec.days[dayId] || {};
+  const v = (value||'').trim();
+  if(v==='') delete cell[field]; else cell[field] = v;
+  /* an empty cell is not an override — prune it, and the whole table with it, so a location
+     that has been fiddled with and put back is byte-identical to one that never was */
+  if(!Object.keys(cell).length) delete rec.days[dayId];
+  if(!Object.keys(rec.days).length) delete rec.days;
+  if(!Object.keys(rec).length) delete (currentProject().locationCosts||{})[locId];
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+async function addLocationExtra(locId){
+  const rec = locCostRec(locId);
+  rec.extras = rec.extras || [];
+  rec.extras.push({id:uid(), label:'', amount:''});
+  renderProjectBody();
+  document.getElementById('locx-'+rec.extras[rec.extras.length-1].id)?.focus();
+  saveInBackground('db:projects', projectsDB);
+}
+async function setLocationExtra(locId, extraId, field, value){
+  const rec = locCostRec(locId);
+  const x = (rec.extras||[]).find(e=>e.id===extraId); if(!x) return;
+  x[field] = value;
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+async function removeLocationExtra(locId, extraId){
+  const rec = locCostRec(locId);
+  rec.extras = (rec.extras||[]).filter(e=>e.id!==extraId);
+  if(!rec.extras.length) delete rec.extras;
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+/* ⚠️ The one write that leaves this project. Same shape and the same confirmation habit as
+   saveCrewRateToDatabase(): pushing a project override down onto the shared record changes
+   what every OTHER project sees, so it says so first. */
+async function saveLocationFeeToDatabase(locId){
+  const loc = locById(locId); if(!loc) return;
+  const {mode, rate, hours} = resolveLocationCost(locId);
+  if(!confirm(`Save ${locFeeModeLabel(mode).toLowerCase()} ${budgetFmt(rate)}${mode==='hourly'?` × ${hours} hrs`:''} to “${loc.name}” in the Locations database? Every project using this location will pick it up.`)) return;
+  loc.feeMode = mode;
+  loc.fee = String(rate||'');
+  loc.feeHours = mode==='hourly' ? String(hours||'') : (loc.feeHours||'');
+  loc.vatRegistered = resolveLocationCost(locId).vat || '';
+  /* the override has become the record, so drop it — otherwise the row keeps claiming to
+     differ from a database it now matches */
+  const rec = locCostRec(locId);
+  delete rec.mode; delete rec.rate; delete rec.hours; delete rec.vat;
+  await saveDB('db:locations', locationsDB);
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+/* ---- the cost panel that opens under a location row (Phase CQ) ----
+   ⚠️ NO HEADING AND NO NAME. It hangs off the row that carries both; repeating them was the
+   thing that made the old standalone "Location costs" section read as a second list of the
+   same locations rather than as the detail behind the first one. */
+function locCostPanelHTML(l, days){
+  const p = currentProject();
+  const c = resolveLocationCost(l.id, p);
+  const used = locDaysUsed(l.id, p).length;
+  const rec = ((p.locationCosts||{})[l.id]) || {};
+  const fee = locationFeeFor(l.id, days, p, used);
+  const feeTotal = fee===null ? c.rate : fee;
+  /* said in words, because "£4,200" against a venue tells you nothing about whether it is
+     going to move when you tick another day */
+  const basis = !c.rate ? 'No fee set'
+    : c.mode==='perday' ? `${budgetFmt(c.rate)} × ${used} day${used===1?'':'s'}`
+    : c.mode==='hourly' ? `${budgetFmt(c.rate)} × ${c.hours||0} hr${c.hours===1?'':'s'} × ${used} day${used===1?'':'s'}`
+    : used ? `${budgetFmt(c.rate)} split across ${used} day${used===1?'':'s'}`
+    : `${budgetFmt(c.rate)} — not ticked on any day yet, so charged once`;
+  /* ⚠️ Phase CP — DAY BY DAY, for per-day and hourly only. A buyout has one fee by definition,
+     so a per-day table under it would be inviting you to edit a number that does not exist.
+     Placeholders carry the standard figure, so a blank cell is visibly "the usual" rather than
+     zero, and typing in one costs that day differently without touching the others. */
+  const usedDays = locDaysUsed(l.id, p);
+  const dayRows = (c.mode==='buyout' || !usedDays.length) ? '' : `<div class="loc-days">
+      <div class="loc-day-head" style="--locday-cols:${c.mode==='hourly'?2:1};"><span></span>${c.mode==='hourly'?'<span>Hours</span>':''}<span>Rate</span><span>Cost</span></div>
+      ${usedDays.map(d=>`<div class="loc-day-row" style="--locday-cols:${c.mode==='hourly'?2:1};">
+        <span class="loc-day-num" title="${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</span>
+        ${c.mode==='hourly'?`<input type="text" inputmode="decimal" class="budget-rate-input" placeholder="${esc(String(c.hours||0))}"
+          value="${esc(locDayOverride(c,d.id,'hours')||'')}" onchange="setLocationDayField('${l.id}','${d.id}','hours', this.value)">`:''}
+        <input type="text" inputmode="decimal" class="budget-rate-input" placeholder="${esc(String(c.rate||0))}"
+          value="${esc(locDayOverride(c,d.id,'rate')||'')}" onchange="setLocationDayField('${l.id}','${d.id}','rate', this.value)">
+        <span class="loc-day-cost">${budgetFmt(locDayCost(c, d))}</span>
+      </div>`).join('')}
+    </div>`;
+  const extras = c.extras.map(x=>`<div class="loc-extra-row">
+      <input type="text" id="locx-${x.id}" class="loc-extra-label" value="${esc(x.label||'')}" placeholder="What for — cleaning, overrun…"
+        onchange="setLocationExtra('${l.id}','${x.id}','label', this.value)">
+      <span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${esc(x.amount||'')}" placeholder="0.00"
+        onchange="setLocationExtra('${l.id}','${x.id}','amount', this.value)"></span>
+      <button type="button" class="icon-btn danger-ic" onclick="removeLocationExtra('${l.id}','${x.id}')" title="Remove this charge" aria-label="Remove charge">${icon('trash')}</button>
+    </div>`).join('');
+  return `<div class="loc-cost-body">
+    <div class="loc-cost-fields">
+      <div><label>Charged as</label>
+        <select onchange="setLocationCostField('${l.id}','mode', this.value)">
+          ${LOCATION_FEE_MODES.map(([k,lbl,t])=>`<option value="${k}" ${c.mode===k?'selected':''} title="${esc(t)}">${lbl}</option>`).join('')}
+        </select></div>
+      <div><label>${c.mode==='hourly'?'Rate per hour':c.mode==='perday'?'Rate per day':'Fee'}</label>
+        <span class="rate-with-save"><span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input"
+          value="${esc(rec.rate!=null&&rec.rate!==''?rec.rate:(c.rate||''))}" placeholder="0.00"
+          onchange="setLocationCostField('${l.id}','rate', this.value)"></span>
+        <button type="button" class="icon-btn" onclick="saveLocationFeeToDatabase('${l.id}')" title="Saves to Database" aria-label="Save to the Locations database">${icon('save')}</button></span></div>
+      ${c.mode==='hourly' ? `<div><label>Hours per day</label>
+        <input type="text" inputmode="decimal" class="budget-rate-input" value="${esc(rec.hours!=null&&rec.hours!==''?rec.hours:(c.hours||''))}" placeholder="0"
+          onchange="setLocationCostField('${l.id}','hours', this.value)"></div>` : ''}
+      ${/* ⚠️ A TOGGLE, not a three-way select. "Not set" and "No" were two ways of saying the
+            venue does not charge VAT and produced the identical figure, so the third state was
+            a distinction the budget could not see. Same checkbox treatment as Roles' Buyout and
+            VAT reg. cells. */''}
+      <div class="loc-vat-field"><label>Charges VAT</label>
+        <label class="loc-vat-toggle"><input type="checkbox" ${c.vat==='Yes'?'checked':''}
+          onchange="setLocationCostField('${l.id}','vat', this.checked?'Yes':'No')"
+          title="${c.vat==='Yes'?`Charging ${Math.round(VAT_RATE*100)}% VAT on this venue's bill`:'Not charging VAT'}"><span>${Math.round(VAT_RATE*100)}%</span></label></div>
+    </div>
+    <div class="hint">${esc(basis)}${c.vat==='Yes'?` · plus ${Math.round(VAT_RATE*100)}% VAT`:''}${c.isOverride?' · set for this project only — the save icon writes it to the database':''}</div>
+    ${dayRows}
+    ${extras ? `<div class="loc-extras">${extras}</div>` : ''}
+    <div class="toolbar" style="margin:8px 0 0;">
+      <button class="small" onclick="addLocationExtra('${l.id}')">+ Additional charge</button>
+      ${c.extrasTotal?`<span class="hint">${budgetFmt(c.extrasTotal)} of extras, charged once</span>`:''}
+    </div>
+  </div>`;
+}
+/* the tab's own banner — the same shape and the same pill as Crew ▸ Roles, cut to what a
+   locations screen has to say: one total, and the toggle that hides it. ⚠️ Deliberately NOT
+   budgetSummaryBarHTML(): that carries phase scopes and crew tools which mean nothing here,
+   and bending it to a second screen's needs is how one banner becomes two banners' worth of
+   options. What it shares is the vocabulary — .bnr-tool, .budget-stat, the same words. */
+function locBannerHTML(assigned, days){
+  const p = currentProject();
+  const total = assigned.reduce((sum,l)=>{
+    const c = resolveLocationCost(l.id, p);
+    const fee = locationFeeFor(l.id, days, p, locDaysUsed(l.id, p).length);
+    return sum + (fee===null ? c.rate : fee) + c.extrasTotal;
+  }, 0);
+  const vat = assigned.reduce((sum,l)=>{
+    const c = resolveLocationCost(l.id, p);
+    if(c.vat!=='Yes') return sum;
+    const fee = locationFeeFor(l.id, days, p, locDaysUsed(l.id, p).length);
+    return sum + ((fee===null ? c.rate : fee) + c.extrasTotal) * VAT_RATE;
+  }, 0);
+  return `<div class="phase-banner loc-banner">
+    <div class="bnr-totals">${locShowMoney
+      ? `<div class="budget-stat"><div class="num">${budgetFmt(total + vat)}</div>
+           <div class="lbl">Locations${vat?`<span class="budget-stat-note">inc. ${budgetFmt(vat)} VAT</span>`:''}</div>
+           ${vat?`<div class="budget-stat-sub">xVAT ${budgetFmt(total)}</div>`:''}</div>`
+      : `<div class="bnr-totals-off">Location costs hidden. Turn on <strong>Budget</strong> to see what each venue costs — the day ticks work either way.</div>`}</div>
+    <div class="bnr-toolrow" style="grid-area:tools;">
+      <button type="button" class="bnr-tool${locShowMoney?' on':''}" aria-pressed="${locShowMoney?'true':'false'}"
+        onclick="toggleLocMoney()" title="${locShowMoney?'Hide location costs':'Show location costs'}">Budget</button>
+    </div>
+  </div>`;
+}
 function locDayGridHTML(assigned, days){
   if(!days.length){
     return assigned.map(l=>`
@@ -8979,8 +9979,9 @@ function locDayGridHTML(assigned, days){
       </div>`).join('') + `<div class="hint" style="margin-top:8px;">Add shoot days first, then tick which days each location is used.</div>`;
   }
   const dayHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length};">
-      <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;"></div>
+      <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;">Location</div>
       ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
+      <div class="crewgrid-header" style="text-align:right;">${locShowMoney?'Total':''}</div>
       <div class="crewgrid-header"></div>
     </div>`;
   return `<div class="tablewrap">${dayHeaderRow}${assigned.map(l=>locRowHTML(l, days)).join('')}</div>`;
@@ -8996,10 +9997,27 @@ function locRowHTML(l, days){
     const checked = isPrimary || isAdditional;
     return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleLocOnDay('${l.id}','${d.id}',this.checked)" title="${isPrimary?'Primary location — ':''}Day ${esc(d.dayNum||'?')}"></div>`;
   }).join('');
-  return `<div class="crewgrid crewgrid-row" style="--daycols:${days.length};">
-    <div class="crewgrid-row-name crewgrid-name-span" style="grid-column:1/4;"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></div>
+  /* ⚠️ THE NAME CELL IS THE CONTROL, exactly as the Shoot count is on Roles — a heading that
+     happens to be clickable, so it grows a caret and a pointer and nothing else. No separate
+     "open" button: the thing you want to read more about is the thing you click. */
+  const open = locExpanded.has(l.id);
+  const p = currentProject();
+  const c = resolveLocationCost(l.id, p);
+  const fee = locationFeeFor(l.id, projectDays(p.id), p, locDaysUsed(l.id, p).length);
+  const total = (fee===null ? c.rate : fee) + c.extrasTotal;
+  return `<div class="crewgrid crewgrid-row loc-row${open?' loc-row-open':''}" style="--daycols:${days.length};">
+    <div class="crewgrid-row-name crewgrid-name-span loc-name-cell" style="grid-column:1/4;"
+      role="button" tabindex="0" aria-expanded="${open?'true':'false'}"
+      onclick="toggleLocExpanded('${l.id}')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleLocExpanded('${l.id}');}"
+      title="${open?'Hide this location’s costs':'Show this location’s costs'}">
+      <span class="dept-caret">${open?'▾':'▸'}</span>
+      <span class="loc-name-text"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></span>
+    </div>
     ${dayCells}
-    <div class="crewgrid-remove"><button class="icon-btn danger-ic" onclick="removeLocFromProject('${l.id}')" title="Remove ${esc(l.name)} from this project" aria-label="Remove from project">${icon('trash')}</button></div>
+    <div class="crewgrid-cell loc-row-total">${locShowMoney ? (total ? budgetFmt(total) : '<span class="budget-noRate">—</span>') : ''}</div>
+    <div class="crewgrid-remove"><button class="icon-btn danger-ic" onclick="event.stopPropagation();removeLocFromProject('${l.id}')" title="Remove ${esc(l.name)} from this project" aria-label="Remove from project">${icon('trash')}</button></div>
+    ${open ? `<div class="crewgrid-editform loc-cost-panel">${locCostPanelHTML(l, days)}</div>` : ''}
   </div>`;
 }
 async function toggleLocOnDay(locId, dayId, checked){
@@ -9371,9 +10389,15 @@ function setBudgetExportView(view){ budgetExportView = view; renderProjectBody()
    state. See that function for why the split. */
 let budgetOutputOpen = false;
 function toggleBudgetOutputPanel(){ budgetOutputOpen = !budgetOutputOpen; renderProjectBody(); }
-// true = itemized (every figure ex-VAT, VAT broken out at the top); false =
-// baked in (VAT folded silently into every figure, one Total). The toggle's
-// whole job — see budgetPersonDisplay().
+/* ⚠️ PHASE CL INVERTED THIS. Read it before "fixing" it back.
+   true  = VAT SHOWING: every Total is inc-VAT, and the ex-VAT figure sits beside it as its
+           own column (Subtotal on a row, xVAT on the banner). VAT is a thing you can see.
+   false = VAT HIDDEN: every Total is ex-VAT, and no VAT appears anywhere.
+   It used to be the other way round — itemizing made the figures ex-VAT and baked VAT in when
+   OFF — which put the biggest number on screen at its LARGEST in the state that claimed to be
+   showing less. Turning a control called VAT on should add VAT to the totals, not take it out
+   of them. ⚠️ ex-VAT is the working figure and inc-VAT is the quotable one, so with the
+   breakdown off the totals are the ones you budget with. */
 let budgetVatToggle = true;
 function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(); }
 /* Split kit & labour — HOW it's shown, like Itemize VAT, so it lives in the same
@@ -9445,13 +10469,13 @@ function toggleAllBudgetDayBlocks(){ setAllBudgetDayBlocksCollapsed(!allBlocksCo
    another; that arithmetic is buildBudgetData()/budgetPersonDisplay()'s job alone. */
 function budgetFmt(n){ return '£'+(n||0).toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 
-/* A person's DISPLAYED cost, respecting the VAT toggle: the plain ex-VAT
-   subtotal when itemized (VAT is shown as its own line in the summary bar
-   instead), or subtotal+VAT baked silently in when not. The `vat` handed in is
+/* A person's DISPLAYED cost, respecting the VAT toggle (Phase CL: subtotal+VAT when the
+   breakdown is ON, since Subtotal then carries the ex-VAT figure beside it; the plain ex-VAT
+   subtotal when it is OFF). The `vat` handed in is
    whatever buildBudgetData attributed to that PERSON — since AO that's their day
    rate AND their travel, per c.vatRegistered. Catering/hotel/location extras carry
    no VAT in either state: they're supplier-paid, so no person's status attaches. */
-function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle ? 0 : vat); }
+function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle ? vat : 0); }
 
 /* AH: Budget Per Person's VAT checkbox — the editable front-end for the same
    c.vatRegistered the crew database's own "VAT registered" field (crewFormHTML's
@@ -9857,17 +10881,45 @@ function buildBudgetData(){
      Uses parseRateNumber(), the same free-text reader as the crew rate field. */
   const usesLocation = (d, locId) => d.locationId===locId
     || (d.additionalLocationIds||[]).some(pair=>pair[0]===locId);
+  /* ⚠️ Phase CO — THIS NOW READS resolveLocationCost(), which knows about buyout / per day /
+     hourly. It used to assume every venue was a buyout (one fee, split across the days used).
+     That case is unchanged and is still the default; the other two are new. ⚠️ EXTRAS ARE NOT
+     IN HERE — they are charged once, project-wide, and apportioning them per day would
+     multiply them by the days used. See locationExtrasTotal below. */
   const locationFeeForDays = dayList => (p.locationIds||[]).reduce((sum, locId)=>{
-    const loc = locById(locId); if(!loc) return sum;
-    const fee = parseRateNumber(loc.fee); if(!fee) return sum;
+    if(!locById(locId)) return sum;
     const totalDaysUsed = projectDays().filter(d=>usesLocation(d, locId)).length;
-    if(!totalDaysUsed) return sum + (dayList===days ? fee : 0);   // unassigned: charge once, project-wide only
-    const perDay = fee / totalDaysUsed;
-    return sum + perDay * dayList.filter(d=>usesLocation(d, locId)).length;
+    const fee = locationFeeFor(locId, dayList, p, totalDaysUsed);
+    /* null means a booked location ticked on no day at all — its fee is real but belongs to no
+       day, so it is charged once, project-wide only, exactly as it always was */
+    if(fee===null) return sum + (dayList===days ? resolveLocationCost(locId, p).rate : 0);
+    return sum + fee;
   }, 0);
+  /* one labelled charge at a time — cleaning, an overrun, a breakage — summed once for the
+     project. Deliberately outside the per-day arithmetic above. */
+  const locationExtrasTotal = (p.locationIds||[])
+    .reduce((sum, locId)=> sum + resolveLocationCost(locId, p).extrasTotal, 0);
+  /* ⚠️ Phase CP — LOCATION VAT, and it does NOT contradict the AO note further down. That note
+     says catering/hotel/locations carry no PER-PERSON VAT, because no crew member invoices them
+     — which is true and still true. What was missing was the venue's own VAT status, and a
+     VAT-registered studio charges VAT on its own bill. `vatRegistered` on the location record
+     (project-overridable like the rest) supplies the party the note said did not exist.
+     ⚠️ Applies to the FEE and the EXTRAS alike — it is all one invoice from the venue. */
+  const locVatRate = locId => resolveLocationCost(locId, p).vat==='Yes' ? VAT_RATE : 0;
+  const locationVatForDays = dayList => (p.locationIds||[]).reduce((sum, locId)=>{
+    const r = locVatRate(locId); if(!r) return sum;
+    const totalDaysUsed = projectDays().filter(d=>usesLocation(d, locId)).length;
+    const fee = locationFeeFor(locId, dayList, p, totalDaysUsed);
+    if(fee===null) return sum + (dayList===days ? resolveLocationCost(locId, p).rate * r : 0);
+    return sum + fee * r;
+  }, 0);
+  const locationExtrasVat = (p.locationIds||[]).reduce((sum, locId)=>
+    sum + resolveLocationCost(locId, p).extrasTotal * locVatRate(locId), 0);
   // Phase BS — every extra below belongs to the shoot, so they all follow prodOn.
-  const locationRaw = locationFeeForDays(days);
+  const locationRaw = locationFeeForDays(days) + locationExtrasTotal;
   const locationTotal = locationRaw * prodOn;
+  /* follows prodOn exactly as the fee it is charged on does */
+  const locationVatTotal = (locationVatForDays(days) + locationExtrasVat) * prodOn;
 
   const cateringGrid = buildCateringSummaryGrid();
   const transportSummary = buildTransportSummary();
@@ -9913,7 +10965,9 @@ function buildBudgetData(){
      precisely because it IS charged back through the crew member. Do not "fix" this
      by adding VAT to them. */
   const crewTotalExVat = people.reduce((s,pp)=>s+pp.subtotal, 0);
-  const vatTotal = people.reduce((s,pp)=>s+pp.vat, 0);
+  /* ⚠️ locationVatTotal is the ONE non-person VAT in here (Phase CP) — see its note above. It
+     has to be in this sum or `ex + vat === inc` stops holding the moment a venue charges VAT. */
+  const vatTotal = people.reduce((s,pp)=>s+pp.vat, 0) + locationVatTotal;
   const extrasTotal = cateringTotal + travelTotal + hotelTotal + locationTotal;
   const totalExVat = crewTotalExVat + extrasTotal;
   const totalIncVat = totalExVat + vatTotal;
@@ -9992,7 +11046,10 @@ function buildBudgetData(){
     // figures so Per Day's expanded table can use the identical itemized columns.
     const dayExVat = dayDepartments.reduce((s,dd)=>s+dd.exVat, 0)
                      + dayCatering + dayTravel + dayHotel + dayLocation;
-    const dayVatTotal = dayDepartments.reduce((s,dd)=>s+dd.vat, 0);
+    /* ⚠️ the day's share of the venue's VAT rides with the day's share of its fee, so Per Day's
+       VAT column still sums back to the project's. The EXTRAS' VAT does not appear here for the
+       same reason the extras themselves do not — they belong to no day. */
+    const dayVatTotal = dayDepartments.reduce((s,dd)=>s+dd.vat, 0) + locationVatForDays([d]) * prodOn;
     return {
       dayId:d.id, dayNum:d.dayNum, locationLabel: loc ? loc.name : '',
       departments:dayDepartments, catering:dayCatering, travel:dayTravel, hotel:dayHotel,
@@ -10003,7 +11060,7 @@ function buildBudgetData(){
   });
 
   return {
-    people, departments, cateringTotal, travelTotal, hotelTotal, locationTotal, extrasTotal,
+    people, departments, cateringTotal, travelTotal, hotelTotal, locationTotal, locationVatTotal, extrasTotal,
     crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
     /* Phase BU — `people` indexed by ENTRY id, so Crew ▸ Roles can put the Budget's own row
        for a person straight onto that person's row instead of recomputing it. ⚠️ It is the
@@ -10051,7 +11108,14 @@ function buildBudgetData(){
       return {
         preproduction: Object.assign({ ex: people.reduce((n,pp)=>n+pp.prepRaw,0), vat: people.reduce((n,pp)=>n+pp.prepVatRaw,0) }, countsFor('preproduction')),
         post:          Object.assign({ ex: people.reduce((n,pp)=>n+pp.postRaw,0), vat: people.reduce((n,pp)=>n+pp.postVatRaw,0) }, countsFor('post')),
+        /* ⚠️ Phase CR — `ex` is the ALL-IN production figure (crew fees plus the four extras
+           that hang off the shoot) and `crewEx` is the crew fees ALONE. Both are carried
+           because the two screens reading this stack want different ones: the Budget tab is
+           the aggregator and wants everything, Crew ▸ Roles is a crew screen and wants the
+           department it is showing. Prep and post need no such pair — they are crew fee only
+           by definition, there being no catering on a prep day. */
         production:    Object.assign({ ex: people.reduce((n,pp)=>n+pp.prodRaw,0) + cateringRaw + travelRaw + hotelRaw + locationRaw,
+                                       crewEx: people.reduce((n,pp)=>n+pp.prodRaw,0),
                                        vat: people.reduce((n,pp)=>n+pp.prodVatRaw,0) }, countsFor('production')),
       };
     })(),
@@ -10070,7 +11134,6 @@ function buildBudgetData(){
                        stays, see .phase-banner, it just says why it is empty)
    o.showStage       — zone 2 carries the three phase buttons
    o.showMoneyToggle — the Budget button, the Crew tab's three money-bearing sub-tabs
-   o.showModes       — the Stage/Days/Dates picker, Roles only
 
    ⚠️ WHERE EACH ZONE IS HONEST. On Roles and on all three Budget views the STAGE buttons
    both cost and (on Roles) filter, so they belong. On Pre-Prod and Post they do NEITHER —
@@ -10082,7 +11145,19 @@ function buildBudgetData(){
    asked for. A tool row with two empty zones beside it is a smaller cost than two
    implementations of the same button drifting apart. */
 function budgetSummaryBarHTML(data, o){
-  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, showModes:false}, o||{});
+  /* ⚠️ Phase CR — `crewOnly` is the Crew tab's view of the money: crew fees, and nothing else.
+     Catering, travel, hotels and locations are real costs on this job but they are not what a
+     CREW screen is counting, and a Roles headline that quietly included the venue hire made the
+     one number you scan there disagree with the column of rates underneath it. THE BUDGET TAB
+     IS THE AGGREGATOR and is unchanged — it still shows everything, because that is its job.
+     ⚠️ This is presentation only. buildBudgetData() computes one set of figures and both
+     screens read it; nothing here recalculates anything, so the two can still never disagree
+     about a number they both show. */
+  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false}, o||{});
+  /* the four figures the headline and the stack read, switched in ONE place */
+  const totalEx  = o.crewOnly ? data.crewTotalExVat : data.totalExVat;
+  const totalVat = o.crewOnly ? data.people.reduce((s,pp)=>s+pp.vat, 0) : data.vatTotal;
+  const totalInc = totalEx + totalVat;
   const fmt = budgetFmt;
   /* ⚠️ With Itemize VAT OFF the single headline is ALREADY the inc-VAT figure — it just
      never said so, and "TOTAL" beside a number carrying £6,567 of VAT is a number you
@@ -10091,9 +11166,30 @@ function budgetSummaryBarHTML(data, o){
      spell the same thing out in full, and repeating it would be noise. Not shown when
      the VAT is zero either — nobody on the job is VAT registered, and "inc. £0.00 VAT"
      is a fact about nothing. */
-  const stats = budgetVatToggle
-    ? [['Total (ex-VAT)', data.totalExVat], ['VAT', data.vatTotal], ['Total (inc-VAT)', data.totalIncVat]]
-    : [['Total', data.totalIncVat, data.vatTotal>0 ? `inc. ${fmt(data.vatTotal)} VAT` : '']];
+  /* ⚠️ Phase CJ — ONE HEADLINE, ALWAYS, AND ITEMIZE VAT NO LONGER RESHAPES IT. It used to
+     swap between three 26px figures (ex-VAT / VAT / inc-VAT) and this single one, which meant
+     the widest, loudest element on the screen changed shape under a toggle that is really
+     about the TABLE's columns. The one figure is the inc-VAT total — the number you would
+     quote — with both of the others written small underneath it, so nothing is lost and
+     nothing has to be switched to read it.
+     ⚠️ ex-VAT is GREEN and inc. VAT is muted, deliberately: they are two different kinds of
+     fact about the headline. The VAT note says what is INSIDE the number above it; the ex-VAT
+     line is a second number in its own right, and the one you work from. Both in the same
+     size and weight, so neither reads as more important than the headline.
+     ⚠️ "xVAT", NOT "ex-VAT" — that is the word the Budget tab's Per Department table already
+     uses for this exact figure (see its TOTAL / xVAT / VAT header, and the note there about
+     not relabelling one without the other). Two words for one number across two screens of
+     the same app is how a reader ends up wondering whether they are the same thing. */
+  /* ⚠️ Phase CK — the xVAT line and the stack's two extra columns FOLLOW THE VAT TOGGLE; the
+     `inc. £X VAT` note beside the label does NOT, and that is deliberate. The note is a safety
+     rail, not a breakdown: "TOTAL" printed beside a number carrying £8,127 of VAT is a figure
+     you could quote to a client by mistake, and switching the breakdown off is not a reason to
+     stop saying what is inside the headline. Shown only when there IS VAT — nobody on the job
+     being VAT registered makes "inc. £0.00 VAT" a fact about nothing. */
+  const stats = [[o.crewOnly ? 'Crew total' : 'Total',
+    budgetVatToggle ? totalInc : totalEx,
+    budgetVatToggle ? (totalVat>0 ? `inc. ${fmt(totalVat)} VAT` : '') : 'ex-VAT',
+    budgetVatToggle ? `xVAT ${fmt(totalEx)}` : '']];
   /* Phase BS — the scope toggles sit in the same cluster as Itemize VAT, and in that
      reading order: WHAT is being costed, then HOW it's shown. All start ticked, so the
      number you land on is the complete one.
@@ -10109,12 +11205,18 @@ function budgetSummaryBarHTML(data, o){
      ⚠️ Production has no phase slice of its own — prep and post are the two carved OUT
      of the shoot — so its figure is the remainder, total minus the two. Same arithmetic
      Per Department already shows, not a second source that could disagree with it. */
-  /* Reads phaseRaw, NOT the scoped slices — a switched-off phase still has to show what
-     it would cost, and its scoped figure is 0 by construction. Follows Itemize VAT so
-     the three lines are in the same money as the headline they sit under. */
-  const phaseTotal = key => {
+  /* Reads phaseRaw, NOT the scoped slices — a switched-off phase still has to show what it
+     would cost, and its scoped figure is 0 by construction.
+     ⚠️ Phase CJ — THREE FIGURES PER PHASE NOW: ex-VAT, VAT, inc-VAT. This is what the space
+     freed by collapsing the headline bought, and it is the same itemization the headline
+     carries, one level down — so "how much of the shoot is VAT" is readable without opening
+     the Budget tab. It no longer follows Itemize VAT: that toggle is about the table's
+     columns, and a stack that changed shape under it was the same fault the headline had. */
+  const phaseFigures = key => {
     const r = (data.phaseRaw||{})[key] || {ex:0, vat:0};
-    return budgetVatToggle ? r.ex : r.ex + r.vat;
+    /* crewEx exists on production only — the other two are crew fee already */
+    const ex = (o.crewOnly && r.crewEx!=null) ? r.crewEx : (r.ex||0);
+    return {ex, vat:r.vat||0, inc:ex+(r.vat||0)};
   };
   /* ⚠️ WITH THE MONEY OFF, THE STACK SAYS WHAT IS IN THE PHASE INSTEAD OF WHAT IT COSTS.
      It used to print the figure regardless, which quietly defeated Budget: the whole point of
@@ -10129,14 +11231,17 @@ function budgetSummaryBarHTML(data, o){
     const n = r.peopleCount||0, d = r.daysTotal||0;
     return `${n} ${n===1?'person':'people'} · ${d} ${d===1?'day':'days'}`;
   };
-  const scopeRow = ([key, label]) => `<div class="budget-scope-row${budgetScope[key]?'':' off'}"
+  const scopeRow = ([key, label]) => `<div class="budget-scope-row${budgetVatToggle&&o.showTotals?' itemized':''}${budgetScope[key]?'':' off'}"
       role="button" tabindex="0" aria-pressed="${budgetScope[key]?'true':'false'}"
       onclick="toggleBudgetScope('${key}', !budgetScope['${key}'])"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
       title="${budgetScope[key]?'Costed — click to leave it out':'Not costed — click to include it'}">
       <span class="budget-scope-name">${esc(label)}</span>
-      ${o.showTotals
-        ? `<span class="budget-scope-amt">${fmt(phaseTotal(key))}</span>`
+      ${o.showTotals ? (()=>{ const f = phaseFigures(key); return budgetVatToggle ? `
+        <span class="budget-scope-ex">${fmt(f.ex)}</span>
+        <span class="budget-scope-vat">${f.vat ? fmt(f.vat) : '—'}</span>
+        <span class="budget-scope-amt">${fmt(f.inc)}</span>`
+        : `<span class="budget-scope-amt">${fmt(f.ex)}</span>`; })()
         : `<span class="budget-scope-count">${esc(scopeMeta(key))}</span>`}
     </div>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
@@ -10145,7 +11250,7 @@ function budgetSummaryBarHTML(data, o){
      a sentence in it: an empty left third of a banner reads as a screen that failed rather
      than one you switched the money off on. */
   const totalsHTML = o.showTotals
-    ? stats.map(([lbl,v,note])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div></div>`).join('')
+    ? stats.map(([lbl,v,note,sub])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div>${sub?`<div class="budget-stat-sub">${esc(sub)}</div>`:''}</div>`).join('')
     : `<div class="bnr-totals-off">Rates and totals hidden. Turn on <strong>Budget</strong> to cost this list — the phase buttons still filter who is on it.</div>`;
   /* ---- TOOLS, zone 3 ----
      ⚠️ ONE cluster for everything that changes what this screen SHOWS, as buttons. The
@@ -10154,12 +11259,8 @@ function budgetSummaryBarHTML(data, o){
      control that hides all of it there would only be a way to get to a blank screen. */
   const toolBtn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}"
       aria-pressed="${on?'true':'false'}" onclick="${call}" title="${esc(title)}">${label}</button>`;
-  const modeHTML = o.showModes ? `<div class="bnr-modes" role="group" aria-label="Row mode">
-      ${ROLES_MODES.map(([key,label,title])=>
-        `<button type="button" class="bnr-tool${crewRolesMode===key?' on':''}"
-           aria-pressed="${crewRolesMode===key?'true':'false'}"
-           onclick="setCrewRolesMode('${key}')" title="${esc(title)}">${label}</button>`).join('')}
-    </div>` : '';
+  /* ⚠️ REMOVED in Phase CF: `modeHTML` and the `.bnr-modes` STAGE | DAYS picker. Roles has
+     one shape now — see the note where ROLES_MODES used to live. */
   const moneyHTML = o.showMoneyToggle
     ? toolBtn(crewShowMoney, 'Budget', 'toggleCrewMoney()',
         crewShowMoney ? 'Hide rates and totals' : 'Show rates and totals')
@@ -10168,8 +11269,18 @@ function budgetSummaryBarHTML(data, o){
      with Budget off they go rather than sitting there doing nothing to a blank column. */
   const showMoneyTools = !o.showMoneyToggle || crewShowMoney;
   const moneyToolsHTML = showMoneyTools ? [
-      toolBtn(budgetVatToggle, 'Itemize VAT', `toggleBudgetVat(${!budgetVatToggle})`,
-        'Show ex-VAT, VAT and inc-VAT separately'),
+      /* ⚠️ Phase CK — LABELLED "VAT", not "Itemize VAT". It now governs one consistent thing
+         across the whole screen — whether the VAT breakdown is shown at all: the headline's
+         xVAT line, the phase stack's xVAT and VAT columns, and the table's Subtotal and VAT
+         columns. "Itemize" described the old three-figures-vs-one headline swap, which no
+         longer happens. */
+      /* ⚠️ THE LABEL IS THE STATE, not the action (Phase CN): "VAT" while the totals include
+         it, "xVAT" while they don't. Every other pill in this cluster is a thing you switch on,
+         so its label can stay fixed and the lit/unlit state carries the rest; this one changes
+         what the biggest number on the screen MEANS, and a button reading "VAT" above a column
+         of ex-VAT figures is the one misreading worth spending a word to prevent. */
+      toolBtn(budgetVatToggle, budgetVatToggle ? 'VAT' : 'xVAT', `toggleBudgetVat(${!budgetVatToggle})`,
+        budgetVatToggle ? 'Hide the VAT breakdown' : 'Break out xVAT and VAT on the totals, the phases and every row'),
       toolBtn(budgetSplitKit, 'Split kit &amp; labour', `toggleBudgetSplitKit(${!budgetSplitKit})`,
         'Break each rate into its equipment and labour halves'),
       toolBtn(budgetCostsPP, 'Costs PP', `toggleBudgetCostsPP(${!budgetCostsPP})`,
@@ -10189,12 +11300,14 @@ function budgetSummaryBarHTML(data, o){
      unpredictably as the extras came and went, which is what moved Budget in the first place. */
   return `<div class="phase-banner">
     <div class="bnr-totals">${o.showTotals||o.showStage ? totalsHTML : ''}</div>
-    <div class="budget-scope-stack">${o.showStage ? BUDGET_SCOPES.map(scopeRow).join('') : ''}</div>
+    <div class="budget-scope-stack">${o.showStage ? `${o.showTotals ? `<div class="budget-scope-row${budgetVatToggle?' itemized':''} budget-scope-head" aria-hidden="true">
+        <span class="budget-scope-name"></span>${budgetVatToggle ? `<span class="budget-scope-ex">xVAT</span>
+        <span class="budget-scope-vat">VAT</span>` : ''}<span class="budget-scope-amt">Total</span>
+      </div>` : ''}${BUDGET_SCOPES.map(scopeRow).join('')}` : ''}</div>
     <div class="bnr-tools">
-      ${modeHTML ? `<div class="bnr-toolrow">${modeHTML}</div>` : ''}
       <div class="bnr-toolrow">${moneyToolsHTML}${moneyHTML}</div>
     </div>
-    ${o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every phase is off, so nothing is being costed${o.showModes?' and only crew in no phase at all are listed':''}. Click Pre-production, Production or Post — or all three.</div>` : ''}
+    ${o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every phase is off, so nothing is being costed and only crew in no phase at all are listed. Click Pre-production, Production or Post — or all three.</div>` : ''}
   </div>`;
 }
 
@@ -11394,6 +12507,10 @@ function refreshCrewScreen(){
 }
 function toggleCrewForm(){
   addingCrewNew = !addingCrewNew;
+  /* ⚠️ the Add person popup's typed name prefills this form ONCE (see
+     startNewCrewFromAddPerson); left set, it would reappear the next time anybody opened a
+     blank new-crew form from anywhere */
+  if(!addingCrewNew) newCrewPrefillName = '';
   if(addingCrewNew){ editingCrewId = null; pendingNewCrewRole = ''; }
   refreshCrewScreen();
   /* G18 — the form was never missing; it opened below the fold. This button is the
@@ -11427,7 +12544,7 @@ function closeCrewForm(){
        expansion is the only thing the pencil opens, so cancelling closes it outright —
        leaving a read panel behind there would be a state that screen has never had. */
     if(route.screen==='db-crew') viewingCrewId = id;
-  } else { addingCrewNew = false; pendingNewCrewRole = ''; }
+  } else { addingCrewNew = false; pendingNewCrewRole = ''; newCrewPrefillName = ''; }
   refreshCrewScreen();
 }
 function editCrew(id){
@@ -11548,7 +12665,7 @@ async function saveCrew(){
     if(p){ addCrewEntry(p, merged.id); await saveDB('db:projects', projectsDB); }
   }
   pendingNewCrewRole = '';
-  editingCrewId = null; addingCrewNew = false;
+  editingCrewId = null; addingCrewNew = false; newCrewPrefillName = '';
   /* Saving an EXISTING record on the Crew Database drops back to read mode on that same
      card, so what you just changed is on screen instead of the list snapping shut. A
      brand-new person is left collapsed: they are new to the list, and the useful thing
@@ -11642,6 +12759,20 @@ function locFormHTML(l){
       <div><label>On-site contact phone</label><input type="text" id="nlContactPhone" value="${esc(l.onsiteContactPhone||'')}"></div>
     </div>
     <div class="grid g2" style="margin:0 0 10px;">
+      <div><label for="nlFeeMode">Charged as</label>
+        <select id="nlFeeMode" class="fld-md">
+          ${LOCATION_FEE_MODES.map(([k,lbl,t])=>`<option value="${k}" ${(l.feeMode||'buyout')===k?'selected':''} title="${esc(t)}">${lbl}</option>`).join('')}
+        </select>
+        <div class="hint">The venue's usual basis. A project can override it without changing this.</div></div>
+      <div><label for="nlVat">Charges VAT</label>
+        <select id="nlVat" class="fld-md">
+          <option value="" ${!(l.vatRegistered)?'selected':''}>Not set</option>
+          <option value="Yes" ${l.vatRegistered==='Yes'?'selected':''}>Yes</option>
+          <option value="No" ${l.vatRegistered==='No'?'selected':''}>No</option>
+        </select></div>
+      <div><label for="nlFeeHours">Hours per day</label>
+        <input type="text" inputmode="decimal" id="nlFeeHours" class="fld-md" value="${esc(l.feeHours||'')}" placeholder="0">
+        <div class="hint">Hourly venues only — ignored otherwise.</div></div>
       <div><label for="nlFee">Location fee</label>
         <input type="text" inputmode="decimal" id="nlFee" class="fld-md" value="${esc(l.fee||'')}" placeholder="0.00">
         <div class="hint" style="margin-top:4px;">Total fee for this location, whatever the deal is. Budget spreads it evenly across the shoot days it's used on, so the Per&nbsp;Day view and the day filter stay honest.</div>
@@ -11682,7 +12813,9 @@ function editLocation(id){
 async function saveLocation(){
   const name = val('nlName'); if(!name){ alert('Location name is required'); return; }
   const id = val('locEditId');
-  const rec = { id:id||uid(), name, address:val('nlAddress'), fee:val('nlFee'), lat:locFormState.lat, lon:locFormState.lon,
+  const rec = { id:id||uid(), name, address:val('nlAddress'), fee:val('nlFee'),
+    feeMode:val('nlFeeMode')||'buyout', feeHours:val('nlFeeHours'), vatRegistered:val('nlVat'),
+    lat:locFormState.lat, lon:locFormState.lon,
     onsiteContactName:val('nlContactName'), onsiteContactPhone:val('nlContactPhone'),
     accessInfo:val('nlAccess'), recceInfo:val('nlRecce'), parkingInfo:val('nlParking'), hospital:locFormState.hospital, nearestParking:locFormState.parking };
   const existing = locById(id);
