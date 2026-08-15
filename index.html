@@ -695,6 +695,14 @@
      instead, and the frozen header row scrolls off with it. 60vh is the fallback for the frame
      before the measurement lands. */
   .roles-tablewrap{max-height:60vh; overflow:auto; overscroll-behavior:contain;}
+  /* Touch devices: the 60vh scrollport traps a finger — the table fills most of the
+     screen and overscroll:contain stops a swipe inside it ever reaching the page, so
+     the Roles tab felt unscrollable on a tablet. Let the wrap grow to full height
+     there (vertical swipes scroll the page as normal) and keep only the horizontal
+     scroll. Costs the frozen header row on touch; the frozen left columns survive. */
+  @media (pointer:coarse){
+    .roles-tablewrap{max-height:none; overflow:visible; overflow-x:auto; overscroll-behavior:auto;}
+  }
   /* ⚠️ WITHOUT THIS THE FROZEN COLUMNS ONLY HALF WORK, and the failure is subtle enough to
      ship by accident: a sticky box is never pushed outside its own CONTAINING BLOCK, which
      here is the grid container. Left at the wrapper's width (800px) while the template sums to
