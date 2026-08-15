@@ -1,5 +1,10 @@
 # Code Map — index.html
 
+> **15 Aug 2026 (D5):** the long phase-history comment blocks inside index.html were
+> slimmed to short pointers — THIS FILE is the single home of that reasoning now.
+> Comments of 1–3 lines (including most ⚠️ invariant notes) were kept in place.
+> The full pre-slim text is preserved in git history (branch `cleanup-audit`).
+
 Update this map whenever a function is added, renamed, or moved — as part of the existing phase verification checklist.
 
 Entries are anchored to function/variable names (not line numbers, which go stale). Grouped by the app's tabs, with a shared section for cross-tab utilities.
