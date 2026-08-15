@@ -5478,6 +5478,22 @@ function techSpecFieldsHTML(prefix){
   }).join('')}</div>`;
 }
 function projectOf(day){ return projById(day && day.projectId); }
+/* ---- THE OVERRIDE LAYER (D10, 15 Aug 2026) ----
+   One definition of "use the standard value unless something more specific says
+   otherwise". Every estimate/override pair in the app resolves through these four
+   helpers — crew rates, location costs, tech specs, cameras, day crew overrides —
+   and any future one (Vendors: a quote overriding an estimate) MUST too.
+   See MAP.md "The override layer" for the full contract. */
+const hasVal = v => v!=null && v!=='';                       // '' and null both mean "not set here"
+const pickVal = (override, base) => hasVal(override) ? override : base;
+const overlay = (base, ov) => (!ov || !Object.keys(ov).length) ? base : Object.assign({}, base, ov, {_overridden:true});
+/* the write-side twin: which proposed fields actually differ from the base —
+   store only those, so "overridden" always means "something is different" */
+function overlayDiff(proposed, base, fields){
+  const ov = {};
+  fields.forEach(f=>{ if((proposed[f]||'') !== (base[f]||'')) ov[f] = proposed[f]; });
+  return ov;
+}
 function resolveTechSpecs(day){
   const p = projectOf(day) || {};
   return Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{}, day && day.techSpecs || {});
@@ -6267,10 +6283,10 @@ function resolveLocationCost(locId, p){
   const proj = p || currentProject() || {};
   const loc = locById(locId) || {};
   const rec = ((proj.locationCosts||{})[locId]) || {};
-  const has = v => v!=null && v!=='';
-  const mode = has(rec.mode) ? rec.mode : (loc.feeMode || 'buyout');
-  const rate = has(rec.rate) ? parseRateNumber(rec.rate) : parseRateNumber(loc.fee);
-  const hours = has(rec.hours) ? (Number(rec.hours)||0) : (Number(loc.feeHours)||0);
+  const has = hasVal;
+  const mode = pickVal(rec.mode, loc.feeMode || 'buyout');
+  const rate = hasVal(rec.rate) ? parseRateNumber(rec.rate) : parseRateNumber(loc.fee);
+  const hours = hasVal(rec.hours) ? (Number(rec.hours)||0) : (Number(loc.feeHours)||0);
   const extras = (rec.extras||[]).filter(x=>x);
   return {
     mode, rate, hours, extras,
@@ -6289,7 +6305,7 @@ function resolveLocationCost(locId, p){
    card and the same day's cost in the budget will drift. */
 const locDayOverride = (c, dayId, field) => {
   const v = ((c.days||{})[dayId]||{})[field];
-  return (v!=null && v!=='') ? v : null;
+  return hasVal(v) ? v : null;
 };
 function locDayCost(c, d){
   const r = locDayOverride(c, d.id, 'rate');
@@ -9017,9 +9033,7 @@ function resolveCrewForDay(entryId, day){
   const p = projById(day && day.projectId);
   const e = entryById(entryId, p);
   const base = (e && entryView(e)) || {id:entryId, name:'(removed crew)', role:'', phone:''};
-  const ov = day && day.crewOverrides && day.crewOverrides[entryId];
-  if(!ov || !Object.keys(ov).length) return base;
-  return Object.assign({}, base, ov, {_overridden:true});
+  return overlay(base, day && day.crewOverrides && day.crewOverrides[entryId]);
 }
 function hasOverride(entryId, day){
   const ov = day && day.crewOverrides && day.crewOverrides[entryId];
@@ -9070,9 +9084,7 @@ async function saveDayOverride(entryId){
   const e = entryById(entryId, projById(day.projectId));
   const base = (e && entryView(e)) || {};
   const proposed = { role: val('ovRole'), department: val('ovDept'), coProductionCompany: val('ovCoPro') };
-  // only store fields that actually differ from the database record
-  const ov = {};
-  OVERRIDABLE_FIELDS.forEach(f=>{ if((proposed[f]||'') !== (base[f]||'')) ov[f] = proposed[f]; });
+  const ov = overlayDiff(proposed, base, OVERRIDABLE_FIELDS);   // store only what differs
   day.crewOverrides = day.crewOverrides || {};
   if(Object.keys(ov).length) day.crewOverrides[entryId] = ov; else delete day.crewOverrides[entryId];
   await saveDB('db:shootdays', shootDaysDB);

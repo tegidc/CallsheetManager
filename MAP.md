@@ -13,6 +13,33 @@ Module-level UI state variables (`crewDB`, `editingCrewId`, `collapsedDepts`, fi
 
 See also the **Section codes** table at the bottom: short handles (T-1, T-2.2, D-1, …) for the tabs/sections/tools themselves, for naming a screen without describing it in prose.
 
+## The override layer — one concept, five (soon six) uses
+
+**D10, 15 Aug 2026.** Everything in the app that means "use the standard value unless
+something more specific says otherwise" resolves through four shared primitives
+(defined just above `resolveTechSpecs()`):
+
+- `hasVal(v)` — the one definition of "set here": `''` and `null` both mean *not set*.
+- `pickVal(override, base)` — one field, override-else-base.
+- `overlay(base, ov)` — whole-record merge; returns `base` untouched when the override
+  is empty, else a copy with `_overridden:true`.
+- `overlayDiff(proposed, base, fields)` — the WRITE side: which proposed fields
+  actually differ. Store only that, so "overridden" always means "different".
+
+The five current users, each a thin wrapper with its own precedence order:
+
+| system | resolver | base → override chain |
+|---|---|---|
+| Crew rate | `resolveEntryRate()` | crew record rate → saved-role rate → entry rate |
+| Location cost | `resolveLocationCost()` + `locDayOverride()` | location record → project record → per-day |
+| Tech specs | `resolveTechSpecs()` | defaults → project → day |
+| Cameras | `resolveCameras()` | project → day (whole object) |
+| Day crew fields | `resolveCrewForDay()` / `saveDayOverride()` | entry → day override (`OVERRIDABLE_FIELDS`) |
+
+⚠️ **Vendors (planned): a supplier's QUOTE overriding the running ESTIMATE, flowing
+into Budget, is this exact pattern — build it on these four primitives and give it a
+row in this table. Do not hand-roll a sixth `v!=null && v!==''`.**
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
