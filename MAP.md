@@ -26,8 +26,8 @@ Every screen needs the same handful of records. These are the single place that 
 
 ## Overview
 
-- `renderProjectOverview()` — renders the project overview tab body: Project details (with the Quick add button row at the bottom of that same card), then Tasks, then Danger zone (Phase Overview Reorder — Tasks/AI Scan used to render above Project details; Phase Quick Add inserted quick-add controls after details; **Phase Quick Add follow-up folded AI Scan into that same row as a fourth button and removed the Quick add divider**, so AI Scan is no longer its own section at all). Project details has no manual Save button — autosave (`body.oninput` → `scheduleAutosave('overview', …)` → `saveProjectOverview(true)`) is the only save path; the `#ovStatus` "Saved" flash span stays — [Overview]
-- `saveProjectOverview(silent)` — validates and persists overview fields (client/title/start date required), updates sidebar/header on save. Only ever called from the autosave path now (`silent=true`) — the non-silent `alert()` branch is unreachable dead code kept for signature safety, not wired to any button — [Overview]
+- `renderProjectOverview()` — renders the project overview tab body: Project details (with the Quick add button row at the bottom of that same card), then Tasks, then Danger zone (Phase Overview Reorder — Tasks/AI Scan used to render above Project details; Phase Quick Add inserted quick-add controls after details; **Phase Quick Add follow-up folded AI Scan into that same row as a fourth button and removed the Quick add divider**, so AI Scan is no longer its own section at all). Project details has no manual Save button — autosave (`body.oninput` → `scheduleAutosave('overview', …)` → `saveProjectOverview()`) is the only save path; the `#ovStatus` "Saved" flash span stays — [Overview]
+- `saveProjectOverview()` — validates and persists overview fields (client/title/start date required), updates sidebar/header on save. Only ever called from the autosave path (15 Aug 2026 cleanup: the `silent` parameter and its unreachable non-silent `alert()` branch were removed) — [Overview]
 - `quickAddSectionHTML()` (Phase Quick Add; restyled in the follow-up below) — **four buttons, one row, no header or collapse of its own** — Shoot date / Location / Crew / AI Chat — rendered directly at the bottom of the Project details card's own `.section`, inside its toolbar. One control open at a time (`quickAddMode`, now `null | 'day' | 'loc' | 'crew' | 'ai'`), each button opening the minimum UI for that job below the row. **Add-only and deliberately shallow** for the first three — a shortcut into data that has full editing on its own tab, not a second place to manage it. AI Chat is the odd one out: a full chat interface, not a small form, but it opens into the same slot and is styled identically to the other three — [Overview]
   - ⚠️ **Originally this was a collapsible "Quick add" box** (its own `.section`, `sd-block-head`/`dept-caret` toggle, `quickAddOpen` state) sitting between Project details and Tasks, with AI Scan as a *separate* collapsible box below Tasks. Both the divider and the separate AI Scan section were removed on request — the four controls now read as one toolbar belonging to Project details, not a feature of their own. `quickAddOpen`/`toggleQuickAddSection()`/`aiScanOpen`/`toggleAiScanBlock()` no longer exist; do not look for them.
 - `setQuickAddMode()` / `resetQuickAdd()` — mode switching and the return-to-rest reset. Clicking the already-open control closes it, so the row never needs a Cancel button. Switching **into** `'ai'` calls `checkAiScanConfigured()` — the same call the old standalone toggle made on open. `resetQuickAdd()` is also called from `addLocToProject()`, `addCrewToProject()` and `saveLocation()`'s project branch, so the row settles back to four plain buttons whichever shared function the user actually finished through. `resetQuickAdd()` never touches AI Scan's own state (`aiScanMessages` etc.) — switching away from and back to AI Chat resumes the same conversation, exactly like the old standalone box did — [Overview, Crew, Locations]
@@ -434,9 +434,9 @@ matching cross-reference in **Preview & Export**.
   a full re-render, so the field the user is typing in doesn't lose focus (same rule
   as `renderCateringSummaryGridSection()`/`renderTransportSummaryGridSection()`) —
   [Budget]
-- `budgetDayFilter` / `budgetDeptFilter` / `budgetSort` / `budgetFilterOpen` /
+- `budgetDayFilter` / `budgetSort` / `budgetFilterOpen` /
   `toggleBudgetFilterPanel()` / `toggleBudgetFilterDay()` /
-  `toggleBudgetFilterDept()` / `setBudgetSort()` / `clearBudgetFilter()` /
+  `setBudgetSort()` / `clearBudgetFilter()` /
   `budgetSelectedDays()` / `budgetDayFilterCount()` /
   `budgetActiveFilterCount()` / `budgetFilteredDays()` /
   `budgetFilterPanelHTML()` (Phase Refinement; department scope + sort added
@@ -733,7 +733,7 @@ per-category or per-cost-field VAT flag anywhere and one must not be added.
 - `useCrewAsTemplate()` / `duplicateCrew()` (Phase BG renamed the control and added the first of these) — **"Use as template"**, the D-1 crew-card action that clones a record as the starting point for a DIFFERENT PERSON (same company, agent and rate; new name). Never a second role for the same person — that's BA's "Add again as" once it ships. `useCrewAsTemplate()` is a confirm step and nothing else; `duplicateCrew()` below it is unchanged and still does the actual clone (new `uid()`, `_copyOriginalRole` stamp, `saveDB('db:crew')`). ⚠️ **The guard sits BEFORE the write, not at save**: `duplicateCrew()` writes to `db:crew` on click, so there is no pending record and no save step to gate — cancelling has to mean "don't create it", which only exists as a choice up front. Cancel writes nothing at all. Uses native `confirm()`, matching `deleteCrew()`/`removeSubDeptAdmin()` on this same screen; D-1.5's `addRoleDialogHTML()` is a picker, not a confirmation, so it isn't the pattern to copy — [Crew, Shared/utility functions]
   - The control was labelled **"Duplicate"** before Phase BG (never "Duplicate crew member", despite how it gets referred to). Its `title` and both `copy`-badge tooltips were reworded off "duplicate" at the same time; the badges themselves and `_copyOriginalRole` keep their existing purpose, since the copy really does exist and they still describe something true — [Crew]
 - `coProPillSelect()` / `quickSetCoPro()` / `coProCompaniesList` — render and update a crew member's co-production company assignment — [Shared/utility functions]
-- `crewIdentityHTML()` / `crewControlsHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). ⚠️ **`opts.selectCbHTML` (Phase BK) REPLACED `opts.bulkSelect`** — do not look for the old one: every Crew list is one person BLOCK per person now, and the ids a block's checkbox must toggle are that person's currently VISIBLE entries, which only the block knows (a partial-match filter can hide some). The old branch built the checkbox from `c` alone and had no way to express that. `opts.showAsOrRole` displays `c.showAs||c.role` instead of the raw role (Phase S item 8 — those same four tabs are display-only for role, editing only ever happens on the Roles tab).
+- `crewIdentityHTML()` / `crewControlsHTML()` / `deptLabelHTML()` / `posnIdentityHTML()` / `crewExpansionHTML()` — shared rendering helpers for how a crew member's identity/role/department are displayed across tabs. `crewIdentityHTML()`'s department badge is always the read-only `deptLabelHTML()` now (no more editable department pill — see Phase R item 1). `opts.hideDept` / `opts.hideLeadPill` suppress the department badge / Lead Company pill (used by Days on site/Hotel/Travel/Catering — Phase S item 6; the Roles tab doesn't use this function at all any more, see `crewRolesRowHTML`). ⚠️ **`opts.selectCbHTML` (Phase BK) REPLACED `opts.bulkSelect`** — do not look for the old one: every Crew list is one person BLOCK per person now, and the ids a block's checkbox must toggle are that person's currently VISIBLE entries, which only the block knows (a partial-match filter can hide some). The old branch built the checkbox from `c` alone and had no way to express that. ⚠️ `opts.showAsOrRole` and `opts.wrap` were REMOVED (15 Aug 2026 cleanup) — Phase BO moved the role chip into its own grid column via `roleBannerHTML()`, after which no caller passed either option.
   - ⚠️ **Phase BO split the checkbox+Edit-pencil pair out into `crewControlsHTML(c, opts)`.** `crewIdentityHTML()` still calls it internally and renders the pair inline by default (unchanged for its one other caller, the Crew database's `crewCardHTML()`) — but `opts.hideButtons:true` suppresses that inline rendering so a caller can render `crewControlsHTML()` itself in a separate grid cell instead. Days on site/Hotel/Travel/Catering do exactly this now: their Controls column is explicit (`--pb-controls-w`, shared with Roles/Pre-production), not embedded inside the identity block's own flex row, which is what makes the checkbox/pencil start at the same x on every one of the six Crew sub-tabs. The checkbox+pencil markup/behaviour itself is byte-for-byte what it always was — only where it renders moved — [Shared/utility functions]
 - `appSettings` / `SETTINGS_DEFAULTS` / `FONT_CHOICES` (**renamed from `HEADER_FONTS` in Phase R/R15** — it now feeds all three font roles, not just headings) / `TINT_ALPHAS` / `hexToRgbTriple()` / `applyAppSettings()` / `setSetting()` / `previewSetting()` / `saveAppSettings()` / `resetAppSettings()` (Phase Q) — the app's configurable header font and brand colours, plus (Phase Tasks) the three Overview auto-flag rule toggles (`flagNoLocation`/`flagNoCrew`/`flagNoDayRate`) — same object, same persistence, just not all of it is styling. Persisted to `db:settings` (an object key, so it's in `loadDB`'s `isObjKey` list alongside `db:subdepartments`/`db:roleseniority`). `applyAppSettings()` works by writing the SAME custom properties the stylesheet already declares in `:root` — `--disp`, `--tape`, `--tape-light` and all six `--tint-N`, the last derived from the brand hex — onto `documentElement`, so no CSS rule needs to know settings exist. `previewSetting()` applies without saving: the colour picker fires `oninput` continuously while dragging, and one Supabase write per hue is not a trade worth making — `onchange` calls `setSetting()` to persist. Only families already in the Google Fonts `<link>` (plus two system stacks) may be added to `HEADER_FONTS` — [Shared/utility functions]
 - `renderSettings()` / `goSettings()` (Phase Q) — the Settings screen (S-1), reached from the sidebar. A full screen, not a floating cog panel: the app's one existing pattern for a project-independent thing you go and look at is the sidebar screen (Crew database, Locations database), and a modal would have been a second pattern for no gain — [Shared/utility functions]
@@ -1103,11 +1103,11 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   they had been permanently `true` with no way to reach them — kept then "in case a UI
   returns", declined now. Do not re-add without a UI — [Overview]
 
-- `budgetDeptFilter` / `toggleBudgetFilterDept()` / `budgetActiveFilterCount()`
-  (**R16**) — a department scope, living in the SAME panel as the day filter rather
-  than becoming a per-view control. Applied to the people list inside
-  `buildBudgetData()`, so the summary bar, Per Department, Per Day and Per Person
-  can't disagree about what's being costed. `clearBudgetFilter()` clears both
+- ⚠️ REMOVED (15 Aug 2026 cleanup): `budgetDeptFilter` / `toggleBudgetFilterDept()` —
+  the R16 per-Budget department scope. The department scope was folded into the
+  shared `personMatchesProjectFilter()`, which left this Set with no UI writing to
+  it and its two remaining reads permanently false. `budgetActiveFilterCount()`
+  survives, counting the SHARED crew filter. `clearBudgetFilter()` clears both
   (renamed from `clearBudgetDayFilter()` once it stopped being day-only — see the
   Budget section).
   **Verified**: filtering to Cinematography produces £26,400, exactly the figure that
@@ -2209,7 +2209,7 @@ pattern in this paragraph still holds everywhere else, including desktop's
 heading rule divides, margin spaces. `.formgroup` likewise. Boxes are kept *only*
 where one means something: `.card` (the call sheet preview — a sheet of paper, and it
 carries a stronger 20% border so it reads as one), dialogs, transient panels
-(`.filter-panel`, `.bulk-edit-panel`) and open editing states.
+(`.filter-panel`) and open editing states. (`.bulk-edit-panel` was removed in the 15 Aug 2026 cleanup — bulk edit renders as `.bulk-action-bar`.)
 
 **No drawn line between rows.** `.crewgrid-row`, `.roles-grid-row`,
 `.crewgrid-catering-person` and `.cam-row` have no bottom rule — the department
@@ -2276,7 +2276,7 @@ but no rule. Header *controls* (`.crew-header-row`, `.filter-toggle`,
 same font, size and tracking, and go green on hover.
 
 **Names.** Person names and record titles are `--body` (Jost) 600 **14px**
-everywhere — `.list-card .meta strong`, `.crew-ident-top strong`,
+everywhere — `.list-card .meta strong`, `.crew-ident.one-line strong`,
 `.crew-ident.one-line strong`, `.roles-grid-name`, `.cam-who strong`. Fraunces is now
 reserved for display headings only. Note this also restyles location titles, since
 they share `.list-card .meta strong`.
@@ -2293,7 +2293,7 @@ below 900px. `.ts-field` and `.field-inline` were duplicates and are now one rul
 **Boxes.** White fill, `--box-radius` 8px, `--box-pad` 10px. `.card` (call sheet
 preview, a document) and `.modal-box` (a dialog) keep 16px padding as deliberate
 exceptions. `.list-card` lost its mint fill. Faint green panel tints stay on
-`.filter-panel` / `.bulk-edit-panel` / `.formgroup` / `.day-override-form`.
+`.filter-panel` / `.formgroup` / `.day-override-form`.
 
 **Green tints.** Nine hand-written `rgba(1,119,86,…)` values collapsed to four
 tokens: `--tint-1` .03 (panels), `--tint-2` .05 (editing/overridden rows), `--tint-3`
