@@ -6439,7 +6439,7 @@ function crewEditModalHTML(){
 function bulkEditFieldsHTML(){
   const inUse = crewDB.map(x=>x.coProductionCompany).filter(Boolean);
   const known = [...new Set(coProCompaniesList.concat(inUse))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-  const opts = ['<option value="">— Lead company —</option>']
+  const opts = [`<option value="">${esc(COMPANY)}</option>`]
     .concat(known.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`))
     .concat(['<option value="__add__">+ Add company…</option>']).join('');
   return `<div>
@@ -13542,7 +13542,7 @@ function dayOverrideFormHTML(entryId){
   });
   const inUse = crewDB.map(x=>x.coProductionCompany).filter(Boolean);
   const known = [...new Set(coProCompaniesList.concat(inUse))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-  const coOpts = ['<option value="">— Lead company —</option>']
+  const coOpts = [`<option value="">${esc(COMPANY)}</option>`]
     .concat(known.map(n=>`<option value="${esc(n)}" ${eff.coProductionCompany===n?'selected':''}>${esc(n)}</option>`)).join('');
   return `<div class="day-override-form">
     <div class="fg-title">Just for Day ${esc(day.dayNum||'?')}</div>
