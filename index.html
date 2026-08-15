@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Call Sheet App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- AI Scan (Phase AI Scan): client-side .docx text extraction only — PDFs go to the
@@ -1858,7 +1859,9 @@
 <!-- Supabase: loaded as a classic (non-module) script so it runs synchronously in document
      order, before the app script below touches it. This is Supabase's own documented
      "vanilla JS, no build step" pattern — no npm install needed. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Pinned to an exact version with an integrity fingerprint: the floating "@2" tag
+     meant any new release (or a tampered CDN file) went straight into production. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script>
 <script>
 /* single client instance, reused by every loadDB/saveDB call */
 const sb = supabase.createClient(
@@ -2747,10 +2750,9 @@ function crewRatesSectionHTML(c){
     : `<div class="hint">Rates are per role. Give this person a saved role above and a line will appear here for it.</div>`}
   </details>`;
 }
-/* money for the rate rows only. Plain 2dp with no currency symbol, matching the bare
-   numbers in the inputs beside them — budgetFmt()'s "£1,234.00" next to an unadorned
-   "800" would read as two different kinds of number. */
-function fmtRateVat(n){ return '£' + (Math.round(n*100)/100).toFixed(2); }
+/* money for the rate rows — same "£1,234.00" shape as budgetFmt() so a rate reads
+   as the same kind of number here as it does on Budget, Roles and the exports. */
+function fmtRateVat(n){ return budgetFmt(n); }
 /* Recalculates ONE row in place — never a re-render, which would throw away whatever is
    half-typed in the rest of the form. Called from the rate box, the kit box and the
    split toggle, so all three routes land on the same arithmetic. */
@@ -3469,18 +3471,27 @@ const DB_OBJECT_KEYS = ['db:roleseniority','db:settings','db:roles'];
 const isObjDB = key => DB_OBJECT_KEYS.includes(key);
 let dbStamp = {};   // key -> updated_at last seen
 let dbBase  = {};   // key -> deep snapshot matching that stamp
+/* ⚠️ Keys whose LOAD failed (network down, Supabase error) — as opposed to "no row
+   exists yet", which is the dbStamp[key]=null state. The distinction is what stops
+   a transient read failure destroying data: a failed load leaves dbStamp[key]
+   undefined, and undefined == null, so without this set the next save would take
+   saveDB's unguarded-upsert branch and overwrite the real row with the empty
+   collection the failed load fell back to. saveDB refuses to write these keys;
+   the only way out is a reload that reads them successfully. */
+let dbLoadFailed = new Set();
 const dbClone = v => JSON.parse(JSON.stringify(v ?? null));
 
 async function loadDB(key){
   const empty = () => isObjDB(key) ? {} : [];
   try{
     const { data, error } = await sb.from('app_data').select('value, updated_at').eq('key', key).maybeSingle();
-    if(error){ console.error('Supabase load failed ('+key+'):', error.message); return empty(); }
+    if(error){ console.error('Supabase load failed ('+key+'):', error.message); dbLoadFailed.add(key); return empty(); }
+    dbLoadFailed.delete(key);
     if(!data){ dbStamp[key] = null; dbBase[key] = empty(); return empty(); }
     dbStamp[key] = data.updated_at;
     dbBase[key]  = dbClone(data.value);
     return data.value;
-  }catch(e){ console.error('Supabase load exception ('+key+'):', e); return empty(); }
+  }catch(e){ console.error('Supabase load exception ('+key+'):', e); dbLoadFailed.add(key); return empty(); }
 }
 
 /* Three-way merge of one collection. Arrays of {id:…} records merge per record;
@@ -3551,6 +3562,11 @@ async function saveDB(key, value){
   // call time: a retry should push the merged value, not the pre-merge one.
   const fail = (kind, detail) => { reportSaveFailure(key, kind, detail, value); return {ok:false, kind, detail}; };
   const ok   = () => { clearSaveFailure(key); return {ok:true}; };
+  if(dbLoadFailed.has(key)){
+    // This collection never loaded, so what's in memory is NOT what's in the
+    // database — writing now would overwrite the stored data with a fallback.
+    return fail('unsaved', "this data couldn't be loaded when the app started, so saving it is blocked to protect what's already stored — reload the page");
+  }
   try{
     for(let attempt=0; attempt<3; attempt++){
       const now = stamp();
@@ -3697,24 +3713,30 @@ function applyMergedDB(key, merged){
 }
 
 async function initApp(){
-  crewDB = await loadDB('db:crew');
-  locationsDB = await loadDB('db:locations');
-  projectsDB = await loadDB('db:projects');
-  shootDaysDB = await loadDB('db:shootdays');
-  travelMethodsList = await loadDB('db:travelmethods');
-  coProCompaniesList = await loadDB('db:coprocompanies');
-  const savedRoles = await loadDB('db:roles');
+  /* All nine collections load in PARALLEL — none depends on another's value, and
+     in series this was nine full round-trips before anything rendered. */
+  const [crew, locations, projects, shootdays, travel, copro,
+         savedRoles, savedRoleSeniority, savedSettings] = await Promise.all([
+    loadDB('db:crew'), loadDB('db:locations'), loadDB('db:projects'),
+    loadDB('db:shootdays'), loadDB('db:travelmethods'), loadDB('db:coprocompanies'),
+    loadDB('db:roles'), loadDB('db:roleseniority'), loadDB('db:settings')
+  ]);
+  crewDB = crew; locationsDB = locations; projectsDB = projects;
+  shootDaysDB = shootdays; travelMethodsList = travel; coProCompaniesList = copro;
   if(savedRoles && !Array.isArray(savedRoles) && Object.keys(savedRoles).length) ROLES_BY_DEPT = savedRoles;
-  const savedRoleSeniority = await loadDB('db:roleseniority');
   if(savedRoleSeniority && !Array.isArray(savedRoleSeniority) && Object.keys(savedRoleSeniority).length) ROLE_SENIORITY = savedRoleSeniority;
-  const savedSettings = await loadDB('db:settings');
   if(savedSettings && !Array.isArray(savedSettings)) appSettings = Object.assign({}, SETTINGS_DEFAULTS, savedSettings);
   applyAppSettings();
+  renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
     await saveDB('db:travelmethods', travelMethodsList);
   }
-  if(!crewDB.length && !locationsDB.length && !projectsDB.length){
+  /* ⚠️ Seed ONLY when the emptiness is real. Three failed reads look identical to a
+     first-ever load (all three collections in memory are []), and seeding on that
+     evidence would write the sample over the real data the moment the network came
+     back. dbLoadFailed distinguishes the two. */
+  if(!dbLoadFailed.size && !crewDB.length && !locationsDB.length && !projectsDB.length){
     await seedSampleData();   // first-ever load — populate with the OFTV sample so there's something to work with
   }
   /* Phase BF — convert p.crewIds to p.crewEntries before anything renders, so no screen
@@ -3731,7 +3753,30 @@ async function initApp(){
   await migratePhaseMembers();   // Phase BU — prep/edit opt-in lists; must follow migrateCrewEntries()
   renderSide(); renderMain();
 }
-initApp();
+/* Loads that failed are already softened to empty collections and banner-flagged;
+   this catch is for anything past that (a migration throwing, a render error) so a
+   broken boot says so instead of leaving a silent blank page. */
+initApp().catch(e=>{
+  console.error('App failed to start:', e);
+  const el = document.createElement('div');
+  el.className = 'save-banner save-banner-lost';
+  el.innerHTML = '<div class="save-banner-text"><strong>The app hit a problem while starting.</strong> Try reloading the page; if this keeps happening, the browser console has the details.</div>'
+    + '<button type="button" class="small" onclick="location.reload()">Reload</button>';
+  document.body.appendChild(el);
+});
+
+/* Companion to the save-failure banner: raised once at boot when one or more
+   collections could not be READ. Saving those keys is blocked (see saveDB), so
+   the honest message is "reload", not "retry". */
+function renderLoadFailureBanner(){
+  if(!dbLoadFailed.size) return;
+  let el = document.getElementById('loadFailBanner');
+  if(!el){ el = document.createElement('div'); el.id='loadFailBanner'; document.body.appendChild(el); }
+  el.className = 'save-banner save-banner-lost';
+  const what = [...dbLoadFailed].map(k=>DB_KEY_LABELS[k]||k).join(', ');
+  el.innerHTML = `<div class="save-banner-text"><strong>Couldn't load ${esc(what)} from the database.</strong> The app is running without that data, and saving it is switched off to protect what's stored. Check your connection and reload.</div>
+    <button type="button" class="small" onclick="location.reload()">Reload</button>`;
+}
 
 /* ---- Grid ergonomics: keyboard navigation ----
    The core interaction here is "move down a list answering yes/no", so it should be
@@ -10288,7 +10333,7 @@ async function saveEntryRate(entryId, rawValue){
     delete e.rate;                                  // clearing reverts to the database rate
   } else {
     const n = Number(trimmed);
-    if(isNaN(n)){ renderProjectBody(); return; }    // reject garbage, revert the field to the last valid value
+    if(isNaN(n) || n < 0){ renderProjectBody(); return; }  // reject garbage and negatives, revert the field to the last valid value
     e.rate = n;
   }
   await saveDB('db:projects', projectsDB);
@@ -13326,7 +13371,7 @@ function weatherFetchedLabel(v){
   if(!v) return '';
   if(!/^\d{4}-\d{2}-\d{2}T/.test(v)) return v;
   const t = Date.parse(v);
-  return isNaN(t) ? v : new Date(t).toLocaleDateString();
+  return isNaN(t) ? v : fmtDate(v.slice(0,10));
 }
 const WMO={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Dense drizzle',61:'Slight rain',63:'Rain',65:'Heavy rain',71:'Slight snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Violent showers',95:'Thunderstorm'};
 async function fetchWeatherForDay(){
