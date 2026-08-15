@@ -501,6 +501,11 @@
   .roles-tablewrap{max-height:60vh; overflow:auto; overscroll-behavior:contain;}
   @media (pointer:coarse){
     .roles-tablewrap{max-height:none; overflow:visible; overflow-x:auto; overscroll-behavior:auto;}
+    /* touch polish (D13): fingers need bigger targets than a mouse pointer does */
+    input[type="checkbox"].bulk-select-cb, .crewgrid-check input[type="checkbox"],
+    .meal-cell input[type="checkbox"], .filter-chips input[type="checkbox"]{width:20px; height:20px;}
+    .icon-btn{min-width:34px; min-height:34px;}
+    .filter-chips label{padding:4px 2px;}
   }
   .roles-tablewrap .roles-grid,
   .roles-tablewrap .dept-group,
