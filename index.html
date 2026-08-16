@@ -2029,6 +2029,50 @@ let currentShootDayId = null;
 let crewGridView = 'roles';
 let travelMethodsList = [];  // shared, extensible list of travel method options
 let coProCompaniesList = []; // shared, extensible list of co-production company names
+/* IDEAS DEMO — Vendors. A vendor is a supplier (caterer, kit house, transport…)
+   kept in its own shared database; what a vendor COSTS on a project lives on the
+   project as p.vendorCosts. Cost resolution is the override layer: quote
+   overrides estimate; a Catering vendor can follow the Catering tab's estimate. */
+let vendorsDB = [];
+const VENDOR_TYPES = ['Catering','Equipment','Transport','Post','Other'];
+const vendorById = id => vendorsDB.find(v=>v.id===id) || null;
+const projectVendorCosts = p => (p && p.vendorCosts) || [];
+function vendorCostEff(vc, cateringEstimate){
+  const est = vc.useCateringEstimate ? (cateringEstimate||0) : (parseRateNumber(vc.estimate) || 0);
+  const q = hasVal(vc.quote) ? parseRateNumber(vc.quote) : null;
+  return { est, quote:q, eff: q!=null ? q : est, quoted: q!=null };
+}
+/* IDEAS DEMO — feedback. Every demo feature carries a Feedback button; notes are
+   saved to db:feedback so a future session can read exactly what worked and what
+   didn't, feature by feature, and act on it. */
+let feedbackDB = [];
+let feedbackOpenFor = null;   // which area's feedback box is open
+function feedbackButtonHTML(area, label){
+  const notes = feedbackDB.filter(f=>f.area===area);
+  const open = feedbackOpenFor===area;
+  return `<div style="margin-top:12px;">
+    <button class="small" onclick="toggleFeedback('${area}')" style="border-color:var(--tape); color:var(--tape);">💬 ${open?'Close feedback':`Feedback on ${label||area}`}${notes.length?` (${notes.length})`:''}</button>
+    ${open ? `
+      <div style="margin-top:8px; max-width:560px;">
+        ${notes.map(f=>`<div class="list-card" style="margin-bottom:6px;"><div class="meta"><div>${esc(f.text)}</div><div class="hint">${esc(fmtDate((f.createdAt||'').slice(0,10)))}</div></div>
+          <div class="actions"><button class="icon-btn danger-ic" onclick="deleteFeedback('${f.id}')" title="Delete note">${icon('trash')}</button></div></div>`).join('')}
+        <textarea id="fbText" placeholder="What works, what doesn't, what you'd change…" style="min-height:60px;"></textarea>
+        <div class="toolbar" style="margin-top:6px;"><button class="small primary" onclick="saveFeedback('${area}')">Save note</button></div>
+      </div>` : ''}
+  </div>`;
+}
+function toggleFeedback(area){ feedbackOpenFor = feedbackOpenFor===area ? null : area; renderProjectBody(); }
+async function saveFeedback(area){
+  const text = (val('fbText')||'').trim(); if(!text) return;
+  feedbackDB.push({ id:uid(), area, text, createdAt:new Date().toISOString(), projectId: currentProjectId||null });
+  await saveDB('db:feedback', feedbackDB);
+  renderProjectBody();
+}
+async function deleteFeedback(id){
+  feedbackDB = feedbackDB.filter(f=>f.id!==id);
+  await saveDB('db:feedback', feedbackDB);
+  renderProjectBody();
+}
 
 let autosaveTimers = {};
 function scheduleAutosave(key, fn){
@@ -2285,7 +2329,8 @@ const DB_KEY_LABELS = {
   'db:projects':'project details', 'db:shootdays':'shoot days',
   'db:settings':'settings', 'db:roles':'the roles list',
   'db:roleseniority':'role seniority',
-  'db:travelmethods':'travel methods', 'db:coprocompanies':'production companies'
+  'db:travelmethods':'travel methods', 'db:coprocompanies':'production companies',
+  'db:vendors':'the vendors list', 'db:feedback':'demo feedback notes'
 };
 let saveFailure = null;   // {key, kind:'unsaved'|'discarded', detail, value, retrying}
 
@@ -2334,7 +2379,8 @@ function renderSaveFailureBanner(){
 function applyMergedDB(key, merged){
   const live = { 'db:crew':()=>crewDB, 'db:locations':()=>locationsDB,
                  'db:projects':()=>projectsDB, 'db:shootdays':()=>shootDaysDB,
-                 'db:travelmethods':()=>travelMethodsList, 'db:coprocompanies':()=>coProCompaniesList }[key];
+                 'db:travelmethods':()=>travelMethodsList, 'db:coprocompanies':()=>coProCompaniesList,
+                 'db:vendors':()=>vendorsDB, 'db:feedback':()=>feedbackDB }[key];
   if(live && Array.isArray(merged)){
     const arr = live(); if(Array.isArray(arr)){ arr.splice(0, arr.length, ...merged); }
   } else if(key==='db:settings' && merged && typeof merged==='object'){
@@ -2349,13 +2395,15 @@ async function initApp(){
   /* All nine collections load in PARALLEL — none depends on another's value, and
      in series this was nine full round-trips before anything rendered. */
   const [crew, locations, projects, shootdays, travel, copro,
-         savedRoles, savedRoleSeniority, savedSettings] = await Promise.all([
+         savedRoles, savedRoleSeniority, savedSettings, vendors, feedback] = await Promise.all([
     loadDB('db:crew'), loadDB('db:locations'), loadDB('db:projects'),
     loadDB('db:shootdays'), loadDB('db:travelmethods'), loadDB('db:coprocompanies'),
-    loadDB('db:roles'), loadDB('db:roleseniority'), loadDB('db:settings')
+    loadDB('db:roles'), loadDB('db:roleseniority'), loadDB('db:settings'),
+    loadDB('db:vendors'), loadDB('db:feedback')
   ]);
   crewDB = crew; locationsDB = locations; projectsDB = projects;
   shootDaysDB = shootdays; travelMethodsList = travel; coProCompaniesList = copro;
+  vendorsDB = vendors; feedbackDB = feedback;
   if(savedRoles && !Array.isArray(savedRoles) && Object.keys(savedRoles).length) ROLES_BY_DEPT = savedRoles;
   if(savedRoleSeniority && !Array.isArray(savedRoleSeniority) && Object.keys(savedRoleSeniority).length) ROLE_SENIORITY = savedRoleSeniority;
   if(savedSettings && !Array.isArray(savedSettings)) appSettings = Object.assign({}, SETTINGS_DEFAULTS, savedSettings);
@@ -2375,6 +2423,21 @@ async function initApp(){
     }catch(e){ console.error('Sample data failed to load:', e); }
   }
   renderSide(); renderMain();
+  renderDemoBanner();
+}
+/* IDEAS DEMO — the banner that says this build is the demo branch. */
+function renderDemoBanner(){
+  if(localStorage.getItem('ideasDemoBannerDismissed')) return;
+  const el = document.createElement('div');
+  el.id = 'ideasDemoBanner';
+  el.style.cssText = 'position:fixed; left:12px; bottom:12px; z-index:60; max-width:420px; background:#eef6f2; border:1px solid var(--tape); border-radius:10px; padding:12px 14px; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.12);';
+  el.innerHTML = `<strong style="color:var(--tape);">IDEAS DEMO</strong> — new in this build:
+    <b>Vendors &amp; quotes</b> (Locations tab) · <b>Additional costs</b> (Budget → Costs) ·
+    <b>BBC view</b> (Budget) · <b>Deliverables</b> (Overview).
+    Each has a 💬 Feedback button — your notes are saved for the next session.
+    Entries save to the real database; the live site just doesn't show these sections yet.
+    <span style="float:right; cursor:pointer; font-weight:700;" onclick="localStorage.setItem('ideasDemoBannerDismissed','1'); document.getElementById('ideasDemoBanner').remove();">✕</span>`;
+  document.body.appendChild(el);
 }
 /* Loads that failed are already softened to empty collections and banner-flagged;
    this catch is for anything past that (a migration throwing, a render error) so a
@@ -2721,7 +2784,7 @@ function renderProject(m){
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
-      <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS</div>
+      <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS &amp; VENDORS</div>
       <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
@@ -2771,6 +2834,7 @@ function renderProjectOverview(body){
       ${quickAddSectionHTML(p)}
     </div>
     ${renderTasksSection(p, days)}
+    ${deliverablesSectionHTML(p)}
     <div class="section">
       <h2>Danger zone</h2>
       <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
@@ -3140,6 +3204,66 @@ function tasksListHTML(p){
   return `${openHTML}${doneToggle}${doneHTML}`;
 }
 
+/* IDEAS DEMO — Deliverables: what this project owes and when — an edit, a
+   shoot, a delivery — so the Overview says what "done" means. */
+const DELIVERABLE_TYPES = ['Edit','Shoot','Delivery','Other'];
+let deliverablesSectionOpen = true;
+function toggleDeliverablesSection(){ deliverablesSectionOpen = !deliverablesSectionOpen; renderProjectBody(); }
+function deliverablesSectionHTML(p){
+  const items = p.deliverables || [];
+  const open = items.filter(d=>!d.done);
+  const today = new Date().toISOString().slice(0,10);
+  const row = d => `<div class="list-card">
+    <div class="meta" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+        <input type="checkbox" ${d.done?'checked':''} onchange="toggleDeliverable('${d.id}', this.checked)">
+        <strong style="${d.done?'text-decoration:line-through; color:var(--muted);':''}">${esc(d.title)}</strong>
+      </label>
+      <span class="pill dept">${esc(d.type||'Other')}</span>
+      ${d.due ? `<span class="hint" style="${(!d.done && d.due<today)?'color:var(--danger);':''}">due ${esc(fmtDate(d.due))}${(!d.done && d.due<today)?' — overdue':''}</span>` : ''}
+    </div>
+    <div class="actions"><button class="icon-btn danger-ic" onclick="deleteDeliverable('${d.id}')" title="Delete">${icon('trash')}</button></div>
+  </div>`;
+  return `<div class="section">
+    <div class="sd-block-head flush" style="margin-bottom:${deliverablesSectionOpen?'10px':'0'};">
+      <span class="sd-block-head-toggle" onclick="toggleDeliverablesSection()">
+        <span class="dept-caret">${deliverablesSectionOpen?'▾':'▸'}</span>
+        <h2 style="display:inline; margin:0;">Deliverables${open.length?` (${open.length})`:''}</h2>
+        <span class="pill" style="border:1px solid var(--tape); color:var(--tape); margin-left:8px;">DEMO</span>
+      </span>
+    </div>
+    ${deliverablesSectionOpen ? `
+      ${items.length ? items.map(row).join('') : '<div class="empty-note">Nothing owed yet. A deliverable is what the project has to hand over — an edit, a shoot day, a final delivery.</div>'}
+      <div class="toolbar" style="margin-top:10px; flex-wrap:wrap; gap:8px;">
+        <input type="text" id="dvTitle" placeholder="What's owed — e.g. 90s hero edit" style="width:220px;">
+        <select id="dvType" style="width:auto;">${DELIVERABLE_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
+        <input type="date" id="dvDue" style="width:auto;">
+        <button class="small primary" onclick="addDeliverable()">Add</button>
+      </div>
+      ${feedbackButtonHTML('deliverables', 'Deliverables')}` : ''}
+  </div>`;
+}
+async function addDeliverable(){
+  const p = currentProject(); if(!p) return;
+  const title = (val('dvTitle')||'').trim(); if(!title) return;
+  p.deliverables = p.deliverables || [];
+  p.deliverables.push({ id:uid(), title, type: val('dvType')||'Other', due: val('dvDue')||'', done:false });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function toggleDeliverable(id, checked){
+  const p = currentProject(); if(!p) return;
+  const d = (p.deliverables||[]).find(x=>x.id===id); if(!d) return;
+  d.done = checked;
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+async function deleteDeliverable(id){
+  const p = currentProject(); if(!p) return;
+  p.deliverables = (p.deliverables||[]).filter(x=>x.id!==id);
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
 function renderTasksSection(p, days){
   const flagItems = buildTaskFlags(p, days);
   const openTaskCount = (p.tasks||[]).filter(t=>!t.completed).length;
@@ -6229,8 +6353,96 @@ function renderProjectLocations(body){
         </div>
         <div id="locFormWrap" style="display:none; margin-top:12px;"></div>
       ` : '<div id="locFormWrap" style="display:none;"></div>'}
-    </div>`;
+    </div>
+    ${vendorsSectionHTML(p)}`;
   if(locAddOpen) document.getElementById('locAddSearch')?.focus();
+}
+/* IDEAS DEMO — Vendors on this project. A vendor's cost starts life as an
+   ESTIMATE; when the real QUOTE arrives it overrides (override layer). A
+   Catering vendor can follow the Catering tab's live estimate until quoted. */
+let vendorNewOpen = false;
+function vendorsSectionHTML(p){
+  const bookings = projectVendorCosts(p);
+  const cateringEst = (buildCateringSummaryGrid()||{}).totalCost || 0;
+  const rows = bookings.map(vc=>{
+    const v = vendorById(vc.vendorId) || {name:'(removed vendor)', type:'Other'};
+    const c = vendorCostEff(vc, cateringEst);
+    const statusPill = c.quoted
+      ? `<span class="pill" style="border:1px solid var(--tape); color:var(--tape);">QUOTED</span>`
+      : `<span class="pill" style="border:1px solid #8a6d1a; color:#8a6d1a;">ESTIMATE</span>`;
+    const estField = vc.useCateringEstimate
+      ? `<span class="hint" title="Follows the Catering tab's costs live">follows Catering tab: <strong>${budgetFmt(cateringEst)}</strong></span>`
+      : `<label style="margin:0;">Estimate £<input type="text" inputmode="decimal" value="${esc(vc.estimate||'')}" placeholder="0" style="width:80px;" onchange="setVendorCostField('${vc.id}','estimate',this.value)"></label>`;
+    return `<div class="list-card">
+      <div class="meta">
+        <strong>${esc(v.name)}</strong> <span class="pill dept">${esc(v.type)}</span> ${statusPill}
+        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:6px;">
+          ${estField}
+          <label style="margin:0;">Quote £<input type="text" inputmode="decimal" value="${esc(vc.quote||'')}" placeholder="—" style="width:80px;" onchange="setVendorCostField('${vc.id}','quote',this.value)"></label>
+          ${c.quoted ? `<span class="hint">quote stands — estimate ${budgetFmt(c.est)} overridden</span>` : `<span class="hint">counting the estimate until a quote lands</span>`}
+          <strong>${budgetFmt(c.eff)}</strong>
+        </div>
+        ${v.type==='Catering' ? `<label class="hint" style="display:inline-flex; align-items:center; gap:6px; margin-top:4px;"><input type="checkbox" ${vc.useCateringEstimate?'checked':''} onchange="toggleVendorUseCatering('${vc.id}', this.checked)"> Estimate follows the Catering tab (replaces the separate Catering line in Budget)</label>` : ''}
+      </div>
+      <div class="actions"><button class="icon-btn danger-ic" onclick="removeVendorBooking('${vc.id}')" title="Remove vendor from project">${icon('trash')}</button></div>
+    </div>`;
+  }).join('');
+  const unbooked = vendorsDB.filter(v=>!bookings.some(vc=>vc.vendorId===v.id));
+  return `<div class="section">
+    <h2>Vendors <span class="pill" style="border:1px solid var(--tape); color:var(--tape);">DEMO</span></h2>
+    ${rows || '<div class="empty-note">No vendors on this project yet. A vendor is a supplier with a cost — a caterer, a kit house, a transport company.</div>'}
+    <div class="toolbar" style="margin-top:10px; flex-wrap:wrap; gap:10px;">
+      ${unbooked.length ? `<select style="width:auto;" onchange="if(this.value){ addVendorBooking(this.value); }">
+        <option value="">+ Add saved vendor…</option>
+        ${unbooked.map(v=>`<option value="${v.id}">${esc(v.name)} (${esc(v.type)})</option>`).join('')}
+      </select>` : ''}
+      <button class="small" onclick="vendorNewOpen=!vendorNewOpen; renderProjectBody();">${vendorNewOpen?'Cancel':'+ New vendor'}</button>
+      ${vendorNewOpen ? `<input type="text" id="vnName" placeholder="Vendor name — e.g. Keira’s Kitchen" style="width:220px;">
+      <select id="vnType" style="width:auto;">${VENDOR_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
+      <button class="small primary" onclick="createVendorAndBook()">Add</button>` : ''}
+    </div>
+    <div class="hint" style="margin-top:8px;">Every vendor feeds the <strong>Vendors</strong> line in Budget — the quote when there is one, the estimate until then.</div>
+    ${feedbackButtonHTML('vendors', 'Vendors')}
+  </div>`;
+}
+async function addVendorBooking(vendorId){
+  const p = currentProject(); if(!p) return;
+  const v = vendorById(vendorId); if(!v) return;
+  p.vendorCosts = p.vendorCosts || [];
+  p.vendorCosts.push({ id:uid(), vendorId, estimate:'', quote:'', useCateringEstimate: v.type==='Catering' });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function createVendorAndBook(){
+  const name = (val('vnName')||'').trim(); if(!name) return;
+  const type = val('vnType') || 'Other';
+  const v = { id:uid(), name, type };
+  vendorsDB.push(v);
+  await saveDB('db:vendors', vendorsDB);
+  vendorNewOpen = false;
+  await addVendorBooking(v.id);
+}
+async function setVendorCostField(vcId, field, value){
+  const p = currentProject(); if(!p) return;
+  const vc = projectVendorCosts(p).find(x=>x.id===vcId); if(!vc) return;
+  const trimmed = (value||'').trim();
+  if(trimmed!=='' && (isNaN(Number(trimmed)) || Number(trimmed)<0)){ renderProjectBody(); return; }
+  vc[field] = trimmed;
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function toggleVendorUseCatering(vcId, checked){
+  const p = currentProject(); if(!p) return;
+  const vc = projectVendorCosts(p).find(x=>x.id===vcId); if(!vc) return;
+  vc.useCateringEstimate = checked;
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function removeVendorBooking(vcId){
+  const p = currentProject(); if(!p) return;
+  p.vendorCosts = projectVendorCosts(p).filter(x=>x.id!==vcId);
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
 }
 let locShowMoney = false;
 function toggleLocMoney(){ locShowMoney = !locShowMoney; renderProjectBody(); }
@@ -7091,11 +7303,23 @@ function buildBudgetData(){
   const hotelRaw = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
   const hotelTotal = hotelRaw * prodOn;
 
+  /* IDEAS DEMO — Vendors + Additional costs join the extras. A catering vendor
+     that follows the Catering tab REPLACES the separate Catering line (its cost
+     is inside the Vendors line), or the same lunches would be counted twice.
+     Neither carries VAT yet — a demo simplification to flag in feedback. */
+  const vendorBookings = projectVendorCosts(p);
+  const cateringViaVendor = vendorBookings.some(vc=>vc.useCateringEstimate);
+  const vendorsRaw = vendorBookings.reduce((s,vc)=> s + vendorCostEff(vc, cateringRaw).eff, 0);
+  const vendorsTotal = vendorsRaw * prodOn;
+  const cateringCounted = cateringViaVendor ? 0 : cateringTotal;
+  const additionalRaw = (p.additionalCosts||[]).reduce((s,c)=> s + (parseRateNumber(c.amount)||0), 0);
+  const additionalTotal = additionalRaw * prodOn;
+
   const crewTotalExVat = people.reduce((s,pp)=>s+pp.subtotal, 0);
   /* ⚠️ locationVatTotal is the ONE non-person VAT in here (Phase CP) — see its note above. It
      has to be in this sum or `ex + vat === inc` stops holding the moment a venue charges VAT. */
   const vatTotal = people.reduce((s,pp)=>s+pp.vat, 0) + locationVatTotal;
-  const extrasTotal = cateringTotal + travelTotal + hotelTotal + locationTotal;
+  const extrasTotal = cateringCounted + travelTotal + hotelTotal + locationTotal + vendorsTotal + additionalTotal;
   const totalExVat = crewTotalExVat + extrasTotal;
   const totalIncVat = totalExVat + vatTotal;
 
@@ -7156,6 +7380,7 @@ function buildBudgetData(){
 
   return {
     people, departments, cateringTotal, travelTotal, hotelTotal, locationTotal, locationVatTotal, extrasTotal,
+    vendorsTotal, additionalTotal, cateringViaVendor, cateringCounted,
     crewTotalExVat, vatTotal, totalExVat, totalIncVat, perDay,
     byEntry: people.reduce((m,pp)=>{ m[pp.id] = pp; return m; }, {}),
     prep, post, phases:[prep, post],
@@ -7252,8 +7477,9 @@ function budgetSummaryBarHTML(data, o){
 
 function budgetDeptExtrasTableHTML(o){
   const fmt = budgetFmt;
-  const {departments, catering, travel, hotel, location, extrasLabel, hideExtras} = o;
-  if(!departments.length && !catering && !travel && !hotel && !location){
+  const {departments, catering, travel, hotel, location, vendors=0, additional=0, cateringViaVendor=false, extrasLabel, hideExtras} = o;
+  const cateringLbl = cateringViaVendor ? 'Catering <span class="hint">— inside Vendors</span>' : 'Catering';
+  if(!departments.length && !catering && !travel && !hotel && !location && !vendors && !additional){
     return '<div class="empty-note">Nothing to cost yet.</div>';
   }
   const deptCell = d => `<td>${d.code?`<span class="dept-code">${esc(d.code)}</span> `:''}${esc(d.dept)}</td>`;
@@ -7262,10 +7488,12 @@ function budgetDeptExtrasTableHTML(o){
       <tr><th>Department</th><th>Cost</th></tr>
       ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.total)}</td></tr>`).join('')}
       ${hideExtras ? '' : `<tr class="budget-extras-row"><td colspan="2"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
-      <tr><td>Catering</td><td>${fmt(catering)}</td></tr>
+      <tr><td>${cateringLbl}</td><td>${fmt(catering)}</td></tr>
       <tr><td>Travel</td><td>${fmt(travel)}</td></tr>
       <tr><td>Hotels</td><td>${fmt(hotel)}</td></tr>
-      <tr><td>Locations</td><td>${fmt(location)}</td></tr>`}
+      <tr><td>Locations</td><td>${fmt(location)}</td></tr>
+      ${vendors ? `<tr><td>Vendors</td><td>${fmt(vendors)}</td></tr>` : ''}
+      ${additional ? `<tr><td>Additional costs</td><td>${fmt(additional)}</td></tr>` : ''}`}
       <tr class="budget-total-row"><td>Total</td><td>${fmt(o.total)}</td></tr>
     </table></div>`;
   }
@@ -7275,10 +7503,12 @@ function budgetDeptExtrasTableHTML(o){
     <tr><th>Department</th><th>TOTAL</th><th>xVAT</th><th>VAT</th></tr>
     ${departments.map(d=>`<tr>${deptCell(d)}<td>${fmt(d.incVat)}</td><td>${fmt(d.exVat)}</td><td>${fmt(d.vat)}</td></tr>`).join('')}
     ${hideExtras ? '' : `<tr class="budget-extras-row"><td colspan="4"><span class="subhead" style="margin:0;">${esc(extrasLabel)}</span></td></tr>
-    ${extraRow('Catering', catering)}
+    ${extraRow(cateringLbl, catering)}
     ${extraRow('Travel', travel)}
     ${extraRow('Hotels', hotel)}
-    ${extraRow('Locations', location)}`}
+    ${extraRow('Locations', location)}
+    ${vendors ? extraRow('Vendors', vendors) : ''}
+    ${additional ? extraRow('Additional costs', additional) : ''}`}
     <tr class="budget-total-row"><td>Total</td><td>${fmt(o.incVat)}</td><td>${fmt(o.exVat)}</td><td>${fmt(o.vat)}</td></tr>
   </table></div>
   ${hideExtras ? '' : `<div class="hint" style="margin-top:8px;">A department's VAT is summed from the people in it who are actually VAT-registered — not 20% of its total.${anyTravelVat?' It includes VAT on their travel, which is itself shown ex-VAT in the Travel row above.':''} Catering, Hotels and Locations are paid direct to a supplier, so no crew member's VAT attaches to them.</div>`}`;
@@ -7293,12 +7523,80 @@ function budgetDepartmentViewHTML(data){
     `${budgetFmt(budgetVatToggle ? ph.exVat : ph.incVat)} of ${ph.noteName} (${ph.daysTotal} day${ph.daysTotal===1?'':'s'} across ${ph.peopleCount} crew member${ph.peopleCount===1?'':'s'})`);
   const noteHTML = phaseParts.length ? `<div class="hint" style="margin-top:8px;">Department totals include ${phaseParts.join(' and ')}, at the same day rate. Untick ${phaseParts.length>1?'either scope':'that scope'} above for the shoot on its own.</div>` : '';
   return budgetDeptExtrasTableHTML({
-    departments: data.departments, catering: data.cateringTotal, travel: data.travelTotal,
-    hotel: data.hotelTotal, location: data.locationTotal, extrasLabel: 'Project-wide extras',
+    departments: data.departments, catering: data.cateringCounted, travel: data.travelTotal,
+    hotel: data.hotelTotal, location: data.locationTotal,
+    vendors: data.vendorsTotal, additional: data.additionalTotal, cateringViaVendor: data.cateringViaVendor,
+    extrasLabel: 'Project-wide extras',
     total: displayTotal, exVat: data.totalExVat, vat: data.vatTotal, incVat: data.totalIncVat
   }) + noteHTML;
 }
 
+/* IDEAS DEMO — the BBC view: the same money re-cut into a BBC-style cost
+   structure. ⚠️ THE MAPPING IS A FIRST DRAFT for feedback, not a claim about how
+   you'd fill in a real BBC form — every rule below is changeable:
+   producers/directors split out of Production by role name; kit fees are NOT split
+   out of day rates yet; vendors land by their type; VAT column reuses the app's
+   per-person VAT. Same grand total as every other view, re-grouped. */
+const BBC_STRUCTURE = [
+  { code:'2',  name:'Producer & Director',        kind:'people', test: pp => /producer|director/i.test(pp.role||'') },
+  { code:'3',  name:'Artists & Contributors',     kind:'people', test: pp => deptBucketKey(pp.department)==='Talent' },
+  { code:'4',  name:'Production Unit',            kind:'people', test: pp => ['Production','Client'].includes(deptBucketKey(pp.department)) },
+  { code:'5',  name:'Technical Crew',             kind:'people', test: pp => ['Cinematography','Audio','Grip','Set','Vanities','Other'].includes(deptBucketKey(pp.department)) },
+  { code:'6',  name:'Equipment & Facilities',     kind:'people', test: pp => deptBucketKey(pp.department)==='Equipment', vendorType:'Equipment' },
+  { code:'7',  name:'Locations & Studios',        kind:'extra',  amount: d => d.locationTotal, vat: d => d.locationVatTotal },
+  { code:'8',  name:'Travel & Transport',         kind:'extra',  amount: d => d.travelTotal, vendorType:'Transport' },
+  { code:'9',  name:'Accommodation & Catering',   kind:'extra',  amount: d => d.hotelTotal + d.cateringCounted, vendorType:'Catering' },
+  { code:'10', name:'Post Production',            kind:'people', test: pp => deptBucketKey(pp.department)==='Post Production', vendorType:'Post' },
+  { code:'13', name:'Sundries & Other',           kind:'extra',  amount: d => d.additionalTotal, vendorType:'Other' },
+];
+function budgetBBCViewHTML(data){
+  const fmt = budgetFmt;
+  const p = currentProject();
+  const cateringEst = (buildCateringSummaryGrid()||{}).totalCost || 0;
+  const vendorEffByType = {};
+  projectVendorCosts(p).forEach(vc=>{
+    const v = vendorById(vc.vendorId) || {type:'Other'};
+    vendorEffByType[v.type] = (vendorEffByType[v.type]||0) + vendorCostEff(vc, cateringEst).eff;
+  });
+  const claimed = new Set();
+  const rows = BBC_STRUCTURE.map(cat=>{
+    let ex=0, vat=0, who=[];
+    if(cat.kind==='people'){
+      data.people.forEach(pp=>{
+        if(claimed.has(pp.id) || !cat.test(pp)) return;
+        claimed.add(pp.id); ex += pp.subtotal; vat += pp.vat; who.push(pp);
+      });
+    } else {
+      ex += cat.amount(data);
+      if(cat.vat) vat += cat.vat(data);
+    }
+    if(cat.vendorType && vendorEffByType[cat.vendorType]){ ex += vendorEffByType[cat.vendorType]; }
+    return { cat, ex, vat, inc: ex+vat, count: who.length };
+  });
+  // people no rule caught (shouldn't happen, but never silently drop money)
+  const unclaimed = data.people.filter(pp=>!claimed.has(pp.id));
+  if(unclaimed.length){
+    const ex = unclaimed.reduce((s,pp)=>s+pp.subtotal,0), vat = unclaimed.reduce((s,pp)=>s+pp.vat,0);
+    rows.push({ cat:{code:'—', name:'Unmapped (tell me where these go)'}, ex, vat, inc:ex+vat, count:unclaimed.length });
+  }
+  const shown = rows.filter(r=>r.ex||r.vat);
+  const totEx = rows.reduce((s,r)=>s+r.ex,0), totVat = rows.reduce((s,r)=>s+r.vat,0);
+  return `
+  <div class="hint" style="margin-bottom:10px;">The same money as every other view, re-cut into a BBC-style cost structure.
+    <strong>The mapping is a first draft</strong> — producers &amp; directors are pulled out of Production by role name, kit is not yet split
+    out of day rates into Facilities, and vendors land by their type. Say what's wrong via Feedback below.</div>
+  <div class="tablewrap"><table>
+    <tr><th style="width:40px;"></th><th>Category</th>${budgetVatToggle?'<th>TOTAL</th><th>xVAT</th><th>VAT</th>':'<th>Cost</th>'}<th class="hint">covers</th></tr>
+    ${shown.map(r=>`<tr>
+      <td><span class="dept-code">${esc(r.cat.code)}</span></td>
+      <td>${esc(r.cat.name)}</td>
+      ${budgetVatToggle?`<td>${fmt(r.inc)}</td><td>${fmt(r.ex)}</td><td>${fmt(r.vat)}</td>`:`<td>${fmt(r.inc)}</td>`}
+      <td class="hint">${r.count?`${r.count} ${r.count===1?'person':'people'}`:''}</td>
+    </tr>`).join('')}
+    <tr class="budget-total-row"><td></td><td>Total</td>${budgetVatToggle?`<td>${fmt(totEx+totVat)}</td><td>${fmt(totEx)}</td><td>${fmt(totVat)}</td>`:`<td>${fmt(totEx+totVat)}</td>`}<td></td></tr>
+  </table></div>
+  ${feedbackButtonHTML('bbc-view', 'the BBC view')}`;
+}
 function budgetPersonViewHTML(data){
   if(!data.hasCrew) return '<div class="empty-note">No crew assigned to this project yet.</div>';
   const fmt = budgetFmt;
@@ -7438,7 +7736,63 @@ function budgetCostsViewHTML(){
         costFieldHTML('tsCostPublic', 'Est. public transport cost/day', transportCosts.publicPerDay)
       + costFieldHTML('tsCostMileage', 'Mileage rate (own car, per use)', transportCosts.mileage))}
     ${group('hotel', 'Hotel',
-        costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight))}`;
+        costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight))}
+    ${additionalCostsSectionHTML(p)}`;
+}
+/* IDEAS DEMO — Additional costs: the weird one-off costs that creep into every
+   shoot and fit nowhere else. Estimate/confirmed is a click on the pill. */
+function additionalCostsSectionHTML(p){
+  const items = p.additionalCosts || [];
+  const rows = items.map(c=>`<div class="list-card">
+    <div class="meta" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <strong>${esc(c.label)}</strong>
+      <label style="margin:0;">£<input type="text" inputmode="decimal" value="${esc(c.amount||'')}" style="width:80px;" onchange="setAdditionalCostField('${c.id}','amount',this.value)"></label>
+      <span class="pill" style="cursor:pointer; border:1px solid ${c.confirmed?'var(--tape)':'#8a6d1a'}; color:${c.confirmed?'var(--tape)':'#8a6d1a'};" onclick="toggleAdditionalCostConfirmed('${c.id}')" title="Click to switch">${c.confirmed?'CONFIRMED':'ESTIMATE'}</span>
+    </div>
+    <div class="actions"><button class="icon-btn danger-ic" onclick="deleteAdditionalCost('${c.id}')" title="Delete">${icon('trash')}</button></div>
+  </div>`).join('');
+  return `<div class="sd-block" style="margin-top:18px;">
+    <div class="sd-block-head flush"><span class="sd-block-head-toggle">Additional costs <span class="pill" style="border:1px solid var(--tape); color:var(--tape);">DEMO</span></span></div>
+    ${rows || '<div class="empty-note">Nothing yet. For the costs that creep in — a skip hire, a parking fine, a drone permit.</div>'}
+    <div class="toolbar" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
+      <input type="text" id="acLabel" placeholder="What is it — e.g. Skip hire" style="width:220px;">
+      <input type="text" id="acAmount" inputmode="decimal" placeholder="£" style="width:80px;">
+      <button class="small primary" onclick="addAdditionalCost()">Add</button>
+    </div>
+    <div class="hint" style="margin-top:6px;">Feeds the <strong>Additional costs</strong> line in the Budget views, whether estimate or confirmed.</div>
+    ${feedbackButtonHTML('additional-costs', 'Additional costs')}
+  </div>`;
+}
+async function addAdditionalCost(){
+  const p = currentProject(); if(!p) return;
+  const label = (val('acLabel')||'').trim(); if(!label) return;
+  const amount = (val('acAmount')||'').trim();
+  p.additionalCosts = p.additionalCosts || [];
+  p.additionalCosts.push({ id:uid(), label, amount, confirmed:false });
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function setAdditionalCostField(id, field, value){
+  const p = currentProject(); if(!p) return;
+  const c = (p.additionalCosts||[]).find(x=>x.id===id); if(!c) return;
+  const trimmed = (value||'').trim();
+  if(field==='amount' && trimmed!=='' && (isNaN(Number(trimmed)) || Number(trimmed)<0)){ renderProjectBody(); return; }
+  c[field] = trimmed;
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function toggleAdditionalCostConfirmed(id){
+  const p = currentProject(); if(!p) return;
+  const c = (p.additionalCosts||[]).find(x=>x.id===id); if(!c) return;
+  c.confirmed = !c.confirmed;
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
+}
+async function deleteAdditionalCost(id){
+  const p = currentProject(); if(!p) return;
+  p.additionalCosts = (p.additionalCosts||[]).filter(x=>x.id!==id);
+  await saveDB('db:projects', projectsDB);
+  renderProjectBody();
 }
 /* Targeted refresh of just the summary bar after a Costs-tab cost field autosaves —
    same "don't blow away the field the user is still typing in" rule as
@@ -7546,7 +7900,7 @@ function budgetExportRows(data, view){
 }
 // The output menu's own labels for the four views — same wording as the view
 // switcher (BUDGET_VIEW_LABELS), so the menu can't name a view differently.
-const BUDGET_VIEW_LABELS = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Costs'};
+const BUDGET_VIEW_LABELS = {department:'Per Department', day:'Per Day', person:'Per Person', costs:'Costs', bbc:'BBC'};
 function budgetExportTitle(view){
   const p = currentProject();
   return `BUDGET — ${(p&&(p.title||p.client))||''} — ${BUDGET_VIEW_LABELS[view]||'Budget'}`;
@@ -7618,6 +7972,7 @@ function renderProjectBudget(body){
   const viewHTML = budgetView==='person' ? budgetPersonViewHTML(data)
     : budgetView==='day' ? budgetDayViewHTML(data)
     : budgetView==='costs' ? budgetCostsViewHTML()
+    : budgetView==='bbc' ? budgetBBCViewHTML(data)
     : budgetDepartmentViewHTML(data);
   body.innerHTML = `
     <div class="section">
