@@ -502,13 +502,19 @@
   /* IDEAS DEMO — Shoot Day editor: the general info lives in two columns
      (details/brief/location/hospital left, weather/notes/parking right),
      stacking back to one on narrow screens. */
-  .sd-two-col{display:grid; grid-template-columns:1fr 1fr; gap:0 32px; align-items:start;}
-  /* read-only info lines (address, on-site, hospital, parking lookup) read like
-     roles-grid names: Jost 600 14px, full ink — these are the lines you act on. */
-  .sd-info{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text);}
+  /* IDEAS DEMO — the Shoot Day general section is a stack of BANDS, each a
+     two-column row whose halves align (brief|notes, location|access,
+     hospital|car park), the way a printed call sheet pairs them. */
+  .sd-band{display:grid; grid-template-columns:1fr 1fr; gap:0 36px; align-items:start;}
+  @media(max-width:900px){ .sd-band{grid-template-columns:1fr;} }
+  /* Roles' type discipline: Oswald/green is for SECTION TITLES only (the
+     .subhead), so field labels here are quiet Jost — a label is not a heading. */
+  .sd-band label{font-family:var(--body); font-size:13px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted);}
+  /* data lines (address, on-site, hospital, car park) are plain Jost ink —
+     values, not titles. The address link keeps its underline as the affordance. */
+  .sd-info{font-family:var(--body); font-weight:400; font-size:14px; color:var(--text); line-height:1.5;}
   .sd-info a{color:var(--text);}
-  .sd-info .hint{font-weight:400;}
-  .sd-weather-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .sd-weather-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px;}
   @media(max-width:900px){ .sd-two-col{grid-template-columns:1fr;} }
   .ts-field.sd-allcall input[type="text"]{font-size:22px; font-weight:700; letter-spacing:1px; height:auto; padding:6px 10px; max-width:130px;}
   @media (pointer:coarse){
@@ -8929,7 +8935,7 @@ function shootDayBuildHTML(){
      same inputs wherever they sit. */
   const general = `
     <div class="section">
-      <div class="sd-two-col">
+      <div class="sd-band">
         <div>
           <div class="subhead">Day details</div>
           <div class="ts-grid">
@@ -8940,25 +8946,10 @@ function shootDayBuildHTML(){
             <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
             <div class="ts-field sd-allcall"><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
           </div>
-          <div class="subhead">Production brief</div>
-          <label>The scenes / setups being shot today — one per line</label>
-          <textarea id="sdBrief" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
-          <div class="subhead">Primary location</div>
-          <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
-          <div id="sdLocationSummary" class="sd-info" style="margin-top:8px;"></div>
-          <div class="subhead">Nearest hospital</div>
-          <div id="sdHospitalInfo" class="sd-info"></div>
-          <div class="subhead">Additional locations</div>
-          <div class="rows-add" id="rows-sdaddloc"></div>
-          <button class="small" onclick="addSdLocRow()">+ Add location</button>
         </div>
         <div>
           <div class="subhead">Weather</div>
-          <div class="sd-weather-row">
-            <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch</button>
-            <span id="weatherStatus" class="hint"></span>
-          </div>
-          <div class="ts-grid" style="margin-top:10px;">
+          <div class="ts-grid">
             <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
             <div class="ts-field"><label>Condition</label><input type="text" id="wxCond" class="fld-md"></div>
           </div>
@@ -8966,13 +8957,46 @@ function shootDayBuildHTML(){
             <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
             <div class="ts-field"><label>Sunrise/Sunset</label><input type="text" id="wxSun" class="fld-md"></div>
           </div>
+          <div class="sd-weather-row">
+            <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch</button>
+            <span id="weatherStatus" class="hint"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sd-band">
+        <div>
+          <div class="subhead">Production brief</div>
+          <label>The scenes / setups being shot today — one per line</label>
+          <textarea id="sdBrief" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
+        </div>
+        <div>
           <div class="subhead">Production notes</div>
           <textarea id="sdNotes"></textarea>
+        </div>
+      </div>
+      <div class="sd-band">
+        <div>
+          <div class="subhead">Primary location</div>
+          <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
+          <div id="sdLocationSummary" class="sd-info" style="margin-top:8px;"></div>
+          <div class="subhead">Additional locations</div>
+          <div class="rows-add" id="rows-sdaddloc"></div>
+          <button class="small" onclick="addSdLocRow()">+ Add location</button>
+        </div>
+        <div>
           <div class="subhead">Parking / arrival / access</div>
           <textarea id="sdParking"></textarea>
           <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
           <div id="sdAccessInfo" class="sd-info" style="margin-top:6px;"></div>
-          <div class="subhead">Nearest parking</div>
+        </div>
+      </div>
+      <div class="sd-band">
+        <div>
+          <div class="subhead">Nearest hospital</div>
+          <div id="sdHospitalInfo" class="sd-info"></div>
+        </div>
+        <div>
+          <div class="subhead">Nearest car park</div>
           <div id="sdParkingLookupInfo" class="sd-info"></div>
         </div>
       </div>
