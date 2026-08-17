@@ -505,8 +505,16 @@
   /* IDEAS DEMO — the Shoot Day general section is a stack of BANDS, each a
      two-column row whose halves align (brief|notes, location|access,
      hospital|car park), the way a printed call sheet pairs them. */
-  .sd-band{display:grid; grid-template-columns:1fr 1fr; gap:0 36px; align-items:start;}
+  .sd-band{display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; align-items:stretch; margin-bottom:12px;}
   @media(max-width:900px){ .sd-band{grid-template-columns:1fr;} }
+  /* each half of a band is a soft card (same idiom as the day-override form) so
+     the paired blocks read as blocks — the card edge does the separating, which
+     lets the title's rule-line go and calms the wash of horizontal strokes */
+  .sd-card{border:1px solid var(--line); border-radius:10px; background:var(--tint-1); padding:14px 16px;}
+  .sd-card .subhead:first-child{margin-top:0;}
+  .sd-card .subhead{margin-top:16px;}
+  .sd-card .subhead::after{display:none;}
+  .sd-card textarea{min-height:84px;}
   /* Roles' type discipline: Oswald/green is for SECTION TITLES only (the
      .subhead), so field labels here are quiet Jost — a label is not a heading. */
   .sd-band label{font-family:var(--body); font-size:13px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted);}
@@ -8936,7 +8944,7 @@ function shootDayBuildHTML(){
   const general = `
     <div class="section">
       <div class="sd-band">
-        <div>
+        <div class="sd-card">
           <div class="subhead">Day details</div>
           <div class="ts-grid">
             <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"></div>
@@ -8947,7 +8955,7 @@ function shootDayBuildHTML(){
             <div class="ts-field sd-allcall"><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
           </div>
         </div>
-        <div>
+        <div class="sd-card">
           <div class="subhead">Weather</div>
           <div class="ts-grid">
             <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
@@ -8964,18 +8972,18 @@ function shootDayBuildHTML(){
         </div>
       </div>
       <div class="sd-band">
-        <div>
+        <div class="sd-card">
           <div class="subhead">Production brief</div>
           <label>The scenes / setups being shot today — one per line</label>
           <textarea id="sdBrief" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
         </div>
-        <div>
+        <div class="sd-card">
           <div class="subhead">Production notes</div>
           <textarea id="sdNotes"></textarea>
         </div>
       </div>
       <div class="sd-band">
-        <div>
+        <div class="sd-card">
           <div class="subhead">Primary location</div>
           <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
           <div id="sdLocationSummary" class="sd-info" style="margin-top:8px;"></div>
@@ -8983,7 +8991,7 @@ function shootDayBuildHTML(){
           <div class="rows-add" id="rows-sdaddloc"></div>
           <button class="small" onclick="addSdLocRow()">+ Add location</button>
         </div>
-        <div>
+        <div class="sd-card">
           <div class="subhead">Parking / arrival / access</div>
           <textarea id="sdParking"></textarea>
           <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
@@ -8991,11 +8999,11 @@ function shootDayBuildHTML(){
         </div>
       </div>
       <div class="sd-band">
-        <div>
+        <div class="sd-card">
           <div class="subhead">Nearest hospital</div>
           <div id="sdHospitalInfo" class="sd-info"></div>
         </div>
-        <div>
+        <div class="sd-card">
           <div class="subhead">Nearest car park</div>
           <div id="sdParkingLookupInfo" class="sd-info"></div>
         </div>
