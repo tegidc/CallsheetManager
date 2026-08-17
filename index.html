@@ -506,6 +506,7 @@
      two-column row whose halves align (brief|notes, location|access,
      hospital|car park), the way a printed call sheet pairs them. */
   .sd-band{display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; align-items:stretch; margin-bottom:12px;}
+  .sd-band-full{grid-template-columns:1fr;}
   @media(max-width:900px){ .sd-band{grid-template-columns:1fr;} }
   /* each half of a band is a soft card (same idiom as the day-override form) so
      the paired blocks read as blocks — the card edge does the separating, which
@@ -8916,6 +8917,27 @@ async function lookupAmenityForForm(kind){
   }catch(e){ infoEl.textContent='Lookup failed — check your connection.'; }
 }
 
+/* IDEAS DEMO — the day form's hospital / car park Fetch buttons. Same Overpass
+   lookup the Locations database uses, run against the selected PRIMARY location's
+   coordinates, and the result is SAVED ONTO THE LOCATION RECORD — so every
+   project using that location inherits it, exactly as if it had been looked up
+   in the Locations database. */
+async function fetchDayAmenity(kind){
+  const statusEl = document.getElementById(kind==='hospital' ? 'sdHospitalStatus' : 'sdCarParkStatus');
+  const l = selectedDayLocation();
+  if(!l){ if(statusEl) statusEl.textContent = 'Select a primary location first.'; return; }
+  if(l.lat==null || l.lon==null){ if(statusEl) statusEl.textContent = 'This location has no map position yet — pick its address in the Locations database first.'; return; }
+  if(statusEl) statusEl.textContent = `Searching nearby ${AMENITY_SEARCH[kind].noun}…`;
+  try{
+    const found = await findNearestAmenity(kind, l.lat, l.lon);
+    if(!found){ if(statusEl) statusEl.textContent = `No ${AMENITY_SEARCH[kind].noun} found nearby.`; return; }
+    if(kind==='hospital') l.hospital = found; else l.nearestParking = found;
+    const res = await saveDB('db:locations', locationsDB);
+    if(statusEl) statusEl.textContent = (res && res.ok) ? 'Found — saved to this location for every project.' : 'Found, but saving failed — see the banner.';
+    updateHospitalDisplay(); updateParkingLookupDisplay();
+  }catch(e){ if(statusEl) statusEl.textContent = 'Lookup failed — check your connection.'; }
+}
+
 /* ============================================================ SHOOT DAY EDITOR */
 function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
 
@@ -8982,7 +9004,7 @@ function shootDayBuildHTML(){
           <textarea id="sdNotes"></textarea>
         </div>
       </div>
-      <div class="sd-band">
+      <div class="sd-band sd-band-full">
         <div class="sd-card">
           <div class="subhead">Primary location</div>
           <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
@@ -8991,6 +9013,8 @@ function shootDayBuildHTML(){
           <div class="rows-add" id="rows-sdaddloc"></div>
           <button class="small" onclick="addSdLocRow()">+ Add location</button>
         </div>
+      </div>
+      <div class="sd-band sd-band-full">
         <div class="sd-card">
           <div class="subhead">Parking / arrival / access</div>
           <textarea id="sdParking"></textarea>
@@ -9002,10 +9026,18 @@ function shootDayBuildHTML(){
         <div class="sd-card">
           <div class="subhead">Nearest hospital</div>
           <div id="sdHospitalInfo" class="sd-info"></div>
+          <div class="sd-weather-row">
+            <button class="small" onclick="fetchDayAmenity('hospital')">${icon('hospital')} Fetch</button>
+            <span id="sdHospitalStatus" class="hint"></span>
+          </div>
         </div>
         <div class="sd-card">
           <div class="subhead">Nearest car park</div>
           <div id="sdParkingLookupInfo" class="sd-info"></div>
+          <div class="sd-weather-row">
+            <button class="small" onclick="fetchDayAmenity('parking')">${icon('car')} Fetch</button>
+            <span id="sdCarParkStatus" class="hint"></span>
+          </div>
         </div>
       </div>
       ${feedbackButtonHTML('shoot-day-layout', 'the Shoot Day layout')}
