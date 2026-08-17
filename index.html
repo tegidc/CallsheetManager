@@ -502,12 +502,15 @@
   /* IDEAS DEMO — Shoot Day editor: the general info lives in two columns
      (details/brief/location/hospital left, weather/notes/parking right),
      stacking back to one on narrow screens. */
-  .sd-two-col{display:grid; grid-template-columns:1fr 1fr; gap:0 28px; align-items:start;}
+  .sd-two-col{display:grid; grid-template-columns:1fr 1fr; gap:0 32px; align-items:start;}
+  /* read-only info lines (address, on-site, hospital, parking lookup) read like
+     roles-grid names: Jost 600 14px, full ink — these are the lines you act on. */
+  .sd-info{font-family:var(--body); font-weight:600; font-size:14px; color:var(--text);}
+  .sd-info a{color:var(--text);}
+  .sd-info .hint{font-weight:400;}
+  .sd-weather-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
   @media(max-width:900px){ .sd-two-col{grid-template-columns:1fr;} }
   .ts-field.sd-allcall input[type="text"]{font-size:22px; font-weight:700; letter-spacing:1px; height:auto; padding:6px 10px; max-width:130px;}
-  .sd-park-person{display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;}
-  .sd-park-person .pill{flex:0 0 auto;}
-  .sd-park-person input{flex:1 1 180px;}
   @media (pointer:coarse){
     .roles-tablewrap{max-height:none; overflow:visible; overflow-x:auto; overscroll-behavior:auto;}
     /* touch polish (D13): fingers need bigger targets than a mouse pointer does */
@@ -8932,29 +8935,35 @@ function shootDayBuildHTML(){
           <div class="ts-grid">
             <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"></div>
             <div class="ts-field"><label>of (total)</label><input type="text" id="sdDayTotal" class="fld-xs" readonly tabindex="-1" title="Total shoot days on this project — add or remove days to change it"></div>
-            <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
           </div>
-          <div class="ts-field sd-allcall" style="margin-top:10px;"><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
+          <div class="ts-grid" style="margin-top:10px;">
+            <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
+            <div class="ts-field sd-allcall"><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
+          </div>
           <div class="subhead">Production brief</div>
           <label>The scenes / setups being shot today — one per line</label>
           <textarea id="sdBrief" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
           <div class="subhead">Primary location</div>
           <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
-          <div id="sdLocationSummary" class="hint" style="margin-top:8px;"></div>
+          <div id="sdLocationSummary" class="sd-info" style="margin-top:8px;"></div>
+          <div class="subhead">Nearest hospital</div>
+          <div id="sdHospitalInfo" class="sd-info"></div>
           <div class="subhead">Additional locations</div>
           <div class="rows-add" id="rows-sdaddloc"></div>
           <button class="small" onclick="addSdLocRow()">+ Add location</button>
-          <div class="subhead">Nearest hospital</div>
-          <div id="sdHospitalInfo" class="hint"></div>
         </div>
         <div>
           <div class="subhead">Weather</div>
-          <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch weather for this date &amp; location</button>
-          <div id="weatherStatus" class="hint" style="margin-top:6px;"></div>
+          <div class="sd-weather-row">
+            <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch</button>
+            <span id="weatherStatus" class="hint"></span>
+          </div>
           <div class="ts-grid" style="margin-top:10px;">
             <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
-            <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
             <div class="ts-field"><label>Condition</label><input type="text" id="wxCond" class="fld-md"></div>
+          </div>
+          <div class="ts-grid" style="margin-top:10px;">
+            <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
             <div class="ts-field"><label>Sunrise/Sunset</label><input type="text" id="wxSun" class="fld-md"></div>
           </div>
           <div class="subhead">Production notes</div>
@@ -8962,9 +8971,9 @@ function shootDayBuildHTML(){
           <div class="subhead">Parking / arrival / access</div>
           <textarea id="sdParking"></textarea>
           <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
-          <div id="sdParkingPeople" style="margin-top:10px;"></div>
+          <div id="sdAccessInfo" class="sd-info" style="margin-top:6px;"></div>
           <div class="subhead">Nearest parking</div>
-          <div id="sdParkingLookupInfo" class="hint"></div>
+          <div id="sdParkingLookupInfo" class="sd-info"></div>
         </div>
       </div>
       ${feedbackButtonHTML('shoot-day-layout', 'the Shoot Day layout')}
@@ -9320,7 +9329,6 @@ function populateShootDay(d){
   setTechSpecFields('ts', resolveTechSpecs(d));
   setv('sdBrief',(d.brief||[]).join('\n')); setv('sdParking',d.parking); setv('sdNotes',d.notes);
   autoGrowTextarea(document.getElementById('sdBrief'));
-  renderSdParkingPeople(d);
   updateHospitalDisplay();
   updateParkingLookupDisplay();
   renderCameraDesignations('day');
@@ -9329,30 +9337,17 @@ function populateShootDay(d){
 function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); updateParkingLookupDisplay(); }
 function updateLocationSummary(){
   const l=selectedDayLocation();
-  const el=document.getElementById('sdLocationSummary'); if(!el) return;
-  if(!l){ el.textContent=''; return; }
-  el.innerHTML=`${esc(l.address||'')}${l.accessInfo?('<br>Access: '+esc(l.accessInfo)):''}${l.onsiteContactName?('<br>On-site: '+esc(l.onsiteContactName)+(l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):'')):''}`;
+  const el=document.getElementById('sdLocationSummary');
+  const accessEl=document.getElementById('sdAccessInfo');
+  if(!el) return;
+  if(!l){ el.textContent=''; if(accessEl) accessEl.textContent=''; return; }
+  // the address opens in Maps — the sketch marks it "(clickable)"
+  const addr = l.address
+    ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}" target="_blank" rel="noopener">${esc(l.address)}</a>` : '';
+  el.innerHTML = `${addr}${l.onsiteContactName?('<br>On-site: '+esc(l.onsiteContactName)+(l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):'')):''}`;
+  // access belongs with parking/arrival on the right, per the sketch
+  if(accessEl) accessEl.innerHTML = l.accessInfo ? 'Access: '+esc(l.accessInfo) : '';
   if(l.parkingInfo && !val('sdParking')) setv('sdParking', l.parkingInfo);
-}
-/* IDEAS DEMO — per-person parking/arrival lines. One line per person on this
-   project travelling by Own car or Production transport (the Travel tab's
-   methods), each with a free-text note for THIS day — a reg plate, a bay
-   number, an arrival instruction. Stored on the day as d.parkingPeople
-   ({crewId: note}); notes are collected by saveShootDay() with the rest of the
-   form, so they ride the same autosave. */
-function renderSdParkingPeople(d){
-  const wrap = document.getElementById('sdParkingPeople'); if(!wrap) return;
-  const p = projectOf(d) || currentProject(); if(!p){ wrap.innerHTML=''; return; }
-  const methods = p.travelMethods || {};
-  const drivers = projectCrew(p).filter(c=>['Own car','Production transport'].includes(methods[c.id]));
-  const notes = d.parkingPeople || {};
-  if(!drivers.length){ wrap.innerHTML = '<div class="hint">Nobody is marked Own car / Production transport on the Travel tab yet — set travel methods there and each driver gets a line here.</div>'; return; }
-  wrap.innerHTML = `<div class="hint" style="margin-bottom:6px;">Per-person arrival — one line per driver / production vehicle:</div>` +
-    drivers.map(c=>`<div class="sd-park-person">
-      <strong>${esc(abbreviateName ? abbreviateName(c.name) : c.name)}</strong>
-      <span class="pill dept" title="${esc(methods[c.id])}">${methods[c.id]==='Own car'?'CAR':'PROD'}</span>
-      <input type="text" data-parkperson="${c.id}" value="${esc(notes[c.id]||'')}" placeholder="reg / bay / arrival note for this day…">
-    </div>`).join('');
 }
 /* both read-only day-form summaries are the same lookup with a different field/noun */
 function updateAmenityDisplay(elId, field, noun){
@@ -9419,12 +9414,6 @@ async function saveShootDay(thenGenerate){
   if(Object.keys(tsOv).length) d.techSpecs = tsOv; else delete d.techSpecs;
   d.brief=parseBriefLines(val('sdBrief'));
   d.parking=val('sdParking'); d.notes=val('sdNotes');
-  const pk = {};
-  document.querySelectorAll('[data-parkperson]').forEach(inp=>{
-    const v = (inp.value||'').trim();
-    if(v) pk[inp.getAttribute('data-parkperson')] = v;
-  });
-  d.parkingPeople = pk;
   const saved = await saveDB('db:shootdays',shootDaysDB);
   flashSaveResult('sdStatus', saved);
   // Don't walk the user to the export screen off the back of a save that didn't
