@@ -1,0 +1,534 @@
+<!-- page content; wrapped in html/head/body at publish time -->
+<title>Warchest</title>
+<style>
+:root{
+  --paper:#FCFCFA; --ink:#141414; --line:#E4E4E0; --mute:#8B8B86;
+  --tile:#FFFFFF; --wash:#F3F3EF; --team:var(--ink);
+  --bad:#C0392B; --ok:#2E7D4F;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#101012; --ink:#EDEDE8; --line:#2A2A2E; --mute:#84848A;
+    --tile:#17171A; --wash:#1D1D21; --bad:#E06A5A; --ok:#5CB584;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101012; --ink:#EDEDE8; --line:#2A2A2E; --mute:#84848A;
+  --tile:#17171A; --wash:#1D1D21; --bad:#E06A5A; --ok:#5CB584;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;line-height:1.45;
+  max-width:480px;margin:0 auto;padding:0 12px 60px;min-height:100vh}
+.disp{font-family:"Barlow Condensed","Arial Narrow",sans-serif}
+button{font-family:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--team);outline-offset:2px}
+
+header.top{display:flex;justify-content:space-between;align-items:baseline;padding:14px 2px 10px}
+.brand{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px;letter-spacing:.14em}
+.tools{display:flex;gap:6px}
+.tbtn{font-size:10px;letter-spacing:.1em;color:var(--mute);border:1px solid var(--line);padding:4px 8px;border-radius:2px}
+.tbtn:active{color:var(--ink);border-color:var(--ink)}
+
+/* ---- calculator bar ---- */
+.bar{position:sticky;top:0;z-index:30;background:var(--paper);border:1px solid var(--ink);
+  border-radius:3px;padding:9px 10px 8px;margin-bottom:14px}
+.cells{display:flex;align-items:stretch;gap:10px}
+.cell{flex:1;min-width:0}
+.cell .k{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.cell b{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:30px;line-height:1.05;
+  font-variant-numeric:tabular-nums}
+.cell b.bad{color:var(--bad)} .cell b.ok{color:var(--ok)}
+.actions{display:flex;flex-direction:column;gap:5px;justify-content:center}
+.apply{background:var(--team);color:var(--paper);font-family:"Barlow Condensed",sans-serif;
+  font-weight:700;font-size:14px;letter-spacing:.12em;padding:7px 16px;border-radius:2px}
+.apply:disabled{background:var(--line);color:var(--mute)}
+.ghost{font-size:10px;letter-spacing:.12em;color:var(--mute);border:1px solid var(--line);
+  padding:4px 10px;border-radius:2px;text-align:center}
+.ghost:active{color:var(--ink);border-color:var(--ink)}
+.subline{font-size:11px;color:var(--mute);margin-top:5px}
+.subline:empty{display:none}
+.warns{font-size:11px;color:var(--bad);margin-top:4px;line-height:1.5}
+.warns:empty{display:none}
+
+/* ---- last spend ---- */
+.last{border:1px dashed var(--line);border-radius:3px;padding:9px 11px;margin-bottom:14px;font-size:11px;color:var(--mute)}
+.last h3{font-family:"Barlow Condensed",sans-serif;font-size:12px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink);display:flex;justify-content:space-between;margin-bottom:4px}
+.last .undo{font-size:10px;letter-spacing:.1em;color:var(--mute);text-decoration:underline}
+.last div{line-height:1.55}
+
+section{margin-bottom:20px}
+h2{font-family:"Barlow Condensed",sans-serif;font-size:13px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--mute);margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline}
+h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM Plex Mono";text-transform:none}
+
+/* ---- build grid ---- */
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.chit{position:relative;background:var(--tile);border:1px solid var(--line);border-radius:3px;
+  aspect-ratio:1/1.18;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 2px}
+.chit svg{width:24px;height:24px;fill:var(--team)}
+.chit .un{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.chit .uc{font-size:9px;color:var(--mute)}
+.chit.sel{border-color:var(--team)}
+.chit.dim{opacity:.38}
+.chit .n{position:absolute;top:-6px;right:-5px;min-width:20px;height:20px;border-radius:10px;
+  background:var(--team);color:var(--paper);font-family:"Barlow Condensed",sans-serif;font-weight:700;
+  font-size:13px;line-height:20px;text-align:center;padding:0 4px}
+.chit .minus{position:absolute;top:-7px;left:-6px;width:22px;height:22px;border-radius:11px;
+  background:var(--paper);border:1px solid var(--ink);font-size:14px;line-height:19px;text-align:center}
+
+/* ---- strategy grid ---- */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.scard{background:var(--tile);border:1px solid var(--line);border-top:3px solid var(--cc,var(--line));
+  border-radius:3px;padding:7px 8px 8px;text-align:left;min-height:64px;display:flex;flex-direction:column;justify-content:space-between}
+.scard .num{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;color:var(--cc);line-height:1}
+.scard .nm{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
+.scard .fc{font-size:9px;color:var(--mute);margin-top:3px}
+.scard.on{background:var(--cc);border-color:var(--cc)}
+.scard.on .num,.scard.on .nm,.scard.on .fc{color:#FFFFFF}
+.scard.on.darktxt .num,.scard.on.darktxt .nm,.scard.on.darktxt .fc{color:#141414}
+.pooltile{background:var(--wash);border:1px solid var(--line);border-radius:3px;padding:7px 8px;
+  display:flex;flex-direction:column;justify-content:space-between;min-height:64px}
+.pooltile .nm{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+.pooltile .fc{font-size:9px;color:var(--mute)}
+
+/* ---- pay ---- */
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.planet{position:relative;background:var(--tile);border:1px solid var(--line);border-radius:3px;padding:6px 7px 7px}
+.planet.exh{opacity:.4}
+.planet .pn{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:13px;letter-spacing:.04em;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.planet .halves{display:flex;gap:4px;margin-top:5px}
+.ph{flex:1;border:1px solid var(--line);border-radius:2px;padding:3px 0;text-align:center;
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:15px;line-height:1.15}
+.ph small{display:block;font-family:"IBM Plex Mono";font-size:8px;letter-spacing:.12em;color:var(--mute);font-weight:400}
+.ph.on{background:var(--team);border-color:var(--team);color:var(--paper)}
+.ph.on small{color:var(--paper)}
+.ph:disabled{opacity:.3}
+.planet .del{position:absolute;top:-7px;right:-6px;width:22px;height:22px;border-radius:11px;
+  background:var(--paper);border:1px solid var(--bad);color:var(--bad);font-size:12px;line-height:20px;text-align:center}
+.addtile{border:1px dashed var(--line);border-radius:3px;color:var(--mute);
+  font-family:"Barlow Condensed",sans-serif;font-size:13px;letter-spacing:.1em;min-height:64px}
+.tgrow{display:flex;align-items:center;gap:10px;background:var(--wash);border:1px solid var(--line);
+  border-radius:3px;padding:8px 10px;margin-top:6px;flex-wrap:wrap}
+.tgrow .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.tgrow b{font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:700}
+.step{display:flex;align-items:center;border:1px solid var(--line);border-radius:2px;background:var(--tile)}
+.step button{width:28px;height:26px;font-size:15px;line-height:1}
+.step button:disabled{opacity:.25}
+.step .v{min-width:24px;text-align:center;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:15px;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);align-self:stretch;line-height:26px}
+
+/* ---- sheet ---- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;display:none}
+.scrim.open{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--paper);
+  border-top:2px solid var(--sc,var(--ink));border-radius:10px 10px 0 0;
+  max-width:480px;margin:0 auto;padding:16px 16px calc(18px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .18s ease;max-height:78vh;overflow-y:auto}
+.sheet.open{transform:none}
+@media (prefers-reduced-motion:reduce){.sheet{transition:none}}
+.sheet .snum{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:26px;color:var(--sc,var(--ink));line-height:1}
+.sheet h3{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px;letter-spacing:.08em;text-transform:uppercase;margin:1px 0 10px}
+.sheet h4{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:12px 0 3px}
+.sheet p{font-size:12px;line-height:1.55}
+.followbtn{display:block;width:100%;margin-top:14px;background:var(--sc,var(--team));color:#fff;
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;letter-spacing:.1em;
+  padding:10px;border-radius:2px;text-transform:uppercase}
+.followbtn.off{background:none;border:1px solid var(--line);color:var(--ink)}
+.followbtn.darktxt{color:#141414}
+.leadrow{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.field{margin-top:10px}
+.field label{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-bottom:4px}
+.field input{width:100%;background:var(--tile);border:1px solid var(--line);border-radius:2px;
+  color:var(--ink);font-family:inherit;font-size:14px;padding:8px 10px}
+.field input:focus{outline:2px solid var(--team);outline-offset:1px}
+.frow{display:flex;gap:14px;margin-top:10px}
+.note{font-size:10px;color:var(--mute);margin-top:10px;line-height:1.5}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<header class="top">
+  <div class="brand">WARCHEST</div>
+  <div class="tools">
+    <button class="tbtn" id="readyall">READY ALL</button>
+    <button class="tbtn" id="clearq">CLEAR</button>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="cells">
+    <div class="cell"><span class="k">Cost</span><b id="b-cost">0</b></div>
+    <div class="cell"><span class="k">Paid</span><b id="b-paid">0</b></div>
+    <div class="cell"><span class="k">Left after</span><b id="b-left">0</b></div>
+    <div class="actions">
+      <button class="apply" id="apply" disabled>APPLY</button>
+      <button class="ghost" id="auto">AUTO PAY</button>
+    </div>
+  </div>
+  <div class="subline" id="b-inf"></div>
+  <div class="warns" id="b-warn"></div>
+</div>
+
+<div id="last"></div>
+
+<section>
+  <h2>Build <span class="mini">tap to add · fighters &amp; infantry 2 per resource</span></h2>
+  <div class="grid5" id="build"></div>
+</section>
+
+<section>
+  <h2>Strategy <span class="mini">tap a card for primary / secondary</span></h2>
+  <div class="grid3" id="cards"></div>
+</section>
+
+<section>
+  <h2>Pay <span class="mini" id="payhint">tap R or I to exhaust</span>
+    <button class="tbtn" id="editpl">EDIT</button></h2>
+  <div class="pgrid" id="planets"></div>
+  <div class="tgrow">
+    <span class="lbl">Trade goods</span><b id="tgheld">0</b>
+    <span class="lbl">→ res</span>
+    <div class="step"><button data-tg="res" data-d="-1">−</button><div class="v" id="tgres">0</div><button data-tg="res" data-d="1">+</button></div>
+    <span class="lbl">→ inf</span>
+    <div class="step"><button data-tg="inf" data-d="-1">−</button><div class="v" id="tginf">0</div><button data-tg="inf" data-d="1">+</button></div>
+    <span class="lbl" style="margin-left:auto">held</span>
+    <div class="step"><button data-tg="held" data-d="-1">−</button><div class="v" id="tgheldstep">0</div><button data-tg="held" data-d="1">+</button></div>
+  </div>
+</section>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+const ICONS={
+ warsun:'<circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+ dread:'<path d="M2 12 L7 9 h13 l2.5 3 -2.5 3 H7 Z"/>',
+ carrier:'<path d="M3 10 h13 l5 2.5 -5 2.5 H3 l1.5 -2.5 Z"/><path d="M6 7 h8 v2.2 H6 Z"/>',
+ cruiser:'<path d="M4 12 L9.5 9.4 h8 l3 2.6 -3 2.6 h-8 Z"/>',
+ destroyer:'<path d="M6 12 L10.5 10.2 h6.5 l2 1.8 -2 1.8 h-6.5 Z"/>',
+ fighter:'<path d="M18.5 12 L6 5.5 l3.6 6.5 L6 18.5 Z"/>',
+ inf:'<circle cx="12" cy="7.2" r="3.1"/><path d="M6 20 c0-4.2 2.8-7 6-7 s6 2.8 6 7 Z"/>',
+ mech:'<rect x="7.5" y="4.5" width="9" height="8" rx="1"/><path d="M8.5 13.5 h2.8 v6 h-2.8 Z M12.7 13.5 h2.8 v6 h-2.8 Z M5 5.5 h1.8 v5.5 H5 Z M17.2 5.5 h1.8 v5.5 h-1.8 Z"/>',
+ pds:'<path d="M4 19.5 h16 v-2.6 H4 Z M8 16 a4.2 4.2 0 0 1 8 0 Z"/><path d="M13.4 9.4 l4.8-4.8 1.6 1.6 -4.8 4.8 Z"/>',
+ dock:'<path d="M12 3.2 l7 4 v8.6 l-7 4 -7-4 V7.2 Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="11.5" r="2.4"/>'
+};
+const UNITS=[
+ {id:'dread',name:'Dread',cost:4,pair:false,max:5},
+ {id:'carrier',name:'Carrier',cost:3,pair:false,max:4},
+ {id:'cruiser',name:'Cruiser',cost:2,pair:false,max:8},
+ {id:'destroyer',name:'Destr',cost:1,pair:false,max:8},
+ {id:'fighter',name:'Fighter',cost:1,pair:true,max:10},
+ {id:'warsun',name:'War Sun',cost:12,pair:false,max:2},
+ {id:'mech',name:'Mech',cost:2,pair:false,max:4},
+ {id:'inf',name:'Infantry',cost:1,pair:true,max:12},
+ {id:'pds',name:'PDS',cost:2,pair:false,max:6},
+ {id:'dock',name:'Dock',cost:4,pair:false,max:3}
+];
+const CARDS=[
+ {id:'leadership',n:1,name:'Leadership',c:'#C03A2B',
+  p:'Gain 3 command tokens. Then you may spend influence, 3 per token, to gain more.',
+  s:'Spend influence, 3 per extra token, to gain command tokens. Costs no strategy token.',
+  token:false,res:0,lead:true},
+ {id:'diplomacy',n:2,name:'Diplomacy',c:'#DB7B2B',
+  p:'Choose a system you control; other players place a token there and cannot activate it. Ready up to 2 exhausted planets.',
+  s:'Spend 1 strategy token: ready up to 2 of your exhausted planets.',token:true,res:0},
+ {id:'politics',n:3,name:'Politics',c:'#B8890A',dark:true,
+  p:'Choose the new speaker. Draw 2 action cards. Look at the top 2 agenda cards and rearrange them.',
+  s:'Spend 1 strategy token: draw 2 action cards.',token:true,res:0},
+ {id:'construction',n:4,name:'Construction',c:'#3E8E4E',
+  p:'Place 1 space dock and 1 PDS, or 2 PDS, on planets you control.',
+  s:'Spend 1 strategy token: place 1 structure on a planet you control.',token:true,res:0},
+ {id:'trade',n:5,name:'Trade',c:'#2E9C8E',
+  p:'Gain 3 trade goods, replenish your commodities, then choose players who also replenish.',
+  s:'Spend 1 strategy token: replenish your commodities.',token:true,res:0},
+ {id:'warfare',n:6,name:'Warfare',c:'#3B6FB4',
+  p:'Remove 1 of your command tokens from the board, then redistribute your pools.',
+  s:'Spend 1 strategy token: produce units at your home space dock. Unit costs still apply — add them in Build.',token:true,res:0},
+ {id:'tech',n:7,name:'Technology',c:'#31479E',
+  p:'Research 1 technology. Then you may spend 6 resources to research a second.',
+  s:'Spend 1 strategy token and 4 resources: research 1 technology.',token:true,res:4},
+ {id:'imperial',n:8,name:'Imperial',c:'#6E4BA6',
+  p:'Score 1 public objective you qualify for. Gain 1 VP if you control Mecatol Rex, otherwise draw 1 secret objective.',
+  s:'Spend 1 strategy token: draw 1 secret objective.',token:true,res:0}
+];
+const SEED=[
+ {name:'Winnu',res:3,inf:4},{name:'Sakulag',res:4,inf:1},{name:'Lazar',res:2,inf:1},
+ {name:'Mehar Xull',res:1,inf:3},{name:'Corneeq',res:1,inf:2},{name:'Thibah',res:1,inf:1},
+ {name:'Abyz',res:3,inf:0},{name:'Fria',res:2,inf:0},{name:'Resculon',res:2,inf:0}
+];
+const KEY='warchest-v1';
+let S=null;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.planets){
+ S={buy:{},follow:{},lead:0,pool:2,tg:3,tgRes:0,tgInf:0,edit:false,
+    planets:SEED.map((p,i)=>({id:'p'+i,name:p.name,res:p.res,inf:p.inf,ex:false})),
+    spend:{},last:null,prev:null,nextId:SEED.length};
+}
+S.edit=false;
+const $=id=>document.getElementById(id);
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+
+function unitCost(){
+ return UNITS.reduce((s,u)=>{const n=S.buy[u.id]||0;
+  return s+(u.pair?Math.ceil(n/2)*u.cost:n*u.cost)},0);
+}
+function tally(){
+ const secRes=CARDS.reduce((s,c)=>s+((S.follow[c.id]&&c.res)||0),0);
+ const costRes=unitCost()+secRes;
+ const costInf=S.lead*3;
+ const tokens=CARDS.reduce((s,c)=>s+((S.follow[c.id]&&c.token)?1:0),0);
+ let paidRes=S.tgRes, paidInf=S.tgInf, readyRes=0, readyInf=0;
+ S.planets.forEach(p=>{
+  if(p.ex) return;
+  const m=S.spend[p.id];
+  if(m==='res') paidRes+=p.res;
+  else if(m==='inf') paidInf+=p.inf;
+  else {readyRes+=p.res; readyInf+=p.inf;}
+ });
+ const tgLeft=S.tg-S.tgRes-S.tgInf;
+ return {secRes,costRes,costInf,tokens,paidRes,paidInf,
+  leftRes:readyRes+tgLeft, leftInf:readyInf+tgLeft,
+  covered:paidRes>=costRes&&paidInf>=costInf&&S.pool>=tokens,
+  queued:costRes>0||costInf>0||tokens>0||paidRes>0||paidInf>0};
+}
+
+function drawBar(t){
+ $('b-cost').textContent=t.costRes;
+ $('b-paid').textContent=t.paidRes;
+ $('b-paid').className=t.paidRes<t.costRes?'bad':'ok';
+ $('b-left').textContent=t.leftRes;
+ const inf=[];
+ if(t.costInf||t.paidInf) inf.push(`influence: cost ${t.costInf} · paid ${t.paidInf}`);
+ if(t.tokens) inf.push(`${t.tokens} strategy token${t.tokens>1?'s':''} of ${S.pool}`);
+ $('b-inf').textContent=inf.join('  ·  ');
+ const w=[];
+ if(t.paidRes<t.costRes) w.push(`${t.costRes-t.paidRes} resource short — tap planets or AUTO PAY.`);
+ if(t.paidRes>t.costRes&&t.costRes>0||t.paidRes>0&&t.costRes===0) w.push(`${t.paidRes-t.costRes} resource wasted if you apply now.`);
+ if(t.paidInf<t.costInf) w.push(`${t.costInf-t.paidInf} influence short.`);
+ if(t.paidInf>t.costInf) w.push(`${t.paidInf-t.costInf} influence wasted.`);
+ if(t.tokens>S.pool) w.push(`Not enough strategy tokens (${S.pool} in pool).`);
+ $('b-warn').innerHTML=w.join('<br>');
+ $('apply').disabled=!(t.queued&&t.covered);
+}
+
+function drawLast(){
+ const b=$('last');
+ if(!S.last){b.innerHTML='';return;}
+ b.innerHTML=`<div class="last"><h3>Applied${S.prev?'<button class="undo" id="undo">undo</button>':''}</h3>
+  ${S.last.map(l=>`<div>${l}</div>`).join('')}</div>`;
+}
+
+function drawBuild(t){
+ const slack=t.leftRes+t.paidRes-t.costRes; // spare purchasing power right now
+ $('build').innerHTML=UNITS.map(u=>{
+  const n=S.buy[u.id]||0;
+  const marginal=u.pair?(n%2===1?0:u.cost):u.cost;
+  const dim=n===0&&marginal>slack;
+  return `<button class="chit ${n>0?'sel':''} ${dim?'dim':''}" data-u="${u.id}" aria-label="${u.name}, cost ${u.pair?'half':u.cost}">
+   <svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[u.id]}</svg>
+   <span class="un">${u.name}</span><span class="uc">${u.pair?'½':u.cost}R</span>
+   ${n>0?`<span class="n">${n}</span><span class="minus" data-minus="${u.id}" role="button" aria-label="remove one">−</span>`:''}
+  </button>`;
+ }).join('');
+}
+
+function drawCards(){
+ $('cards').innerHTML=CARDS.map(c=>{
+  const on=c.lead?S.lead>0:!!S.follow[c.id];
+  const bits=[];
+  if(c.lead&&S.lead>0) bits.push(`${S.lead} token${S.lead>1?'s':''} · ${S.lead*3}I`);
+  else if(c.lead) bits.push('tokens for influence');
+  else{const parts=[];if(c.token)parts.push('1⬡');if(c.res)parts.push(c.res+'R');bits.push(parts.join(' + '));}
+  return `<button class="scard ${on?'on':''} ${c.dark?'darktxt':''}" style="--cc:${c.c}" data-c="${c.id}">
+   <span class="num">${c.n}</span><span><span class="nm">${c.name}</span>
+   <span class="fc" style="display:block">${bits.join('')}</span></span></button>`;
+ }).join('')+`
+ <div class="pooltile"><span class="nm">Strategy pool</span>
+  <div class="step" style="align-self:flex-start;margin-top:4px">
+   <button data-pool="-1">−</button><div class="v">${S.pool}</div><button data-pool="1">+</button></div>
+  <span class="fc">tokens for secondaries</span></div>`;
+}
+
+function drawPlanets(){
+ $('planets').innerHTML=S.planets.map(p=>{
+  const m=S.spend[p.id];
+  return `<div class="planet ${p.ex?'exh':''}">
+   ${S.edit?`<button class="del" data-del="${p.id}" aria-label="delete ${p.name}">×</button>`:''}
+   ${S.edit?`<button class="pn" data-editp="${p.id}" style="display:block;width:100%;text-align:left">${p.name} ✎</button>`:`<div class="pn">${p.name}${p.ex?' ·EXH':''}</div>`}
+   <div class="halves">
+    <button class="ph ${m==='res'?'on':''}" data-p="${p.id}" data-m="res" ${p.ex?'disabled':''}>${p.res}<small>RES</small></button>
+    <button class="ph ${m==='inf'?'on':''}" data-p="${p.id}" data-m="inf" ${p.ex||p.inf===0?'disabled':''}>${p.inf}<small>INF</small></button>
+   </div></div>`;
+ }).join('')+`<button class="addtile" id="addpl">+ PLANET</button>`;
+ $('tgheld').textContent=S.tg-S.tgRes-S.tgInf;
+ $('tgres').textContent=S.tgRes; $('tginf').textContent=S.tgInf; $('tgheldstep').textContent=S.tg;
+ document.querySelectorAll('[data-tg]').forEach(b=>{
+  const k=b.dataset.tg,d=+b.dataset.d;
+  if(k==='held') b.disabled = d<0 ? S.tg<=S.tgRes+S.tgInf : S.tg>=20;
+  else b.disabled = d<0 ? S[k==='res'?'tgRes':'tgInf']===0 : S.tgRes+S.tgInf>=S.tg;
+ });
+ $('editpl').textContent=S.edit?'DONE':'EDIT';
+}
+
+function render(){
+ const t=tally();
+ drawBar(t); drawLast(); drawBuild(t); drawCards(); drawPlanets();
+ save();
+}
+
+/* ---- sheet ---- */
+let sheetPl=null;
+function openSheet(html,color){
+ const sh=$('sheet');
+ sh.style.setProperty('--sc',color||'var(--ink)');
+ sh.innerHTML=html;
+ $('scrim').classList.add('open'); sh.classList.add('open');
+}
+function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open');sheetPl=null;}
+
+function cardSheet(id){
+ const c=CARDS.find(x=>x.id===id);
+ const on=c.lead?S.lead>0:!!S.follow[c.id];
+ let action;
+ if(c.lead){
+  action=`<div class="leadrow"><span class="lbl" style="font-size:10px;letter-spacing:.1em;color:var(--mute)">TOKENS TO BUY</span>
+   <div class="step"><button data-lead="-1" ${S.lead===0?'disabled':''}>−</button><div class="v">${S.lead}</div><button data-lead="1">+</button></div>
+   <span style="font-size:11px;color:var(--mute)">= ${S.lead*3} influence</span></div>`;
+ }else{
+  const cost=[c.token?'1 strategy token':null,c.res?c.res+' resources':null].filter(Boolean).join(' + ');
+  action=`<button class="followbtn ${on?'':'off'} ${c.dark?'darktxt':''}" data-follow="${c.id}">
+   ${on?'Following — tap to drop':'Follow secondary'+(cost?' · '+cost:'')}</button>`;
+ }
+ openSheet(`<span class="snum">${c.n}</span><h3>${c.name}</h3>
+  <h4>Primary — card holder</h4><p>${c.p}</p>
+  <h4>Secondary — everyone else</h4><p>${c.s}</p>${action}`,c.c);
+}
+
+function planetSheet(p){
+ sheetPl=p?p.id:null;
+ openSheet(`<h3>${p?'Edit planet':'Add planet'}</h3>
+  <div class="field"><label for="f-name">Name</label><input id="f-name" value="${p?p.name.replace(/"/g,'&quot;'):''}" autocomplete="off"></div>
+  <div class="frow">
+   <div class="field" style="flex:1"><label for="f-res">Resources</label><input id="f-res" type="number" min="0" max="9" inputmode="numeric" value="${p?p.res:1}"></div>
+   <div class="field" style="flex:1"><label for="f-inf">Influence</label><input id="f-inf" type="number" min="0" max="9" inputmode="numeric" value="${p?p.inf:1}"></div>
+  </div>
+  <button class="followbtn" id="plsave">Save planet</button>
+  <div class="note">Planet values stay on this device until asyncti4 sync lands.</div>`);
+ setTimeout(()=>$('f-name').focus(),150);
+}
+
+/* ---- auto pay: cheapest cover, keep influence ---- */
+function autoPay(){
+ const t=tally();
+ const needR=t.costRes, needI=t.costInf;
+ const ready=S.planets.filter(p=>!p.ex);
+ const n=ready.length;
+ if(n>11){greedyPay(needR,needI,ready);return;}
+ let best=null;
+ const combos=Math.pow(3,n);
+ for(let c=0;c<combos;c++){
+  let m=c,res=0,inf=0,keepR=0,keepI=0;const used=[];let ok=true;
+  for(let i=0;i<n;i++){
+   const d=m%3;m=(m-d)/3;const p=ready[i];
+   if(d===1){res+=p.res;used.push([p.id,'res']);}
+   else if(d===2){if(p.inf===0){ok=false;break;}inf+=p.inf;used.push([p.id,'inf']);}
+   else{keepR+=p.res;keepI+=p.inf;}
+  }
+  if(!ok||res>needR+4||inf>needI+3)continue;
+  for(let tr=0;tr<=S.tg;tr++)for(let ti=0;ti<=S.tg-tr;ti++){
+   if(res+tr<needR||inf+ti<needI)continue;
+   const score=keepI*3+keepR*2+(S.tg-tr-ti)*2-used.length*.1-(res+tr-needR)*2.5-(inf+ti-needI)*2.5;
+   if(!best||score>best.score)best={score,used,tr,ti};
+  }
+ }
+ if(!best){$('b-warn').innerHTML='Nothing you hold covers this bill.';return;}
+ S.spend={};best.used.forEach(([id,m])=>S.spend[id]=m);
+ S.tgRes=best.tr;S.tgInf=best.ti;render();
+}
+function greedyPay(needR,needI,ready){
+ S.spend={};let r=0,i=0;
+ [...ready].sort((a,b)=>(b.res-b.inf)-(a.res-a.inf)).forEach(p=>{
+  if(r<needR&&p.res>0){S.spend[p.id]='res';r+=p.res;}
+ });
+ [...ready].sort((a,b)=>(b.inf-b.res)-(a.inf-a.res)).forEach(p=>{
+  if(i<needI&&!S.spend[p.id]&&p.inf>0){S.spend[p.id]='inf';i+=p.inf;}
+ });
+ S.tgRes=Math.min(S.tg,Math.max(0,needR-r));
+ S.tgInf=Math.min(S.tg-S.tgRes,Math.max(0,needI-i));
+ render();
+}
+
+function apply(){
+ const t=tally();
+ if(!(t.queued&&t.covered))return;
+ S.prev=JSON.stringify({buy:S.buy,follow:S.follow,lead:S.lead,pool:S.pool,tg:S.tg,
+  tgRes:S.tgRes,tgInf:S.tgInf,planets:S.planets,spend:S.spend,last:S.last});
+ const lines=[];
+ const built=UNITS.filter(u=>S.buy[u.id]>0).map(u=>`${S.buy[u.id]}× ${u.name}`).join(', ');
+ if(built)lines.push(`Built ${built} — ${unitCost()}R.`);
+ const fol=CARDS.filter(c=>c.lead?S.lead>0:S.follow[c.id])
+  .map(c=>c.lead?`Leadership ${S.lead} token${S.lead>1?'s':''} (${S.lead*3}I)`:c.name+(c.res?` (+${c.res}R)`:''));
+ if(fol.length)lines.push(`Followed ${fol.join(', ')}.`);
+ const pay=[];
+ S.planets.forEach(p=>{const m=S.spend[p.id];
+  if(m==='res')pay.push(`${p.name} R${p.res}`);else if(m==='inf')pay.push(`${p.name} I${p.inf}`);});
+ if(S.tgRes)pay.push(`${S.tgRes} TG→R`);if(S.tgInf)pay.push(`${S.tgInf} TG→I`);
+ if(pay.length)lines.push(`Paid with ${pay.join(', ')}.`);
+ if(t.paidRes>t.costRes)lines.push(`${t.paidRes-t.costRes}R over — wasted.`);
+ if(t.paidInf>t.costInf)lines.push(`${t.paidInf-t.costInf}I over — wasted.`);
+ if(S.lead>0)lines.push(`Gained ${S.lead} command token${S.lead>1?'s':''} — add to a pool by hand.`);
+ // commit
+ S.planets.forEach(p=>{if(S.spend[p.id])p.ex=true;});
+ S.tg-=S.tgRes+S.tgInf;
+ S.pool-=t.tokens;
+ const t2=(()=>{let rr=0,ii=0;S.planets.forEach(p=>{if(!p.ex){rr+=p.res;ii+=p.inf;}});return{rr,ii}})();
+ lines.push(`Left ready: ${t2.rr}R / ${t2.ii}I + ${S.tg} TG.`);
+ S.buy={};S.follow={};S.lead=0;S.spend={};S.tgRes=0;S.tgInf=0;
+ S.last=lines;
+ render();
+}
+
+document.addEventListener('click',e=>{
+ const minus=e.target.closest('[data-minus]');
+ const b=e.target.closest('button');
+ if(minus){e.stopPropagation();
+  S.buy[minus.dataset.minus]=Math.max(0,(S.buy[minus.dataset.minus]||0)-1);render();return;}
+ if(e.target.id==='scrim'){closeSheet();return;}
+ if(!b)return;
+ if(b.dataset.u){const u=UNITS.find(x=>x.id===b.dataset.u);
+  S.buy[u.id]=Math.min(u.max,(S.buy[u.id]||0)+1);render();}
+ else if(b.dataset.c){cardSheet(b.dataset.c);}
+ else if(b.dataset.follow){S.follow[b.dataset.follow]=!S.follow[b.dataset.follow];render();cardSheet(b.dataset.follow);}
+ else if(b.dataset.lead!==undefined){S.lead=Math.max(0,S.lead+ +b.dataset.lead);render();cardSheet('leadership');}
+ else if(b.dataset.pool!==undefined){S.pool=Math.max(0,Math.min(9,S.pool+ +b.dataset.pool));render();}
+ else if(b.dataset.p){const id=b.dataset.p,m=b.dataset.m;
+  S.spend[id]=S.spend[id]===m?undefined:m;if(!S.spend[id])delete S.spend[id];render();}
+ else if(b.dataset.del){S.planets=S.planets.filter(p=>p.id!==b.dataset.del);delete S.spend[b.dataset.del];render();}
+ else if(b.dataset.tg){const k=b.dataset.tg,d=+b.dataset.d;
+  if(k==='held'){S.tg=Math.max(S.tgRes+S.tgInf,Math.min(20,S.tg+d));}
+  else{const key=k==='res'?'tgRes':'tgInf';
+   if(d>0&&S.tgRes+S.tgInf<S.tg)S[key]++;if(d<0&&S[key]>0)S[key]--;}
+  render();}
+ else if(b.dataset.editp){const p=S.planets.find(x=>x.id===b.dataset.editp);if(p)planetSheet(p);}
+ else if(b.id==='addpl'){planetSheet(null);}
+ else if(b.id==='plsave'){
+  const name=$('f-name').value.trim()||'Planet';
+  const res=Math.max(0,Math.min(9,+$('f-res').value||0));
+  const inf=Math.max(0,Math.min(9,+$('f-inf').value||0));
+  if(sheetPl){const p=S.planets.find(x=>x.id===sheetPl);if(p){p.name=name;p.res=res;p.inf=inf;}}
+  else S.planets.push({id:'p'+(S.nextId++),name,res,inf,ex:false});
+  closeSheet();render();}
+ else if(b.id==='editpl'){S.edit=!S.edit;render();}
+ else if(b.id==='readyall'){S.planets.forEach(p=>p.ex=false);render();}
+ else if(b.id==='clearq'){S.buy={};S.follow={};S.lead=0;S.spend={};S.tgRes=0;S.tgInf=0;render();}
+ else if(b.id==='auto'){autoPay();}
+ else if(b.id==='apply'){apply();}
+ else if(b.id==='undo'){if(S.prev){const p=JSON.parse(S.prev);Object.assign(S,p);S.prev=null;render();}}
+});
+render();
+</script>
