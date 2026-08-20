@@ -147,6 +147,17 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
 .field input:focus{outline:2px solid var(--team);outline-offset:1px}
 .frow{display:flex;gap:14px;margin-top:10px}
 .note{font-size:10px;color:var(--mute);margin-top:10px;line-height:1.5}
+.pip{display:inline-block;width:9px;height:9px;border-radius:2px;margin-left:3px}
+.trow{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;
+  border:1px solid var(--line);border-radius:2px;padding:8px 10px;margin-top:5px;text-align:left;background:var(--tile)}
+.trow .tn{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:14px;letter-spacing:.03em}
+.trow.sel{border-color:var(--team);background:var(--wash)}
+.trow .pip{margin-left:2px}
+.tgroup{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:12px 0 2px}
+.backbtn{font-size:10px;letter-spacing:.12em;color:var(--mute);border:1px solid var(--line);padding:4px 10px;border-radius:2px;margin-bottom:8px}
+.segbtn{flex:1;border:1px solid var(--line);border-radius:2px;padding:7px 0;text-align:center;
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px}
+.segbtn.on{background:var(--team);border-color:var(--team);color:var(--paper)!important}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -171,6 +182,7 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
     </div>
   </div>
   <div class="subline" id="b-inf"></div>
+  <div class="subline" id="b-left2"></div>
   <div class="warns" id="b-warn"></div>
 </div>
 
@@ -270,6 +282,36 @@ if(!S||!S.planets){
     spend:{},last:null,prev:null,nextId:SEED.length};
 }
 S.edit=false;
+const TCOL={B:'#2E5FB7',G:'#3E8E4E',Y:'#B8890A',R:'#C03A2B'};
+const pips=pre=>[...(pre||'')].map(c=>`<span class="pip" style="background:${TCOL[c]}"></span>`).join('');
+const TECHS=[
+ {g:'Blue — Propulsion',list:[
+  ['antimass','Antimass Deflectors',''],['darkenergy','Dark Energy Tap',''],
+  ['gravdrive','Gravity Drive','B'],['sling','Sling Relay','B'],
+  ['fleetlog','Fleet Logistics','BB'],['lwd','Light/Wave Deflector','BBB']]},
+ {g:'Green — Biotic',list:[
+  ['neural','Neural Motivator',''],['psycho','Psychoarchaeology',''],
+  ['dacxive','Dacxive Animators','G'],['biostims','Bio-Stims','G'],
+  ['hyper','Hyper Metabolism','GG'],['x89','X-89 Bacterial Weapon','GGG']]},
+ {g:'Yellow — Cybernetic',list:[
+  ['sarween','Sarween Tools',''],['scanlink','Scanlink Drone Network',''],
+  ['graviton','Graviton Laser System','Y'],['predictive','Predictive Intelligence','Y'],
+  ['transit','Transit Diodes','YY'],['integrated','Integrated Economy','YYY']]},
+ {g:'Red — Warfare',list:[
+  ['plasma','Plasma Scoring',''],['aidev','AI Development Algorithm',''],
+  ['magen','Magen Defense Grid','R'],['selfassembly','Self-Assembly Routines','R'],
+  ['duranium','Duranium Armor','RR'],['assault','Assault Cannon','RRR']]},
+ {g:'Unit upgrades',list:[
+  ['carrier2','Carrier II','BB'],['cruiser2','Cruiser II','GYR'],
+  ['destroyer2','Destroyer II','RR'],['dread2','Dreadnought II','BBY'],
+  ['fighter2','Fighter II','BG'],['inf2','Infantry II','GR'],
+  ['pds2','PDS II','RY'],['dock2','Space Dock II','YY'],['warsun2','War Sun','RRRY']]}
+];
+const TECHIX={};TECHS.forEach(g=>g.list.forEach(([id,name,pre])=>TECHIX[id]={id,name,pre}));
+const SKIPMAP={'Thibah':'B','Mehar Xull':'R','Lazar':'Y'};
+S.planets.forEach(pl=>{if(pl.skip===undefined)pl.skip=SKIPMAP[pl.name]||null;});
+if(S.tech===undefined)S.tech=null;
+if(S.skipPlanet===undefined)S.skipPlanet=null;
 const $=id=>document.getElementById(id);
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 
@@ -282,19 +324,21 @@ function tally(){
  const costRes=unitCost()+secRes;
  const costInf=S.lead*3;
  const tokens=CARDS.reduce((s,c)=>s+((S.follow[c.id]&&c.token)?1:0),0);
+ const skipUsed=S.follow.tech?S.skipPlanet:null;
  let paidRes=S.tgRes, paidInf=S.tgInf, readyRes=0, readyInf=0;
  S.planets.forEach(p=>{
-  if(p.ex) return;
+  if(p.ex||p.id===skipUsed) return;
   const m=S.spend[p.id];
   if(m==='res') paidRes+=p.res;
   else if(m==='inf') paidInf+=p.inf;
   else {readyRes+=p.res; readyInf+=p.inf;}
  });
  const tgLeft=S.tg-S.tgRes-S.tgInf;
- return {secRes,costRes,costInf,tokens,paidRes,paidInf,
+ const leadMax=Math.floor((readyInf+tgLeft)/3);
+ return {secRes,costRes,costInf,tokens,paidRes,paidInf,readyRes,readyInf,tgLeft,leadMax,skipUsed,
   leftRes:readyRes+tgLeft, leftInf:readyInf+tgLeft,
   covered:paidRes>=costRes&&paidInf>=costInf&&S.pool>=tokens,
-  queued:costRes>0||costInf>0||tokens>0||paidRes>0||paidInf>0};
+  queued:costRes>0||costInf>0||tokens>0||paidRes>0||paidInf>0||!!skipUsed};
 }
 
 function drawBar(t){
@@ -306,6 +350,7 @@ function drawBar(t){
  if(t.costInf||t.paidInf) inf.push(`influence: cost ${t.costInf} · paid ${t.paidInf}`);
  if(t.tokens) inf.push(`${t.tokens} strategy token${t.tokens>1?'s':''} of ${S.pool}`);
  $('b-inf').textContent=inf.join('  ·  ');
+ $('b-left2').textContent=`left: ${t.readyRes}R + ${t.tgLeft}TG · ${t.readyInf}I — Leadership: up to ${t.leadMax} token${t.leadMax===1?'':'s'}`;
  const w=[];
  if(t.paidRes<t.costRes) w.push(`${t.costRes-t.paidRes} resource short — tap planets or AUTO PAY.`);
  if(t.paidRes>t.costRes&&t.costRes>0||t.paidRes>0&&t.costRes===0) w.push(`${t.paidRes-t.costRes} resource wasted if you apply now.`);
@@ -337,12 +382,13 @@ function drawBuild(t){
  }).join('');
 }
 
-function drawCards(){
+function drawCards(t){
  $('cards').innerHTML=CARDS.map(c=>{
   const on=c.lead?S.lead>0:!!S.follow[c.id];
   const bits=[];
   if(c.lead&&S.lead>0) bits.push(`${S.lead} token${S.lead>1?'s':''} · ${S.lead*3}I`);
-  else if(c.lead) bits.push('tokens for influence');
+  else if(c.lead) bits.push(`up to ${t.leadMax} buyable`);
+  else if(c.id==='tech'&&on&&S.tech) bits.push(`1⬡+4R · ${TECHIX[S.tech].name}`);
   else{const parts=[];if(c.token)parts.push('1⬡');if(c.res)parts.push(c.res+'R');bits.push(parts.join(' + '));}
   return `<button class="scard ${on?'on':''} ${c.dark?'darktxt':''}" style="--cc:${c.c}" data-c="${c.id}">
    <span class="num">${c.n}</span><span><span class="nm">${c.name}</span>
@@ -357,12 +403,14 @@ function drawCards(){
 function drawPlanets(){
  $('planets').innerHTML=S.planets.map(p=>{
   const m=S.spend[p.id];
+  const isPre=!!(S.follow.tech&&S.skipPlanet===p.id);
+  const sk=p.skip?`<span class="pip" style="background:${TCOL[p.skip]}"></span>`:'';
   return `<div class="planet ${p.ex?'exh':''}">
    ${S.edit?`<button class="del" data-del="${p.id}" aria-label="delete ${p.name}">×</button>`:''}
-   ${S.edit?`<button class="pn" data-editp="${p.id}" style="display:block;width:100%;text-align:left">${p.name} ✎</button>`:`<div class="pn">${p.name}${p.ex?' ·EXH':''}</div>`}
+   ${S.edit?`<button class="pn" data-editp="${p.id}" style="display:block;width:100%;text-align:left">${p.name} ✎</button>`:`<div class="pn">${p.name}${sk}${p.ex?' ·EXH':isPre?' ·PRE':''}</div>`}
    <div class="halves">
-    <button class="ph ${m==='res'?'on':''}" data-p="${p.id}" data-m="res" ${p.ex?'disabled':''}>${p.res}<small>RES</small></button>
-    <button class="ph ${m==='inf'?'on':''}" data-p="${p.id}" data-m="inf" ${p.ex||p.inf===0?'disabled':''}>${p.inf}<small>INF</small></button>
+    <button class="ph ${m==='res'?'on':''}" data-p="${p.id}" data-m="res" ${p.ex||isPre?'disabled':''}>${p.res}<small>RES</small></button>
+    <button class="ph ${m==='inf'?'on':''}" data-p="${p.id}" data-m="inf" ${p.ex||p.inf===0||isPre?'disabled':''}>${p.inf}<small>INF</small></button>
    </div></div>`;
  }).join('')+`<button class="addtile" id="addpl">+ PLANET</button>`;
  $('tgheld').textContent=S.tg-S.tgRes-S.tgInf;
@@ -377,7 +425,7 @@ function drawPlanets(){
 
 function render(){
  const t=tally();
- drawBar(t); drawLast(); drawBuild(t); drawCards(); drawPlanets();
+ drawBar(t); drawLast(); drawBuild(t); drawCards(t); drawPlanets();
  save();
 }
 
@@ -404,11 +452,31 @@ function cardSheet(id){
   action=`<button class="followbtn ${on?'':'off'} ${c.dark?'darktxt':''}" data-follow="${c.id}">
    ${on?'Following — tap to drop':'Follow secondary'+(cost?' · '+cost:'')}</button>`;
  }
+ let extra='';
+ if(c.id==='tech'){
+  const tk=S.tech?TECHIX[S.tech]:null;
+  extra=`<h4>Researching</h4>
+   <button class="trow" data-choosetech="1"><span class="tn">${tk?tk.name:'Choose a technology…'}</span><span>${tk?pips(tk.pre):''} ›</span></button>`;
+  if(tk&&tk.pre){
+   const opts=S.planets.filter(pl=>!pl.ex&&pl.skip&&tk.pre.includes(pl.skip));
+   extra+=`<h4>Cover 1 prerequisite with a specialty planet</h4>`+
+    (opts.length?opts.map(pl=>`<button class="trow ${S.skipPlanet===pl.id?'sel':''}" data-skipp="${pl.id}">
+      <span class="tn">${pl.name}</span><span style="font-size:10px;color:var(--mute)">exhaust ${pips(pl.skip)}</span></button>`).join('')
+     :`<p style="font-size:11px;color:var(--mute);margin-top:4px">No ready planet with a matching specialty.</p>`);
+  }
+ }
  openSheet(`<span class="snum">${c.n}</span><h3>${c.name}</h3>
   <h4>Primary — card holder</h4><p>${c.p}</p>
-  <h4>Secondary — everyone else</h4><p>${c.s}</p>${action}`,c.c);
+  <h4>Secondary — everyone else</h4><p>${c.s}</p>${extra}${action}`,c.c);
 }
 
+function techSheet(){
+ openSheet(`<button class="backbtn" data-c="tech">‹ BACK</button><h3>Choose technology</h3>`+
+  TECHS.map(g=>`<div class="tgroup">${g.g}</div>`+g.list.map(([id,name,pre])=>
+   `<button class="trow ${S.tech===id?'sel':''}" data-pick="${id}"><span class="tn">${name}</span>
+    <span>${pips(pre)||'<span style="font-size:9px;color:var(--mute)">no prereq</span>'}</span></button>`).join('')).join(''),
+  CARDS.find(c=>c.id==='tech').c);
+}
 function planetSheet(p){
  sheetPl=p?p.id:null;
  openSheet(`<h3>${p?'Edit planet':'Add planet'}</h3>
@@ -417,6 +485,10 @@ function planetSheet(p){
    <div class="field" style="flex:1"><label for="f-res">Resources</label><input id="f-res" type="number" min="0" max="9" inputmode="numeric" value="${p?p.res:1}"></div>
    <div class="field" style="flex:1"><label for="f-inf">Influence</label><input id="f-inf" type="number" min="0" max="9" inputmode="numeric" value="${p?p.inf:1}"></div>
   </div>
+  <div class="field"><label>Tech specialty (prereq skip)</label>
+   <div class="frow" id="skipseg" style="gap:6px;margin-top:0">
+   ${['','B','G','Y','R'].map(v=>`<button class="segbtn ${(p&&(p.skip||'')===v)||(!p&&v==='')?'on':''}" data-skipv="${v}" style="color:${v?TCOL[v]:'var(--mute)'}">${v||'—'}</button>`).join('')}
+  </div></div>
   <button class="followbtn" id="plsave">Save planet</button>
   <div class="note">Planet values stay on this device until asyncti4 sync lands.</div>`);
  setTimeout(()=>$('f-name').focus(),150);
@@ -426,7 +498,7 @@ function planetSheet(p){
 function autoPay(){
  const t=tally();
  const needR=t.costRes, needI=t.costInf;
- const ready=S.planets.filter(p=>!p.ex);
+ const ready=S.planets.filter(p=>!p.ex&&!(S.follow.tech&&S.skipPlanet===p.id));
  const n=ready.length;
  if(n>11){greedyPay(needR,needI,ready);return;}
  let best=null;
@@ -442,7 +514,7 @@ function autoPay(){
   if(!ok||res>needR+4||inf>needI+3)continue;
   for(let tr=0;tr<=S.tg;tr++)for(let ti=0;ti<=S.tg-tr;ti++){
    if(res+tr<needR||inf+ti<needI)continue;
-   const score=keepI*3+keepR*2+(S.tg-tr-ti)*2-used.length*.1-(res+tr-needR)*2.5-(inf+ti-needI)*2.5;
+   const score=keepI*3+keepR*1.5+(S.tg-tr-ti)*3.2-used.length*.1-(res+tr-needR)*2.6-(inf+ti-needI)*2.6;
    if(!best||score>best.score)best={score,used,tr,ti};
   }
  }
@@ -467,12 +539,16 @@ function apply(){
  const t=tally();
  if(!(t.queued&&t.covered))return;
  S.prev=JSON.stringify({buy:S.buy,follow:S.follow,lead:S.lead,pool:S.pool,tg:S.tg,
-  tgRes:S.tgRes,tgInf:S.tgInf,planets:S.planets,spend:S.spend,last:S.last});
+  tgRes:S.tgRes,tgInf:S.tgInf,planets:S.planets,spend:S.spend,last:S.last,tech:S.tech,skipPlanet:S.skipPlanet});
  const lines=[];
  const built=UNITS.filter(u=>S.buy[u.id]>0).map(u=>`${S.buy[u.id]}× ${u.name}`).join(', ');
  if(built)lines.push(`Built ${built} — ${unitCost()}R.`);
+ const skp=(S.follow.tech&&S.skipPlanet)?S.planets.find(pl=>pl.id===S.skipPlanet):null;
  const fol=CARDS.filter(c=>c.lead?S.lead>0:S.follow[c.id])
-  .map(c=>c.lead?`Leadership ${S.lead} token${S.lead>1?'s':''} (${S.lead*3}I)`:c.name+(c.res?` (+${c.res}R)`:''));
+  .map(c=>{
+   if(c.lead)return `Leadership ${S.lead} token${S.lead>1?'s':''} (${S.lead*3}I)`;
+   if(c.id==='tech'&&S.tech)return `Technology → ${TECHIX[S.tech].name} (+4R${skp?`; ${skp.name} exhausted for prereq`:''})`;
+   return c.name+(c.res?` (+${c.res}R)`:'');});
  if(fol.length)lines.push(`Followed ${fol.join(', ')}.`);
  const pay=[];
  S.planets.forEach(p=>{const m=S.spend[p.id];
@@ -484,11 +560,13 @@ function apply(){
  if(S.lead>0)lines.push(`Gained ${S.lead} command token${S.lead>1?'s':''} — add to a pool by hand.`);
  // commit
  S.planets.forEach(p=>{if(S.spend[p.id])p.ex=true;});
+ if(skp)skp.ex=true;
  S.tg-=S.tgRes+S.tgInf;
  S.pool-=t.tokens;
  const t2=(()=>{let rr=0,ii=0;S.planets.forEach(p=>{if(!p.ex){rr+=p.res;ii+=p.inf;}});return{rr,ii}})();
- lines.push(`Left ready: ${t2.rr}R / ${t2.ii}I + ${S.tg} TG.`);
- S.buy={};S.follow={};S.lead=0;S.spend={};S.tgRes=0;S.tgInf=0;
+ const lm=Math.floor((t2.ii+S.tg)/3);
+ lines.push(`Left ready: ${t2.rr}R / ${t2.ii}I + ${S.tg} TG — up to ${lm} Leadership token${lm===1?'':'s'}.`);
+ S.buy={};S.follow={};S.lead=0;S.spend={};S.tgRes=0;S.tgInf=0;S.tech=null;S.skipPlanet=null;
  S.last=lines;
  render();
 }
@@ -506,6 +584,16 @@ document.addEventListener('click',e=>{
  else if(b.dataset.follow){S.follow[b.dataset.follow]=!S.follow[b.dataset.follow];render();cardSheet(b.dataset.follow);}
  else if(b.dataset.lead!==undefined){S.lead=Math.max(0,S.lead+ +b.dataset.lead);render();cardSheet('leadership');}
  else if(b.dataset.pool!==undefined){S.pool=Math.max(0,Math.min(9,S.pool+ +b.dataset.pool));render();}
+ else if(b.dataset.choosetech){techSheet();}
+ else if(b.dataset.pick){S.tech=b.dataset.pick;S.follow.tech=true;
+  const tk=TECHIX[S.tech];
+  if(S.skipPlanet){const sp=S.planets.find(pl=>pl.id===S.skipPlanet);
+   if(!sp||!sp.skip||!tk.pre.includes(sp.skip))S.skipPlanet=null;}
+  render();cardSheet('tech');}
+ else if(b.dataset.skipp){S.skipPlanet=S.skipPlanet===b.dataset.skipp?null:b.dataset.skipp;
+  if(S.skipPlanet)delete S.spend[S.skipPlanet];render();cardSheet('tech');}
+ else if(b.dataset.skipv!==undefined){
+  b.parentElement.querySelectorAll('.segbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');}
  else if(b.dataset.p){const id=b.dataset.p,m=b.dataset.m;
   S.spend[id]=S.spend[id]===m?undefined:m;if(!S.spend[id])delete S.spend[id];render();}
  else if(b.dataset.del){S.planets=S.planets.filter(p=>p.id!==b.dataset.del);delete S.spend[b.dataset.del];render();}
@@ -520,8 +608,10 @@ document.addEventListener('click',e=>{
   const name=$('f-name').value.trim()||'Planet';
   const res=Math.max(0,Math.min(9,+$('f-res').value||0));
   const inf=Math.max(0,Math.min(9,+$('f-inf').value||0));
-  if(sheetPl){const p=S.planets.find(x=>x.id===sheetPl);if(p){p.name=name;p.res=res;p.inf=inf;}}
-  else S.planets.push({id:'p'+(S.nextId++),name,res,inf,ex:false});
+  const sv=document.querySelector('#skipseg .segbtn.on');
+  const skip=(sv&&sv.dataset.skipv)?sv.dataset.skipv:null;
+  if(sheetPl){const p=S.planets.find(x=>x.id===sheetPl);if(p){p.name=name;p.res=res;p.inf=inf;p.skip=skip;}}
+  else S.planets.push({id:'p'+(S.nextId++),name,res,inf,ex:false,skip});
   closeSheet();render();}
  else if(b.id==='editpl'){S.edit=!S.edit;render();}
  else if(b.id==='readyall'){S.planets.forEach(p=>p.ex=false);render();}
