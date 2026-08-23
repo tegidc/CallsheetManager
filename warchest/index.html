@@ -83,6 +83,12 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
   font-size:13px;line-height:20px;text-align:center;padding:0 4px}
 .chit .minus{position:absolute;top:-7px;left:-6px;width:22px;height:22px;border-radius:11px;
   background:var(--paper);border:1px solid var(--ink);font-size:14px;line-height:19px;text-align:center}
+.chit .info{position:absolute;bottom:-7px;right:-5px;width:22px;height:22px;border-radius:11px;
+  background:var(--paper);border:1px solid var(--line);color:var(--mute);
+  font-family:Georgia,serif;font-style:italic;font-size:12px;line-height:20px;text-align:center}
+.statrow{display:flex;gap:20px;margin:12px 0 2px}
+.statrow div span{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.statrow div b{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:24px;line-height:1.1}
 
 /* ---- strategy grid ---- */
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -249,17 +255,29 @@ const ICONS={
  dock:'<path d="M12 3.2 l7 4 v8.6 l-7 4 -7-4 V7.2 Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="11.5" r="2.4"/>'
 };
 const UNITS=[
- {id:'dread',name:'Dread',cost:4,pair:false,max:5},
- {id:'carrier',name:'Carrier',cost:3,pair:false,max:4},
- {id:'cruiser',name:'Cruiser',cost:2,pair:false,max:8},
- {id:'destroyer',name:'Destr',cost:1,pair:false,max:8},
- {id:'fighter',name:'Fighter',cost:1,pair:true,max:10},
- {id:'warsun',name:'War Sun',cost:12,pair:false,max:2},
- {id:'mech',name:'Mech',cost:2,pair:false,max:4},
- {id:'inf',name:'Infantry',cost:1,pair:true,max:12},
- {id:'pds',name:'PDS',cost:2,pair:false,max:6},
- {id:'dock',name:'Dock',cost:4,pair:false,max:3}
+ {id:'dread',name:'Dread',full:'Dreadnought I',cost:4,pair:false,max:5,c:'5',mv:1,cap:1,
+  ab:'Sustain Damage · Bombardment 5'},
+ {id:'carrier',name:'Carrier',full:'Carrier I',cost:3,pair:false,max:4,c:'9',mv:1,cap:4},
+ {id:'cruiser',name:'Cruiser',full:'Cruiser I',cost:2,pair:false,max:8,c:'7',mv:2,cap:0},
+ {id:'destroyer',name:'Destr',full:'Destroyer I',cost:1,pair:false,max:8,c:'9',mv:2,cap:0,
+  ab:'Anti-Fighter Barrage 9 (×2)'},
+ {id:'fighter',name:'Fighter',full:'Fighter I',cost:1,pair:true,max:10,c:'9',
+  note:'Needs capacity from carriers, dreads, war suns or docks. 1 resource buys two.'},
+ {id:'warsun',name:'War Sun',full:'War Sun',cost:12,pair:false,max:2,c:'3 (×3)',mv:2,cap:6,
+  ab:'Sustain Damage · Bombardment 3 (×3) · ignores Planetary Shield'},
+ {id:'mech',name:'Mech',full:'Mech',cost:2,pair:false,max:4,c:'6',
+  ab:'Sustain Damage · ground force',note:'Your faction\u2019s mech adds its own ability.'},
+ {id:'inf',name:'Infantry',full:'Infantry I',cost:1,pair:true,max:12,c:'8',
+  note:'Ground force. 1 resource buys two.'},
+ {id:'pds',name:'PDS',full:'PDS I',cost:2,pair:false,max:6,
+  ab:'Space Cannon 6 · Planetary Shield',
+  note:'Structure — usually placed free via the Construction strategy card.'},
+ {id:'dock',name:'Dock',full:'Space Dock I',cost:4,pair:false,max:3,
+  ab:'Production: planet resources + 2 · holds 3 fighters',
+  note:'Structure — usually placed free via Construction.'}
 ];
+const UPMAP={dread:'dread2',carrier:'carrier2',cruiser:'cruiser2',destroyer:'destroyer2',
+ fighter:'fighter2',inf:'inf2',pds:'pds2',dock:'dock2'};
 const CARDS=[
  {id:'leadership',n:1,name:'Leadership',c:'#C03A2B',
   p:'Gain 3 command tokens. Then you may spend influence, 3 per token, to gain more.',
@@ -426,6 +444,7 @@ function drawBuild(t){
    <svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[u.id]}</svg>
    <span class="un">${u.name}</span><span class="uc">${u.pair?'½':u.cost}R</span>
    ${n>0?`<span class="n">${n}</span><span class="minus" data-minus="${u.id}" role="button" aria-label="remove one">−</span>`:''}
+   <span class="info" data-uinfo="${u.id}" role="button" aria-label="${u.full||u.name} stats">i</span>
   </button>`;
  }).join('');
 }
@@ -488,6 +507,20 @@ function openSheet(html,color){
 }
 function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open');sheetPl=null;}
 
+function unitSheet(id){
+ const u=UNITS.find(x=>x.id===id);if(!u)return;
+ const up=UPMAP[id]?TECHIX[UPMAP[id]]:null;
+ const cell=(k,v)=>v==null?'':`<div><span>${k}</span><b>${v}</b></div>`;
+ openSheet(`<div style="display:flex;align-items:center;gap:12px">
+   <svg viewBox="0 0 24 24" style="width:34px;height:34px;fill:var(--ink);flex:none" aria-hidden="true">${ICONS[id]}</svg>
+   <h3 style="margin:0">${u.full||u.name}</h3></div>
+  <div class="statrow">
+   ${cell('Cost',u.pair?'1 per 2':u.cost)}${cell('Combat',u.c)}${cell('Move',u.mv)}${cell('Capacity',u.cap)}
+  </div>
+  ${u.ab?`<h4>Abilities</h4><p>${u.ab}</p>`:''}
+  ${u.note?`<p style="font-size:11px;color:var(--mute);margin-top:8px">${u.note}</p>`:''}
+  ${up?`<h4>Upgrade — ${up.name} ${pips(up.pre)}</h4><p>${up.desc}</p>`:''}`);
+}
 function cardSheet(id){
  const c=CARDS.find(x=>x.id===id);
  const on=c.lead?S.lead>0:!!S.follow[c.id];
@@ -660,6 +693,8 @@ function apply(){
 }
 
 document.addEventListener('click',e=>{
+ const uinfo=e.target.closest('[data-uinfo]');
+ if(uinfo){e.stopPropagation();unitSheet(uinfo.dataset.uinfo);return;}
  const minus=e.target.closest('[data-minus]');
  const b=e.target.closest('button');
  if(minus){e.stopPropagation();
