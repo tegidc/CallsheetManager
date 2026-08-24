@@ -77,6 +77,10 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
 .chit .info{position:absolute;bottom:-7px;right:-5px;width:22px;height:22px;border-radius:11px;
   background:var(--paper);border:1px solid var(--line);color:var(--mute);
   font-family:Georgia,serif;font-style:italic;font-size:12px;line-height:20px;text-align:center}
+.chit .pairtog{position:absolute;bottom:-7px;left:-5px;min-width:26px;height:22px;border-radius:11px;
+  background:var(--paper);border:1px solid var(--line);color:var(--mute);
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11px;line-height:20px;text-align:center;padding:0 4px}
+.chit .pairtog.one{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .statrow{display:flex;gap:20px;margin:12px 0 2px}
 .statrow div span{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 .statrow div b{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:24px;line-height:1.1}
@@ -204,7 +208,7 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
 <div id="last"></div>
 
 <section>
-  <h2>Build <span class="mini">tap to add · fighters &amp; infantry 2 per resource</span></h2>
+  <h2>Build <span class="mini">tap to add · a tap buys a pair of fighters or infantry — ×2 toggles to ×1</span></h2>
   <div class="grid5" id="build"></div>
 </section>
 
@@ -367,6 +371,7 @@ const TECHIX={};TECHS.forEach(g=>g.list.forEach(([id,name,pre,desc])=>TECHIX[id]
 const SKIPMAP={'Thibah':'B','Mehar Xull':'R','Lazar':'Y'};
 S.planets.forEach(pl=>{if(pl.skip===undefined)pl.skip=SKIPMAP[pl.name]||null;if(!pl.att)pl.att=[];});
 if(S.tech===undefined)S.tech=null;
+if(!S.single)S.single={};
 if(S.skipPlanet===undefined)S.skipPlanet=null;
 const $=id=>document.getElementById(id);
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
@@ -434,7 +439,8 @@ function drawBuild(t){
   return `<button class="chit ${n>0?'sel':''} ${dim?'dim':''}" data-u="${u.id}" aria-label="${u.name}, cost ${u.pair?'half':u.cost}">
    <svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[u.id]}</svg>
    <span class="un">${u.name}</span><span class="uc">${u.pair?'½':u.cost}R</span>
-   ${n>0?`<span class="n">${n}</span><span class="minus" data-minus="${u.id}" role="button" aria-label="remove one">−</span>`:''}
+   ${n>0?`<span class="n">${n}</span><span class="minus" data-minus="${u.id}" role="button" aria-label="remove">−</span>`:''}
+   ${u.pair?`<span class="pairtog ${S.single[u.id]?'one':''}" data-pairtog="${u.id}" role="button" aria-label="toggle 1 or 2 per tap">×${S.single[u.id]?1:2}</span>`:''}
    <span class="info" data-uinfo="${u.id}" role="button" aria-label="${u.full||u.name} stats">i</span>
   </button>`;
  }).join('');
@@ -684,16 +690,22 @@ function apply(){
 }
 
 document.addEventListener('click',e=>{
+ const ptog=e.target.closest('[data-pairtog]');
+ if(ptog){e.stopPropagation();const id=ptog.dataset.pairtog;
+  S.single[id]=!S.single[id];render();return;}
  const uinfo=e.target.closest('[data-uinfo]');
  if(uinfo){e.stopPropagation();unitSheet(uinfo.dataset.uinfo);return;}
  const minus=e.target.closest('[data-minus]');
  const b=e.target.closest('button');
  if(minus){e.stopPropagation();
-  S.buy[minus.dataset.minus]=Math.max(0,(S.buy[minus.dataset.minus]||0)-1);render();return;}
+  const u=UNITS.find(x=>x.id===minus.dataset.minus);
+  const step=(u&&u.pair&&!S.single[u.id])?2:1;
+  S.buy[u.id]=Math.max(0,(S.buy[u.id]||0)-step);render();return;}
  if(e.target.id==='scrim'){closeSheet();return;}
  if(!b)return;
  if(b.dataset.u){const u=UNITS.find(x=>x.id===b.dataset.u);
-  S.buy[u.id]=Math.min(u.max,(S.buy[u.id]||0)+1);render();}
+  const step=(u.pair&&!S.single[u.id])?2:1;
+  S.buy[u.id]=Math.min(u.max,(S.buy[u.id]||0)+step);render();}
  else if(b.dataset.c){cardSheet(b.dataset.c);}
  else if(b.dataset.follow){S.follow[b.dataset.follow]=!S.follow[b.dataset.follow];render();cardSheet(b.dataset.follow);}
  else if(b.dataset.lead!==undefined){S.lead=Math.max(0,S.lead+ +b.dataset.lead);render();cardSheet('leadership');}
