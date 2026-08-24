@@ -3,23 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#FCFCFA">
+<meta name="theme-color" content="#FFFFFF">
 <title>Warchest</title>
 <style>
 :root{
-  --paper:#FCFCFA; --ink:#141414; --line:#E4E4E0; --mute:#8B8B86;
-  --tile:#FFFFFF; --wash:#F3F3EF; --team:var(--ink);
-  --bad:#C0392B; --ok:#2E7D4F;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --paper:#101012; --ink:#EDEDE8; --line:#2A2A2E; --mute:#84848A;
-    --tile:#17171A; --wash:#1D1D21; --bad:#E06A5A; --ok:#5CB584;
-  }
-}
-:root[data-theme="dark"]{
-  --paper:#101012; --ink:#EDEDE8; --line:#2A2A2E; --mute:#84848A;
-  --tile:#17171A; --wash:#1D1D21; --bad:#E06A5A; --ok:#5CB584;
+  color-scheme:light;
+  --paper:#FFFFFF; --ink:#000000; --line:#ABABA6; --mute:#54544F;
+  --tile:#FFFFFF; --wash:#F1F1EC; --team:var(--ink);
+  --bad:#A61E12; --ok:#1D6338;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
@@ -77,7 +68,7 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
 .chit .un{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
 .chit .uc{font-size:9px;color:var(--mute)}
 .chit.sel{border-color:var(--team)}
-.chit.dim{opacity:.38}
+.chit.dim{opacity:.5}
 .chit .n{position:absolute;top:-6px;right:-5px;min-width:20px;height:20px;border-radius:10px;
   background:var(--team);color:var(--paper);font-family:"Barlow Condensed",sans-serif;font-weight:700;
   font-size:13px;line-height:20px;text-align:center;padding:0 4px}
@@ -97,7 +88,7 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
 .scard .num{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;color:var(--cc);line-height:1}
 .scard .nm{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
 .scard .fc{font-size:9px;color:var(--mute);margin-top:3px}
-.scard.on{background:var(--cc);border-color:var(--cc)}
+.scard.on{background:var(--cc);border-color:var(--cc);outline:2px solid var(--ink);outline-offset:-1px}
 .scard.on .num,.scard.on .nm,.scard.on .fc{color:#FFFFFF}
 .scard.on.darktxt .num,.scard.on.darktxt .nm,.scard.on.darktxt .fc{color:#141414}
 .pooltile{background:var(--wash);border:1px solid var(--line);border-radius:3px;padding:7px 8px;
@@ -108,7 +99,7 @@ h2 .mini{font-size:10px;letter-spacing:.08em;color:var(--mute);font-family:"IBM 
 /* ---- pay ---- */
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .planet{position:relative;background:var(--tile);border:1px solid var(--line);border-radius:3px;padding:6px 7px 7px}
-.planet.exh{opacity:.4}
+.planet.exh{opacity:.5}
 .planet .pn{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:13px;letter-spacing:.04em;
   text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .planet .halves{display:flex;gap:4px;margin-top:5px}
@@ -279,29 +270,29 @@ const UNITS=[
 const UPMAP={dread:'dread2',carrier:'carrier2',cruiser:'cruiser2',destroyer:'destroyer2',
  fighter:'fighter2',inf:'inf2',pds:'pds2',dock:'dock2'};
 const CARDS=[
- {id:'leadership',n:1,name:'Leadership',c:'#C03A2B',
+ {id:'leadership',n:1,name:'Leadership',c:'#A62A1C',
   p:'Gain 3 command tokens. Then you may spend influence, 3 per token, to gain more.',
   s:'Spend influence, 3 per extra token, to gain command tokens. Costs no strategy token.',
   token:false,res:0,lead:true},
- {id:'diplomacy',n:2,name:'Diplomacy',c:'#DB7B2B',
+ {id:'diplomacy',n:2,name:'Diplomacy',c:'#B55A0A',
   p:'Choose a system you control; other players place a token there and cannot activate it. Ready up to 2 exhausted planets.',
   s:'Spend 1 strategy token: ready up to 2 of your exhausted planets.',token:true,res:0},
- {id:'politics',n:3,name:'Politics',c:'#B8890A',dark:true,
+ {id:'politics',n:3,name:'Politics',c:'#846200',dark:true,
   p:'Choose the new speaker. Draw 2 action cards. Look at the top 2 agenda cards and rearrange them.',
   s:'Spend 1 strategy token: draw 2 action cards.',token:true,res:0},
- {id:'construction',n:4,name:'Construction',c:'#3E8E4E',
+ {id:'construction',n:4,name:'Construction',c:'#2C7440',
   p:'Place 1 space dock and 1 PDS, or 2 PDS, on planets you control.',
   s:'Spend 1 strategy token: place 1 structure on a planet you control.',token:true,res:0},
- {id:'trade',n:5,name:'Trade',c:'#2E9C8E',
+ {id:'trade',n:5,name:'Trade',c:'#166F63',
   p:'Gain 3 trade goods, replenish your commodities, then choose players who also replenish.',
   s:'Spend 1 strategy token: replenish your commodities.',token:true,res:0},
- {id:'warfare',n:6,name:'Warfare',c:'#3B6FB4',
+ {id:'warfare',n:6,name:'Warfare',c:'#2A5793',
   p:'Remove 1 of your command tokens from the board, then redistribute your pools.',
   s:'Spend 1 strategy token: produce units at your home space dock. Unit costs still apply — add them in Build.',token:true,res:0},
- {id:'tech',n:7,name:'Technology',c:'#31479E',
+ {id:'tech',n:7,name:'Technology',c:'#273A87',
   p:'Research 1 technology. Then you may spend 6 resources to research a second.',
   s:'Spend 1 strategy token and 4 resources: research 1 technology.',token:true,res:4},
- {id:'imperial',n:8,name:'Imperial',c:'#6E4BA6',
+ {id:'imperial',n:8,name:'Imperial',c:'#573A8C',
   p:'Score 1 public objective you qualify for. Gain 1 VP if you control Mecatol Rex, otherwise draw 1 secret objective.',
   s:'Spend 1 strategy token: draw 1 secret objective.',token:true,res:0}
 ];
@@ -319,7 +310,7 @@ if(!S||!S.planets){
     spend:{},last:null,prev:null,nextId:SEED.length};
 }
 S.edit=false;
-const TCOL={B:'#2E5FB7',G:'#3E8E4E',Y:'#B8890A',R:'#C03A2B'};
+const TCOL={B:'#2A5793',G:'#2C7440',Y:'#846200',R:'#A62A1C'};
 const pips=pre=>[...(pre||'')].map(c=>`<span class="pip" style="background:${TCOL[c]}"></span>`).join('');
 const PDB=window.WARCHEST_PLANETS||[];
 const ATTDB=window.WARCHEST_ATTACH||[];
