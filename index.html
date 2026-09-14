@@ -793,6 +793,7 @@
     padding-left:0; padding-right:0;}
   .roles-name-text{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   /* the name on a Roles row opens the person's record in the edit pop-up (crewEditModalHTML) */
+  .roles-footnote .roles-tips-toggle{white-space:nowrap;}
   .roles-name-link{cursor:pointer;} .roles-name-link:hover{color:var(--tape); text-decoration:underline; text-underline-offset:2px;}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
   .formgroup{border:none; border-radius:0; padding:0; margin-bottom:16px; background:none;}
@@ -1358,7 +1359,8 @@ const FONT_CHOICES = {
 };
 const SETTINGS_DEFAULTS = { headerFont:'fraunces', labelFont:'oswald', bodyFont:'jost',
                             brand:'#017756', brandLight:'#0FA47A', rolesColumnOrder:null,
-                            sheetSync:null /* {url, sheetUrl, sheetName, lastPush, lastPull} — see GOOGLE SHEET SYNC */ };
+                            sheetSync:null, /* {url, sheetUrl, sheetName, lastPush, lastPull} — see GOOGLE SHEET SYNC */
+                            hideRolesTips:false /* Roles table: "Hide tips" under the grid (rolesFootnoteHTML) */ };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -1392,7 +1394,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -4804,27 +4806,44 @@ function onRolesColKey(ev, id){
    on which phases are on, and three near-identical sentences competing under one grid is
    how the old one ended up describing a Shoot checkbox that no longer exists. */
 function rolesFootnoteHTML(data){
-  const parts = ['One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records.'];
-  parts.push('Prep and Post are the same numbers those tabs hold, and <strong>the numbers are what put someone in a phase</strong> — type one and they are in it, clear it and they are out. <strong>Dates</strong> opens that person’s calendar — every role they hold, all three phases on one month.');
+  /* Two kinds of sentence live here and they are treated differently (14 Sep 2026):
+     TIPS — how the table works — can be hidden with "Hide tips" (appSettings.hideRolesTips,
+     db:settings, so it sticks on every device) and brought back with "Tips";
+     STATUS — "your own column order", "a phase is switched off" — always shows, because
+     it describes something you did that would otherwise read as a bug. */
+  const tipsHidden = !!appSettings.hideRolesTips;
+  const tips = [];
+  const status = [];
+  tips.push('One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records.');
+  tips.push('Prep and Post are the same numbers those tabs hold, and <strong>the numbers are what put someone in a phase</strong> — type one and they are in it, clear it and they are out. <strong>Dates</strong> opens that person’s calendar — every role they hold, all three phases on one month.');
   /* the caret alone does not tell you what is behind it — and once it IS open, that it writes
      the same ticks as the Production tab is the thing you need to know before touching it */
   if(projectDays().length){
-    parts.push(rolesShootOpen()
+    tips.push(rolesShootOpen()
       ? 'The day ticks are the <strong>Production</strong> tab\'s own — a tick here is a tick there, and ticking one puts that person on the shoot. Click <strong>Shoot</strong> again to close them.'
       : 'Click <strong>Shoot</strong> to open the day ticks.');
   }
-  /* said on the one screen it applies to, and it changes once you have used it — "you can do
-     this" is worth saying once, "you have done this, here is the way back" is worth saying
-     every time, because a column order you don't remember setting reads as a bug */
-  parts.push('<strong>Arrow keys</strong> move between fields — down a column for the same field on the next person — and space ticks a box.');
-  parts.push(appSettings.rolesColumnOrder && appSettings.rolesColumnOrder.length
-    ? 'These columns are in <strong>your own order</strong> — drag a heading to move one, or <span class="filter-clear" role="button" tabindex="0" onclick="resetRolesColumnOrder()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();resetRolesColumnOrder();}">put them back</span>.'
-    : '<strong>Drag a column heading</strong> to reorder the table — the order is kept for every project.');
+  tips.push('<strong>Arrow keys</strong> move between fields — down a column for the same field on the next person — and space ticks a box.');
+  /* "you can do this" is a tip; "you have done this, here is the way back" is status */
+  if(appSettings.rolesColumnOrder && appSettings.rolesColumnOrder.length){
+    status.push('These columns are in <strong>your own order</strong> — drag a heading to move one, or <span class="filter-clear" role="button" tabindex="0" onclick="resetRolesColumnOrder()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();resetRolesColumnOrder();}">put them back</span>.');
+  } else {
+    tips.push('<strong>Drag a column heading</strong> to reorder the table — the order is kept for every project.');
+  }
   const off = BUDGET_SCOPES.filter(([k])=>!budgetScope[k]).map(([,l])=>l);
   if(off.length){
-    parts.push(`<strong>${off.join(' and ')} ${off.length>1?'are':'is'} switched off</strong>, so ${off.length>1?'those phases’':'that phase’s'} crew ${off.length>1?'are':'is'} hidden and uncosted. Anyone in no phase at all still shows.`);
+    status.push(`<strong>${off.join(' and ')} ${off.length>1?'are':'is'} switched off</strong>, so ${off.length>1?'those phases’':'that phase’s'} crew ${off.length>1?'are':'is'} hidden and uncosted. Anyone in no phase at all still shows.`);
   }
-  return `<div class="hint" style="margin-top:8px;">${parts.join(' ')}</div>`;
+  const toggle = tipsHidden
+    ? `<span class="filter-clear roles-tips-toggle" role="button" tabindex="0" onclick="setRolesTipsHidden(false)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setRolesTipsHidden(false);}" title="Show how this table works">Tips</span>`
+    : `<span class="filter-clear roles-tips-toggle" role="button" tabindex="0" onclick="setRolesTipsHidden(true)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setRolesTipsHidden(true);}" title="Hide these tips — Tips brings them back">Hide tips</span>`;
+  const text = (tipsHidden ? status : tips.concat(status)).join(' ');
+  return `<div class="hint roles-footnote" style="margin-top:8px;">${text}${text?' ':''}${toggle}</div>`;
+}
+async function setRolesTipsHidden(hidden){
+  appSettings.hideRolesTips = !!hidden;
+  await saveAppSettings();
+  renderProjectBody();
 }
 function crewRolesRowHTML(e, spec, data){
   const p = currentProject();
