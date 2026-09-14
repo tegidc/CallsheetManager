@@ -292,6 +292,55 @@ Every screen needs the same handful of records. These are the single place that 
 - `dayOverrideFormHTML()` / `saveDayOverride()` / `clearDayOverride()` — render/save/clear a per-day override of an ENTRY's role/department/company. ⚠️ `d.crewOverrides` is keyed by ENTRY id since Phase BF (it overrides role, which is entry-level). It was empty on all ten live shoot days at migration time, so this rekey moved no data — [Crew, Shoot Days]
 - `OVERRIDABLE_FIELDS` — list of crew fields that can be overridden per shoot day — [Crew, Shoot Days]
 
+### Google Sheet sync (Crew database mirror)
+
+**14 Sep 2026.** A Google Sheet as a two-way mirror of `db:crew`. The script that lives
+inside the spreadsheet is `google-sheet-sync.gs` in this folder (setup steps in its header);
+the app side is the `GOOGLE SHEET SYNC` block just above the Locations database code.
+
+⚠️ **The sheet never writes into `app_data`.** Both directions go through the app tab:
+"Send to sheet" rewrites the sheet's Crew tab from `crewDB`; "Load from sheet" reads it,
+shows a preview, and only on Apply mutates `crewDB` and saves through `saveDB('db:crew')`
+— so the guarded write / merge in `saveDB()` stays the one path into the database. A
+Google Form can feed the same tab (the script's `onFormSubmit`); its rows arrive without an
+id and come in as new people on the next load.
+
+- `SHEET_SYNC_COLUMNS` — THE column contract: header the app writes, aliases a load accepts
+  (case-insensitive — "Email address", "Mobile", …), crew-record field, and the three special
+  columns (`id`, `Saved roles` as `Dept/Role; Dept/Role`, `Head of Dept` as Yes/blank).
+  `roleRates`, `hotel`, `travelNotes`, `carOnSet` and the legacy `dietary` are deliberately
+  NOT columns; a load leaves every unmapped field on a record exactly as it was — [Crew]
+- `sheetSyncRequest()` — the only fetch. GET for reads (`?ping=1` tests the connection and
+  learns the spreadsheet's name/URL), POST as `text/plain` so the browser sends it without a
+  CORS preflight (Apps Script web apps cannot answer one). URL must match `SHEET_SYNC_URL_RE`
+  (`…/exec`, never `/dev`) — [Crew]
+- `sheetSyncPlan(data)` — **pure**: builds every candidate record on a `dbClone()` and returns
+  `{changes, adds, linkIds, missing, newRoles, unknown, skippedBlank}` without touching `crewDB`.
+  Matching: by `id`, else by a UNIQUE case-insensitive name (a shared name becomes a new person
+  rather than a guess). ⚠️ **Rows the app wrote carry an id and are authoritative — a blank cell
+  clears the field. Rows without an id (Form submissions, hand-typed rows) only contribute the
+  cells they fill in and never rename the person they matched.** Two rows for one person layer
+  in sheet order. Only columns the sheet actually has are compared, so a partial sheet
+  (Name / Phone / Email) updates just those fields. `missing` is only computed when the sheet
+  has an id column, and is a note, never a deletion — [Crew]
+- `sheetSyncReconcileRoles()` — squares Department / Role / Saved roles after a sheet edit, the
+  same invariants `setActiveRole()`/`addRoleToCrew()` keep. Unknown roles in a known department
+  are added to `ROLES_BY_DEPT` on Apply (`db:roles`) and listed in the preview — [Crew]
+- `sheetSyncPush()` — app → sheet. Reads the sheet FIRST and, if the plan shows edits not yet
+  in the app, `confirm()`s before flattening them. Then `replace` rewrites the whole tab
+  (headers + one row per record, in `crewDB` order) — [Crew]
+- `sheetSyncPull()` / `sheetSyncApply()` / `sheetSyncCancel()` — sheet → app in two steps.
+  Apply swaps the planned clones in (skipping any record whose object identity changed while
+  the preview was open — an edit made here meanwhile wins and is counted as "skipped"), saves
+  `db:crew` (and `db:roles` if needed), then `writeIds` sends the new/linked ids back to their
+  sheet rows (the script only writes into a row that still has no id and the same name). Undo
+  toast covers `db:crew` via `beginUndo`/`finishUndo` — [Crew]
+- `sheetSyncBarHTML()` / `sheetSyncPreviewHTML()` / `sheetSyncSettingsHTML()` — the bar above
+  the Crew database search (D-1.6), the preview card (D-1.7) and the Settings-tab block
+  (D-1.8). State lives in `sheetSyncBusy` / `sheetSyncPreview` / `sheetSyncNotice`; the
+  connection in `appSettings.sheetSync` (`{url, sheetUrl, sheetName, lastPush, lastPull}`,
+  in `db:settings`). `resetAppSettings()` deliberately keeps `sheetSync` — [Crew, Shared/utility functions]
+
 ## Locations
 
 - `renderProjectLocations()` — renders the project Locations tab: the assigned-locations day grid, then the ONE "Add location" entry point — [Locations]
@@ -923,6 +972,9 @@ coarse information first, finest detail last.
 | D-1.3 | · Crew record form | Basics / Camera & equipment / Logistics & sizing / About & extras / Private | `crewFormHTML()` |
 | D-1.4 | · Crew read-only view | Everything on file, one table | `crewViewHTML()` |
 | D-1.5 | · Add saved role dialog | Pick or create a role for a person | `addRoleDialogHTML()` |
+| D-1.6 | · Google Sheet bar | Send to sheet / Load from sheet, last-synced stamps, Open sheet link — above the search box on every list tab (14 Sep 2026) | `sheetSyncBarHTML()` |
+| D-1.7 | · Load preview | What a load would change — updated / new / new roles / in-app-but-not-in-sheet — with Apply and Cancel; nothing is saved until Apply | `sheetSyncPreviewHTML()` / `sheetSyncApply()` |
+| D-1.8 | · Google Sheet settings | Web-app URL, Save & test, the one-time setup steps, the column list — on the Settings tab above Departments & roles | `sheetSyncSettingsHTML()` |
 | **D-2** | **Locations database** | Every location, with address, contacts, access | `renderLocationsDatabase()` |
 | D-2.1 | · Location form | Address search, map preview, access/recce/parking notes | `locFormHTML()` |
 | D-2.2 | · Nearest hospital / parking | OpenStreetMap Overpass lookup, saved onto the location | `lookupAmenityForForm()` |

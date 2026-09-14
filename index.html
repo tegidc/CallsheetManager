@@ -239,6 +239,19 @@
 
   .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
   .crewdb-tab-count{font-family:var(--body); font-weight:400; letter-spacing:0; opacity:.55;}
+  /* Google Sheet sync bar (Crew database) — one quiet row above the search box */
+  .sheet-sync-bar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:8px;}
+  .sheet-sync-title{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); display:inline-flex; align-items:center; gap:6px; margin-right:4px;}
+  .sheet-sync-status{font-size:var(--fs-meta); color:var(--muted); margin-left:auto;}
+  .sheet-sync-link{color:var(--tape); text-decoration:underline; text-underline-offset:2px;}
+  .sheet-sync-notice{font-size:var(--fs-meta); color:var(--tape); margin:-4px 0 10px; padding:0 10px;}
+  .sheet-sync-notice.err{color:var(--danger);}
+  .sheet-sync-preview{border:1px solid var(--tape); border-radius:8px; padding:var(--box-pad); margin-bottom:12px; background:var(--panel);}
+  .sheet-sync-preview-head{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
+  .sheet-sync-group{margin-bottom:8px;} .sheet-sync-group ul{margin:4px 0 0 18px; padding:0; font-size:14px; line-height:1.5;}
+  .sheet-sync-setup{margin-top:12px;} .sheet-sync-steps{margin:8px 0 0 18px; padding:0; font-size:14px; line-height:1.6;}
+  .sheet-sync-steps code{font-size:12px; background:var(--panel-2); padding:1px 4px; border-radius:3px;}
   .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px;
     color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;}
   .tab.active{color:var(--tape); border-color:var(--tape);}
@@ -1331,7 +1344,8 @@ const FONT_CHOICES = {
   helvetica: { label:'Helvetica / Arial (system sans)',          stack:"'Helvetica Neue', Helvetica, Arial, sans-serif" },
 };
 const SETTINGS_DEFAULTS = { headerFont:'fraunces', labelFont:'oswald', bodyFont:'jost',
-                            brand:'#017756', brandLight:'#0FA47A', rolesColumnOrder:null };
+                            brand:'#017756', brandLight:'#0FA47A', rolesColumnOrder:null,
+                            sheetSync:null /* {url, sheetUrl, sheetName, lastPush, lastPull} — see GOOGLE SHEET SYNC */ };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -1364,7 +1378,8 @@ async function setSetting(field, value){
   await saveAppSettings();
 }
 async function resetAppSettings(){
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS);
+  // fonts and colours reset; the Google Sheet connection is not a brand default and survives
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -8241,12 +8256,13 @@ function renderCrewDatabase(m){
      search, no filter panel, no "+ Add crew member". Hence two whole sections rather
      than one with pieces switched off inside it. */
   const body = tab.key==='settings'
-    ? `<div class="section">
+    ? sheetSyncSettingsHTML() + `<div class="section">
         <h2>Departments &amp; roles</h2>
         <div class="hint" style="margin-bottom:12px;">Add roles to a department, set their seniority order, and pick Heads of Department.</div>
         ${renderDeptAdminPanel()}
       </div>`
     : `<div class="section">
+        ${sheetSyncBarHTML()}
         <input type="text" id="crewSearch" value="${esc(crewSearchQuery)}" style="margin-bottom:10px;" placeholder="Search name, role, skills, camera gear…" oninput="crewSearchQuery=this.value;renderCrewList()">
         ${filterToggleHTML({open: crewDbFilterOpen, count: crewDbActiveFilterCount(), onToggle: 'toggleCrewDbFilterPanel()'})}
         ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
@@ -8701,6 +8717,392 @@ async function deleteCrew(id){
   await saveDB('db:crew', crewDB); await saveDB('db:projects', projectsDB);
   renderCrewList();
   finishUndo(`Deleted ${who} from the crew database.`, snaps);
+}
+
+/* ============================================================ GOOGLE SHEET SYNC (Crew database mirror)
+   A Google Sheet as a two-way mirror of db:crew — see google-sheet-sync.gs for the
+   script that lives inside the spreadsheet, and MAP.md ▸ Google Sheet sync.
+
+   ⚠️ The sheet NEVER writes into app_data itself. Both directions go through this
+   tab: "Send to sheet" rewrites the Crew tab from crewDB; "Load from sheet" reads
+   the tab, shows a preview of what would change, and only on Apply mutates crewDB
+   and saves through saveDB('db:crew') like any other edit. That keeps the guarded
+   write / merge in saveDB() as the one path into the database.
+
+   Column contract: SHEET_SYNC_COLUMNS below. A pull only touches the columns the
+   sheet actually has (matched by header, case-insensitively, with a few aliases),
+   so a partial sheet — say Name / Phone / Email — updates just those fields and
+   leaves everything else on the record alone. Rows without an id become new people
+   and get their id written back to the sheet. Rows deleted in the sheet are NOT
+   deleted here — deletion cascades into projects, so it stays a deliberate act on
+   the Crew database screen; the preview lists them instead. */
+const SHEET_SYNC_URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+const sheetSyncYesNo = v => { const s = (v||'').toString().trim().toLowerCase(); return ['yes','y','true','1'].includes(s) ? 'Yes' : ['no','n','false','0'].includes(s) ? 'No' : ''; };
+const sheetSyncDietary = v => { const s = (v||'').toString().trim(); const hit = DIETARY_OPTIONS.find(o=>o.toLowerCase()===s.toLowerCase()); return hit || s; };
+const sheetSyncRoleName = rp => rp.includes('/') ? rp.split('/').slice(1).join('/') : rp;
+/* h = the sheet header the app writes; aliases = other headers a pull will accept
+   (an existing sheet of yours probably says "Email address", not "Email").
+   f = the crew-record field. get/set/cmp = the three special columns. */
+const SHEET_SYNC_COLUMNS = [
+  { h:'id',                 special:'id' },
+  { h:'Name',               f:'name',               aliases:['full name','crew name'] },
+  { h:'Department',         f:'department',         aliases:['dept'] },
+  { h:'Role',               f:'role',               aliases:['active role','position','job title'] },
+  { h:'Saved roles',        special:'roles',        aliases:['roles','all roles'] },
+  { h:'Show as',            f:'showAs',             aliases:['show as (call sheet)','display name'] },
+  { h:'Company',            f:'coProductionCompany', aliases:['lead company','production company','co-production company'] },
+  { h:'Phone',              f:'phone',              aliases:['phone number','mobile','mobile number','tel'] },
+  { h:'Email',              f:'email',              aliases:['email address','e-mail'] },
+  { h:'Skills',             f:'skills',             aliases:['skills / tags','tags'] },
+  { h:'Main camera 1',      f:'camera1',            aliases:['camera 1','main camera'] },
+  { h:'Main camera 2',      f:'camera2',            aliases:['camera 2'] },
+  { h:'Main camera 3',      f:'camera3',            aliases:['camera 3'] },
+  { h:'Other equipment',    f:'cameraExtras',       aliases:['other equipment / extras','kit','equipment'] },
+  { h:'Dietary (general)',  f:'dietaryGeneral',     aliases:['dietary','diet'], norm:sheetSyncDietary },
+  { h:'Dietary (specific)', f:'dietarySpecific',    aliases:['allergies','dietary notes','dietary requirements'] },
+  { h:'Shoe size',          f:'shoeSize' },
+  { h:'Clothing size',      f:'clothingSize',       aliases:['clothing / jacket size','jacket size'] },
+  { h:'VAT registered',     f:'vatRegistered',      aliases:['vat','vat registered?'], norm:sheetSyncYesNo },
+  { h:'Drives',             f:'drives',             aliases:['drives?','driver'], norm:sheetSyncYesNo },
+  { h:'Car make / model',   f:'carMakeModel',       aliases:['car','car make/model','vehicle'] },
+  { h:'Registration',       f:'carReg',             aliases:['registration plate','reg','number plate'] },
+  { h:'Home address',       f:'homeAddress',        aliases:['address'] },
+  { h:'Notes',              f:'generalNotes',       aliases:['general notes'] },
+  { h:'Previous projects',  f:'previousProjects' },
+  { h:'Instagram',          f:'instagram' },
+  { h:'YouTube',            f:'youtube' },
+  { h:'LinkedIn',           f:'linkedin' },
+  { h:'Coffee / tea order', f:'coffeeOrder',        aliases:['coffee order','coffee'] },
+  { h:'Invoices as',        f:'invoicesAs' },
+  { h:'Fee / rate',         f:'rate',               aliases:['rate','day rate','fee'] },
+  { h:'Private notes',      f:'notes' },
+  { h:'Head of Dept',       special:'hod',          aliases:['hod','head of department'] },
+];
+const sheetSyncCellOf = (c, col) => {
+  if(col.special==='id')    return c.id || '';
+  if(col.special==='roles') return (c.roles||[]).join('; ');
+  if(col.special==='hod')   return c.isHoD ? 'Yes' : '';
+  return (c[col.f] ?? '').toString();
+};
+const sheetSyncNormalise = (col, v) => col.norm ? col.norm(v) : (v||'').toString().trim();
+
+let sheetSyncBusy = '';          // progress text while a request is in flight ('' = idle)
+let sheetSyncPreview = null;     // the plan awaiting Apply, from sheetSyncPull()
+let sheetSyncNotice = null;      // {kind:'ok'|'err', text} shown in the bar until the next action
+let sheetSyncSetupOpen = false;  // the numbered setup steps on the Settings tab
+
+const sheetSyncSettings = () => (appSettings.sheetSync && typeof appSettings.sheetSync==='object') ? appSettings.sheetSync : {};
+const sheetSyncUrl = () => (sheetSyncSettings().url || '').trim();
+async function sheetSyncSaveSettings(patch){
+  appSettings.sheetSync = Object.assign({}, sheetSyncSettings(), patch);
+  await saveAppSettings();
+}
+function sheetSyncWhen(iso){
+  if(!iso) return '';
+  const d = new Date(iso); if(isNaN(d)) return '';
+  return d.toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+/* ---------- talking to the script ---------- */
+/* GET with query params; POST as text/plain so the browser sends it without a CORS
+   preflight (Apps Script web apps answer the redirect-then-JSON dance fine for a
+   simple request, and not at all for a preflighted one). */
+async function sheetSyncRequest(method, params, body){
+  const url = sheetSyncUrl();
+  if(!SHEET_SYNC_URL_RE.test(url)) throw new Error('No valid web-app URL saved — it should start with https://script.google.com/macros/s/ and end in /exec.');
+  const u = new URL(url);
+  Object.entries(params||{}).forEach(([k,v])=>u.searchParams.set(k, v));
+  const ctrl = new AbortController(); const timer = setTimeout(()=>ctrl.abort(), 60000);
+  let res, text;
+  try{
+    res = await fetch(u.toString(), method==='POST'
+      ? { method:'POST', redirect:'follow', signal:ctrl.signal, headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body||{}) }
+      : { method:'GET', redirect:'follow', signal:ctrl.signal });
+    text = await res.text();
+  }catch(e){
+    throw new Error(e.name==='AbortError' ? 'The sheet did not answer within a minute.' : 'Could not reach the sheet — check your connection, and that the script is deployed with access set to "Anyone".');
+  }finally{ clearTimeout(timer); }
+  let data;
+  try{ data = JSON.parse(text); }
+  catch(e){ throw new Error(res.status===200 ? 'The script answered with a page instead of data — in Apps Script, deploy it as a Web app with "Who has access: Anyone".' : `The script answered with HTTP ${res.status}.`); }
+  if(!data || data.ok!==true) throw new Error((data && data.error) || 'The script reported an error.');
+  return data;
+}
+
+/* ---------- the plan: what a pull would change ---------- */
+/* Pure — reads crewDB, never writes it. Every candidate record is built on a clone
+   and kept on the plan, so Apply just swaps clones in. */
+function sheetSyncPlan(data){
+  const norm = s => (s||'').toString().trim().toLowerCase();
+  const headers = (data.headers||[]).map(h=>(h||'').toString().trim());
+  const present = [];    // [{col, header}] — columns the sheet actually has
+  const unknown = [];
+  headers.forEach(h=>{
+    if(!h) return;
+    const col = SHEET_SYNC_COLUMNS.find(c=>norm(c.h)===norm(h) || (c.aliases||[]).some(a=>a===norm(h)));
+    if(col && !present.some(p=>p.col===col)) present.push({col, header:h}); else unknown.push(h);
+  });
+  const has = key => present.some(p=>p.col.special===key || p.col.f===key);
+  const headerFor = col => (present.find(p=>p.col===col)||{}).header;
+  const cellRaw = (row, col) => { const h = headerFor(col); return h==null ? undefined : (row[h] ?? ''); };
+  const plan = { present, unknown, changes:[], adds:[], linkIds:[], missing:[], skippedBlank:0, newRoles:[], hasName:has('name') };
+  if(!has('id') && !plan.hasName) return plan;   // nothing we can match on
+  const seenIds = new Set();
+  const idCol = SHEET_SYNC_COLUMNS[0];
+  (data.rows||[]).forEach(row=>{
+    const id = has('id') ? (cellRaw(row, idCol)||'').toString().trim() : '';
+    const name = plan.hasName ? (cellRaw(row, SHEET_SYNC_COLUMNS[1])||'').toString().trim() : '';
+    /* match by id; failing that by a UNIQUE name (a Form submission from someone
+       already in the database, or a sheet that has never been sent to). A name shared
+       by two records is ambiguous, so that row becomes a new person rather than a guess.
+       Two rows for the same person (their own row plus a form submission) layer in
+       sheet order — the later row's cells land on top of the earlier row's. */
+    let existing = id ? crewById(id) : null, linkedByName = false;
+    if(!existing && name){
+      const hits = crewDB.filter(c=>norm(c.name)===norm(name));
+      if(hits.length===1){ existing = hits[0]; linkedByName = true; }
+    }
+    if(!existing && !name){ plan.skippedBlank++; return; }
+    if(existing) seenIds.add(existing.id);
+    const prior = existing ? plan.changes.find(ch=>ch.id===existing.id) : null;
+    const base = prior ? prior.rec : existing ? dbClone(existing) : { id: id || uid(), name, roles:[], role:'', department:'' };
+    /* A row the app wrote carries an id and is authoritative: a blank cell there
+       means "cleared". A row without an id (a Form submission, a row typed in by
+       hand) only contributes the cells it fills in, and never renames the person
+       it was matched to. */
+    const partial = !id;
+    const changed = [];
+    present.forEach(({col})=>{
+      const raw = cellRaw(row, col);
+      const v = sheetSyncNormalise(col, raw);
+      if(col.special==='id') return;
+      if(partial && v==='') return;
+      if(linkedByName && col.f==='name') return;
+      if(col.special==='roles'){
+        const list = v.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
+        if(!list.length && !existing) return;               // a new person with no saved-roles cell — derived below
+        if(JSON.stringify(list)!==JSON.stringify(base.roles||[])){ base.roles = list; changed.push(col.h); }
+        return;
+      }
+      if(col.special==='hod'){
+        const on = v==='Yes';
+        if(on!==!!base.isHoD){ if(on) base.isHoD = true; else delete base.isHoD; changed.push(col.h); }
+        return;
+      }
+      const cur = (base[col.f] ?? '').toString();
+      if(v!==cur){ base[col.f] = v; changed.push(col.h); }
+    });
+    // Department / Role / Saved roles must agree with each other, whichever the sheet supplied
+    const rolesBefore = JSON.stringify(base.roles||[]), roleBefore = base.role, deptBefore = base.department;
+    sheetSyncReconcileRoles(base);
+    if(JSON.stringify(base.roles||[])!==rolesBefore && !changed.includes('Saved roles')) changed.push('Saved roles');
+    if(base.role!==roleBefore && !changed.includes('Role')) changed.push('Role');
+    if(base.department!==deptBefore && !changed.includes('Department')) changed.push('Department');
+    (base.roles||[]).forEach(rp=>{
+      const d = departmentForRolePath(rp), r = sheetSyncRoleName(rp);
+      if(d && r && DEPARTMENTS.includes(d) && !rolesFor(d).some(x=>x.toLowerCase()===r.toLowerCase()) && !plan.newRoles.includes(rp)) plan.newRoles.push(rp);
+    });
+    if(!existing){
+      if(!base.name){ plan.skippedBlank++; return; }
+      plan.adds.push({ row:row._row, name:base.name, rec:base, keepId:!!id });
+    } else {
+      if(linkedByName) plan.linkIds.push({ row:row._row, name, id:existing.id });   // the script adds an id column if the sheet has none
+      if(prior) changed.forEach(f=>{ if(!prior.fields.includes(f)) prior.fields.push(f); });
+      else if(changed.length) plan.changes.push({ id:existing.id, name:existing.name, fields:changed, rec:base, was:existing });
+    }
+  });
+  if(has('id')) plan.missing = crewDB.filter(c=>!seenIds.has(c.id)).map(c=>c.name||'(no name)');
+  return plan;
+}
+/* the one place Department, Role and Saved roles are squared with each other after
+   a sheet edit — the same invariants setActiveRole()/addRoleToCrew() keep: roles are
+   "Dept/Role" paths, the active role is one of them, department follows it */
+function sheetSyncReconcileRoles(c){
+  c.roles = (c.roles||[]).map(s=>(s||'').toString().trim()).filter(Boolean);
+  c.role = (c.role||'').toString().trim(); c.department = (c.department||'').toString().trim();
+  if(c.role && !c.department){ const rp = c.roles.find(r=>sheetSyncRoleName(r).toLowerCase()===c.role.toLowerCase()); if(rp) c.department = departmentForRolePath(rp); }
+  if(c.role && c.department){
+    const path = `${c.department}/${c.role}`;
+    const hit = c.roles.find(r=>r.toLowerCase()===path.toLowerCase());
+    if(hit){ c.role = sheetSyncRoleName(hit); c.department = departmentForRolePath(hit); }
+    else c.roles.push(path);
+  }
+  if(!c.role && c.roles.length){ c.role = sheetSyncRoleName(c.roles[0]); c.department = departmentForRolePath(c.roles[0]); }
+}
+
+/* ---------- actions ---------- */
+async function sheetSyncRun(label, fn){
+  if(sheetSyncBusy) return;
+  sheetSyncBusy = label; sheetSyncNotice = null; refreshCrewDatabase();
+  try{ await fn(); }
+  catch(e){ sheetSyncNotice = { kind:'err', text: e.message || String(e) }; }
+  finally{ sheetSyncBusy = ''; refreshCrewDatabase(); }
+}
+async function sheetSyncSaveUrl(){
+  const url = val('sheetSyncUrlInput');
+  if(url && !SHEET_SYNC_URL_RE.test(url)){
+    sheetSyncNotice = { kind:'err', text: url.endsWith('/dev')
+      ? 'That is the /dev test URL — use the Web app URL from Deploy ▸ Manage deployments, which ends in /exec.'
+      : 'That does not look like an Apps Script web-app URL (https://script.google.com/macros/s/…/exec).' };
+    refreshCrewDatabase(); return;
+  }
+  await sheetSyncSaveSettings({ url, sheetUrl: url ? sheetSyncSettings().sheetUrl : '', sheetName: url ? sheetSyncSettings().sheetName : '' });
+  sheetSyncNotice = url ? null : { kind:'ok', text:'Google Sheet disconnected.' };
+  if(url) await sheetSyncTest(); else refreshCrewDatabase();
+}
+async function sheetSyncTest(){
+  await sheetSyncRun('Testing the connection…', async ()=>{
+    const r = await sheetSyncRequest('GET', { ping:1 });
+    await sheetSyncSaveSettings({ sheetUrl:r.url||'', sheetName:r.spreadsheet||'' });
+    sheetSyncNotice = { kind:'ok', text:`Connected to "${r.spreadsheet}" — the ${r.sheet} tab has ${r.rows} row${r.rows===1?'':'s'}.` };
+  });
+}
+/* app → sheet. Reads the sheet first so an edit made there since the last load is
+   never silently flattened: if the plan shows changes, the user is asked. */
+async function sheetSyncPush(){
+  await sheetSyncRun('Sending to the sheet…', async ()=>{
+    const current = await sheetSyncRequest('GET');
+    const plan = sheetSyncPlan(current);
+    const pending = plan.changes.length + plan.adds.length;
+    if(pending){
+      const who = plan.changes.concat(plan.adds).slice(0,5).map(x=>x.name).join(', ');
+      if(!confirm(`The sheet has ${pending} edit${pending===1?'':'s'} that aren't in the app yet (${who}${pending>5?', …':''}).\n\nSending now will overwrite them with what the app has. Load from sheet first if you want to keep them.\n\nOverwrite the sheet?`)){ sheetSyncNotice = { kind:'ok', text:'Nothing sent.' }; return; }
+    }
+    const headers = SHEET_SYNC_COLUMNS.map(c=>c.h);
+    const rows = crewDB.map(c=>SHEET_SYNC_COLUMNS.map(col=>sheetSyncCellOf(c, col)));
+    const r = await sheetSyncRequest('POST', null, { action:'replace', headers, rows });
+    await sheetSyncSaveSettings({ lastPush:new Date().toISOString(), sheetUrl: current.url || sheetSyncSettings().sheetUrl });
+    sheetSyncNotice = { kind:'ok', text:`Sent ${r.written} ${r.written===1?'person':'people'} to the sheet.` };
+  });
+}
+/* sheet → app, step 1: read and plan. Nothing is written until sheetSyncApply(). */
+async function sheetSyncPull(){
+  sheetSyncPreview = null;
+  await sheetSyncRun('Reading the sheet…', async ()=>{
+    const data = await sheetSyncRequest('GET');
+    if(!(data.headers||[]).length) throw new Error('The Crew tab is empty — press "Send to sheet" first to write the columns.');
+    const plan = sheetSyncPlan(data);
+    if(!plan.hasName && !plan.present.some(p=>p.col.special==='id')) throw new Error('The sheet needs at least a "Name" column (or the app\'s "id" column) in row 1 to match people up.');
+    if(!plan.changes.length && !plan.adds.length && !plan.linkIds.length){
+      sheetSyncNotice = { kind:'ok', text:`Nothing to load — the sheet and the app already match.${plan.missing.length?` (${plan.missing.length} in the app but not in the sheet — they stay.)`:''}` };
+      await sheetSyncSaveSettings({ lastPull:new Date().toISOString(), sheetUrl: data.url || sheetSyncSettings().sheetUrl });
+      return;
+    }
+    plan.sheetUrl = data.url || '';
+    sheetSyncPreview = plan;
+  });
+}
+function sheetSyncCancel(){ sheetSyncPreview = null; sheetSyncNotice = null; refreshCrewDatabase(); }
+/* sheet → app, step 2: apply the plan through the normal save path. */
+async function sheetSyncApply(){
+  const plan = sheetSyncPreview; if(!plan) return;
+  sheetSyncPreview = null;
+  await sheetSyncRun('Loading into the app…', async ()=>{
+    const snaps = beginUndo(['db:crew']);
+    let applied = 0, stale = 0;
+    plan.changes.forEach(ch=>{
+      const idx = crewDB.findIndex(c=>c.id===ch.id);
+      // the record was edited in the app while the preview was open — leave it, say so
+      if(idx<0 || crewDB[idx]!==ch.was){ stale++; return; }
+      crewDB[idx] = ch.rec; applied++;
+    });
+    plan.adds.forEach(a=>{ crewDB.push(a.rec); });
+    plan.newRoles.forEach(rp=>{
+      const d = departmentForRolePath(rp), r = sheetSyncRoleName(rp);
+      ROLES_BY_DEPT[d] = ROLES_BY_DEPT[d] || [];
+      if(!ROLES_BY_DEPT[d].some(x=>x.toLowerCase()===r.toLowerCase())) ROLES_BY_DEPT[d].push(r);
+    });
+    const res = await saveDB('db:crew', crewDB);
+    if(res && res.ok===false) throw new Error('The crew database could not be saved — nothing from the sheet was kept. ' + (res.detail||''));
+    if(plan.newRoles.length) await saveDB('db:roles', ROLES_BY_DEPT);
+    // write the new ids back so the next load matches these rows instead of adding them again
+    let idsBack = null;
+    const toWrite = plan.adds.filter(a=>!a.keepId).map(a=>({ row:a.row, name:a.name, id:a.rec.id })).concat(plan.linkIds);
+    if(toWrite.length){
+      try{ idsBack = await sheetSyncRequest('POST', null, { action:'writeIds', ids:toWrite }); }
+      catch(e){ idsBack = { error:e.message }; }
+    }
+    await sheetSyncSaveSettings({ lastPull:new Date().toISOString(), sheetUrl: plan.sheetUrl || sheetSyncSettings().sheetUrl });
+    const bits = [];
+    if(applied) bits.push(`${applied} updated`);
+    if(plan.adds.length) bits.push(`${plan.adds.length} added`);
+    if(plan.newRoles.length) bits.push(`${plan.newRoles.length} new role${plan.newRoles.length===1?'':'s'} added to the roles list`);
+    if(stale) bits.push(`${stale} skipped (edited here while the preview was open)`);
+    let text = `Loaded from the sheet: ${bits.join(', ')}.`;
+    if(idsBack && (idsBack.error || (idsBack.skipped||[]).length)) text += ` Some new rows could not be given their id in the sheet${idsBack.error?` (${idsBack.error})`:''} — press "Send to sheet" to line it up.`;
+    sheetSyncNotice = { kind:'ok', text };
+    finishUndo(`Loaded ${applied + plan.adds.length} ${applied + plan.adds.length===1?'change':'changes'} from the Google Sheet.`, snaps);
+  });
+}
+
+/* ---------- rendering ---------- */
+function sheetSyncBarHTML(){
+  const s = sheetSyncSettings();
+  const connected = SHEET_SYNC_URL_RE.test(sheetSyncUrl());
+  const busy = !!sheetSyncBusy;
+  const open = s.sheetUrl ? `<a class="sheet-sync-link" href="${esc(s.sheetUrl)}" target="_blank" rel="noopener">Open sheet</a>` : '';
+  const status = busy ? esc(sheetSyncBusy)
+    : !connected ? `Not connected — <a class="sheet-sync-link" href="#" onclick="event.preventDefault();setCrewDbView('settings')">set up in Settings</a>`
+    : [s.lastPush ? `Sent ${sheetSyncWhen(s.lastPush)}` : '', s.lastPull ? `Loaded ${sheetSyncWhen(s.lastPull)}` : ''].filter(Boolean).join(' · ') || 'Connected — not synced yet';
+  const notice = sheetSyncNotice ? `<div class="sheet-sync-notice ${sheetSyncNotice.kind==='err'?'err':''}">${esc(sheetSyncNotice.text)}</div>` : '';
+  return `<div class="sheet-sync-bar">
+      <span class="sheet-sync-title">${icon('cloud')} Google Sheet</span>
+      <button class="small" onclick="sheetSyncPush()" ${connected&&!busy?'':'disabled'} title="Rewrite the sheet's Crew tab from the app">${icon('send')} Send to sheet</button>
+      <button class="small" onclick="sheetSyncPull()" ${connected&&!busy?'':'disabled'} title="Read the sheet and preview what would change here">${icon('download')} Load from sheet</button>
+      <span class="sheet-sync-status">${status}${open?` · ${open}`:''}</span>
+    </div>${notice}${sheetSyncPreview ? sheetSyncPreviewHTML(sheetSyncPreview) : ''}`;
+}
+function sheetSyncPreviewHTML(plan){
+  const li = (arr, f) => arr.map(x=>`<li>${f(x)}</li>`).join('');
+  const block = (title, items) => items.length ? `<div class="sheet-sync-group"><strong>${esc(title)}</strong><ul>${items}</ul></div>` : '';
+  const more = (arr, n) => arr.length>n ? `<li class="hint">…and ${arr.length-n} more</li>` : '';
+  return `<div class="sheet-sync-preview">
+      <div class="sheet-sync-preview-head">Load from sheet — what will change</div>
+      ${!plan.changes.length && !plan.adds.length ? `<div class="hint">No field changes — ${plan.linkIds.length} row${plan.linkIds.length===1?'':'s'} matched by name will be given their id in the sheet.</div>` : ''}
+      ${block(`${plan.changes.length} updated`, li(plan.changes.slice(0,40), ch=>`${esc(ch.name)} <span class="hint">— ${esc(ch.fields.join(', '))}</span>`) + more(plan.changes,40))}
+      ${block(`${plan.adds.length} new ${plan.adds.length===1?'person':'people'}`, li(plan.adds.slice(0,40), a=>`${esc(a.name)} <span class="hint">— ${esc([a.rec.role, a.rec.department].filter(Boolean).join(', ') || 'no role yet')}</span>`) + more(plan.adds,40))}
+      ${block(`${plan.newRoles.length} new role${plan.newRoles.length===1?'':'s'} for the roles list`, li(plan.newRoles, esc))}
+      ${plan.missing.length ? `<div class="sheet-sync-group"><strong>${plan.missing.length} in the app but not in the sheet</strong><div class="hint">They stay — loading never deletes anyone. Delete them from the Crew database if you mean it, or press Send to sheet to put them back in the sheet.</div><ul>${li(plan.missing.slice(0,15), esc)}${more(plan.missing,15)}</ul></div>` : ''}
+      ${plan.unknown.length ? `<div class="hint">Columns ignored (not crew fields): ${esc(plan.unknown.join(', '))}</div>` : ''}
+      ${plan.skippedBlank ? `<div class="hint">${plan.skippedBlank} row${plan.skippedBlank===1?'':'s'} skipped for having no name.</div>` : ''}
+      <div class="toolbar" style="margin:10px 0 0;">
+        <button class="primary" onclick="sheetSyncApply()">Apply to the app</button>
+        <button onclick="sheetSyncCancel()">Cancel</button>
+      </div>
+    </div>`;
+}
+function sheetSyncSettingsHTML(){
+  const s = sheetSyncSettings();
+  const connected = SHEET_SYNC_URL_RE.test(sheetSyncUrl());
+  const busy = !!sheetSyncBusy;
+  const notice = sheetSyncNotice ? `<div class="sheet-sync-notice ${sheetSyncNotice.kind==='err'?'err':''}">${esc(sheetSyncNotice.text)}</div>` : '';
+  return `<div class="section">
+      <h2>Google Sheet</h2>
+      <div class="hint" style="margin-bottom:12px;">A Google Sheet that mirrors the crew database. "Send to sheet" rewrites its Crew tab from the app; "Load from sheet" reads it back and shows you what would change before anything is saved. Both buttons live at the top of the Crew database list.</div>
+      <label for="sheetSyncUrlInput">Web app URL from the sheet's Apps Script</label>
+      <input type="text" id="sheetSyncUrlInput" value="${esc(s.url||'')}" placeholder="https://script.google.com/macros/s/…/exec" spellcheck="false" autocomplete="off">
+      <div class="toolbar" style="margin:10px 0 0;">
+        <button class="primary" onclick="sheetSyncSaveUrl()" ${busy?'disabled':''}>Save &amp; test</button>
+        <button onclick="sheetSyncTest()" ${connected&&!busy?'':'disabled'}>Test connection</button>
+        ${s.sheetUrl ? `<a class="sheet-sync-link" href="${esc(s.sheetUrl)}" target="_blank" rel="noopener">Open "${esc(s.sheetName||'sheet')}"</a>` : ''}
+        ${busy ? `<span class="hint" style="margin:0;">${esc(sheetSyncBusy)}</span>` : ''}
+      </div>
+      ${notice}
+      <div class="sheet-sync-setup">
+        <div class="sd-block-head" onclick="sheetSyncSetupOpen=!sheetSyncSetupOpen;refreshCrewDatabase();" style="cursor:pointer;"><span class="dept-caret">${sheetSyncSetupOpen?'▾':'▸'}</span> Setting up the sheet (once)</div>
+        ${sheetSyncSetupOpen ? `<ol class="sheet-sync-steps">
+          <li>Open the Google Sheet you want to use (a new blank one is fine).</li>
+          <li>Extensions ▸ Apps Script. Replace the editor's contents with the script from <code>google-sheet-sync.gs</code> in the app's folder, and Save.</li>
+          <li>Deploy ▸ New deployment ▸ type Web app. Execute as <em>Me</em>; who has access <em>Anyone</em>. Deploy, authorise, and copy the Web app URL (it ends in <code>/exec</code>).</li>
+          <li>Paste it above and press Save &amp; test.</li>
+          <li>Press Send to sheet once — that writes the columns and everyone currently in the database into a tab called Crew.</li>
+        </ol>
+        <div class="hint">From then on, edit in either place. Rows without an id become new people when loaded, and get their id written back. Loading never deletes anyone. The URL works like a password for the sheet, so don't share it. A Google Form can feed the same tab — see the notes at the top of the script.</div>` : ''}
+      </div>
+      <div class="sheet-sync-setup">
+        <div class="hint">Columns the app writes, in order: ${esc(SHEET_SYNC_COLUMNS.map(c=>c.h).join(' · '))}. A sheet of your own only needs a Name column (plus id once it has been sent once); any other columns it has are matched by header, and the rest of each record is left as it is.</div>
+      </div>
+    </div>`;
 }
 
 /* ============================================================ LOCATIONS DATABASE */
