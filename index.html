@@ -2850,7 +2850,6 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
-      <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
       <div class="tab ${currentProjectTab==='notes'?'active':''}" onclick="goProjectTab('notes')">NOTES</div>
@@ -2865,7 +2864,6 @@ function renderProjectBody(){
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
   if(currentProjectTab==='locations') return renderProjectLocations(body);
-  if(currentProjectTab==='tech') return renderProjectTech(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
   if(currentProjectTab==='notes') return renderProjectNotes(body);
@@ -2917,81 +2915,10 @@ function renderProjectOverview(body){
   const chatEl = document.getElementById('aiScanChat');
   if(chatEl) chatEl.scrollTop = chatEl.scrollHeight;
 }
-let techBlocks = { defaults:true, cameras:true, roundup:false };
-function toggleTechBlock(key){ toggleBlock(techBlocks, 'tt', key); }
-function setAllTechBlocksCollapsed(collapsed){ setAllBlocksCollapsed(techBlocks, 'tt', collapsed); }
-function toggleAllTechBlocks(){ setAllTechBlocksCollapsed(!allBlocksCollapsed(techBlocks)); }
-function techBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
-  return collapsibleSectionHTML({
-    state: techBlocks[key], prefix: 'tt', key, title, inner: bodyInnerHTML,
-    actions: headerActionsHTML, id: `techBlock-${key}`, onToggle: `toggleTechBlock('${key}')`
-  });
-}
-function jumpToTechRoundup(){
-  if(!techBlocks.roundup) toggleTechBlock('roundup');
-  document.getElementById('techBlock-roundup')?.scrollIntoView({block:'start'});
-}
-function renderProjectTech(body){
-  const p = currentProject();
-  const projTS = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
-  const continuous = p.continuousNumbering!==false;
-  body.innerHTML = `
-    ${expandCollapseAllHTML('toggleAllTechBlocks()', `<span onclick="jumpToTechRoundup()">Summary</span>`, allBlocksCollapsed(techBlocks), 'tt')}
-    ${techBlockHTML('defaults', 'Tech specs — project defaults', '', `
-      <div class="hint" style="margin-bottom:10px;">Set once for the whole shoot. Every day inherits these; a day only differs if you change it there.</div>
-      ${techSpecFieldsHTML('pj')}
-      <div class="field-inline" style="margin-top:14px;">
-        <label for="pjContinuousNumbering">Shot numbering</label>
-        <select id="pjContinuousNumbering">
-          <option value="continuous" ${continuous?'selected':''}>Continuous numbering throughout shoot</option>
-          <option value="reset" ${!continuous?'selected':''}>Reset numbers each day</option>
-        </select>
-        <span class="hint">Continuous gives a rough sense of which day footage is from just by the number.</span>
-      </div>
-      <div class="toolbar" style="margin-top:12px;">
-        <button class="primary" onclick="saveProjectTechSpecs()">Save defaults</button>
-        <span class="status" id="pjStatus"></span>
-      </div>`)}
-    ${techBlockHTML('cameras', 'Camera designations', '', `
-      <div class="hint" style="margin-bottom:10px;">Only people on this project in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
-      <div id="cameraDesigListProject"></div>`)}
-    <div id="techSpecsRoundupSection"></div>`;
-  setTechSpecFields('pj', projTS);
-  renderCameraDesignations('project');
-  renderTechSpecsRoundup();
-  body.oninput = () => scheduleAutosave('tech', () => { saveProjectTechSpecs(); renderTechSpecsRoundup(); });
-}
-/* project-level version of the Preview & Export "Tech specs" roundup (T-6.3) — same
-   rows/camera-designations tables, but resolved from the project defaults rather than
-   a specific (possibly-overriding) shoot day, since the Tech tab has no day context */
-function projectTechRoundupData(){
-  const p = currentProject(); if(!p) return null;
-  const ts = Object.assign({}, TECHSPEC_DEFAULTS, p.techSpecs||{});
-  const cams = normalizeCameras(p.cameras, p.id);
-  return { shootTitle:[p.client,p.title].filter(Boolean).join(' — '), rows:techSpecRows(ts), camRows:cameraDesignationRows(cams) };
-}
-function renderTechSpecsRoundup(){
-  const el = document.getElementById('techSpecsRoundupSection'); if(!el) return;
-  const data = projectTechRoundupData();
-  const headerActions = `<button class="small" onclick="copyProjectTechSpecs()">${icon('copy')} Copy tech specs</button>`;
-  if(!data || (!data.rows.length && !data.camRows.length)){
-    el.innerHTML = techBlockHTML('roundup', 'Tech specs roundup', '', '<div class="empty-note">No tech specs set yet — fill in the project defaults above.</div>');
-    return;
-  }
-  const body = techSpecsRoundupBodyHTML(data.rows, data.camRows);
-  el.innerHTML = techBlockHTML('roundup', 'Tech specs roundup', headerActions, body);
-}
-function copyProjectTechSpecsText(){
-  const data = projectTechRoundupData(); if(!data) return '';
-  const L = [`*TECH SPECS* — ${data.shootTitle||''}`.trim()];
-  data.rows.forEach(([k,v])=>L.push(`${k}: ${v}`));
-  if(data.camRows.length){
-    L.push('','*CAMERA DESIGNATIONS*');
-    data.camRows.forEach(cd=>L.push(`Camera ${cd.letter} — ${cd.name}${cd.shorthand?(' ['+cd.shorthand+']'):''} (${cd.tag})`));
-  }
-  return L.join('\n');
-}
-function copyProjectTechSpecs(){ return copyText(copyProjectTechSpecsText()); }
+/* ⚠️ REMOVED 14 Sep 2026: the Tech tab (T-4) — renderProjectTech(), techBlocks/techBlockHTML(),
+   jumpToTechRoundup(), projectTechRoundupData(), renderTechSpecsRoundup(), copyProjectTechSpecs*().
+   Tech specs and camera designations are edited on the Preview & Export tab's Tech specs
+   block (renderTechSpecsSection, T-7.3). Do not look for the old names. */
 let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' | 'ai' — one control open at a time
 let quickAddError = null;                 // e.g. "Pick a date first."
 let quickDayDraft = { dayNum:'', date:'', allCrewCall:'', brief:'' };
@@ -3760,15 +3687,6 @@ async function sendAiScanMessage(){
     aiScanBusy = false;
     renderProjectBody();
   }
-}
-async function saveProjectTechSpecs(){
-  const p = currentProject(); if(!p) return;
-  p.techSpecs = p.techSpecs || {};
-  const entered = readTechSpecFields('pj');
-  TECHSPEC_FIELDS.forEach(f=>{ if(entered[f]) p.techSpecs[f] = entered[f]; else delete p.techSpecs[f]; });
-  const numbering = document.getElementById('pjContinuousNumbering');
-  if(numbering) p.continuousNumbering = numbering.value!=='reset';
-  flashSaveResult('pjStatus', await saveDB('db:projects', projectsDB));
 }
 async function saveProjectOverview(){
   const p = currentProject(); if(!p) return;
@@ -5793,8 +5711,8 @@ function resolveTechSpecs(day){
 }
 function techSpecsOverridden(day){ return !!(day && day.techSpecs && Object.keys(day.techSpecs).length); }
 /* flattened camera-designation rows ({letter,name,shorthand,tag}) for a normalized
-   cams object — shared by the per-day Preview export (buildFullData) and the
-   project-level Tech tab roundup (projectTechRoundupData) */
+   cams object — used by buildFullData() for every per-day output (the project-level
+   Tech tab roundup that also read it went on 14 Sep 2026) */
 function cameraDesignationRows(cams){
   return cams.order.map((cid,oi)=>{
     const c = crewInfo(cid); const baseLetter = letterForIndex(oi);
@@ -5826,7 +5744,11 @@ function cinematographyCrew(projectId){
   // with one camera letter, so this reads projectCrew() rather than the entry list
   return projectCrew(p).filter(c=>c.department==='Cinematography');
 }
-function normalizeCameras(cams, projectId){
+/* `day` (14 Sep 2026): when given, the operator pool is the Cinematography crew who hold a
+   POSITION ON THAT DAY, not everyone in the department on the project — camera letters
+   belong to the cameras actually booked. Without a day (legacy project-level list) it is
+   the whole department. */
+function normalizeCameras(cams, projectId, day){
   cams = cams || {};
   if(cams.assign && !cams.order && !cams.cameras){
     const entries = Object.keys(cams.assign).map(cid=>({ cid, a:cams.assign[cid].a||'', bodyA:cams.assign[cid].bodyA, bodyB:cams.assign[cid].bodyB, hasB:!!cams.assign[cid].b }));
@@ -5844,7 +5766,8 @@ function normalizeCameras(cams, projectId){
   cams.order = cams.order || [];
   cams.cameras = cams.cameras || {};
   cams.unnamed = cams.unnamed || [];
-  const crew = cinematographyCrew(projectId);
+  const crew = day ? cinematographyCrew(projectId).filter(c=>crewOnDay(c.id, day, projById(projectId)))
+                   : cinematographyCrew(projectId);
   crew.forEach(c=>{ if(!cams.order.includes(c.id)) cams.order.push(c.id); });
   cams.order = cams.order.filter(cid=>crew.some(c=>c.id===cid));
   cams.order.forEach(cid=>{
@@ -5858,7 +5781,7 @@ function normalizeCameras(cams, projectId){
 function resolveCameras(day){
   const p = projectOf(day) || {};
   const raw = (day && day.cameras) ? day.cameras : (p.cameras || null);
-  return normalizeCameras(raw, day ? day.projectId : null);
+  return normalizeCameras(raw, day ? day.projectId : null, day || null);
 }
 function camerasOverridden(day){ return !!(day && day.cameras); }
 function nameInitials(name){
@@ -5880,17 +5803,15 @@ function cameraFileTag(letter, cameraModel, name){
   const initials = nameInitials(name) || 'UNOP';
   return `${letter||'—'}_${cam}_${initials}_`;
 }
-/* scope: 'project' (editing the default) or 'day' (editing an override) */
+/* scope is always 'day' (kept as a parameter because every handler in the markup passes it) */
 function renderCameraDesignations(scope){
-  const el = document.getElementById(scope==='project' ? 'cameraDesigListProject' : 'cameraDesigList');
+  const el = document.getElementById('cameraDesigList');
   if(!el) return;
-  const day = scope==='day' ? currentDay() : null;
-  if(scope==='day' && !day) return;
-  const projectId = scope==='day' ? day.projectId : currentProjectId;
-  const cams = scope==='day' ? resolveCameras(day) : normalizeCameras((projById(projectId)||{}).cameras, projectId);
+  const day = currentDay(); if(!day) return;
+  const cams = resolveCameras(day);
   let html = '';
   if(!cams.order.length){
-    html += `<div class="empty-note">No one on this project is in the Cinematography department yet — add them via the Crew tab first.</div>`;
+    html += `<div class="empty-note">No camera crew booked on this day — give someone in Cinematography a position on this day (Crew ▸ Days on site) and they appear here.</div>`;
   } else {
     html += cams.order.map((cid,oi)=>{
       const c = crewById(cid); if(!c) return '';
@@ -5957,16 +5878,12 @@ function renderCameraDesignations(scope){
 }
 /* returns the cameras object to mutate, creating a day override on first day-scoped edit */
 function camerasForEdit(scope){
-  if(scope==='project'){
-    const p = currentProject(); if(!p) return null;
-    p.cameras = normalizeCameras(p.cameras, currentProjectId);
-    return { obj:p.cameras, key:'db:projects', arr:()=>projectsDB };
-  }
+  // scope is always 'day' now (the project-level editor went with the Tech tab, 14 Sep 2026)
   const day = currentDay(); if(!day) return null;
   if(!day.cameras){
     day.cameras = JSON.parse(JSON.stringify(resolveCameras(day)));   // fork the resolved (already-normalized) default
   } else {
-    day.cameras = normalizeCameras(day.cameras, day.projectId);
+    day.cameras = normalizeCameras(day.cameras, day.projectId, day);
   }
   return { obj:day.cameras, key:'db:shootdays', arr:()=>shootDaysDB };
 }
@@ -5975,8 +5892,8 @@ function camerasForEdit(scope){
 async function commitCameras(scope, t){
   await saveDB(t.key, t.arr());
   renderCameraDesignations(scope);
-  if(scope==='day') refreshTechSpecsBanner();
-  else renderTechSpecsRoundup();
+  refreshTechSpecsBanner();
+  renderTechExportedTable();
 }
 async function moveOperator(scope, crewId, dir){
   const t = camerasForEdit(scope); if(!t) return;
@@ -6036,7 +5953,10 @@ async function resetDayTechSpecs(){
   const day = currentDay(); if(!day) return;
   delete day.techSpecs; delete day.cameras;
   await saveDB('db:shootdays', shootDaysDB);
-  populateShootDay(day);
+  setTechSpecFields('ts', resolveTechSpecs(day));
+  renderCameraDesignations('day');
+  refreshTechSpecsBanner();
+  renderTechExportedTable();
 }
 function refreshTechSpecsBanner(){
   const el = document.getElementById('techSpecsBanner'); if(!el) return;
@@ -8174,6 +8094,8 @@ function renderProjectPreview(body){
     if(!e.target) return;
     if(printable && exportSections.travel && (e.target.id==='tsCostPublic' || e.target.id==='tsCostMileage'))
       scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); });
+    else if(printable && exportSections.tech && TECHSPEC_FIELDS.some(f=>techSpecFieldId('ts',f)===e.target.id))
+      scheduleAutosave('techspecs', () => saveDayTechSpecs());
     else if(printable && exportSections.hotels && e.target.id==='hcRoomNight')
       scheduleAutosave('hotelCosts', () => saveHotelCosts());
   };
@@ -9479,7 +9401,7 @@ function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return 
 /* Collapse state for the four Shoot Day blocks. Deliberately GLOBAL, not per-day:
    when you're working one concern at a time (e.g. schedules across the week),
    collapsing on Day 1 should stay collapsed when you move to Day 5. */
-let shootDayBlocks = { general:true, schedule:true, positions:true, tech:true };
+let shootDayBlocks = { general:true, schedule:true, positions:true };   // tech left for the Preview tab, 14 Sep 2026
 function toggleShootDayBlock(key){ toggleBlock(shootDayBlocks, 'sd', key); }
 function setAllShootDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(shootDayBlocks, 'sd', collapsed); }
 function toggleAllShootDayBlocks(){ setAllShootDayBlocksCollapsed(!allBlocksCollapsed(shootDayBlocks)); }
@@ -9606,21 +9528,11 @@ function shootDayBuildHTML(){
       <div class="hint">Only crew assigned to the project appear here. Grouped by company, then department, then position.</div>
     </div>`;
 
-  const tech = `
-    <div class="section">
-      <div class="hint" style="margin-bottom:8px;">Reference for camera &amp; technical crew only — stays off the main call sheet.</div>
-      <div id="techSpecsBanner"></div>
-      ${techSpecFieldsHTML('ts')}
-      <div class="subhead" style="margin-top:18px;">Camera designations</div>
-      <div class="hint" style="margin-bottom:10px;">Only people in the Cinematography department appear here. Reorder with the arrows — that order sets everyone's letter (A, B, C…).</div>
-      <div id="cameraDesigList"></div>
-    </div>`;
 
   return expandCollapseAllHTML('toggleAllShootDayBlocks()', undefined, allBlocksCollapsed(shootDayBlocks), 'sd')
        + sdBlock('general','General information', general)
        + sdBlock('schedule','Schedule', schedule)
        + sdBlock('positions','Position assignments', positions)
-       + sdBlock('tech','Tech specs &amp; cameras', tech)
        + `<div class="section">
             <h2>Danger zone</h2>
             <button class="danger" onclick="deleteShootDay(currentShootDayId)">Delete this shoot day</button>
@@ -9925,13 +9837,10 @@ function populateShootDay(d){
   document.getElementById('rows-sched').innerHTML='<div class="row" style="border:none;padding:0;margin:0 0 2px;"><span></span><span></span><label>Time</label><label>Duration</label><label>Description</label><span></span></div>';
   (d.schedule&&d.schedule.length?d.schedule:[[],[]]).forEach(r=>addSchedRow(r));
   renderPositionAssignments(); refreshAddPosnPick();
-  setTechSpecFields('ts', resolveTechSpecs(d));
   setv('sdBrief',(d.brief||[]).join('\n')); setv('sdParking',d.parking); setv('sdNotes',d.notes);
   autoGrowTextarea(document.getElementById('sdBrief'));
   updateHospitalDisplay();
   updateParkingLookupDisplay();
-  renderCameraDesignations('day');
-  refreshTechSpecsBanner();
 }
 function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); updateParkingLookupDisplay(); }
 function updateLocationSummary(){
@@ -10005,12 +9914,7 @@ async function saveShootDay(thenGenerate){
     const prev = prevPositions.find(p=>p[0]===cid);
     return [cid, call, '', prev?(prev[3]||''):'', prev?(prev[4]||''):''];
   });
-  // store only what actually differs from the project defaults, so later default changes flow through
-  const projTS = Object.assign({}, TECHSPEC_DEFAULTS, (projectOf(d)||{}).techSpecs||{});
-  const entered = readTechSpecFields('ts');
-  const tsOv = {};
-  TECHSPEC_FIELDS.forEach(f=>{ if((entered[f]||'') !== (projTS[f]||'')) tsOv[f] = entered[f]; });
-  if(Object.keys(tsOv).length) d.techSpecs = tsOv; else delete d.techSpecs;
+  // tech specs are no longer on this form (edited on Preview & Export, saveDayTechSpecs) — never touch d.techSpecs here
   d.brief=parseBriefLines(val('sdBrief'));
   d.parking=val('sdParking'); d.notes=val('sdNotes');
   const saved = await saveDB('db:shootdays',shootDaysDB);
@@ -10142,15 +10046,72 @@ function generatePreview(d){
   if(wa) wa.textContent=buildWAText(data);
   renderTechSpecsSection(data);
 }
+/* T-7.3 — since 14 Sep 2026 the ONE place tech specs and camera designations are edited
+   (the Tech tab T-4 and the Shoot Day block T-5.5 are gone). Per selected day:
+   - the six spec fields autosave as a DAY OVERRIDE holding only what differs from the
+     project defaults (overlayDiff — the rule saveShootDay used), so a later "Use for
+     every day" flows through to days that never diverged;
+   - "Use for every day" promotes the fields to p.techSpecs and clears every day's override;
+   - the camera list is the Cinematography crew BOOKED ON THIS DAY (resolveCameras with the
+     day), reordered/edited here through the existing camera handlers, scope 'day';
+   - the "As exported" table below is what the Copy button, WhatsApp text and .xlsx carry. */
 function renderTechSpecsSection(d){
   const el=document.getElementById('techSpecsSection'); if(!el) return;
-  const ts=d.techSpecs||{};
-  const rows=techSpecRows(ts);
-  const cams = d.cameraDesignations||[];
+  const day = currentDay(); if(!day) return;
   const headerActions = `<button class="small" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
-  if(!rows.length && !cams.length){ el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, '<div class="empty-note">No tech specs set for this day yet — add them under Tech, or per-day under Shoot Days.</div>'); return; }
-  const body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — not included in the WhatsApp text above.</div>` + techSpecsRoundupBodyHTML(rows, cams);
+  const body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — the call sheet card stays clear of this; it goes out with the WhatsApp text and the .xlsx only while Tech specs is ticked.</div>
+    <div id="techSpecsBanner"></div>
+    ${techSpecFieldsHTML('ts')}
+    <div class="toolbar" style="margin:10px 0 0;">
+      <button class="small" onclick="applyTechSpecsToProject()" title="Make these the project defaults and clear every day's own version">Use for every day</button>
+      <span class="status" id="tsStatus"></span>
+    </div>
+    <div class="subhead" style="margin-top:18px;">Camera designations</div>
+    <div class="hint" style="margin-bottom:10px;">The Cinematography crew booked on this day, in letter order (A, B, C…). Reorder with the arrows; add a second body or an unmanned camera below. Someone missing? Give them a position on this day first.</div>
+    <div id="cameraDesigList"></div>
+    <div class="subhead" style="margin-top:18px;">As exported</div>
+    <div id="techSpecsExported"></div>`;
   el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
+  setTechSpecFields('ts', resolveTechSpecs(day));
+  renderCameraDesignations('day');
+  refreshTechSpecsBanner();
+  renderTechExportedTable();
+}
+/* the read-only rows + camera table (shared markup with the exports), refreshed after every
+   spec or camera save without re-rendering the inputs above it */
+function renderTechExportedTable(){
+  const el = document.getElementById('techSpecsExported'); if(!el) return;
+  const day = currentDay(); if(!day) return;
+  const data = buildFullData(day);
+  const rows = techSpecRows(data.techSpecs||{}), cams = data.cameraDesignations||[];
+  el.innerHTML = (rows.length || cams.length) ? techSpecsRoundupBodyHTML(rows, cams)
+    : '<div class="empty-note">Nothing yet — fill in the fields above.</div>';
+}
+/* autosave for the six fields: a day stores only what differs from the project defaults */
+async function saveDayTechSpecs(){
+  const d = currentDay(); if(!d) return;
+  const projTS = Object.assign({}, TECHSPEC_DEFAULTS, (projectOf(d)||{}).techSpecs||{});
+  const tsOv = overlayDiff(readTechSpecFields('ts'), projTS, TECHSPEC_FIELDS);
+  if(Object.keys(tsOv).length) d.techSpecs = tsOv; else delete d.techSpecs;
+  flashSaveResult('tsStatus', await saveDB('db:shootdays', shootDaysDB));
+  refreshTechSpecsBanner();
+  renderTechExportedTable();
+}
+/* "Use for every day": these fields become the project defaults and no day keeps its own */
+async function applyTechSpecsToProject(){
+  const d = currentDay(), p = currentProject(); if(!d || !p) return;
+  const entered = readTechSpecFields('ts');
+  const days = projectDays(p.id);
+  const snaps = beginUndo(['db:projects','db:shootdays']);
+  p.techSpecs = {};
+  TECHSPEC_FIELDS.forEach(f=>{ if(entered[f]) p.techSpecs[f] = entered[f]; });
+  days.forEach(x=>{ delete x.techSpecs; });
+  const r1 = await saveDB('db:projects', projectsDB);
+  const r2 = await saveDB('db:shootdays', shootDaysDB);
+  flashSaveResult('tsStatus', (r1.ok && r2.ok) ? {ok:true} : (r1.ok ? r2 : r1), 'Set for every day');
+  refreshTechSpecsBanner();
+  renderTechExportedTable();
+  finishUndo(`Tech specs set as the project defaults for all ${days.length} day${days.length===1?'':'s'}.`, snaps);
 }
 /* text form of a day's tech specs — shared by the Copy button and the WhatsApp
    export's Tech specs section (Phase Q). Takes RESOLVED data (buildFullData output),

@@ -371,36 +371,25 @@ id and come in as new people on the next load.
 - `findLocationByName()` — looks up a location record by its name — [Locations, Shared/utility functions]
 - `locSelectOptionsHTML()` / `refreshLocationDropdowns()` — build and refresh `<option>` lists of locations for pickers — [Locations]
 
-## Tech Specs (Camera Designations, shot numbering)
+## Tech Specs & Camera Designations
 
-- `renderProjectTech()` — renders the project Tech Specs tab: project-default tech fields, shot-numbering mode, camera designations list, and (Phase P1) the Tech specs roundup, each wrapped in `techBlockHTML()` so every section on this tab is collapsible — [Tech Specs]
-- `techBlocks` / `toggleTechBlock()` / `setAllTechBlocksCollapsed()` / `techBlockHTML()` (Phase P1) — collapsible-block state and rendering for the Tech tab's three sections (`defaults`, `cameras`, `roundup`), same shared plumbing (`applyBlockState`/`toggleBlock`/`setAllBlocksCollapsed`) as Preview & Export's `pv` blocks and the Shoot Day editor's `sd` blocks. `roundup` starts collapsed (`techBlocks.roundup = false`); `defaults`/`cameras` start open — matches the Hotel summary block's collapsed-by-default pattern — [Tech Specs]
-- `saveProjectTechSpecs()` — persists the project-level tech spec defaults and continuous/reset numbering choice — [Tech Specs]
-- `cameraDesignationRows()` (Phase P1) — flattens a normalized `cams` object into the `{letter,name,shorthand,tag}` rows used by every camera-designations table; shared by `buildFullData()` (per-day, Preview & Export) and `projectTechRoundupData()` (project-level, Tech tab) — [Tech Specs, Preview & Export]
-- `techSpecsRoundupBodyHTML()` (Phase P1) — renders the tech-spec-rows table + camera-designations table shared by the Tech tab's roundup and Preview & Export's Tech specs block — [Tech Specs, Preview & Export]
-- `projectTechRoundupData()` / `renderTechSpecsRoundup()` / `copyProjectTechSpecsText()` / `copyProjectTechSpecs()` (Phase P1) — the Tech tab's own "Tech specs roundup" section (T-4.4): project-defaults tech specs + project-scope camera designations, resolved without any day context (the Tech tab has no selected shoot day), with its own Copy button. Re-rendered on every tech-field/camera edit (`body.oninput` in `renderProjectTech()`, and from the non-day branch of `commitCameras()`) so it stays live without a full tab re-render — [Tech Specs]
-- `jumpToTechRoundup()` (Phase P3) — the "Summary" jump-link next to the Tech tab's Expand all/Collapse all: expands `techBlocks.roundup` if collapsed, then scrolls `#techBlock-roundup` (the `techBlockHTML('roundup', …)` wrapper) into view — [Tech Specs]
+**14 Sep 2026 — the Tech tab (T-4) and the Shoot Day tech block (T-5.5) are gone.** Everything below is reached from the Preview & Export tab's Tech specs block (T-7.3), per selected shoot day. The data model did NOT change: `p.techSpecs` (project defaults) + `day.techSpecs` (only what differs), `p.cameras` + `day.cameras`, resolved through the override layer as before.
+
+- `renderTechSpecsSection()` — renders T-7.3 into `#techSpecsSection` from `generatePreview()`: hint, `#techSpecsBanner`, the six fields (`techSpecFieldsHTML('ts')`), "Use for every day", the camera editor (`#cameraDesigList`) and `#techSpecsExported`. Fills the fields from `resolveTechSpecs(day)` after rendering — [Tech Specs, Preview & Export]
+- `saveDayTechSpecs()` — the autosave target for the six fields (wired in `renderProjectPreview()`'s `body.oninput` by field id, alongside the Travel/Hotel cost autosaves). Stores `overlayDiff(entered, projectDefaults, TECHSPEC_FIELDS)` on the day, deleting the key when nothing differs — the same rule `saveShootDay()` used to apply — [Tech Specs]
+- `applyTechSpecsToProject()` — "Use for every day": the entered fields become `p.techSpecs` and every day of the project loses its `techSpecs` override. Both writes under one `beginUndo`/`finishUndo` — [Tech Specs]
+- `renderTechExportedTable()` — the "As exported" rows + camera table, rebuilt from `buildFullData(day)` after every spec or camera save WITHOUT re-rendering the inputs above it (a full re-render would drop text still waiting for its autosave tick) — [Tech Specs, Preview & Export]
 - `resolveTechSpecs()` / `techSpecsOverridden()` — resolve a shoot day's effective tech specs (day override vs. project default) — [Tech Specs]
-- `resetDayTechSpecs()` — clears a day's tech spec override, reverting it to the project default — [Tech Specs]
-- `refreshTechSpecsBanner()` — updates the "using project default / overridden" banner shown on a shoot day — [Tech Specs]
-- `TECHSPEC_FIELDS` / `TECHSPEC_DEFAULTS` / `TECHSPEC_LABELS` / `TECHSPEC_HINTS` — the tech spec keys, their default values, their human labels, and each field's placeholder + box width — [Tech Specs]
-- `techSpecFieldsHTML()` — the six tech-spec inputs, rendered once for both the project defaults (prefix `pj`) and a day's override (prefix `ts`) — [Tech Specs]
-- `techSpecFieldId()` / `setTechSpecFields()` / `readTechSpecFields()` — build a field's DOM id, and fill/read a whole tech-spec form — [Tech Specs]
-- `techSpecRows()` — `[label, value]` pairs for the fields that have a value; shared by the Preview table, the copyable text and the Excel sheet — [Tech Specs, Preview & Export]
-- `CAMERA_LETTERS` — the A–Z pool used to assign camera designation letters — [Tech Specs]
-- `letterForIndex()` — maps a camera's position index to its designation letter — [Tech Specs]
-- `cinematographyCrew()` — returns the crew on a project who belong to the Cinematography department — [Tech Specs]
-- `normalizeCameras()` — reconciles a project's/day's camera list against current cinematography crew (adds/removes/reorders entries) — [Tech Specs]
-- `resolveCameras()` / `camerasOverridden()` — resolve a shoot day's effective camera list (day override vs. project) — [Tech Specs]
-- `nameInitials()` — derives initials from a crew member's name for camera tagging — [Tech Specs]
-- `shortenCameraModel()` — abbreviates a camera model name by stripping known brand prefixes — [Tech Specs]
-- `CAMERA_BRAND_PREFIXES` — brand name prefixes stripped by `shortenCameraModel()` — [Tech Specs]
-- `cameraFileTag()` — builds the camera's file-naming tag from letter, model and operator name — [Tech Specs]
-- `renderCameraDesignations()` — renders the camera designation list/editor for either the project defaults or a specific day — [Tech Specs]
-- `camerasForEdit()` — returns the camera list currently being edited for a given scope (project/day) — [Tech Specs]
-- `moveOperator()` / `addOperatorCamera()` / `removeOperatorCamera()` / `setOperatorCameraField()` — reorder, add, remove and edit an operator-assigned camera entry — [Tech Specs]
-- `addUnnamedCamera()` / `removeUnnamedCamera()` / `setUnnamedCameraField()` / `moveUnnamedCamera()` — add, remove, edit and reorder a camera with no assigned operator — [Tech Specs]
-- `commitCameras()` — the shared tail of every camera edit: persist, re-render the list, and (day scope only) refresh the overridden-vs-default banner — [Tech Specs]
+- `resetDayTechSpecs()` / `refreshTechSpecsBanner()` — the banner's Reset clears the day's tech-spec AND camera overrides, then refills the fields, camera list and exported table in place — [Tech Specs]
+- `TECHSPEC_FIELDS` / `TECHSPEC_DEFAULTS` / `TECHSPEC_LABELS` / `TECHSPEC_HINTS` / `techSpecFieldsHTML()` / `techSpecFieldId()` / `setTechSpecFields()` / `readTechSpecFields()` / `techSpecRows()` — unchanged; only the `'ts'` prefix is in use now (the `'pj'` form went with the Tech tab) — [Tech Specs]
+- `cameraDesignationRows()` / `techSpecsRoundupBodyHTML()` — the flattened `{letter,name,shorthand,tag}` rows and the shared table markup, used by `buildFullData()` and the "As exported" table — [Tech Specs, Preview & Export]
+- `CAMERA_LETTERS` / `letterForIndex()` / `nameInitials()` / `shortenCameraModel()` / `CAMERA_BRAND_PREFIXES` / `cameraFileTag()` — unchanged — [Tech Specs]
+- `cinematographyCrew()` — the Cinematography people on a project (deduplicated, `projectCrew()`) — [Tech Specs]
+- `normalizeCameras(cams, projectId, day)` — ⚠️ **takes the day since 14 Sep 2026.** With a day, the operator pool is `cinematographyCrew()` filtered by `crewOnDay()` — camera letters belong to the cameras actually booked on that day, so someone with no position on the day gets no letter and is dropped from that day's list. Without a day (legacy call) it is the whole department. Still adds newcomers and drops leavers against that pool, and still seeds each operator's first body from `camera1` — [Tech Specs]
+- `resolveCameras()` / `camerasOverridden()` — resolve a shoot day's effective camera list; `resolveCameras(day)` passes the day through to `normalizeCameras()` — [Tech Specs]
+- `renderCameraDesignations()` / `camerasForEdit()` — day scope only now (the `scope` parameter is kept because every handler in the markup passes `'day'`); `camerasForEdit` forks the resolved list onto `day.cameras` on the first edit, exactly as before — [Tech Specs]
+- `moveOperator()` / `addOperatorCamera()` / `removeOperatorCamera()` / `setOperatorCameraField()` / `addUnnamedCamera()` / `removeUnnamedCamera()` / `setUnnamedCameraField()` / `moveUnnamedCamera()` / `commitCameras()` — unchanged, except `commitCameras()` now also refreshes the banner and the exported table (its old project-scope branch re-rendered the Tech tab roundup) — [Tech Specs]
+- REMOVED (do not look for them): `renderProjectTech()`, `techBlocks`/`toggleTechBlock()`/`setAllTechBlocksCollapsed()`/`toggleAllTechBlocks()`/`techBlockHTML()`, `jumpToTechRoundup()`, `projectTechRoundupData()`, `renderTechSpecsRoundup()`, `copyProjectTechSpecsText()`/`copyProjectTechSpecs()`, `saveProjectTechSpecs()`, `shootDayBlocks.tech`, the `tech` block in the Shoot Day editor, and the tech-spec lines in `saveShootDay()`/`populateShootDay()`.
 
 ## Shoot Days
 
@@ -937,17 +926,17 @@ coarse information first, finest detail last.
 | T-3.1 | · Location × day grid | Which days each location is used | `locDayGridHTML()` |
 | T-3.2 | · Add location | ONE button → search the Locations database as you type, with "create new location" as the last row of the same result list (Phase Q) | `toggleLocAdd()` / `locAddResultsHTML()` |
 | ~~T-3.3~~ | ~~· Add a new location~~ | Merged into T-3.2 by Phase Q — there is no second add button | — |
-| **T-4** | **Tech** | Project-wide technical defaults | `renderProjectTech()` |
-| T-4.1 | · Tech specs — project defaults | Frame rate, resolution, delivery, colour, timecode, codec | `techSpecFieldsHTML('pj')` |
-| T-4.2 | · Shot numbering | Continuous vs reset-each-day | `saveProjectTechSpecs()` |
-| T-4.3 | · Camera designations (project) | Operator order → letters; unmanned cameras | `renderCameraDesignations('project')` |
-| T-4.4 | · Tech specs roundup | Collapsed-by-default summary (rows + camera designations table) of the project defaults, with its own Copy button — same table markup as T-6.3, which keeps its own copy of this block (Phase P1) | `renderTechSpecsRoundup()` |
+| ~~**T-4**~~ | ~~**Tech**~~ | **Retired 14 Sep 2026** — the tab is gone; tech specs and camera designations are edited per day on Preview & Export | → **T-7.3** |
+| ~~T-4.1~~ | ~~· Tech specs — project defaults~~ | Retired with T-4. The project defaults still exist as data (`p.techSpecs`) and are written by T-7.3's "Use for every day" | → **T-7.3** |
+| ~~T-4.2~~ | ~~· Shot numbering~~ | Retired with T-4. `p.continuousNumbering` was stored but never read by any output, so it has no replacement | — |
+| ~~T-4.3~~ | ~~· Camera designations (project)~~ | Retired with T-4. Letters are per day now, from the crew booked on that day | → **T-7.3** |
+| ~~T-4.4~~ | ~~· Tech specs roundup~~ | Retired with T-4 | → **T-7.3** "As exported" |
 | **T-5** | **Shoot Days** | The per-day detail | `renderProjectDays()` |
 | T-5.1 | · Day tabs | Day switcher + New day | `dayTabsBarHTML()` |
 | T-5.2 | · General information | Day #/date/call, brief, parking, notes, locations, weather, hospital, parking lookup — one bound card, `.subhead`-divided (Phase N item 1), matching T-1.1 | `sdBlock('general', …)` |
 | T-5.3 | · Schedule | Time/duration rows, insert, reorder, bulk time shift | `addSchedRow()` / `shiftScheduleTimes()` |
 | T-5.4 | · Position assignments | Call times, grouped by company → department → role seniority (Phase N item 2) | `renderPositionAssignments()` |
-| T-5.5 | · Tech specs & cameras (day) | Day-level override of T-4.1 / T-4.3 | `sdBlock('tech', …)` |
+| ~~T-5.5~~ | ~~· Tech specs & cameras (day)~~ | Retired 14 Sep 2026 — same data, edited on Preview & Export instead, so there is one place | → **T-7.3** |
 | T-5.6 | · Per-day crew override | Role/dept/company for this day only | `dayOverrideFormHTML()` |
 | **T-6** | **Budget** | Cost visibility only, rolled up from data already entered on other tabs — not a working budget (Phase Budget) | `renderProjectBudget()` |
 | T-6.0 | · Filter & output | Phase Refinement/R16 — tick shoot days and/or departments to cost part of the shoot, plus the Per Person sort (R4) and the Copy/Export controls (R1). Scopes all four views at once, so it sits above the switcher, not in it. Nothing ticked = whole project. Foot row shared with T-2.6/D-1.2 — see **The filter-panel foot** | `budgetFilterPanelHTML()` / `filterPanelFootHTML()` / `copyBudget()` |
@@ -963,7 +952,7 @@ coarse information first, finest detail last.
 | T-7.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
 | T-7.2 | · WhatsApp text | Plain-text version for the full crew (no tech specs) — same Client/Positions/Talent/co-production ordering as T-7.1 | `buildWAText()` |
 | T-7.2b | · Hotel summary | Same room-booking table + per-night table as T-2.3's Hotel summary, shown again here below the WhatsApp text | `hotelSummaryHTML()` |
-| T-7.3 | · Tech specs | Camera/technical crew reference + camera designations, per the selected shoot day (resolved override vs. project default). Kept here as-is even after Phase P1 added the project-level version at T-4.4 — this one stays day-aware, T-4.4 doesn't | `renderTechSpecsSection()` |
+| T-7.3 | · Tech specs | **The editor, since 14 Sep 2026** — the only place tech specs and camera designations are set. Per selected day: the six spec fields (autosave → day override of only what differs), "Use for every day" (→ project defaults, clears every day's override, Undo), the default/differs banner with Reset, the camera designations editor whose pool is the Cinematography crew BOOKED ON THIS DAY, and an "As exported" table (the exact rows the Copy button, WhatsApp text and .xlsx carry) | `renderTechSpecsSection()` / `saveDayTechSpecs()` / `applyTechSpecsToProject()` |
 | T-7.4 | · Transport summary | Same cost fields + per-day method-count grid as T-2.4, shown here too when Travel is ticked (Phase Q) | `transportSummaryHTML()` |
 | T-7.5 | · Catering order | Per-day headcounts + dietary requirements | `renderCateringExport()` |
 | T-7.6 | · Excel export | Multi-sheet .xlsx — Call Sheet plus one sheet per ticked section (Phase Q) — same Client/Positions/Talent/co-production ordering as T-7.1. No longer a block of its own: it's the Download .xlsx button in T-7.0 | `downloadExcel()` |
