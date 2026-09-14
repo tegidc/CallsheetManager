@@ -64,7 +64,7 @@ const MAX_ROWS = 2000;   // how far down the dropdowns and text format reach
 // Column views, by header. null = show everything. Name is always kept visible.
 const VIEWS = {
   'All':        null,
-  'Essential':  ['Name','Phone','Email','Department','Role','Saved roles','Fee / rate'],
+  'Essential':  ['Name','Show as','Phone','Email','Department','Role','Saved roles','Fee / rate'],
   'Additional': ['Name','Department','Role','Show as','Company','Home address','Shoe size','Clothing size',
                  'Dietary (general)','Dietary (specific)','Coffee / tea order','Drives','Car make / model','Registration',
                  'VAT registered','Invoices as','Head of Dept','Instagram','YouTube','LinkedIn','Previous projects','Notes','Private notes'],
