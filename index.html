@@ -247,6 +247,16 @@
   .sheet-sync-link{color:var(--tape); text-decoration:underline; text-underline-offset:2px;}
   .sheet-sync-notice{font-size:var(--fs-meta); color:var(--tape); margin:-4px 0 10px; padding:0 10px;}
   .sheet-sync-notice.err{color:var(--danger);}
+  /* Project Notes (T-9) — ruled rows, borderless bodies: a scratchpad, not a form */
+  .notes-bar{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;}
+  .notes-search{flex:1 1 260px;}
+  .note-row{padding:10px 0; border-top:1px solid var(--line);}
+  .note-row:last-child{border-bottom:1px solid var(--line);}
+  .note-meta{display:flex; align-items:center; gap:8px; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:2px;}
+  .note-meta .note-edited{text-transform:none; letter-spacing:0; font-family:var(--body); font-size:var(--fs-meta);}
+  .note-meta .note-del{margin-left:auto;}
+  .note-text{width:100%; border:none; background:transparent; padding:4px 0; margin:0; min-height:30px; font-family:var(--body); font-size:var(--fs-name); line-height:1.55; color:var(--text); resize:none; overflow:hidden; border-radius:0;}
+  .note-text:focus{outline:none; box-shadow:inset 3px 0 0 var(--tape); padding-left:10px;}
   .sheet-sync-summary{display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:14px; margin-bottom:6px;}
   .sheet-sync-preview{border:1px solid var(--tape); border-radius:8px; padding:var(--box-pad); margin-bottom:12px; background:var(--panel);}
   .sheet-sync-preview-head{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
@@ -782,6 +792,8 @@
   .roles-grid-name .pill.dept{flex:0 0 56px; display:inline-flex; justify-content:center;
     padding-left:0; padding-right:0;}
   .roles-name-text{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  /* the name on a Roles row opens the person's record in the edit pop-up (crewEditModalHTML) */
+  .roles-name-link{cursor:pointer;} .roles-name-link:hover{color:var(--tape); text-decoration:underline; text-underline-offset:2px;}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
   .formgroup{border:none; border-radius:0; padding:0; margin-bottom:16px; background:none;}
   .formgroup > .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:10px;
@@ -2837,10 +2849,11 @@ function renderProject(m){
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
-      <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">LOCATIONS &amp; VENDORS</div>
+      <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
       <div class="tab ${currentProjectTab==='tech'?'active':''}" onclick="goProjectTab('tech')">TECH</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
+      <div class="tab ${currentProjectTab==='notes'?'active':''}" onclick="goProjectTab('notes')">NOTES</div>
       <div class="tab ${currentProjectTab==='preview'?'active':''}" onclick="goProjectTab('preview')">PREVIEW &amp; EXPORT</div>
     </div>
     <div id="projectBody"></div>`;
@@ -2855,6 +2868,7 @@ function renderProjectBody(){
   if(currentProjectTab==='tech') return renderProjectTech(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
+  if(currentProjectTab==='notes') return renderProjectNotes(body);
   if(currentProjectTab==='preview') return renderProjectPreview(body);
 }
 
@@ -3184,7 +3198,7 @@ function buildTaskFlags(p, days){
   const items = [];
   const noDateDays = days.filter(d=>!d.date);
   if(noDateDays.length) items.push({ label:`${noDateDays.length} shoot day${noDateDays.length>1?'s':''} missing a date`, onclick:`currentShootDayId='${noDateDays[0].id}';goProjectTab('days')` });
-  if(!(p.locationIds||[]).length) items.push({ label:'No locations added yet', onclick:`goProjectTab('locations')` });
+  if(!(p.locationIds||[]).length) items.push({ label:'No venues added yet', onclick:`goProjectTab('locations')` });
   if(!projectEntries(p).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
 
   days.filter(d=>!d.locationId).forEach(d=>{
@@ -3255,6 +3269,94 @@ function tasksListHTML(p){
   const doneToggle = done.length ? `<div class="hint" style="cursor:pointer; margin-top:8px;" onclick="toggleShowCompletedTasks()">${showCompletedTasks?'▾':'▸'} Show completed (${done.length})</div>` : '';
   const doneHTML = (showCompletedTasks && done.length) ? `<div style="margin-top:8px;">${done.map(taskListItemHTML).join('')}</div>` : '';
   return `${openHTML}${doneToggle}${doneHTML}`;
+}
+
+/* ============================================================ PROJECT NOTES (T-9)
+   A scratchpad per project: free text, nothing else. Stored on the project record
+   (p.notes = [{id, text, createdAt, updatedAt}]) next to Tasks, so it travels with
+   the project and needs no new collection. Newest first, searchable, autosaved the
+   way Project details is. Deliberately no tags, formatting, attachments or sharing —
+   when a scrap turns into something real it becomes a task, a venue or a crew entry
+   through the tools that already exist. */
+let notesQuery = '';
+function fmtDateTime(iso){
+  if(!iso) return ''; const d = new Date(iso); if(isNaN(d)) return '';
+  return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+const projectNotes = (p) => ((p||currentProject()||{}).notes||[]);
+function renderProjectNotes(body){
+  const p = currentProject(); if(!p) return;
+  body.innerHTML = `<div class="section">
+      <div class="notes-bar">
+        <div class="notes-search">
+          <label for="notesSearch">Search notes</label>
+          <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="notesQuery=this.value;renderNotesList()">
+        </div>
+        <button class="primary" onclick="addProjectNote()">+ Note</button>
+        <span class="status" id="notesStatus"></span>
+      </div>
+      <div id="notesList"></div>
+    </div>`;
+  renderNotesList();
+  // only the note bodies autosave; the search box has its own handler and never writes
+  body.oninput = (e) => {
+    if(!e.target || !e.target.classList.contains('note-text')) return;
+    autoGrowTextarea(e.target);
+    scheduleAutosave('notes', saveProjectNotes);
+  };
+}
+function renderNotesList(){
+  const el = document.getElementById('notesList'); if(!el) return;
+  const p = currentProject(); if(!p) return;
+  const all = projectNotes(p).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const q = notesQuery.trim().toLowerCase();
+  const rows = q ? all.filter(n=>(n.text||'').toLowerCase().includes(q)) : all;
+  if(!all.length){ el.innerHTML = '<div class="empty-note">No notes yet — press + Note and type.</div>'; return; }
+  if(!rows.length){ el.innerHTML = `<div class="empty-note">Nothing matches “${esc(notesQuery.trim())}”.</div>`; return; }
+  el.innerHTML = (q ? `<div class="hint" style="margin:0 0 6px;">${rows.length} of ${all.length} match.</div>` : '') + rows.map(n=>{
+    const edited = n.updatedAt && (n.updatedAt||'').slice(0,16) !== (n.createdAt||'').slice(0,16);
+    return `<div class="note-row" data-id="${n.id}">
+      <div class="note-meta">
+        <span>${esc(fmtDateTime(n.createdAt))}</span>
+        ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
+        <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>
+      </div>
+      <textarea class="note-text" data-id="${n.id}" rows="1" placeholder="Type anything — a number, a name, half a thought.">${esc(n.text||'')}</textarea>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.note-text').forEach(autoGrowTextarea);
+}
+async function addProjectNote(){
+  const p = currentProject(); if(!p) return;
+  p.notes = p.notes || [];
+  const now = new Date().toISOString();
+  const n = { id:uid(), text:'', createdAt:now, updatedAt:now };
+  p.notes.push(n);
+  notesQuery = ''; const s = document.getElementById('notesSearch'); if(s) s.value = '';
+  renderNotesList();
+  const ta = document.querySelector(`.note-text[data-id="${n.id}"]`); if(ta) ta.focus();
+  saveInBackground('db:projects', projectsDB);   // G14 — render first, save after
+}
+/* reads every note body on screen; writes only the ones that changed */
+async function saveProjectNotes(){
+  const p = currentProject(); if(!p) return;
+  let changed = false;
+  document.querySelectorAll('.note-text').forEach(ta=>{
+    const n = (p.notes||[]).find(x=>x.id===ta.dataset.id); if(!n) return;
+    if(ta.value !== (n.text||'')){ n.text = ta.value; n.updatedAt = new Date().toISOString(); changed = true; }
+  });
+  if(!changed) return;
+  flashSaveResult('notesStatus', await saveDB('db:projects', projectsDB));
+}
+async function deleteProjectNote(id){
+  const p = currentProject(); if(!p) return;
+  const n = (p.notes||[]).find(x=>x.id===id); if(!n) return;
+  const snaps = beginUndo(['db:projects']);
+  p.notes = p.notes.filter(x=>x.id!==id);
+  await saveDB('db:projects', projectsDB);
+  renderNotesList();
+  const peek = (n.text||'').trim().replace(/\s+/g,' ');
+  finishUndo(`Deleted note${peek?` “${peek.slice(0,40)}${peek.length>40?'…':''}”`:''}.`, snaps);
 }
 
 /* IDEAS DEMO — Deliverables: what this project owes and when — an edit, a
@@ -4861,7 +4963,7 @@ function crewRolesRowHTML(e, spec, data){
   };
   const row = `<div class="roles-grid pb-head" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${deptLabelHTML(e)}<span class="roles-name-text">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</span></div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${deptLabelHTML(e)}<span class="roles-name-text roles-name-link" onclick="event.stopPropagation();editCrew('${e.id}')" title="Open ${esc(e.name)}'s record">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</span></div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e, {abbreviate:rolesRoleCollapsed})}</span></div>
     ${spec.cols.map(cellHTML).join('')}
   </div>`;
@@ -6391,14 +6493,14 @@ function renderProjectLocations(body){
   const days = projectDays();
   body.innerHTML = `
     <div class="section">
-      <h2>Locations on this project</h2>
+      <h2>Venues on this project</h2>
       ${assigned.length ? locBannerHTML(assigned, days) + locDayGridHTML(assigned, days) + `
         <div class="hint" style="margin-top:8px;">Click a location to set what it costs. A buyout is split across the days it is ticked on, so each day carries its share; per-day and hourly follow the ticks directly. Additional charges are counted once for the project, and all of it feeds the <strong>Locations</strong> line in the Budget.</div>`
-        : '<div class="empty-note">No locations assigned to this project yet.</div>'}
+        : '<div class="empty-note">No venues assigned to this project yet.</div>'}
     </div>
     <div class="section">
-      <h2>Add location</h2>
-      <button class="small" onclick="toggleLocAdd()">${locAddOpen?'Cancel':'+ Add location'}</button>
+      <h2>Add venue</h2>
+      <button class="small" onclick="toggleLocAdd()">${locAddOpen?'Cancel':'+ Add venue'}</button>
       ${locAddOpen ? `
         <div class="searchresults" style="margin-top:10px;">
           <input type="text" id="locAddSearch" placeholder="Search saved locations…" value="${esc(locAddQuery)}" oninput="onLocAddInput(this.value)" autocomplete="off">

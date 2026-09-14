@@ -341,6 +341,14 @@ id and come in as new people on the next load.
   connection in `appSettings.sheetSync` (`{url, sheetUrl, sheetName, lastPush, lastPull}`,
   in `db:settings`). `resetAppSettings()` deliberately keeps `sheetSync` — [Crew, Shared/utility functions]
 
+## Notes
+
+- `renderProjectNotes()` — the Notes tab (T-9): search box, "+ Note", the list. `body.oninput` autosaves only `.note-text` bodies (the search box has its own `oninput` and never writes) — [Notes]
+- `renderNotesList()` — newest first, filtered by `notesQuery` (case-insensitive substring of the body), with an "N of M match" line while a query is active. Re-rendered by the search box on every keystroke; autosave never re-renders, so a body being typed into is never replaced under the cursor — [Notes]
+- `addProjectNote()` / `saveProjectNotes()` / `deleteProjectNote()` — the three writes. A note is `{id, text, createdAt, updatedAt}` on `p.notes` (`db:projects`), next to `p.tasks`. Add renders first and saves in the background (G14); save reads every body on screen and writes only the ones that differ, stamping `updatedAt`; delete goes through `beginUndo`/`finishUndo` — [Notes]
+- `fmtDateTime()` — the created/edited stamp (`Mon 14 Sep 12:05`); `fmtDate()` stays date-only — [Notes, Shared/utility functions]
+- ⚠️ Deliberately NOT built: tags/tabs, cross-project search, formatting, attachments, a Quick-add button. A scrap that becomes real turns into a task, venue or crew entry through the existing tools.
+
 ## Locations
 
 - `renderProjectLocations()` — renders the project Locations tab: the assigned-locations day grid, then the ONE "Add location" entry point — [Locations]
@@ -910,7 +918,7 @@ coarse information first, finest detail last.
 | T-1.6 | · AI Scan (AI Chat) | Chat + document attachments, proposes shoot dates/locations/crew as tool-use cards (Phase AI Scan). **No longer its own section** — since the Phase Quick Add follow-up it's the "+ AI Chat" fourth button in T-1.8's row; code kept for the chat mechanics themselves | `aiScanChatBodyHTML()` |
 | T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
-| T-2.1 | · Roles | **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Stage/Days mode picker (⚠️ keys `stage`/`totals` — the mode labelled "Days" is key `'totals'`, see Phase BU ▸ The three modes), and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
+| T-2.1 | · Roles | **Clicking a person's name opens their record in the edit pop-up** (`editCrew(entryId)` → `crewEditModalHTML()`, the same modal bulk-edit uses for one selection; 14 Sep 2026). **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Stage/Days mode picker (⚠️ keys `stage`/`totals` — the mode labelled "Days" is key `'totals'`, see Phase BU ▸ The three modes), and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
 | **T-2.0.2** | · · Role chip | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
 | **T-2.0** | · Person block | Phase BK/BL — the shared card every one of the six sub-tabs renders: person-level facts and — since **Phase BN** — the FRONTED entry's own cells all render onto ONE shared row (`.pb-head`), columns aligned across every block; a stacked-away entry still gets a genuine separate row (`.pb-role-row.pb-role-extra`) below. Collapses to the fronted entry + a muted "+N"; no chevron when one entry is visible. Nothing persists — no open/closed state anywhere, no per-person total ever | `buildPersonBlocks()` / `personBlockWrapHTML()` |
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
@@ -925,7 +933,7 @@ coarse information first, finest detail last.
 | T-2.9.1 | · · Entry row | Role (`roleBannerHTML()`; since Phase BM the chip itself opens the roles menu) / two bare number fields — rate and days, no column headers, no inline labels / the marks indicator. Since Phase BN the FRONTED entry's cells render on the SAME row as the block checkbox and Name, not a second `.pb-role-row`; a stacked-away entry (2+ roles) still gets its own row | `prepRowHTML()` |
 | T-2.9.2 | · · Date marks calendar | Per-entry, one open at a time; click or drag to mark. Stored as a flat array of dates — the drag is selection only, never a stored range | `prepCalendarHTML()` |
 | T-2.9.3 | · · Soft counter | "5 days booked · 6 dates marked", muted, no emphasis when the two differ — a mismatch is valid and is never flagged | `prepCounterText()` |
-| **T-3** | **Locations** | Where the project shoots | `renderProjectLocations()` |
+| **T-3** | **Venues** | Where the project shoots. Tab and headings say **Venues** since 14 Sep 2026 (was "Locations & vendors"); the database screen (D-2) and the Budget line keep the word Locations, and the code keys stay `locations`/`locationIds` | `renderProjectLocations()` |
 | T-3.1 | · Location × day grid | Which days each location is used | `locDayGridHTML()` |
 | T-3.2 | · Add location | ONE button → search the Locations database as you type, with "create new location" as the last row of the same result list (Phase Q) | `toggleLocAdd()` / `locAddResultsHTML()` |
 | ~~T-3.3~~ | ~~· Add a new location~~ | Merged into T-3.2 by Phase Q — there is no second add button | — |
@@ -948,6 +956,8 @@ coarse information first, finest detail last.
 | T-6.3 | · Per Person | Flat list — Name, Role, editable Day rate (per-project override) with its Save-to-database icon (Phase AG), VAT checkbox (Phase AH), Days worked, Subtotal | `budgetPersonViewHTML()` |
 | T-6.4 | · Per Day | One collapsed row per shoot day (day number + short location label + total), expanding to that day's own department + extras breakdown | `budgetDayViewHTML()` |
 | T-6.5 | · Costs | Phase AF — the Hotel/Catering/Travel cost fields, editable from inside Budget too (same underlying fields as their home tabs, not a copy) | `budgetCostsViewHTML()` |
+| **T-9** | **Notes** | Per-project scratchpad: free-text notes, newest first, searchable, autosaved (14 Sep 2026). No tags, formatting or attachments by design | `renderProjectNotes()` |
+| T-9.1 | · Note row | Created stamp (+ "edited" stamp when it differs), delete with Undo, borderless auto-growing textarea | `renderNotesList()` / `saveProjectNotes()` |
 | **T-7** | **Preview & Export** | The finest-detail choices and the outputs | `renderProjectPreview()` |
 | T-7.0 | · Format panel | Collapsible Filter-style panel: Printable/WhatsApp selector, the four section checkboxes that gate all three outputs, and both output actions (Copy, Download .xlsx) | `exportPanelHTML()` |
 | T-7.1 | · Call sheet preview | Formatted card — Client block, then crew Position assignments, then Talent block, then co-production groups (Phase N item 3) | `renderPreviewCard()` |
