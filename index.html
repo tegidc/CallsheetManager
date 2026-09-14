@@ -247,6 +247,7 @@
   .sheet-sync-link{color:var(--tape); text-decoration:underline; text-underline-offset:2px;}
   .sheet-sync-notice{font-size:var(--fs-meta); color:var(--tape); margin:-4px 0 10px; padding:0 10px;}
   .sheet-sync-notice.err{color:var(--danger);}
+  .sheet-sync-summary{display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:14px; margin-bottom:6px;}
   .sheet-sync-preview{border:1px solid var(--tape); border-radius:8px; padding:var(--box-pad); margin-bottom:12px; background:var(--panel);}
   .sheet-sync-preview-head{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   .sheet-sync-group{margin-bottom:8px;} .sheet-sync-group ul{margin:4px 0 0 18px; padding:0; font-size:14px; line-height:1.5;}
@@ -8790,6 +8791,7 @@ let sheetSyncBusy = '';          // progress text while a request is in flight (
 let sheetSyncPreview = null;     // the plan awaiting Apply, from sheetSyncPull()
 let sheetSyncNotice = null;      // {kind:'ok'|'err', text} shown in the bar until the next action
 let sheetSyncSetupOpen = false;  // the numbered setup steps on the Settings tab
+let sheetSyncEditing = false;    // Settings tab: URL field + setup shown (true) or the one-line "Connected" summary (false)
 
 const sheetSyncSettings = () => (appSettings.sheetSync && typeof appSettings.sheetSync==='object') ? appSettings.sheetSync : {};
 const sheetSyncUrl = () => (sheetSyncSettings().url || '').trim();
@@ -8969,6 +8971,7 @@ async function sheetSyncTest(){
   await sheetSyncRun('Testing the connection…', async ()=>{
     const r = await sheetSyncRequest('GET', { ping:1 });
     await sheetSyncSaveSettings({ sheetUrl:r.url||'', sheetName:r.spreadsheet||'' });
+    sheetSyncEditing = false;
     sheetSyncNotice = { kind:'ok', text:`Connected to "${r.spreadsheet}" — the ${r.sheet} tab has ${r.rows} row${r.rows===1?'':'s'}.` };
   });
 }
@@ -9091,6 +9094,20 @@ function sheetSyncSettingsHTML(){
   const connected = SHEET_SYNC_URL_RE.test(sheetSyncUrl());
   const busy = !!sheetSyncBusy;
   const notice = sheetSyncNotice ? `<div class="sheet-sync-notice ${sheetSyncNotice.kind==='err'?'err':''}">${esc(sheetSyncNotice.text)}</div>` : '';
+  /* Connected and not editing: one line. The URL is saved in db:settings, so this is
+     what every device sees after the one-time setup; "Change" reopens the editor. */
+  if(connected && !sheetSyncEditing){
+    return `<div class="section">
+      <h2>Google Sheet</h2>
+      <div class="sheet-sync-summary">
+        <span>Connected to <strong>${esc(s.sheetName||'your sheet')}</strong></span>
+        ${s.sheetUrl ? `<span class="crew-card-sep">·</span><a class="sheet-sync-link" href="${esc(s.sheetUrl)}" target="_blank" rel="noopener">Open sheet</a>` : ''}
+        <span class="crew-card-sep">·</span><a class="sheet-sync-link" href="#" onclick="event.preventDefault();sheetSyncEditing=true;sheetSyncNotice=null;refreshCrewDatabase();">Change</a>
+      </div>
+      ${notice}
+      <div class="hint">Send to sheet and Load from sheet are at the top of the Crew database list.</div>
+    </div>`;
+  }
   return `<div class="section">
       <h2>Google Sheet</h2>
       <div class="hint" style="margin-bottom:12px;">A Google Sheet that mirrors the crew database. "Send to sheet" rewrites its Crew tab from the app; "Load from sheet" reads it back and shows you what would change before anything is saved. Both buttons live at the top of the Crew database list.</div>
@@ -9099,6 +9116,7 @@ function sheetSyncSettingsHTML(){
       <div class="toolbar" style="margin:10px 0 0;">
         <button class="primary" onclick="sheetSyncSaveUrl()" ${busy?'disabled':''}>Save &amp; test</button>
         <button onclick="sheetSyncTest()" ${connected&&!busy?'':'disabled'}>Test connection</button>
+        ${connected ? `<button onclick="sheetSyncEditing=false;sheetSyncNotice=null;refreshCrewDatabase();" ${busy?'disabled':''}>Cancel</button>` : ''}
         ${s.sheetUrl ? `<a class="sheet-sync-link" href="${esc(s.sheetUrl)}" target="_blank" rel="noopener">Open "${esc(s.sheetName||'sheet')}"</a>` : ''}
         ${busy ? `<span class="hint" style="margin:0;">${esc(sheetSyncBusy)}</span>` : ''}
       </div>
@@ -9110,12 +9128,10 @@ function sheetSyncSettingsHTML(){
           <li>Extensions ▸ Apps Script. Replace the editor's contents with the script from <code>google-sheet-sync.gs</code> in the app's folder, and Save.</li>
           <li>Deploy ▸ New deployment ▸ type Web app. Execute as <em>Me</em>; who has access <em>Anyone</em>. Deploy, authorise, and copy the Web app URL (it ends in <code>/exec</code>).</li>
           <li>Paste it above and press Save &amp; test.</li>
-          <li>Press Send to sheet once — that writes the columns and everyone currently in the database into a tab called Crew.</li>
+          <li>Press Send to sheet once — that writes the columns and everyone currently in the database into a tab called Crew, and adds the dropdowns. Reload the sheet and a "Crew sync" menu with column views appears at the right-hand end of its menu bar.</li>
         </ol>
-        <div class="hint">From then on, edit in either place. Rows without an id become new people when loaded, and get their id written back. Loading never deletes anyone. The URL works like a password for the sheet, so don't share it. A Google Form can feed the same tab — see the notes at the top of the script.</div>` : ''}
-      </div>
-      <div class="sheet-sync-setup">
-        <div class="hint">Columns the app writes, in order: ${esc(SHEET_SYNC_COLUMNS.map(c=>c.h).join(' · '))}. A sheet of your own only needs a Name column (plus id once it has been sent once); any other columns it has are matched by header, and the rest of each record is left as it is.</div>
+        <div class="hint">From then on, edit in either place. Rows without an id become new people when loaded, and get their id written back. Loading never deletes anyone. The URL works like a password for the sheet, so don't share it. A Google Form can feed the same tab — see the notes at the top of the script.</div>
+        <div class="hint">Columns the app writes, in order: ${esc(SHEET_SYNC_COLUMNS.map(c=>c.h).join(' · '))}. A sheet of your own only needs a Name column (plus id once it has been sent once); any other columns it has are matched by header, and the rest of each record is left as it is.</div>` : ''}
       </div>
     </div>`;
 }
