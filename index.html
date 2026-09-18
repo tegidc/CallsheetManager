@@ -254,9 +254,23 @@
   .note-row:last-child{border-bottom:1px solid var(--line);}
   .note-meta{display:flex; align-items:center; gap:8px; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:2px;}
   .note-meta .note-edited{text-transform:none; letter-spacing:0; font-family:var(--body); font-size:var(--fs-meta);}
-  .note-meta .note-del{margin-left:auto;}
-  .note-text{width:100%; border:none; background:transparent; padding:4px 0; margin:0; min-height:30px; font-family:var(--body); font-size:var(--fs-name); line-height:1.55; color:var(--text); resize:none; overflow:hidden; border-radius:0;}
+  .note-meta{flex-wrap:wrap;}
+  .note-meta .note-del{margin-left:6px;}
+  /* formatting tools stay out of sight until the note is hovered or being typed in —
+     opacity, not display, so nothing shifts under the cursor on focus */
+  .note-tools{display:flex; gap:2px; margin-left:auto; opacity:0; transition:opacity .12s;}
+  .note-row:hover .note-tools, .note-row:focus-within .note-tools{opacity:1;}
+  @media (hover:none){ .note-tools{opacity:.55;} }
+  .note-tools .icon-btn{font-family:var(--body); font-size:13px; letter-spacing:0; text-transform:none; margin-left:0;}
+  .note-text{position:relative; width:100%; border:none; background:transparent; padding:4px 0; margin:0; min-height:30px; font-family:var(--body); font-size:var(--fs-name); line-height:1.55; color:var(--text); border-radius:0; overflow-wrap:anywhere;}
   .note-text:focus{outline:none; box-shadow:inset 3px 0 0 var(--tape); padding-left:10px;}
+  .note-text.is-empty::before{content:attr(data-placeholder); position:absolute; left:0; top:4px; color:var(--muted); pointer-events:none;}
+  .note-text.is-empty:focus::before{left:10px;}
+  .note-text div, .note-text p{margin:0;}
+  .note-text ul, .note-text ol{margin:2px 0; padding-left:22px;}
+  .note-text li{margin:1px 0;}
+  .note-text h3{font-family:var(--body); font-weight:600; font-size:16px; line-height:1.35; letter-spacing:0; text-transform:none; color:var(--text); margin:8px 0 2px;}
+  .note-text h3:first-child{margin-top:0;}
   .sheet-sync-summary{display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:14px; margin-bottom:6px;}
   .sheet-sync-preview{border:1px solid var(--tape); border-radius:8px; padding:var(--box-pad); margin-bottom:12px; background:var(--panel);}
   .sheet-sync-preview-head{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
@@ -3202,12 +3216,85 @@ function tasksListHTML(p){
 
 /* ============================================================ PROJECT NOTES (T-9)
    A scratchpad per project: free text, nothing else. Stored on the project record
-   (p.notes = [{id, text, createdAt, updatedAt}]) next to Tasks, so it travels with
-   the project and needs no new collection. Newest first, searchable, autosaved the
-   way Project details is. Deliberately no tags, formatting, attachments or sharing —
-   when a scrap turns into something real it becomes a task, a venue or a crew entry
-   through the tools that already exist. */
+   (p.notes = [{id, html, text, createdAt, updatedAt}]) next to Tasks, so it travels
+   with the project and needs no new collection. Newest first, searchable, autosaved
+   the way Project details is.
+   18 Sep 2026 — bodies are rich text (contenteditable): bold / italic / underline,
+   a heading, bullet and numbered lists (Tab / Shift+Tab nests), plus "- " / "* " /
+   "1. " at the start of a line as typing shortcuts. `html` is the body, ALWAYS passed
+   through sanitizeNoteHTML() (whitelist of tags, no attributes) on the way in (paste,
+   save) and on the way out (render). `text` is kept as the plain-text shadow: search,
+   the delete-Undo peek, and notes written before this date (text only) all read it.
+   Still deliberately no tags, attachments or sharing — when a scrap turns into
+   something real it becomes a task, a venue or a crew entry through the tools that
+   already exist. */
 let notesQuery = '';
+const NOTE_TAGS = { B:'b', STRONG:'b', I:'i', EM:'i', U:'u', UL:'ul', OL:'ol', LI:'li', BR:'br',
+  DIV:'div', P:'div', BLOCKQUOTE:'div', PRE:'div', TR:'div', SECTION:'div', ARTICLE:'div',
+  H1:'h3', H2:'h3', H3:'h3', H4:'h3', H5:'h3', H6:'h3' };
+const NOTE_DROP = /^(SCRIPT|STYLE|META|LINK|TITLE|HEAD|IFRAME|OBJECT|EMBED|TEMPLATE|SVG|IMG)$/i;
+/* rebuilds the markup from whitelisted tags only — unknown elements are unwrapped
+   (their text survives), attributes never do. DOMParser documents are inert. */
+function sanitizeNoteHTML(html){
+  const src = new DOMParser().parseFromString('<body>'+(html||'')+'</body>','text/html').body;
+  const out = document.createElement('div');
+  const walk = (from, to) => from.childNodes.forEach(ch=>{
+    if(ch.nodeType===3){ to.appendChild(document.createTextNode(ch.nodeValue.replace(/[\r\n\t]+/g,' '))); return; }
+    if(ch.nodeType!==1 || NOTE_DROP.test(ch.tagName)) return;
+    const tag = NOTE_TAGS[ch.tagName.toUpperCase()];
+    const el = tag ? to.appendChild(document.createElement(tag)) : null;
+    if(tag!=='br') walk(ch, el||to);
+  });
+  walk(src, out);
+  return out.innerHTML;
+}
+/* a note's body as safe HTML — notes from before rich text only have `text` */
+const noteHTML = (n) => sanitizeNoteHTML(n.html!=null ? n.html : esc(n.text||'').replace(/\n/g,'<br>'));
+const noteIsEmpty = (el) => !el.textContent.trim() && !el.querySelector('ul,ol,h3');
+const noteEditorOf = (node) => { const el = node && (node.nodeType===1 ? node : node.parentElement); return el ? el.closest('.note-text') : null; };
+/* toolbar buttons — they keep the selection (onmousedown preventDefault in the markup) */
+function noteCmd(btn, cmd){
+  const ed = btn.closest('.note-row').querySelector('.note-text'); if(!ed) return;
+  if(noteEditorOf(getSelection().anchorNode) !== ed) ed.focus();
+  if(cmd==='heading') document.execCommand('formatBlock', false, /^h3$/i.test(document.queryCommandValue('formatBlock')) ? 'div' : 'h3');
+  else document.execCommand(cmd, false, null);
+  noteAfterEdit(ed);
+}
+function noteAfterEdit(ed){
+  ed.classList.toggle('is-empty', noteIsEmpty(ed));
+  refreshNoteTools();
+  scheduleAutosave('notes', saveProjectNotes);
+}
+function refreshNoteTools(){
+  const ed = noteEditorOf(getSelection().anchorNode);
+  document.querySelectorAll('.note-tools .icon-btn').forEach(b=>{
+    let on = false;
+    if(ed && b.closest('.note-row') === ed.closest('.note-row')){
+      try{ on = b.dataset.cmd==='heading' ? /^h3$/i.test(document.queryCommandValue('formatBlock')) : document.queryCommandState(b.dataset.cmd); }catch(e){}
+    }
+    b.classList.toggle('active', on);
+  });
+}
+/* "- " / "* " / "1. " typed at the start of a plain line turns it into a list */
+function noteAutoList(e){
+  if(e.inputType!=='insertText' || e.data!==' ') return;
+  const sel = getSelection(); if(!sel.isCollapsed) return;
+  const node = sel.anchorNode; if(!node || node.nodeType!==3) return;
+  const m = /^(-|\*|1\.)[ \u00a0]$/.exec(node.nodeValue.slice(0, sel.anchorOffset)); if(!m) return;
+  if(node.previousSibling && !/^(BR|UL|OL|DIV|H3)$/.test(node.previousSibling.nodeName)) return;   // must open the line
+  if(node.parentElement.tagName!=='DIV') return;          // not inside a list item, heading or bold run
+  const ed = e.target, end = sel.anchorOffset;
+  // after the input event has finished — editing commands don't nest reliably inside it
+  setTimeout(()=>{
+    const s2 = getSelection();
+    if(s2.anchorNode!==node || s2.anchorOffset!==end || !s2.isCollapsed) return;
+    const r = document.createRange(); r.setStart(node,0); r.setEnd(node,end);
+    s2.removeAllRanges(); s2.addRange(r);
+    document.execCommand('delete');
+    document.execCommand(m[1]==='1.' ? 'insertOrderedList' : 'insertUnorderedList');
+    noteAfterEdit(ed);
+  }, 0);
+}
 function fmtDateTime(iso){
   if(!iso) return ''; const d = new Date(iso); if(isNaN(d)) return '';
   return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
@@ -3227,12 +3314,33 @@ function renderProjectNotes(body){
       <div id="notesList"></div>
     </div>`;
   renderNotesList();
+  try{ document.execCommand('defaultParagraphSeparator', false, 'div'); }catch(e){}
   // only the note bodies autosave; the search box has its own handler and never writes
   body.oninput = (e) => {
-    if(!e.target || !e.target.classList.contains('note-text')) return;
-    autoGrowTextarea(e.target);
-    scheduleAutosave('notes', saveProjectNotes);
+    if(!e.target || !e.target.classList || !e.target.classList.contains('note-text')) return;
+    noteAutoList(e);
+    noteAfterEdit(e.target);
   };
+  // Tab / Shift+Tab nests a list item (anywhere else Tab keeps its normal job);
+  // Enter on an empty item steps out one level, so Enter twice ends the list
+  body.onkeydown = (e) => {
+    if((e.key!=='Tab' && e.key!=='Enter') || e.isComposing || !noteEditorOf(e.target)) return;
+    const at = getSelection().anchorNode, el = at && (at.nodeType===1 ? at : at.parentElement);
+    const li = el && el.closest('li'); if(!li) return;
+    if(e.key==='Enter' && (e.shiftKey || li.textContent.trim() || li.querySelector('ul,ol'))) return;
+    e.preventDefault();
+    document.execCommand(e.key==='Tab' && !e.shiftKey ? 'indent' : 'outdent');
+    noteAfterEdit(noteEditorOf(e.target));
+  };
+  // paste keeps structure (paragraphs, lists, bold) but none of the source's styling
+  body.onpaste = (e) => {
+    const ed = noteEditorOf(e.target); if(!ed || !e.clipboardData) return;
+    e.preventDefault();
+    const html = e.clipboardData.getData('text/html'), text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertHTML', false, html ? sanitizeNoteHTML(html) : esc(text).replace(/\r?\n/g,'<br>'));
+    noteAfterEdit(ed);
+  };
+  if(!renderProjectNotes._sel){ renderProjectNotes._sel = true; document.addEventListener('selectionchange', ()=>{ if(document.querySelector('.note-tools')) refreshNoteTools(); }); }
 }
 function renderNotesList(){
   const el = document.getElementById('notesList'); if(!el) return;
@@ -3248,18 +3356,25 @@ function renderNotesList(){
       <div class="note-meta">
         <span>${esc(fmtDateTime(n.createdAt))}</span>
         ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
+        <span class="note-tools" onmousedown="event.preventDefault()">
+          <button class="icon-btn" data-cmd="bold" onclick="noteCmd(this,'bold')" title="Bold (⌘B)" aria-label="Bold"><b>B</b></button>
+          <button class="icon-btn" data-cmd="italic" onclick="noteCmd(this,'italic')" title="Italic (⌘I)" aria-label="Italic"><i>I</i></button>
+          <button class="icon-btn" data-cmd="heading" onclick="noteCmd(this,'heading')" title="Heading" aria-label="Heading">H</button>
+          <button class="icon-btn" data-cmd="insertUnorderedList" onclick="noteCmd(this,'insertUnorderedList')" title="Bullet list (or type “- ” at the start of a line)" aria-label="Bullet list">•—</button>
+          <button class="icon-btn" data-cmd="insertOrderedList" onclick="noteCmd(this,'insertOrderedList')" title="Numbered list (or type “1. ”)" aria-label="Numbered list">1.</button>
+        </span>
         <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>
       </div>
-      <textarea class="note-text" data-id="${n.id}" rows="1" placeholder="Type anything — a number, a name, half a thought.">${esc(n.text||'')}</textarea>
+      <div class="note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note" data-id="${n.id}" data-placeholder="Type anything — a number, a name, half a thought.">${noteHTML(n)}</div>
     </div>`;
   }).join('');
-  el.querySelectorAll('.note-text').forEach(autoGrowTextarea);
+  el.querySelectorAll('.note-text').forEach(ed=>ed.classList.toggle('is-empty', noteIsEmpty(ed)));
 }
 async function addProjectNote(){
   const p = currentProject(); if(!p) return;
   p.notes = p.notes || [];
   const now = new Date().toISOString();
-  const n = { id:uid(), text:'', createdAt:now, updatedAt:now };
+  const n = { id:uid(), html:'', text:'', createdAt:now, updatedAt:now };
   p.notes.push(n);
   notesQuery = ''; const s = document.getElementById('notesSearch'); if(s) s.value = '';
   renderNotesList();
@@ -3270,9 +3385,12 @@ async function addProjectNote(){
 async function saveProjectNotes(){
   const p = currentProject(); if(!p) return;
   let changed = false;
-  document.querySelectorAll('.note-text').forEach(ta=>{
-    const n = (p.notes||[]).find(x=>x.id===ta.dataset.id); if(!n) return;
-    if(ta.value !== (n.text||'')){ n.text = ta.value; n.updatedAt = new Date().toISOString(); changed = true; }
+  document.querySelectorAll('.note-text').forEach(ed=>{
+    const n = (p.notes||[]).find(x=>x.id===ed.dataset.id); if(!n) return;
+    const html = noteIsEmpty(ed) ? '' : sanitizeNoteHTML(ed.innerHTML);
+    if(html === noteHTML(n)) return;
+    n.html = html; n.text = html ? ed.innerText.replace(/\n{3,}/g,'\n\n').trim() : '';
+    n.updatedAt = new Date().toISOString(); changed = true;
   });
   if(!changed) return;
   flashSaveResult('notesStatus', await saveDB('db:projects', projectsDB));
