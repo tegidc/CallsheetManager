@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEMO — Shoot Days + Preview & Export merged</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens and component rules copied from index.html so the demo reads as the app. */
+  :root{
+    --bg:#FFFFFF; --panel:#FFFFFF; --panel-2:#EEF5F2;
+    --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tape:#017756; --tape-ink:#FFFFF5; --danger:#a4321f; --text:#110A08; --muted:#6f6a63;
+    --mono:ui-monospace, monospace; --disp:'Fraunces', Georgia, serif;
+    --label:'Oswald', sans-serif; --body:'Jost', 'Futura PT', sans-serif;
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05); --tint-3:rgba(1,119,86,.10);
+    --box-radius:8px; --box-pad:10px;
+    --fs-field:13px; --fs-meta:12px; --fs-ctl:11px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg); color:var(--text); font-family:var(--body); -webkit-font-smoothing:antialiased;}
+  .main{padding:20px 22px 90px; max-width:840px; margin:0 auto;}
+
+  .demo-note{border:1px dashed var(--tape); background:var(--tint-1); border-radius:8px; padding:10px 12px;
+    font-size:var(--fs-meta); color:var(--muted); margin-bottom:18px; line-height:1.5;}
+  .demo-note strong{color:var(--tape); font-family:var(--label); letter-spacing:1.2px; font-weight:500; text-transform:uppercase; font-size:var(--fs-ctl);}
+
+  .proj-head .eyebrow{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--muted); text-transform:uppercase;}
+  .proj-head h1{font-family:var(--disp); font-size:26px; margin:2px 0 14px;}
+
+  .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .tab{padding:9px 16px; font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px;
+    color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;}
+  .tab.active{color:var(--tape); border-color:var(--tape);}
+  .tab.gone{text-decoration:line-through; opacity:.4; cursor:default;}
+  .tabs.daytabs{margin-bottom:14px;}
+  .tabs.daytabs .tab{padding:7px 13px;}
+  .tab.daytab-add{color:var(--tape); opacity:.85;}
+
+  label{display:block; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+  input[type=text], input[type=date], textarea, select{
+    width:100%; background:transparent; border:none; border-radius:0; border-bottom:1px solid var(--field-line);
+    color:var(--text); padding:6px 8px 5px; font-family:var(--body); font-size:var(--fs-field);}
+  input[type=text]:hover, input[type=date]:hover, textarea:hover, select:hover{border-bottom-color:var(--text);}
+  input:focus, textarea:focus, select:focus{outline:none; border-bottom-color:var(--tape); box-shadow:0 1px 0 0 var(--tape);}
+  textarea{resize:vertical; min-height:52px; line-height:1.5;}
+  input[type=checkbox]{accent-color:var(--tape);}
+  button{font-family:var(--body); font-weight:600; font-size:var(--fs-field); cursor:pointer; border-radius:7px;
+    border:1px solid var(--line); background:var(--panel-2); color:var(--text); padding:8px 13px;}
+  button:hover{border-color:var(--tape);}
+  button.small{padding:5px 9px; font-size:var(--fs-meta);}
+  button.danger{color:var(--danger);}
+  .hint{font-size:var(--fs-meta); color:var(--muted); margin-top:6px;}
+  .empty-note{color:var(--muted); font-size:var(--fs-meta); font-style:italic;}
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+
+  /* header row — same construction as the Crew tab's */
+  .crew-header-row{display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; font-size:var(--fs-meta);
+    color:var(--muted); margin-bottom:12px;}
+  .crew-header-left{display:flex; align-items:center; gap:6px 14px; flex-wrap:wrap;}
+  .crew-header-right{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .crew-header-right{margin-left:auto;}
+  .bnr-tool svg{width:11px; height:11px; vertical-align:-1px; margin-right:3px;}
+  .hdr-group{display:inline-flex; align-items:center; gap:4px;}
+  .hdr-group-label{font-size:var(--fs-meta); color:var(--muted); margin-right:3px;}
+  .hdr-sep{opacity:.4;}
+  .bnr-tool{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px; text-transform:uppercase; color:var(--muted);
+    background:transparent; border:1px solid var(--line); border-radius:5px; padding:4px 9px; cursor:pointer;
+    user-select:none; white-space:nowrap; line-height:1.35; font-weight:400;}
+  .bnr-tool:hover{border-color:var(--tape); color:var(--tape);}
+  .bnr-tool.on{background:var(--tape); border-color:var(--tape); color:var(--tape-ink); font-weight:600;}
+  .bnr-tool.edit-btn{min-width:64px;}
+  .status{font-size:var(--fs-meta); color:var(--tape); opacity:0; transition:opacity .2s;}
+  .status.show{opacity:1;}
+
+  /* the call sheet card — Preview & Export's */
+  .card{background:var(--panel); border:1px solid rgba(17,10,8,.20); border-radius:var(--box-radius); padding:16px; margin-bottom:16px;}
+  .card.viewing [data-k]{cursor:text;}
+  .card.viewing [data-k]:hover{background:var(--tint-2); border-radius:4px;}
+  .card.editing{border-color:var(--tape); box-shadow:0 0 0 3px var(--tint-2);}
+  .card h3{font-family:var(--label); font-size:11px; letter-spacing:1.2px; color:var(--tape); margin:16px 0 8px; text-transform:uppercase;
+    display:flex; align-items:center; gap:8px; font-weight:500;}
+  .card h3::after{content:''; flex:1; height:1px; background:var(--line);}
+  .card .line1{font-family:var(--disp); font-weight:700; font-size:22px; color:var(--text);}
+  .card .sub{color:var(--muted); font-size:var(--fs-meta); margin-top:2px;}
+  .card table{width:100%; border-collapse:collapse; font-size:var(--fs-field);}
+  .card td{padding:5px 6px; text-align:left; vertical-align:top;}
+  .card th{padding:5px 6px; text-align:left; border-bottom:1.5px solid rgba(17,10,8,.35);
+    color:var(--muted); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
+  .card ul{margin:4px 0; padding-left:18px;}
+  .card.editing td{vertical-align:middle; padding:2px 6px;}
+  .key-info-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px 28px; margin:16px 0 20px;
+    padding:14px 16px; background:var(--panel-2); border-radius:8px; border:1px solid var(--line);}
+  .ki-col{display:flex; flex-direction:column; gap:12px; min-width:0;}
+  .ki-item h4{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin:0 0 4px; font-weight:500;}
+  .ki-item{font-size:var(--fs-field); line-height:1.5;}
+  .ki-item ul{margin:4px 0 0; padding-left:18px;}
+  @media(max-width:640px){ .key-info-grid{grid-template-columns:1fr;} }
+
+  .block-head{display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;}
+  .dept-caret{font-size:11px; color:var(--muted); width:10px;}
+  /* spec blocks wear the call sheet card: same box, same title face, same header-rule-only tables */
+  .card .line2{font-family:var(--disp); font-weight:700; font-size:17px; color:var(--text);}
+  .card .block-head .bnr-tool{margin-left:auto;}
+  .card .block-head > .grow{flex:1;}
+
+  /* edit-in-place bits */
+  .sub-edit{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; align-items:center;}
+  .inl{display:inline-flex; align-items:center; gap:6px;}
+  .inl label{margin:0; white-space:nowrap;}
+  .w-xs{width:46px!important;} .w-sm{width:78px!important;} .w-md{width:132px!important;} .w-date{width:150px!important;}
+  .wx-grid{display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center;}
+  .x-btn{border:none; background:transparent; color:var(--muted); padding:2px 6px; font-size:14px; line-height:1;}
+  .x-btn:hover{color:var(--danger);}
+  .sched-tools{margin-top:8px; justify-content:space-between;}
+  .sched-shift{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--line); border-radius:8px; background:var(--panel-2);}
+  .sched-shift select{width:auto;}
+  /* the app's own row tools: hover + to insert above a row, arrows to reorder */
+  td.sc-lead{position:relative; white-space:nowrap;}
+  .sched-insert-hint{position:absolute; top:-9px; left:56px; width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+    opacity:0; z-index:2; cursor:pointer; transition:opacity .12s ease;
+    font-family:var(--label); font-size:13px; font-weight:600; line-height:1; color:var(--tape-ink); background:var(--tape); border-radius:50%;}
+  tr:hover .sched-insert-hint, .sched-insert-hint:hover{opacity:1;}
+  .sc-move{display:inline-flex; flex-direction:column; vertical-align:middle; margin-left:4px;}
+  .sc-move button{border:none; background:transparent; color:var(--muted); padding:0 3px; font-size:9px; line-height:1.15;}
+  .sc-move button:hover{color:var(--tape);}
+  .add-row{display:flex; gap:8px; align-items:center; margin-top:8px;}
+  .add-row select{max-width:320px;}
+  .cam-row{display:flex; align-items:center; gap:10px; padding:4px 0; font-size:var(--fs-field);}
+  .cam-letter{font-family:var(--label); color:var(--tape); width:64px;}
+  .danger-link{color:var(--danger); font-size:var(--fs-meta); cursor:pointer; background:none; border:none; padding:0; font-weight:400;}
+  .danger-link:hover{text-decoration:underline;}
+
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--text); color:#fff;
+    font-size:var(--fs-meta); padding:9px 14px; border-radius:7px; opacity:0; transition:all .2s; pointer-events:none; max-width:90vw;}
+  .toast.show{opacity:1; transform:translateX(-50%);}
+</style>
+</head>
+<body>
+<div class="main">
+  <div class="demo-note">
+    <strong>Demo</strong> — one merged <em>Shoot Days</em> page. It opens in <em>Edit</em>: the call sheet card (the Preview &amp; Export look) with every Shoot Days control in the place it prints.
+    Click <em>Editing</em> for the finished version — then double-click any text on it to jump back into Edit with that field focused. Hover between schedule rows for the <em>+</em> insert.
+    Sample data only; nothing here touches the real app.
+  </div>
+  <div class="proj-head">
+    <div class="eyebrow">Littlefilm · Northlight Coffee</div>
+    <h1>Autumn Launch Film</h1>
+  </div>
+  <div class="tabs">
+    <div class="tab">OVERVIEW</div><div class="tab">CREW</div><div class="tab">VENUES</div>
+    <div class="tab active">SHOOT DAYS</div><div class="tab">BUDGET</div><div class="tab">NOTES</div>
+    <div class="tab gone" title="Folded into Shoot Days">PREVIEW &amp; EXPORT</div>
+  </div>
+  <div id="body"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ICON = {
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>'
+};
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => { if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); };
+
+/* ---------- sample data ---------- */
+const LOCATIONS = [
+  {id:'l1', name:'Northlight Roastery', address:'Unit 4, Tanner’s Yard, London SE1 3XF', contact:'Priya Nair — 07700 900114',
+   parking:'Two bays in the yard for kit vehicles only — everyone else Snowsfields car park.', hospital:'Guy’s Hospital — Great Maze Pond, SE1 9RT (~0.9km)', carpark:'Snowsfields Car Park — SE1 3SU (~0.3km)'},
+  {id:'l2', name:'Northlight Café, Borough', address:'18 Park Street, London SE1 9AB', contact:'Tom Ellery — 07700 900162',
+   parking:'No parking on site. Load in from Park Street before 08:30.', hospital:'Guy’s Hospital — Great Maze Pond, SE1 9RT (~0.6km)', carpark:'Q-Park Borough — SE1 1JX (~0.4km)'},
+  {id:'l3', name:'Littlefilm Studio', address:'Arch 22, Ewer Street, London SE1 0NR', contact:'', parking:'Street parking, pay & display.', hospital:'St Thomas’ Hospital — SE1 7EH (~1.8km)', carpark:''}
+];
+const CREW = [
+  {id:'c1', dept:'PRD', role:'Producer', name:'Sam Okafor', phone:'07700 900101', group:'crew'},
+  {id:'c2', dept:'DIR', role:'Director', name:'Elin Hughes', phone:'07700 900102', group:'crew'},
+  {id:'c3', dept:'CAM', role:'DOP', name:'Marcus Bell', phone:'07700 900103', group:'crew', cam:true},
+  {id:'c4', dept:'CAM', role:'B-Cam Operator', name:'Jo Tanaka', phone:'07700 900104', group:'crew', cam:true},
+  {id:'c5', dept:'CAM', role:'1st AC', name:'Rhys Morgan', phone:'07700 900105', group:'crew'},
+  {id:'c6', dept:'SND', role:'Sound Recordist', name:'Aoife Byrne', phone:'07700 900106', group:'crew'},
+  {id:'c7', dept:'LX',  role:'Gaffer', name:'Dev Patel', phone:'07700 900107', group:'crew'},
+  {id:'c8', dept:'PRD', role:'Runner', name:'Callum Reid', phone:'07700 900108', group:'crew'},
+  {id:'c9', dept:'CLI', role:'Brand Lead', name:'Hannah Price', phone:'07700 900120', group:'client'},
+  {id:'c10',dept:'TAL', role:'Barista (hero)', name:'Leo Santos', phone:'07700 900130', group:'talent'}
+];
+const crewById = id => CREW.find(c=>c.id===id);
+const STARTER = () => [['','','CALL'],['','',''],['','1hr','LUNCH'],['','','WRAP']];
+let DAYS = [
+  { dayNum:1, date:'2026-10-06', allCrewCall:'07:30', locationId:'l1', addLocs:[['l3','Pick-ups if time allows']],
+    weather:{temp:'14°C', cond:'Light cloud', precip:'10%', sun:'07:09 / 18:26'},
+    brief:['Roastery floor — green beans to roast, hero macro','Head roaster interview','Packing line b-roll'],
+    parking:'Two bays in the yard for kit vehicles only — everyone else Snowsfields car park.',
+    notes:'Working roastery — closed shoes, no loose sleeves near the drum. Ear defenders provided.',
+    schedule:[['07:30','','CALL — breakfast on site'],['08:00 - 10:30','2hr 30','Roastery floor, hero macro'],['10:30 - 12:30','2hr','Head roaster interview'],['12:30 - 13:30','1hr','LUNCH'],['13:30 - 17:00','3hr 30','Packing line b-roll'],['17:30','','WRAP']],
+    positions:[['c9','09:00'],['c1',''],['c2',''],['c3',''],['c4','08:00'],['c5',''],['c6','10:00'],['c7',''],['c8','07:00']],
+    tech:{}, cams:['c3','c4'] },
+  { dayNum:2, date:'2026-10-07', allCrewCall:'08:00', locationId:'l2', addLocs:[],
+    weather:{temp:'12°C', cond:'Showers', precip:'60%', sun:'07:11 / 18:24'},
+    brief:['Café open — morning rush','Hero barista pour sequence','Customer vox pops'],
+    parking:'No parking on site. Load in from Park Street before 08:30.', notes:'',
+    schedule:[['08:00','','CALL'],['08:30 - 11:00','2hr 30','Morning rush, observational'],['11:00 - 13:00','2hr','Pour sequence — hero barista'],['13:00 - 14:00','1hr','LUNCH'],['14:00 - 16:30','2hr 30','Vox pops'],['17:00','','WRAP']],
+    positions:[['c1',''],['c2',''],['c3',''],['c5',''],['c6',''],['c8','07:30'],['c10','10:30']],
+    tech:{frameRate:'50p (pour sequence 100p)'}, cams:['c3'] },
+  { dayNum:3, date:'', allCrewCall:'', locationId:'', addLocs:[], weather:{}, brief:[], parking:'', notes:'', schedule:STARTER(), positions:[], tech:{}, cams:[] }
+];
+const TECH_FIELDS = [['resolution','Resolution'],['frameRate','Frame rate'],['codec','Codec'],['colour','Colour / LUT'],['audio','Audio'],['timecode','Timecode']];
+let PROJECT_TECH = {resolution:'UHD 3840×2160', frameRate:'25p', codec:'ProRes 422 HQ', colour:'S-Log3 / Littlefilm_Rec709', audio:'48kHz 24-bit, boom + 2 lavs', timecode:'Time of day, jam at call'};
+const resolveTech = d => Object.assign({}, PROJECT_TECH, d.tech);
+
+/* ---------- state ---------- */
+const S = { cur:0, edit:true,
+  inc:{tech:true, catering:true, hotels:false, travel:false},
+  open:{callsheet:true, tech:true, catering:true, hotels:true, travel:true},
+  sel:new Set() };
+const INC_LABELS = {tech:'Tech', catering:'Catering', hotels:'Hotels', travel:'Travel'};
+const day = () => DAYS[S.cur];
+const loc = id => LOCATIONS.find(l=>l.id===id);
+
+/* ---------- actions ---------- */
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+let _st; function saved(){ const s=document.getElementById('sdStatus'); if(!s) return; s.classList.add('show'); clearTimeout(_st); _st=setTimeout(()=>s.classList.remove('show'),1400); }
+function selectDay(i){ S.cur=i; S.sel.clear(); render(); }
+function toggleEdit(){ S.edit=!S.edit; S.sel.clear(); render(); }
+function dblEdit(ev){
+  if(S.edit) return;
+  const hit = ev.target.closest('[data-k]'), k = hit && hit.dataset.k;
+  if(k && k.indexOf('tech')===0) S.open.tech=true; else S.open.callsheet=true;
+  S.edit=true; render();
+  const sel = window.getSelection && window.getSelection(); if(sel) sel.removeAllRanges();
+  const f = k && document.querySelector(`.card.editing [data-k="${k}"]`);
+  if(f){ f.focus(); if(f.select && f.tagName==='INPUT' && f.type==='text') f.select(); f.scrollIntoView({block:'nearest'}); }
+  toast('Editing — press Done when finished');
+}
+function toggleInc(k){ S.inc[k]=!S.inc[k]; render(); }
+function toggleOpen(k){ S.open[k]=!S.open[k]; render(); }
+function toggleAll(){ const allShut=Object.values(S.open).every(v=>!v); Object.keys(S.open).forEach(k=>S.open[k]=allShut); render(); }
+function addDay(){ DAYS.push({dayNum:DAYS.length+1,date:'',allCrewCall:'',locationId:'',addLocs:[],weather:{},brief:[],parking:'',notes:'',schedule:STARTER(),positions:[],tech:{},cams:[]}); S.cur=DAYS.length-1; S.edit=true; render(); }
+function deleteDay(){ if(DAYS.length<2){ toast('Demo keeps at least one day'); return; } if(!confirm('Delete this shoot day?')) return; DAYS.splice(S.cur,1); S.cur=Math.max(0,S.cur-1); render(); toast('Deleted — Undo would appear here'); }
+
+function setF(f,v){ day()[f]=v; saved(); }
+function setWx(f,v){ day().weather[f]=v; saved(); }
+function setBrief(v){ day().brief=v.split('\n').map(s=>s.trim()).filter(Boolean); saved(); }
+function setLocation(id){ const d=day(), l=loc(id); d.locationId=id; if(l && l.parking) d.parking=l.parking; saved(); render(); }
+function fetchWx(){ day().weather={temp:'13°C',cond:'Sunny intervals',precip:'20%',sun:'07:12 / 18:22'}; render(); toast('Weather fetched for the shoot date + location'); }
+function addLoc(){ day().addLocs.push(['','']); render(); }
+function setAddLoc(i,j,v){ day().addLocs[i][j]=v; saved(); }
+function delAddLoc(i){ day().addLocs.splice(i,1); render(); }
+
+function setSched(i,j,v){ day().schedule[i][j]=v; saved(); }
+/* Time and Duration are linked, as in the app: a range fills Duration; a start time + Duration fills the range */
+const tMins = s => { const m=(s||'').match(/(\d{1,2}):(\d{2})/); return m ? (+m[1])*60+(+m[2]) : null; };
+const fmtT = x => { x=((x%1440)+1440)%1440; return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); };
+function durMins(s){ if(!s) return null; let mins=0, ok=false; const h=s.match(/(\d+(?:\.\d+)?)\s*h/i); if(h){ mins+=Math.round(parseFloat(h[1])*60); ok=true; const tail=s.slice(h.index+h[0].length).match(/(\d+)/); if(tail) mins+=+tail[1]; }
+  else { const m=s.match(/(\d+)\s*m/i)||s.match(/^(\d+)$/); if(m){ mins+=+m[1]; ok=true; } } return ok?mins:null; }
+const fmtDur = m => { const h=Math.floor(m/60), r=m%60; return h&&r ? `${h}hr${h>1?'s':''} ${r}min` : h ? `${h}hr${h>1?'s':''}` : `${r}min`; };
+function linkSched(i, which){
+  const r=day().schedule[i], parts=(r[0]||'').split('-');
+  if(which==='time' && parts.length===2){ const a=tMins(parts[0]), b=tMins(parts[1]); if(a!=null&&b!=null&&b>a) r[1]=fmtDur(b-a); }
+  if(which==='dur'){ const a=tMins(parts[0]), d=durMins(r[1]); if(a!=null&&d) r[0]=`${fmtT(a)} - ${fmtT(a+d)}`; }
+  const t=document.getElementById('sc-t-'+i), d=document.getElementById('sc-d-'+i); if(t) t.value=r[0]; if(d) d.value=r[1];
+}
+function addSched(){ day().schedule.push(['','','']); render(); }
+function insertSched(i){ day().schedule.splice(i,0,['','','']); S.sel.clear(); render(); }
+function moveSched(i,dir){ const a=day().schedule, j=i+dir; if(j<0||j>=a.length) return; [a[i],a[j]]=[a[j],a[i]]; S.sel.clear(); render(); saved(); }
+function delSched(i){ day().schedule.splice(i,1); S.sel.clear(); render(); }
+function selSched(i,on){ on?S.sel.add(i):S.sel.delete(i); }
+function selAllSched(){ const n=day().schedule.length; if(S.sel.size===n) S.sel.clear(); else for(let i=0;i<n;i++) S.sel.add(i); render(); }
+function shiftSched(dir){
+  if(!S.sel.size){ toast('Tick the rows to shift first'); return; }
+  const mins = dir*Number(document.getElementById('shiftAmt').value);
+  const bump = t => t.replace(/(\d{1,2}):(\d{2})/g,(m,h,mi)=>{ let x=((+h)*60+(+mi)+mins+1440)%1440; return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); });
+  S.sel.forEach(i=>{ day().schedule[i][0]=bump(day().schedule[i][0]); });
+  render(); saved();
+}
+function setCall(i,v){ day().positions[i][1]=v; saved(); }
+function delPosn(i){ const [cid]=day().positions[i]; day().positions.splice(i,1); day().cams=day().cams.filter(c=>c!==cid); render(); }
+function addPosn(){ const v=document.getElementById('addPosnPick').value; if(!v) return; day().positions.push([v,'']); const c=crewById(v); if(c.cam) day().cams.push(v); render(); }
+function setTech(f,v){ const d=day(); if(v===PROJECT_TECH[f] || v==='') delete d.tech[f]; else d.tech[f]=v; saved(); }
+function techForAll(){ PROJECT_TECH=resolveTech(day()); DAYS.forEach(d=>d.tech={}); render(); toast('Tech specs set as the defaults for all '+DAYS.length+' days'); }
+function moveCam(i,dir){ const a=day().cams, j=i+dir; if(j<0||j>=a.length) return; [a[i],a[j]]=[a[j],a[i]]; render(); }
+
+/* ---------- outputs ---------- */
+function peopleOf(d, group){ return d.positions.map(([cid,call],i)=>Object.assign({i,call},crewById(cid))).filter(p=>p.group===group); }
+function waText(){
+  const d=day(), L=[], l=loc(d.locationId);
+  L.push('*Littlefilm* — Northlight Coffee — Autumn Launch Film');
+  L.push('📅 '+[fmtDate(d.date),`Day ${d.dayNum} of ${DAYS.length}`].filter(Boolean).join(' · '));
+  if(d.allCrewCall) L.push(`⏰ All-crew call: *${d.allCrewCall}*`);
+  const w=d.weather; if(w.temp||w.cond){ L.push('','*WEATHER*'); [w.temp&&'🌡 '+w.temp, w.precip&&'☔ '+w.precip, w.cond, w.sun&&'🌅/🌇 '+w.sun].filter(Boolean).forEach(x=>L.push(x)); }
+  if(l){ L.push('','*LOCATION*','📍 '+l.name,l.address); if(l.contact) L.push('Contact: '+l.contact); L.push('','*NEAREST HOSPITAL*',l.hospital); }
+  if(d.schedule.some(r=>r[0])){ L.push('','*SCHEDULE*'); d.schedule.filter(r=>r[0]).forEach(r=>L.push(`${r[0]}${r[1]?' ('+r[1]+')':''} — ${r[2]}`)); }
+  [['client','CLIENT'],['crew','POSITIONS'],['talent','TALENT']].forEach(([g,h])=>{ const pp=peopleOf(d,g); if(!pp.length) return; L.push('',`*${h}*`); pp.forEach(p=>{ L.push(`*${p.role}* — ${p.name}`); L.push(`Call ${p.call||d.allCrewCall||'TBC'} · ${p.phone}`); }); });
+  if(d.brief.length){ L.push('','*PRODUCTION BRIEF*'); d.brief.forEach(b=>L.push('- '+b)); }
+  if(d.parking) L.push('','*PARKING / ARRIVAL*',d.parking);
+  if(d.notes) L.push('','*NOTES*',d.notes);
+  if(S.inc.tech){ L.push('','*TECH SPECS*'); const t=resolveTech(d); TECH_FIELDS.forEach(([k,lab])=>t[k]&&L.push(`${lab}: ${t[k]}`)); d.cams.forEach((c,i)=>L.push(`Camera ${'ABCDEF'[i]} — ${crewById(c).name}`)); }
+  if(S.inc.catering) L.push('','*CATERING*','Breakfast 9 · Lunch 9 · 1 vegan, 1 gluten-free');
+  if(S.inc.hotels) L.push('','*HOTELS*','2 rooms, 1 night (6 Oct)');
+  if(S.inc.travel) L.push('','*TRAVEL*','Public transport 5 · Own car 2 · Van 2');
+  return L.join('\n');
+}
+async function copyOut(){
+  const text = waText();
+  try{ await navigator.clipboard.writeText(text); }catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){ } ta.remove(); }
+  toast('Copied for WhatsApp — call sheet plus the included sections');
+}
+function exportXlsx(){ const n=Object.values(S.inc).filter(Boolean).length; toast(`Would download callsheet-${day().date||'draft'}-day${day().dayNum}.xlsx — Call Sheet + ${n} section sheet${n===1?'':'s'}`); }
+
+/* ---------- render ---------- */
+function headerRowHTML(){
+  const allShut = Object.values(S.open).every(v=>!v);
+  const inc = Object.keys(INC_LABELS).map(k=>`<button class="bnr-tool ${S.inc[k]?'on':''}" onclick="toggleInc('${k}')" title="${S.inc[k]?'Included':'Left out'} — on the page, in the copied text and in the .xlsx">${INC_LABELS[k]}</button>`).join('');
+  return `<div class="crew-header-row">
+    <div class="crew-header-left">
+      <button class="bnr-tool edit-btn ${S.edit?'on':''}" onclick="toggleEdit()" title="${S.edit?'Show the finished call sheet':'Edit this day in place'}">${S.edit?'✎ Editing':'✎ Edit'}</button>
+      <span class="hdr-group"><span class="hdr-group-label">Include</span>${inc}</span>
+    </div>
+    <div class="crew-header-right">
+      <span class="status" id="sdStatus">Saved</span>
+      <button class="bnr-tool" onclick="toggleAll()">${allShut?'Expand all':'Collapse all'}</button>
+      <button class="bnr-tool" onclick="copyOut()" title="Copy this day as WhatsApp text, with the included sections appended">${ICON.copy}Copy WhatsApp</button>
+      <button class="bnr-tool" onclick="exportXlsx()" title="Download the .xlsx — one sheet per included section">${ICON.download}Export .xlsx</button>
+    </div>
+  </div>`;
+}
+
+function peopleTableHTML(title, people, d){
+  if(!people.length) return '';
+  const rows = people.map(p=> S.edit
+    ? `<tr><td>${esc(p.dept)}</td><td>${esc(p.role)}</td><td>${esc(p.name)}</td>
+         <td><input type="text" data-k="call-${p.i}" class="w-sm" value="${esc(p.call)}" placeholder="${esc(d.allCrewCall||'call')}" oninput="setCall(${p.i},this.value)"></td>
+         <td>${esc(p.phone)}</td><td style="width:28px;"><button class="x-btn" title="Take off this day" onclick="delPosn(${p.i})">×</button></td></tr>`
+    : `<tr><td>${esc(p.dept)}</td><td>${esc(p.role)}</td><td>${esc(p.name)}</td><td data-k="call-${p.i}">${esc(p.call||d.allCrewCall)}</td><td>${esc(p.phone)}</td></tr>`).join('');
+  return `<h3>${title}</h3><table><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th>${S.edit?'<th></th>':''}</tr>${rows}</table>`;
+}
+
+function cardHTML(){
+  const d=day(), l=loc(d.locationId), w=d.weather, E=S.edit;
+  const dayLine = `Day ${d.dayNum} of ${DAYS.length}`;
+  let head = `<div class="block-head" onclick="toggleOpen('callsheet')">
+      <span class="dept-caret">${S.open.callsheet?'▾':'▸'}</span>
+      <div><div class="line1">Littlefilm · Northlight Coffee — Autumn Launch Film</div>
+      ${E ? '' : `<div class="sub" data-k="date">${[fmtDate(d.date),dayLine,d.allCrewCall&&('All-crew call '+esc(d.allCrewCall))].filter(Boolean).join(' · ')}</div>`}</div>
+    </div>`;
+  if(E) head += `<div class="sub-edit">
+      <span class="inl"><label>Shoot date</label><input type="date" data-k="date" class="w-date" value="${esc(d.date)}" onchange="setF('date',this.value)"></span>
+      <span class="inl"><label>Day #</label><input type="text" class="w-xs" value="${esc(d.dayNum)}" oninput="setF('dayNum',this.value)"><span class="hint" style="margin:0;">of ${DAYS.length}</span></span>
+      <span class="inl"><label>All-crew call</label><input type="text" class="w-sm" value="${esc(d.allCrewCall)}" placeholder="08:00" oninput="setF('allCrewCall',this.value)"></span>
+    </div>`;
+  if(!S.open.callsheet) return `<div class="card ${E?'editing':'viewing'}" ondblclick="dblEdit(event)">${head}</div>`;
+
+  let col1='', col2='', h='';
+  if(E){
+    col1 += `<div class="ki-item"><h4>Weather</h4><div class="wx-grid">
+        <input type="text" data-k="weather" class="w-sm" placeholder="Temp" value="${esc(w.temp)}" oninput="setWx('temp',this.value)">
+        <input type="text" class="w-sm" placeholder="Precip" value="${esc(w.precip)}" oninput="setWx('precip',this.value)">
+        <input type="text" class="w-md" placeholder="Condition" value="${esc(w.cond)}" oninput="setWx('cond',this.value)">
+        <input type="text" class="w-md" placeholder="Sunrise / sunset" value="${esc(w.sun)}" oninput="setWx('sun',this.value)">
+        <button class="small" onclick="fetchWx()">☁ Fetch</button></div></div>`;
+    col1 += `<div class="ki-item"><h4>Primary location</h4>
+        <select data-k="location" onchange="setLocation(this.value)"><option value="">— choose a venue —</option>${LOCATIONS.map(x=>`<option value="${x.id}" ${x.id===d.locationId?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+        ${l?`<div class="hint">${esc(l.address)}${l.contact?'<br>Contact: '+esc(l.contact):''}</div>`:''}</div>`;
+    col1 += `<div class="ki-item"><h4>Nearest hospital</h4><div>${l?esc(l.hospital):'<span class="empty-note">Choose a location first</span>'}</div>
+        <div class="toolbar" style="margin-top:6px;"><button class="small" onclick="toast('Looks up the nearest A&amp;E to the primary location')">＋ Fetch hospital</button><button class="small" onclick="toast('Looks up the nearest car park')">Fetch car park</button></div>
+        ${l&&l.carpark?`<div class="hint">Car park: ${esc(l.carpark)}</div>`:''}</div>`;
+    col2 += `<div class="ki-item"><h4>Production brief</h4><textarea data-k="brief" rows="4" placeholder="One scene / setup per line" oninput="setBrief(this.value)">${esc(d.brief.join('\n'))}</textarea></div>`;
+    col2 += `<div class="ki-item"><h4>Parking / arrival</h4><textarea data-k="parking" rows="3" oninput="setF('parking',this.value)">${esc(d.parking)}</textarea><div class="hint">Pre-filled from the venue — edit freely for this day.</div></div>`;
+    col2 += `<div class="ki-item"><h4>Production notes</h4><textarea data-k="notes" rows="3" oninput="setF('notes',this.value)">${esc(d.notes)}</textarea></div>`;
+  } else {
+    if(w.temp||w.precip||w.cond||w.sun) col1+=`<div class="ki-item" data-k="weather"><h4>Weather</h4><div>${[w.temp,w.precip,w.cond,w.sun&&('☀ '+w.sun)].filter(Boolean).map(esc).join(' · ')}</div></div>`;
+    if(l){ col1+=`<div class="ki-item" data-k="location"><h4>Primary location</h4><div>${esc(l.name)}<br>${esc(l.address)}</div>${l.contact?`<div class="hint">Contact: ${esc(l.contact)}</div>`:''}</div>`;
+           col1+=`<div class="ki-item"><h4>Nearest hospital</h4><div>${esc(l.hospital)}</div></div>`; }
+    if(d.brief.length) col2+=`<div class="ki-item" data-k="brief"><h4>Production brief</h4><ul>${d.brief.map(b=>`<li>${esc(b)}</li>`).join('')}</ul></div>`;
+    if(d.parking) col2+=`<div class="ki-item" data-k="parking"><h4>Parking / arrival</h4><div>${esc(d.parking)}</div></div>`;
+    if(d.notes) col2+=`<div class="ki-item" data-k="notes"><h4>Production notes</h4><div>${esc(d.notes)}</div></div>`;
+  }
+  if(col1||col2) h+=`<div class="key-info-grid"><div class="ki-col">${col1}</div><div class="ki-col">${col2}</div></div>`;
+
+  /* additional locations */
+  if(E){
+    h+=`<h3>Additional locations</h3>`+d.addLocs.map((a,i)=>`<div class="add-row" style="margin-top:4px;">
+        <select style="max-width:240px;" onchange="setAddLoc(${i},0,this.value)"><option value="">— venue —</option>${LOCATIONS.map(x=>`<option value="${x.id}" ${x.id===a[0]?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+        <input type="text" placeholder="Note (e.g. pick-ups, unit base)" value="${esc(a[1])}" oninput="setAddLoc(${i},1,this.value)">
+        <button class="x-btn" onclick="delAddLoc(${i})">×</button></div>`).join('')
+      +`<button class="small" style="margin-top:8px;" onclick="addLoc()">+ Add location</button>`;
+  } else if(d.addLocs.filter(a=>loc(a[0])).length){
+    h+=`<h3>Additional locations</h3><ul>`+d.addLocs.filter(a=>loc(a[0])).map(a=>`<li>${esc(loc(a[0]).name)} — ${esc(loc(a[0]).address)}${a[1]?' ('+esc(a[1])+')':''}</li>`).join('')+`</ul>`;
+  }
+
+  /* schedule */
+  if(E){
+    h+=`<h3>Schedule</h3><table><tr><th style="width:48px;"></th><th style="width:150px;">Time</th><th style="width:96px;">Duration</th><th>Description</th><th style="width:28px;"></th></tr>`
+      + d.schedule.map((r,i)=>`<tr><td class="sc-lead"><span class="sched-insert-hint" onclick="insertSched(${i})" title="Insert a row here">+</span>
+            <input type="checkbox" ${S.sel.has(i)?'checked':''} onchange="selSched(${i},this.checked)" title="Select for bulk time shift"><span class="sc-move"><button onclick="moveSched(${i},-1)" title="Move up">▲</button><button onclick="moveSched(${i},1)" title="Move down">▼</button></span></td>
+          <td><input type="text" id="sc-t-${i}" data-k="sc-${i}-0" value="${esc(r[0])}" placeholder="08:00 - 12:00" oninput="setSched(${i},0,this.value)" onchange="linkSched(${i},'time')"></td>
+          <td><input type="text" id="sc-d-${i}" data-k="sc-${i}-1" value="${esc(r[1])}" placeholder="4hrs" oninput="setSched(${i},1,this.value)" onchange="linkSched(${i},'dur')"></td>
+          <td><input type="text" data-k="sc-${i}-2" value="${esc(r[2])}" oninput="setSched(${i},2,this.value)"></td>
+          <td><button class="x-btn" onclick="delSched(${i})">×</button></td></tr>`).join('') + `</table>
+      <div class="toolbar sched-tools"><button class="small" onclick="addSched()">+ Add schedule item</button>
+        <span class="sched-shift"><span class="hint" style="margin:0;">Shift ticked</span>
+          <button class="small" onclick="shiftSched(-1)">−</button>
+          <select id="shiftAmt"><option value="5">5 min</option><option value="15" selected>15 min</option><option value="30">30 min</option><option value="60">60 min</option></select>
+          <button class="small" onclick="shiftSched(1)">+</button>
+          <button class="small" onclick="selAllSched()">${S.sel.size===d.schedule.length&&d.schedule.length?'Select none':'Select all'}</button></span></div>`;
+  } else {
+    const rows=d.schedule.map((r,i)=>[r,i]).filter(([r])=>r[0]);
+    if(rows.length) h+=`<h3>Schedule</h3><table><tr><th>Time</th><th>Duration</th><th>Description</th></tr>`+rows.map(([r,i])=>`<tr><td data-k="sc-${i}-0">${esc(r[0])}</td><td data-k="sc-${i}-1">${esc(r[1])}</td><td data-k="sc-${i}-2">${esc(r[2])}</td></tr>`).join('')+`</table>`;
+  }
+
+  /* people */
+  h += peopleTableHTML('Client', peopleOf(d,'client'), d);
+  h += peopleTableHTML('Position assignments', peopleOf(d,'crew'), d);
+  h += peopleTableHTML('Talent', peopleOf(d,'talent'), d);
+  if(E){
+    const on = new Set(d.positions.map(p=>p[0]));
+    const pool = CREW.filter(c=>!on.has(c.id));
+    if(!d.positions.length) h+=`<h3>Position assignments</h3>`;
+    h+=`<div class="add-row"><select id="addPosnPick"><option value="">— project crew not on this day —</option>${pool.map(c=>`<option value="${c.id}">${esc(c.role)} — ${esc(c.name)}</option>`).join('')}</select>
+        <button class="small" onclick="addPosn()">+ Add to this day</button></div>
+        <div class="hint">Blank call = the all-crew call. Only crew assigned to the project appear here.</div>
+        <div style="margin-top:18px; text-align:right;"><button class="danger-link" onclick="deleteDay()">Delete this shoot day</button></div>`;
+  } else if(!h){
+    h = `<div class="empty-note" style="margin-top:14px;">Nothing on this day yet — press Edit to fill it in.</div>`;
+  }
+  return `<div class="card ${E?'editing':'viewing'}" ondblclick="dblEdit(event)" ${E?'':'title="Double-click to edit"'}>${head}<div style="margin-top:${E?'4':'14'}px;">${h}</div></div>`;
+}
+
+function sectionHTML(key, title, inner, actions, editable){
+  return `<div class="card ${editable ? (S.edit?'editing':'viewing') : ''}" ${editable?'ondblclick="dblEdit(event)"':''}><div class="block-head">
+      <span onclick="toggleOpen('${key}')" style="display:flex;align-items:center;gap:8px;flex:1;">
+        <span class="dept-caret">${S.open[key]?'▾':'▸'}</span><span class="line2">${title}</span></span>${actions||''}</div>
+    ${S.open[key]?`<div style="margin-top:10px;">${inner}</div>`:''}</div>`;
+}
+function techHTML(){
+  const d=day(), t=resolveTech(d), E=S.edit;
+  const cams = d.cams.map((c,i)=>{ const p=crewById(c); return E
+      ? `<div class="cam-row"><span class="cam-letter">Camera ${'ABCDEF'[i]}</span><span style="flex:1;">${esc(p.name)} <span class="hint">(${esc(p.role)})</span></span>
+           <button class="small" onclick="moveCam(${i},-1)">↑</button><button class="small" onclick="moveCam(${i},1)">↓</button></div>`
+      : `<tr><td>Camera ${'ABCDEF'[i]}</td><td>${esc(p.name)}</td><td>${esc(p.role)}</td></tr>`; }).join('');
+  let inner;
+  if(E){
+    inner = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px;">`
+      + TECH_FIELDS.map(([k,lab])=>`<div class="inl" style="display:flex;"><label style="width:90px;">${lab}${d.tech[k]?' *':''}</label><input type="text" data-k="tech-${k}" value="${esc(t[k])}" oninput="setTech('${k}',this.value)"></div>`).join('')
+      + `</div><div class="toolbar" style="margin-top:10px;"><button class="small" onclick="techForAll()">Use for every day</button><span class="hint" style="margin:0;">* differs from the project default on this day</span></div>
+        <h3>Camera designations</h3>
+        ${cams||'<div class="empty-note">No Cinematography crew on this day yet.</div>'}`;
+  } else {
+    inner = `<h3>Specs</h3><table>${TECH_FIELDS.filter(([k])=>t[k]).map(([k,lab])=>`<tr><td style="width:150px;color:var(--muted);">${lab}</td><td data-k="tech-${k}">${esc(t[k])}</td></tr>`).join('')}</table>`
+      + (cams ? `<h3>Camera designations</h3><table><tr><th>Camera</th><th>Name</th><th>Position</th></tr>${cams}</table>` : '');
+  }
+  return sectionHTML('tech','Tech specs',inner, `<button class="bnr-tool" onclick="toast('Copied tech specs')">${ICON.copy}Copy tech specs</button>`, true);
+}
+const roNote = where => S.edit ? `<div class="hint" style="margin-top:8px;">Read-only here — edited on Crew → ${where}.</div>` : '';
+function cateringHTML(){ return sectionHTML('catering','Catering order', `<table><tr><th>Meal</th><th>Count</th><th>Dietary</th></tr><tr><td>Breakfast</td><td>9</td><td></td></tr><tr><td>Lunch</td><td>9</td><td>1 vegan · 1 gluten-free</td></tr></table>${roNote('Catering')}`); }
+function hotelsHTML(){ return sectionHTML('hotels','Hotels', `<table><tr><th>Room</th><th>Name</th><th>From</th><th>To</th><th>Nights</th></tr><tr><td>1</td><td>Marcus Bell</td><td>Mon 5 Oct</td><td>Wed 7 Oct</td><td>2</td></tr><tr><td>2</td><td>Aoife Byrne</td><td>Mon 5 Oct</td><td>Tue 6 Oct</td><td>1</td></tr></table>${roNote('Hotel')}`); }
+function travelHTML(){ return sectionHTML('travel','Travel', `<table><tr><th>Method</th><th>Day 1</th><th>Day 2</th></tr><tr><td>Public transport</td><td>5</td><td>4</td></tr><tr><td>Own car</td><td>2</td><td>2</td></tr><tr><td>Van</td><td>2</td><td>1</td></tr></table>${roNote('Travel')}`); }
+
+function render(){
+  const tabs = `<div class="tabs daytabs">${DAYS.map((d,i)=>`<div class="tab ${i===S.cur?'active':''}" onclick="selectDay(${i})">Day ${esc(d.dayNum)}</div>`).join('')}<div class="tab daytab-add" onclick="addDay()">+ New day</div></div>`;
+  const main = cardHTML() + (S.inc.tech?techHTML():'') + (S.inc.hotels?hotelsHTML():'') + (S.inc.catering?cateringHTML():'') + (S.inc.travel?travelHTML():'');
+  document.getElementById('body').innerHTML = tabs + headerRowHTML() + main;
+  document.querySelectorAll('textarea').forEach(t=>{ t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; });
+}
+render();
+</script>
+</body>
+</html>
