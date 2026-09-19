@@ -290,9 +290,9 @@
   .rows-sched .row{grid-template-columns:24px 30px 100px 90px 1fr 34px; position:relative;}
   .rows-sched .row .sc-select{align-self:center; width:16px; height:16px;}
   /* hover between schedule rows to insert a new blank row at that point, instead of
-     only being able to append at the bottom — sits just left of the Time column,
-     since that's the column you're navigating in when you'd reach for this */
-  .sched-insert-hint{position:absolute; top:-10px; left:50px; width:18px; height:18px;
+     only being able to append at the bottom — sits ON the Time column's left edge (70px =
+     checkbox 24 + arrows 30 + two 8px gaps): at 50px it sat over the move arrows */
+  .sched-insert-hint{position:absolute; top:-10px; left:70px; width:18px; height:18px;
     display:flex; align-items:center; justify-content:center; opacity:0; z-index:2;
     cursor:pointer; transition:opacity .12s ease;}
   .sched-insert-hint span{font-family:var(--label); font-size:13px; font-weight:600; line-height:1;
@@ -370,6 +370,32 @@
     color:var(--tape); margin:0 0 4px;}
   .ki-item{font-size:var(--fs-field); line-height:1.5;}
   .ki-item ul{margin:4px 0 0; padding-left:18px;}
+  /* Merged Shoot Days page (19 Sep 2026): the call sheet card is ALSO the editor. `.editing`
+     is the card with fields in the places they print; `.viewing` is the finished card, where
+     anything carrying data-edit can be double-clicked to land in its field. The spec blocks
+     below it (tech, hotels, catering, travel) wear the same card. */
+  .card.editing{border-color:var(--tape); box-shadow:0 0 0 3px var(--tint-2);}
+  .card.viewing [data-edit]{cursor:text;}
+  .card.viewing [data-edit]:hover{background:var(--tint-2); border-radius:4px;}
+  .sd-sub-edit{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; align-items:center;}
+  .card.editing .key-info-grid{margin-top:12px;}
+  .card.editing .ki-item textarea{min-height:64px;}
+  .card.editing .ki-item .sd-info{font-size:var(--fs-field);}
+  .card.editing .ki-item .sd-weather-row{margin-top:6px;}
+  .card > .sd-block-head{font-size:17px; color:var(--text);}
+  .card > .sd-block-head .sd-block-head-toggle::after{display:none;}
+  .card > .sd-block-head > button{margin-left:auto;}
+  .card > .sd-block-head.flush{margin-bottom:0;}
+  .card > .sd-block-head + div{margin-top:12px;}
+  #techSpecsExported > table:first-child th{border-bottom:none;}
+  .card:has(> .sd-block-head) > div:last-child > .hint:first-child{margin-top:0;}
+  .sd-header-row{margin-bottom:12px;}
+  .sd-header-row .crew-header-right{gap:6px;}
+  .sd-header-row .bnr-tool .ic, .card > .sd-block-head .bnr-tool .ic{width:11px; height:11px; margin-right:2px;}
+  .sd-hdr-group{display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap;}
+  .crew-header-row .sd-hdr-label, .crew-header-row .status{cursor:default; color:var(--muted);}
+  .sd-delete-link{background:none; border:none; padding:0; font-weight:400; font-size:var(--fs-meta); color:var(--danger); cursor:pointer;}
+  .sd-delete-link:hover{text-decoration:underline;}
   /* No rule between people (Phase Detail) — only under the column headings. The
      card stays white; the header rule is stronger than --line so it reads as the
      one division on the sheet. */
@@ -381,8 +407,6 @@
   .section table{width:100%; border-collapse:collapse; font-size:var(--fs-field);}
   .section td, .section th{padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
   .section th{color:var(--tape); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
-  pre#waText{white-space:pre-wrap; word-break:break-word; font-family:var(--mono); font-size:var(--fs-meta);
-    background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:14px; line-height:1.6; max-height:420px; overflow:auto;}
   .hint{font-size:var(--fs-meta); color:var(--muted); margin-top:6px;}
   .pill{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; padding:2px 8px; border-radius:20px;
     background:var(--panel-2); color:var(--muted); letter-spacing:1.2px; vertical-align:middle;}
@@ -537,33 +561,12 @@
   .roles-shoot-total:hover{color:var(--tape);}
   .roles-shoot-total:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
   .roles-tablewrap{max-height:60vh; overflow:auto; overscroll-behavior:contain;}
-  /* IDEAS DEMO — Shoot Day editor: the general info lives in two columns
-     (details/brief/location/hospital left, weather/notes/parking right),
-     stacking back to one on narrow screens. */
-  /* IDEAS DEMO — the Shoot Day general section is a stack of BANDS, each a
-     two-column row whose halves align (brief|notes, location|access,
-     hospital|car park), the way a printed call sheet pairs them. */
-  .sd-band{display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; align-items:stretch; margin-bottom:12px;}
-  .sd-band-full{grid-template-columns:1fr;}
-  @media(max-width:900px){ .sd-band{grid-template-columns:1fr;} }
-  /* each half of a band is a soft card (same idiom as the day-override form) so
-     the paired blocks read as blocks — the card edge does the separating, which
-     lets the title's rule-line go and calms the wash of horizontal strokes */
-  .sd-card{border:1px solid var(--line); border-radius:10px; background:var(--tint-1); padding:14px 16px;}
-  .sd-card .subhead:first-child{margin-top:0;}
-  .sd-card .subhead{margin-top:16px;}
-  .sd-card .subhead::after{display:none;}
-  .sd-card textarea{min-height:84px;}
-  /* Roles' type discipline: Oswald/green is for SECTION TITLES only (the
-     .subhead), so field labels here are quiet Jost — a label is not a heading. */
-  .sd-band label{font-family:var(--body); font-size:13px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted);}
   /* data lines (address, on-site, hospital, car park) are plain Jost ink —
      values, not titles. The address link keeps its underline as the affordance. */
   .sd-info{font-family:var(--body); font-weight:400; font-size:14px; color:var(--text); line-height:1.5;}
   .sd-info a{color:var(--text);}
   .sd-weather-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px;}
   @media(max-width:900px){ .sd-two-col{grid-template-columns:1fr;} }
-  .ts-field.sd-allcall input[type="text"]{font-size:22px; font-weight:700; letter-spacing:1px; height:auto; padding:6px 10px; max-width:130px;}
   @media (pointer:coarse){
     .roles-tablewrap{max-height:none; overflow:visible; overflow-x:auto; overscroll-behavior:auto;}
     /* touch polish (D13): fingers need bigger targets than a mouse pointer does */
@@ -1283,7 +1286,6 @@
     /* --- preview tables scroll instead of squashing --- */
     .card table{font-size:13px;}
     .key-info-grid{grid-template-columns:1fr; gap:14px;}
-    pre#waText{font-size:13px; max-height:340px;}
     .mapembed{height:200px;}
 
     /* --- misc readability --- */
@@ -2699,7 +2701,7 @@ function mostRecentProject(){
 function goRecentProject(){ const p=mostRecentProject(); if(p) openProject(p.id); }
 /* ⚠️ Phase BW — closes the Dates popup. It lives on #globalOverlay, outside #main, so a tab
    change alone would leave it floating over a screen that has nothing to do with it. */
-function goProjectTab(tab){ currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
+function goProjectTab(tab){ flushShootDayEdits(); currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
 
 function renderMain(){
   const m = document.getElementById('main');
@@ -2869,7 +2871,6 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
       <div class="tab ${currentProjectTab==='notes'?'active':''}" onclick="goProjectTab('notes')">NOTES</div>
-      <div class="tab ${currentProjectTab==='preview'?'active':''}" onclick="goProjectTab('preview')">PREVIEW &amp; EXPORT</div>
     </div>
     <div id="projectBody"></div>`;
   renderProjectBody();
@@ -2883,7 +2884,8 @@ function renderProjectBody(){
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
   if(currentProjectTab==='notes') return renderProjectNotes(body);
-  if(currentProjectTab==='preview') return renderProjectPreview(body);
+  // 'preview' was the Preview & Export tab, folded into Shoot Days on 19 Sep 2026
+  if(currentProjectTab==='preview'){ currentProjectTab='days'; return renderProjectDays(body); }
 }
 
 function renderProjectOverview(body){
@@ -2933,7 +2935,7 @@ function renderProjectOverview(body){
 }
 /* ⚠️ REMOVED 14 Sep 2026: the Tech tab (T-4) — renderProjectTech(), techBlocks/techBlockHTML(),
    jumpToTechRoundup(), projectTechRoundupData(), renderTechSpecsRoundup(), copyProjectTechSpecs*().
-   Tech specs and camera designations are edited on the Preview & Export tab's Tech specs
+   Tech specs and camera designations are edited on the Shoot Days tab's Tech specs
    block (renderTechSpecsSection, T-7.3). Do not look for the old names. */
 let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' | 'ai' — one control open at a time
 let quickAddError = null;                 // e.g. "Pick a date first."
@@ -5356,21 +5358,22 @@ function jumpToSummary(key){
   if(!summaryBlocksOpen[key]) toggleSummaryBlock(key);
   document.getElementById(SUMMARY_BLOCKS[key].sectionId)?.scrollIntoView({block:'start'});
 }
-function summaryBlockHTML(key, inner){
+/* wrapClass 'card' on the Shoot Days page, where the summaries match the call sheet card */
+function summaryBlockHTML(key, inner, wrapClass){
   const {prefix, title, sectionId} = SUMMARY_BLOCKS[key];
   return collapsibleSectionHTML({
     state: summaryBlocksOpen[key], prefix, key:'summary', title, inner,
-    id: sectionId, onToggle: `toggleSummaryBlock('${key}')`
+    id: sectionId, onToggle: `toggleSummaryBlock('${key}')`, wrapClass: wrapClass||'section'
   });
 }
-function hotelSummaryHTML(){
+function hotelSummaryHTML(wrapClass){
   const p = currentProject();
   const hotelCosts = getHotelCosts(p);
   const data = buildHotelSummary();
   const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
       ${costFieldHTML('hcRoomNight', 'Est. cost per room/night', hotelCosts.perRoomNight)}
     </div>`;
-  const inner = fieldsHTML + (!data ? `<div class="empty-note">No hotel nights ticked yet — tick them in the grid below.</div>` : `
+  const inner = fieldsHTML + (!data ? `<div class="empty-note">No hotel nights ticked yet — tick them on the Crew tab's Hotel view.</div>` : `
     <div class="hint" style="margin:0 0 12px;">${esc(data.summary)}</div>
     <div class="subhead">Room-booking table</div>
     <table><tr><th>Room No.</th><th>Name</th><th>Date from</th><th>Date to</th><th>Total nights</th></tr>
@@ -5381,7 +5384,7 @@ function hotelSummaryHTML(){
     ${data.perNight.map(n=>`<tr><td>${esc(n.label)}</td><td>${n.rooms}</td><td>${esc(n.names.join(', '))}</td></tr>`).join('')}
     </table>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyHotelSummary()">${icon('copy')} Copy booking summary</button></div>`);
-  return summaryBlockHTML('hotel', inner);
+  return summaryBlockHTML('hotel', inner, wrapClass);
 }
 /* the text form of the hotel summary, as an array of lines — shared by the Copy
    button here and the WhatsApp export's Hotels section (Phase Q). `null` when there
@@ -5445,23 +5448,21 @@ function buildCateringExport(){
 function renderCateringExport(){
   const el = document.getElementById('cateringExportSection'); if(!el) return;
   const data = buildCateringExport();
-  const headerActions = `<button class="small" onclick="copyCateringExport()">${icon('copy')} Copy catering order</button>`;
+  const headerActions = `<button type="button" class="bnr-tool" onclick="copyCateringExport()">${icon('copy')} Copy catering order</button>`;
   if(!data){ el.innerHTML = pvBlockHTML('catering', 'Catering order', headerActions, '<div class="empty-note">No catering selections yet — fill them in on the Crew tab Catering view.</div>'); return; }
   let body = '';
   data.forEach(day=>{
-    body += `<div class="card" style="padding:14px; margin-bottom:10px;">
-      <div class="line1" style="font-size:14px;"><strong>${esc(day.label)}</strong></div>
-      <table style="margin-top:8px;">
+    body += `<h3>${esc(day.label)}</h3>
+      <table>
         <tr><th>Meal</th><th>Count</th></tr>
         ${day.bCount?`<tr><td>Breakfast</td><td>${day.bCount}</td></tr>`:''}
         ${day.lCount?`<tr><td>Lunch</td><td>${day.lCount}</td></tr>`:''}
         ${day.dCount?`<tr><td>Dinner</td><td>${day.dCount}</td></tr>`:''}
       </table>
-      ${day.dietaryNotes.length ? `<h3>Dietary requirements</h3><table>
+      ${day.dietaryNotes.length ? `<div class="hint" style="margin:10px 0 4px;">Dietary requirements</div><table>
         <tr><th>Name</th><th>Type</th><th>Specific</th></tr>
         ${day.dietaryNotes.map(n=>`<tr><td>${esc(n.name)}</td><td>${esc(n.general)}</td><td>${esc(n.specific)}</td></tr>`).join('')}
-      </table>` : ''}
-    </div>`;
+      </table>` : ''}`;
   });
   el.innerHTML = pvBlockHTML('catering', 'Catering order', headerActions, body);
 }
@@ -5737,7 +5738,7 @@ function renderTransportSummaryGridSection(){
   const el = document.getElementById('tsmGridWrap'); if(!el) return;
   el.innerHTML = transportSummaryGridBodyHTML();
 }
-function transportSummaryHTML(){
+function transportSummaryHTML(wrapClass){
   const p = currentProject();
   const costs = getTransportCosts(p);
   const fieldsHTML = `<div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
@@ -5746,7 +5747,7 @@ function transportSummaryHTML(){
     </div>`;
   const inner = `${fieldsHTML}<div id="tsmGridWrap">${transportSummaryGridBodyHTML()}</div>
     <div class="toolbar" style="margin-top:12px;"><button class="small" onclick="copyTransportSummary()">${icon('copy')} Copy transport summary</button></div>`;
-  return summaryBlockHTML('transport', inner);
+  return summaryBlockHTML('transport', inner, wrapClass);
 }
 /* text form of the transport summary — shared by the Copy button and the WhatsApp
    export's Travel section (Phase Q); `null` when no travel methods are in use */
@@ -7021,6 +7022,139 @@ function dayTabsBarHTML(days){
       <div class="tab daytab-add" onclick="addShootDay()">+ New day</div>
     </div>`;
 }
+/* T-5 — merged with the old Preview & Export tab on 19 Sep 2026. ONE page, two states of the
+   same call sheet card: shootDayEditing renders the card with the editor's fields in the places
+   they print (same element ids as the old form, so populateShootDay()/saveShootDay() are
+   unchanged); otherwise renderPreviewCard() draws the finished sheet. Edit is the default. */
+let shootDayEditing = true;
+/* ⚠️ saveShootDay() READS THE FORM. Anything that re-renders or leaves the edit card calls this
+   first, or the last second of typing (the autosave debounce) is lost. saveShootDay's DOM reads
+   all happen before its first await, so a caller that only re-renders needn't await this — one
+   that goes on to write db:shootdays itself (addShootDay) does, so the two writes don't race. */
+function flushShootDayEdits(){
+  if(!document.getElementById('sdEditCard')) return Promise.resolve();
+  clearTimeout(autosaveTimers.shootday);
+  return saveShootDay(false);
+}
+function setShootDayEditing(on){ flushShootDayEdits(); shootDayEditing = !!on; renderProjectBody(); }
+/* double-click on the finished card: into Edit, landing in the field that was clicked.
+   data-edit is '#id', 'sched:row:col', 'posn:entryId' or 'tech'. */
+function shootDayDblEdit(ev){
+  if(shootDayEditing) return;
+  const hit = ev.target.closest('[data-edit]');
+  const target = hit ? hit.getAttribute('data-edit') : '';
+  if(target==='tech') previewBlocks.techspecs = true;
+  shootDayEditing = true; renderProjectBody();
+  const sel = window.getSelection && window.getSelection(); if(sel) sel.removeAllRanges();
+  let f = null;
+  if(target[0]==='#') f = document.querySelector(target);
+  else if(target.indexOf('sched:')===0){
+    const bits = target.split(':');
+    const row = [...document.querySelectorAll('#rows-sched .row')].filter(r=>r.querySelector('.sc-time'))[+bits[1]];
+    f = row && row.querySelector(['.sc-time','.sc-dur','.sc-desc'][+bits[2]]);
+  } else if(target.indexOf('posn:')===0){
+    const h = [...document.querySelectorAll('#rows-posn .posn-crew')].find(x=>x.value===target.slice(5));
+    f = h && h.closest('.posn-row').querySelector('.posn-call');
+  } else if(target==='tech') f = document.getElementById(techSpecFieldId('ts', TECHSPEC_FIELDS[0]));
+  if(f && f.offsetParent!==null){ f.focus(); if(f.select && f.tagName==='INPUT' && f.type==='text') f.select(); f.scrollIntoView({block:'nearest'}); }
+}
+/* the header row — same construction as the Crew tab's: toggles left, actions right. Include
+   is exportSections (what shows below the card AND what Copy / Export carry). */
+function shootDayHeaderRowHTML(){
+  const inc = Object.keys(EXPORT_SECTION_LABELS).map(key=>
+    `<button type="button" class="bnr-tool ${exportSections[key]?'on':''}" onclick="toggleExportSection('${key}', ${!exportSections[key]})"
+       title="${esc(EXPORT_SECTION_LABELS[key])}: ${exportSections[key]?'included':'left out'} — on this page, in the copied text and in the .xlsx">${esc(key==='tech'?'Tech':EXPORT_SECTION_LABELS[key])}</button>`).join('');
+  return `<div class="crew-header-row sd-header-row">
+      <div class="crew-header-left">
+        <button type="button" class="bnr-tool ${shootDayEditing?'on':''}" onclick="setShootDayEditing(${!shootDayEditing})"
+          title="${shootDayEditing?'Show the finished call sheet':'Edit this day in place — or double-click anything on the sheet'}">${icon('edit')} ${shootDayEditing?'Editing':'Edit'}</button>
+        <span class="sd-hdr-group"><span class="sd-hdr-label">Include</span>${inc}</span>
+      </div>
+      <div class="crew-header-right">
+        <span class="status" id="sdStatus"></span>
+        <button type="button" class="bnr-tool" id="eca-pv" onclick="toggleAllPreviewBlocks()">${allBlocksCollapsed(previewBlocks)?'Expand all':'Collapse all'}</button>
+        <button type="button" class="bnr-tool" onclick="copyExportOutput()" title="Copy this day as WhatsApp text, with the included sections appended">${icon('copy')} Copy WhatsApp</button>
+        <button type="button" class="bnr-tool" onclick="downloadExcel()" title="Download the .xlsx — one sheet per included section">${icon('download')} Export .xlsx</button>
+      </div>
+    </div>`;
+}
+/* the call sheet card as an editor. ⚠️ Every field id is the old Shoot Day form's —
+   populateShootDay()/saveShootDay() read the same inputs wherever they sit. */
+function shootDayEditCardHTML(d){
+  const p = projById(d.projectId)||{};
+  const shootTitle = [p.client,p.title].filter(Boolean).join(' — ');
+  return `<div class="card editing" id="sdEditCard">
+    <div class="line1">${esc(p.company||COMPANY)}${shootTitle?(' · '+esc(shootTitle)):''}</div>
+    <div class="sd-sub-edit">
+      <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
+      <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"><label>of</label><input type="text" id="sdDayTotal" class="fld-xs" readonly tabindex="-1" title="Total shoot days on this project — add or remove days to change it"></div>
+      <div class="ts-field"><label>All-crew call</label><input type="text" id="sdAllCall" class="fld-sm" placeholder="08:00"></div>
+    </div>
+    <div class="key-info-grid">
+      <div class="ki-col">
+        <div class="ki-item"><h4>Weather</h4>
+          <div class="ts-grid">
+            <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
+            <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
+            <div class="ts-field"><label>Condition</label><input type="text" id="wxCond" class="fld-md"></div>
+            <div class="ts-field"><label>Sunrise/Sunset</label><input type="text" id="wxSun" class="fld-md"></div>
+          </div>
+          <div class="sd-weather-row"><button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch</button><span id="weatherStatus" class="hint" style="margin:0;"></span></div>
+        </div>
+        <div class="ki-item"><h4>Primary location</h4>
+          <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
+          <div id="sdLocationSummary" class="sd-info" style="margin-top:6px;"></div>
+        </div>
+        <div class="ki-item"><h4>Nearest hospital</h4>
+          <div id="sdHospitalInfo" class="sd-info"></div>
+          <div class="sd-weather-row"><button class="small" onclick="fetchDayAmenity('hospital')">${icon('hospital')} Fetch</button><span id="sdHospitalStatus" class="hint" style="margin:0;"></span></div>
+        </div>
+        <div class="ki-item"><h4>Nearest car park</h4>
+          <div id="sdParkingLookupInfo" class="sd-info"></div>
+          <div class="sd-weather-row"><button class="small" onclick="fetchDayAmenity('parking')">${icon('car')} Fetch</button><span id="sdCarParkStatus" class="hint" style="margin:0;"></span></div>
+        </div>
+      </div>
+      <div class="ki-col">
+        <div class="ki-item"><h4>Production brief</h4>
+          <textarea id="sdBrief" placeholder="The scenes / setups being shot today — one per line" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
+        </div>
+        <div class="ki-item"><h4>Parking / arrival / access</h4>
+          <textarea id="sdParking"></textarea>
+          <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
+          <div id="sdAccessInfo" class="sd-info" style="margin-top:6px;"></div>
+        </div>
+        <div class="ki-item"><h4>Production notes</h4><textarea id="sdNotes"></textarea></div>
+      </div>
+    </div>
+    <h3>Additional locations</h3>
+    <div class="rows-add" id="rows-sdaddloc"></div>
+    <button class="small" onclick="addSdLocRow()">+ Add location</button>
+    <h3>Schedule</h3>
+    <div class="hint" style="margin:0 0 8px;">Time and Duration are linked — enter a time range (e.g. 08:00 - 12:00) and Duration fills in, or a start time plus a Duration (e.g. 4hrs) and the range fills in. Hover between rows for the + to insert one.</div>
+    <div class="rows-sched" id="rows-sched"></div>
+    <div class="toolbar sched-tools" style="margin-top:8px;">
+      <button class="small" onclick="addSchedRow()">+ Add schedule item</button>
+      <span class="sched-shift">
+        <span class="hint">Shift selected</span>
+        <button class="small" onclick="shiftSelected(-1)" title="Earlier">&minus;</button>
+        <select id="schedShiftAmount"><option value="5">5 min</option><option value="15" selected>15 min</option><option value="30">30 min</option><option value="60">60 min</option></select>
+        <button class="small" onclick="shiftSelected(1)" title="Later">+</button>
+        <button class="small" onclick="toggleSelectAllSched()" id="schedSelectAllBtn">Select all</button>
+      </span>
+    </div>
+    <h3>Position assignments</h3>
+    <div id="rows-posn"></div>
+    <div class="toolbar" style="margin-top:10px;">
+      <select id="addPosnPick" style="width:auto; max-width:100%;"></select>
+      <button class="small" onclick="addPosnToDay()">+ Add to this day</button>
+    </div>
+    <div class="hint">Only crew assigned to the project appear here. Grouped by company, then department, then position.</div>
+    <div class="toolbar" style="margin:18px 0 0; justify-content:space-between;">
+      ${feedbackButtonHTML('shoot-day-layout', 'the Shoot Day layout')}
+      <button type="button" class="sd-delete-link" onclick="deleteShootDay(currentShootDayId)">Delete this shoot day</button>
+    </div>
+  </div>`;
+}
 function renderProjectDays(body){
   const days = projectDays();
   if(!days.length){
@@ -7033,13 +7167,43 @@ function renderProjectDays(body){
     return;
   }
   if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
-  body.innerHTML = dayTabsBarHTML(days) + shootDayBuildHTML();
   const d = days.find(x=>x.id===currentShootDayId);
-  populateShootDay(d);
-  body.oninput = () => scheduleAutosave('shootday', () => saveShootDay(false));
+  body.innerHTML = dayTabsBarHTML(days) + shootDayHeaderRowHTML()
+    + (shootDayEditing ? shootDayEditCardHTML(d) : `<div class="card viewing" id="previewCard" ondblclick="shootDayDblEdit(event)"></div>`)
+    + (exportSections.tech ? '<div id="techSpecsSection"></div>' : '')
+    + (exportSections.hotels ? hotelSummaryHTML('card') : '')
+    + (exportSections.catering ? '<div id="cateringExportSection"></div>' : '')
+    + (exportSections.travel ? transportSummaryHTML('card') : '');
+  if(shootDayEditing) populateShootDay(d); else renderPreviewCard(buildFullData(d));
+  renderTechSpecsSection();
+  if(exportSections.catering) renderCateringExport();
+  body.oninput = (e) => {
+    if(!e.target || currentProjectTab!=='days') return;
+    const id = e.target.id;
+    if(id==='tsCostPublic' || id==='tsCostMileage')
+      scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); });
+    else if(TECHSPEC_FIELDS.some(f=>techSpecFieldId('ts',f)===id))
+      scheduleAutosave('techspecs', () => saveDayTechSpecs());
+    else if(id==='hcRoomNight')
+      scheduleAutosave('hotelCosts', () => saveHotelCosts());
+    else if(e.target.closest('#sdEditCard'))
+      scheduleAutosave('shootday', () => saveShootDay(false));
+  };
+  /* row tools (remove / move / shift / insert) change the form without an input event —
+     and there is no Save button any more, so a button press inside the card autosaves too.
+     ⚠️ CAPTURE phase: a row's × removes its own row, so by the time the click bubbles the
+     target is detached and closest('#sdEditCard') finds nothing. The save is debounced a
+     second, so scheduling it before the button's own handler runs is harmless. */
+  if(!body._sdClickHooked){
+    body._sdClickHooked = true;
+    body.addEventListener('click', (e) => {
+      if(currentProjectTab==='days' && e.target && e.target.closest && e.target.closest('#sdEditCard button'))
+        scheduleAutosave('shootday', () => saveShootDay(false));
+    }, true);
+  }
 }
-let previewBlocks = { callsheet:true, whatsapp:true, techspecs:true, catering:true };
-/* ---- collapsible block plumbing, shared by Preview & Export and the Shoot Day editor ----
+let previewBlocks = { callsheet:true, techspecs:true, catering:true };
+/* ---- collapsible block plumbing, shared by the Shoot Days page's blocks and Budget ----
    Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
    only thing that differed between them was the id prefix, so that's the parameter. */
 function applyBlockState(state, prefix, key){
@@ -7070,51 +7234,21 @@ function collapsibleSectionHTML({state=false, prefix='', key='', title='', inner
 function togglePreviewBlock(key){ toggleBlock(previewBlocks, 'pv', key); }
 function setAllPreviewBlocksCollapsed(collapsed){ setAllBlocksCollapsed(previewBlocks, 'pv', collapsed); }
 function toggleAllPreviewBlocks(){ setAllPreviewBlocksCollapsed(!allBlocksCollapsed(previewBlocks)); }
-function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML){
+function pvBlockHTML(key, title, headerActionsHTML, bodyInnerHTML, wrapClass){
   return collapsibleSectionHTML({
     state: previewBlocks[key], prefix: 'pv', key, title, inner: bodyInnerHTML,
-    actions: headerActionsHTML, onToggle: `togglePreviewBlock('${key}')`
+    actions: headerActionsHTML, onToggle: `togglePreviewBlock('${key}')`, wrapClass: wrapClass||'card'
   });
 }
-let exportFormat = 'printable';                                       // 'printable' | 'whatsapp'
 let exportSections = { tech:true, catering:true, hotels:true, travel:true };
 const EXPORT_SECTION_LABELS = { tech:'Tech specs', catering:'Catering', hotels:'Hotels', travel:'Travel' };
-let exportPanelOpen = true;
-function setExportFormat(f){ exportFormat = f; renderProjectBody(); }
-function toggleExportSection(key, checked){ exportSections[key] = checked; renderProjectBody(); }
-function toggleExportPanel(){ exportPanelOpen = !exportPanelOpen; renderProjectBody(); }
-function exportHiddenSectionCount(){ return Object.keys(exportSections).filter(k=>!exportSections[k]).length; }
+function toggleExportSection(key, checked){ flushShootDayEdits(); exportSections[key] = checked; renderProjectBody(); }
 function exportOutputText(){
   const d = currentDay(); if(!d) return '';
   return buildWAText(buildFullData(d));
 }
-function copyExportOutput(){ return copyText(exportOutputText(), 'Copied!'); }
-function exportOptionsHTML(){
-  const hidden = exportHiddenSectionCount();
-  return outputMenuRowHTML({
-    open: exportPanelOpen,
-    onToggle: 'toggleExportPanel()',
-    titleText: `Format: ${exportFormat==='whatsapp'?'WhatsApp':'Printable'}${hidden?` · ${hidden} section${hidden>1?'s':''} hidden`:''}`,
-    panelHTML: exportPanelBodyHTML()
-  });
-}
-function exportPanelBodyHTML(){
-  const fmtTab = (key, label) => `<div class="tab ${exportFormat===key?'active':''}" onclick="setExportFormat('${key}')">${label}</div>`;
-  const boxes = Object.keys(EXPORT_SECTION_LABELS).map(key=>
-    `<label><input type="checkbox" ${exportSections[key]?'checked':''} onchange="toggleExportSection('${key}', this.checked)"> ${esc(EXPORT_SECTION_LABELS[key])}</label>`).join('');
-  return `
-    <div><div class="hint" style="margin-bottom:4px;">Format</div>
-      <div class="tabs">${fmtTab('printable','Printable')}${fmtTab('whatsapp','WhatsApp')}</div></div>
-    <div style="margin-top:10px;"><div class="hint" style="margin-bottom:4px;">Include</div>
-      <div class="filter-chips">${boxes}</div></div>
-    <div class="toolbar" style="margin-top:12px;">
-      <button class="small primary" onclick="copyExportOutput()">${icon('copy')} ${exportFormat==='whatsapp'?'Copy for WhatsApp':'Copy as text'}</button>
-      <button class="small" onclick="downloadExcel()">${icon('download')} Download .xlsx</button>
-    </div>
-    <p class="hint" style="margin-top:10px;">${exportFormat==='whatsapp'
-      ? 'Plain text for a chat app — the ticked sections are appended to the message. Untick Tech specs for the version that goes to the full crew.'
-      : 'The formatted call sheet — print it or save it as a PDF. Copy gives you the same call sheet as plain text; the .xlsx carries one sheet per ticked section.'}</p>`;
-}
+/* flush first: Copy and Export read the saved day, and the form may be a second ahead of it */
+function copyExportOutput(){ flushShootDayEdits(); return copyText(exportOutputText(), 'Copied for WhatsApp'); }
 
 // UK standard rate. Not project-configurable — this phase is cost VISIBILITY,
 // not a real budgeting tool, so a fixed rate is the deliberate scope line.
@@ -8207,37 +8341,7 @@ function renderProjectBudget(body){
       scheduleAutosave('hotelCosts', () => { saveHotelCosts(); renderBudgetSummaryBar(); });
   } : null;
 }
-function renderProjectPreview(body){
-  const days = projectDays();
-  if(!days.length){
-    body.innerHTML = `<div class="section"><h2>Preview &amp; export</h2><div class="empty-note">No shoot days yet — add one under the Shoot Days tab first.</div></div>`;
-    return;
-  }
-  if(!currentShootDayId || !days.find(d=>d.id===currentShootDayId)) currentShootDayId = days[0].id;
-  const printable = exportFormat!=='whatsapp';
-  body.innerHTML = dayTabsBarHTML(days) + exportOptionsHTML() + (printable ? `
-    ${expandCollapseAllHTML('toggleAllPreviewBlocks()', undefined, allBlocksCollapsed(previewBlocks), 'pv')}
-    <div class="card" id="previewCard"></div>
-    ${exportSections.tech ? '<div id="techSpecsSection"></div>' : ''}
-    ${exportSections.hotels ? hotelSummaryHTML() : ''}
-    ${exportSections.catering ? '<div id="cateringExportSection"></div>' : ''}
-    ${exportSections.travel ? transportSummaryHTML() : ''}`
-  : `
-    ${pvBlockHTML('whatsapp', 'WhatsApp text', '', `<pre id="waText"></pre>`)}`);
-  const d = days.find(x=>x.id===currentShootDayId);
-  generatePreview(d);
-  if(printable && exportSections.catering) renderCateringExport();
-  body.oninput = (e) => {
-    if(!e.target) return;
-    if(printable && exportSections.travel && (e.target.id==='tsCostPublic' || e.target.id==='tsCostMileage'))
-      scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); });
-    else if(printable && exportSections.tech && TECHSPEC_FIELDS.some(f=>techSpecFieldId('ts',f)===e.target.id))
-      scheduleAutosave('techspecs', () => saveDayTechSpecs());
-    else if(printable && exportSections.hotels && e.target.id==='hcRoomNight')
-      scheduleAutosave('hotelCosts', () => saveHotelCosts());
-  };
-}
-function selectShootDay(id){ currentShootDayId=id; renderProjectBody(); }
+function selectShootDay(id){ flushShootDayEdits(); currentShootDayId=id; renderProjectBody(); }
 /* shared record shape — used by addShootDay, createProject (auto first day), and syncShootDayCount */
 /* starter schedule for every new shoot day — [time, duration, description] rows,
    same shape rowsOf()/addSchedRow() already read and write */
@@ -8252,6 +8356,8 @@ function makeShootDayRecord(projectId, p){
     hotelNights:[], cateringMeals:{} };
 }
 async function addShootDay(){
+  await flushShootDayEdits();
+  shootDayEditing = true;                        // a new day has nothing to look at yet
   const p = currentProject();
   const rec = makeShootDayRecord(currentProjectId, p);
   shootDaysDB.push(rec); await saveDB('db:shootdays', shootDaysDB);
@@ -8262,6 +8368,7 @@ async function deleteShootDay(id){
   if(!confirm('Delete this shoot day?')) return;
   const label = (()=>{ const d = dayById(id); return d ? shootDayLabel(d) : 'shoot day'; })();
   const snaps = beginUndo(['db:shootdays']);
+  clearTimeout(autosaveTimers.shootday);
   shootDaysDB = shootDaysDB.filter(d=>d.id!==id);
   if(currentShootDayId===id) currentShootDayId = null;
   await saveDB('db:shootdays', shootDaysDB); renderProjectBody();
@@ -8737,7 +8844,9 @@ let viewingCrewId = null;
    it is the "open" state and there is nothing left to toggle. */
 function refreshCrewScreen(){
   if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
-  else if(route.screen==='project' && currentProjectTab==='days'){ captureInProgressPositions(); renderPositionAssignments(); }
+  else if(route.screen==='project' && currentProjectTab==='days'){
+    if(shootDayEditing){ captureInProgressPositions(); renderPositionAssignments(); } else renderProjectBody();
+  }
   // the crew database screen needs a FULL re-render, not just renderCrewList():
   // the add/edit form markup lives outside #crewList, so re-rendering only the
   // list left "+ Add crew member" toggling its label but never showing a form.
@@ -9535,151 +9644,6 @@ async function fetchDayAmenity(kind){
 /* ============================================================ SHOOT DAY EDITOR */
 function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
 
-/* Collapse state for the four Shoot Day blocks. Deliberately GLOBAL, not per-day:
-   when you're working one concern at a time (e.g. schedules across the week),
-   collapsing on Day 1 should stay collapsed when you move to Day 5. */
-let shootDayBlocks = { general:true, schedule:true, positions:true };   // tech left for the Preview tab, 14 Sep 2026
-function toggleShootDayBlock(key){ toggleBlock(shootDayBlocks, 'sd', key); }
-function setAllShootDayBlocksCollapsed(collapsed){ setAllBlocksCollapsed(shootDayBlocks, 'sd', collapsed); }
-function toggleAllShootDayBlocks(){ setAllShootDayBlocksCollapsed(!allBlocksCollapsed(shootDayBlocks)); }
-function sdBlock(key, title, inner){
-  const open = shootDayBlocks[key];
-  return `<div class="sd-block">
-    <div class="sd-block-head" onclick="toggleShootDayBlock('${key}')">
-      <span class="dept-caret" id="sdc-${key}">${open?'▾':'▸'}</span> ${title}
-    </div>
-    <div class="sd-block-body" id="sdb-${key}" style="display:${open?'':'none'}">${inner}</div>
-  </div>`;
-}
-function shootDayBuildHTML(){
-  /* IDEAS DEMO — two-column general section, per the sketched layout:
-     left = what the day IS (details, brief, where, hospital);
-     right = conditions and logistics (weather, notes, parking).
-     Every field id is unchanged — fillShootDayForm()/saveShootDay() read the
-     same inputs wherever they sit. */
-  const general = `
-    <div class="section">
-      <div class="sd-band">
-        <div class="sd-card">
-          <div class="subhead">Day details</div>
-          <div class="ts-grid">
-            <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"></div>
-            <div class="ts-field"><label>of (total)</label><input type="text" id="sdDayTotal" class="fld-xs" readonly tabindex="-1" title="Total shoot days on this project — add or remove days to change it"></div>
-          </div>
-          <div class="ts-grid" style="margin-top:10px;">
-            <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
-            <div class="ts-field sd-allcall"><label>All-crew call</label><input type="text" id="sdAllCall" placeholder="08:00"></div>
-          </div>
-        </div>
-        <div class="sd-card">
-          <div class="subhead">Weather</div>
-          <div class="ts-grid">
-            <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
-            <div class="ts-field"><label>Condition</label><input type="text" id="wxCond" class="fld-md"></div>
-          </div>
-          <div class="ts-grid" style="margin-top:10px;">
-            <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
-            <div class="ts-field"><label>Sunrise/Sunset</label><input type="text" id="wxSun" class="fld-md"></div>
-          </div>
-          <div class="sd-weather-row">
-            <button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch</button>
-            <span id="weatherStatus" class="hint"></span>
-          </div>
-        </div>
-      </div>
-      <div class="sd-band">
-        <div class="sd-card">
-          <div class="subhead">Production brief</div>
-          <label>The scenes / setups being shot today — one per line</label>
-          <textarea id="sdBrief" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
-        </div>
-        <div class="sd-card">
-          <div class="subhead">Production notes</div>
-          <textarea id="sdNotes"></textarea>
-        </div>
-      </div>
-      <div class="sd-band sd-band-full">
-        <div class="sd-card">
-          <div class="subhead">Primary location</div>
-          <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
-          <div id="sdLocationSummary" class="sd-info" style="margin-top:8px;"></div>
-          <div class="subhead">Additional locations</div>
-          <div class="rows-add" id="rows-sdaddloc"></div>
-          <button class="small" onclick="addSdLocRow()">+ Add location</button>
-        </div>
-      </div>
-      <div class="sd-band sd-band-full">
-        <div class="sd-card">
-          <div class="subhead">Parking / arrival / access</div>
-          <textarea id="sdParking"></textarea>
-          <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
-          <div id="sdAccessInfo" class="sd-info" style="margin-top:6px;"></div>
-        </div>
-      </div>
-      <div class="sd-band">
-        <div class="sd-card">
-          <div class="subhead">Nearest hospital</div>
-          <div id="sdHospitalInfo" class="sd-info"></div>
-          <div class="sd-weather-row">
-            <button class="small" onclick="fetchDayAmenity('hospital')">${icon('hospital')} Fetch</button>
-            <span id="sdHospitalStatus" class="hint"></span>
-          </div>
-        </div>
-        <div class="sd-card">
-          <div class="subhead">Nearest car park</div>
-          <div id="sdParkingLookupInfo" class="sd-info"></div>
-          <div class="sd-weather-row">
-            <button class="small" onclick="fetchDayAmenity('parking')">${icon('car')} Fetch</button>
-            <span id="sdCarParkStatus" class="hint"></span>
-          </div>
-        </div>
-      </div>
-      ${feedbackButtonHTML('shoot-day-layout', 'the Shoot Day layout')}
-    </div>`;
-
-  const schedule = `
-    <div class="section">
-      <div class="hint" style="margin-bottom:8px;">Time and Duration are linked — enter a time range (e.g. 08:00 - 12:00) and Duration fills in automatically, or enter a single start time plus a Duration (e.g. 4hrs) and the range fills in.</div>
-      <div class="rows-sched" id="rows-sched">
-        <div class="row" style="border:none;padding:0;margin:0 0 2px;"><span></span><span></span><label>Time</label><label>Duration</label><label>Description</label><span></span></div>
-      </div>
-      <div class="toolbar sched-tools" style="margin-top:8px;">
-        <button class="small" onclick="addSchedRow()">+ Add schedule item</button>
-        <span class="sched-shift">
-          <span class="hint">Shift selected</span>
-          <button class="small" onclick="shiftSelected(-1)" title="Earlier">&minus;</button>
-          <select id="schedShiftAmount"><option value="5">5 min</option><option value="15" selected>15 min</option><option value="30">30 min</option><option value="60">60 min</option></select>
-          <button class="small" onclick="shiftSelected(1)" title="Later">+</button>
-          <button class="small" onclick="toggleSelectAllSched()" id="schedSelectAllBtn">Select all</button>
-        </span>
-      </div>
-    </div>`;
-
-  const positions = `
-    <div class="section">
-      <div id="rows-posn"></div>
-      <div class="toolbar" style="margin-top:10px;">
-        <select id="addPosnPick"></select>
-        <button class="small" onclick="addPosnToDay()">+ Add to this day</button>
-      </div>
-      <div class="hint">Only crew assigned to the project appear here. Grouped by company, then department, then position.</div>
-    </div>`;
-
-
-  return expandCollapseAllHTML('toggleAllShootDayBlocks()', undefined, allBlocksCollapsed(shootDayBlocks), 'sd')
-       + sdBlock('general','General information', general)
-       + sdBlock('schedule','Schedule', schedule)
-       + sdBlock('positions','Position assignments', positions)
-       + `<div class="section">
-            <h2>Danger zone</h2>
-            <button class="danger" onclick="deleteShootDay(currentShootDayId)">Delete this shoot day</button>
-          </div>
-          <div class="toolbar sticky-actions">
-            <button class="primary" onclick="saveShootDay(true)">Save &amp; generate call sheet →</button>
-            <button onclick="saveShootDay(false)">${icon('save')} Save only</button>
-            <span class="status" id="sdStatus"></span>
-          </div>`;
-}
 function projectCrewOptions(){
   const day = currentDay(); if(!day) return [];
   const p = projById(day.projectId);
@@ -10033,9 +9997,12 @@ async function fetchWeatherForDay(){
     const fetchedDay = currentDay();
     if(fetchedDay) fetchedDay.weather = Object.assign({}, fetchedDay.weather, {fetchedAt:new Date().toISOString()});
     s.textContent=`Fetched (${source}) just now.`;
+    scheduleAutosave('shootday', () => saveShootDay(false));   // setv() fires no input event
   }catch(e){ s.textContent='Fetch failed — check your connection.'; }
 }
 async function saveShootDay(thenGenerate){
+  // ⚠️ reads the form: with no edit card in the DOM every val() is '' and this would blank the day
+  if(!document.getElementById('sdEditCard')) return;
   const idx=shootDaysDB.findIndex(x=>x.id===currentShootDayId); if(idx<0) return;
   const d=shootDaysDB[idx];
   d.dayNum=val('sdDayNum'); d.date=val('sdDate'); d.allCrewCall=val('sdAllCall');
@@ -10051,14 +10018,14 @@ async function saveShootDay(thenGenerate){
     const prev = prevPositions.find(p=>p[0]===cid);
     return [cid, call, '', prev?(prev[3]||''):'', prev?(prev[4]||''):''];
   });
-  // tech specs are no longer on this form (edited on Preview & Export, saveDayTechSpecs) — never touch d.techSpecs here
+  // tech specs are not on this form (their own card below it, saveDayTechSpecs) — never touch d.techSpecs here
   d.brief=parseBriefLines(val('sdBrief'));
   d.parking=val('sdParking'); d.notes=val('sdNotes');
   const saved = await saveDB('db:shootdays',shootDaysDB);
   flashSaveResult('sdStatus', saved);
-  // Don't walk the user to the export screen off the back of a save that didn't
-  // land — the call sheet they'd generate is one this database has never seen.
-  if(thenGenerate && saved && saved.ok) goProjectTab('preview');
+  // Don't flip to the finished sheet off the back of a save that didn't land —
+  // the call sheet they'd be looking at is one this database has never seen.
+  if(thenGenerate && saved && saved.ok){ shootDayEditing = false; renderProjectBody(); }
 }
 
 function crewInfo(id){
@@ -10150,7 +10117,7 @@ function buildFullData(d){
   const p=projById(d.projectId)||{};
   const primary=locById(d.locationId);
   const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locById(id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
-  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',coProductionCompany:c.coProductionCompany||''};});
+  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{id:cid,role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',coProductionCompany:c.coProductionCompany||''};});
   const crewOnly = allPositions.filter(r=>!r.coProductionCompany);
   // Client and Talent stand apart from the crew departments (Phase N item 3) — pulled
   // out of the canonical-department-order crew list into their own dedicated blocks
@@ -10173,16 +10140,6 @@ function buildFullData(d){
     // d.techSpecs directly exported blank tech specs for every day on the defaults.
     techSpecs:resolveTechSpecs(d), cameraDesignations };
 }
-/* Only one output shape is in the DOM at a time now (Phase Q), so each of these is
-   guarded rather than assumed — the WhatsApp <pre> doesn't exist in printable mode
-   and the card doesn't exist in WhatsApp mode. */
-function generatePreview(d){
-  const data=buildFullData(d);
-  renderPreviewCard(data);
-  const wa=document.getElementById('waText');
-  if(wa) wa.textContent=buildWAText(data);
-  renderTechSpecsSection(data);
-}
 /* T-7.3 — since 14 Sep 2026 the ONE place tech specs and camera designations are edited
    (the Tech tab T-4 and the Shoot Day block T-5.5 are gone). Per selected day:
    - the six spec fields autosave as a DAY OVERRIDE holding only what differs from the
@@ -10192,26 +10149,29 @@ function generatePreview(d){
    - the camera list is the Cinematography crew BOOKED ON THIS DAY (resolveCameras with the
      day), reordered/edited here through the existing camera handlers, scope 'day';
    - the "As exported" table below is what the Copy button, WhatsApp text and .xlsx carry. */
-function renderTechSpecsSection(d){
+function renderTechSpecsSection(){
   const el=document.getElementById('techSpecsSection'); if(!el) return;
   const day = currentDay(); if(!day) return;
-  const headerActions = `<button class="small" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
-  const body = `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — the call sheet card stays clear of this; it goes out with the WhatsApp text and the .xlsx only while Tech specs is ticked.</div>
+  const headerActions = `<button type="button" class="bnr-tool" onclick="copyTechSpecs()">${icon('copy')} Copy tech specs</button>`;
+  /* 19 Sep 2026 — follows the page's Edit state: fields + cameras while editing, the
+     as-exported table on the finished view (double-click it to get back to the fields) */
+  const body = shootDayEditing ? `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — the call sheet card stays clear of this; it goes out with the WhatsApp text and the .xlsx only while Tech specs is included.</div>
     <div id="techSpecsBanner"></div>
     ${techSpecFieldsHTML('ts')}
     <div class="toolbar" style="margin:10px 0 0;">
       <button class="small" onclick="applyTechSpecsToProject()" title="Make these the project defaults and clear every day's own version">Use for every day</button>
       <span class="status" id="tsStatus"></span>
     </div>
-    <div class="subhead" style="margin-top:18px;">Camera designations</div>
-    <div class="hint" style="margin-bottom:10px;">The Cinematography crew booked on this day, in letter order (A, B, C…). Reorder with the arrows; add a second body or an unmanned camera below. Someone missing? Give them a position on this day first.</div>
-    <div id="cameraDesigList"></div>
-    <div class="subhead" style="margin-top:18px;">As exported</div>
-    <div id="techSpecsExported"></div>`;
-  el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body);
-  setTechSpecFields('ts', resolveTechSpecs(day));
-  renderCameraDesignations('day');
-  refreshTechSpecsBanner();
+    <h3>Camera designations</h3>
+    <div class="hint" style="margin:0 0 10px;">The Cinematography crew booked on this day, in letter order (A, B, C…). Reorder with the arrows; add a second body or an unmanned camera below. Someone missing? Give them a position on this day first.</div>
+    <div id="cameraDesigList"></div>`
+  : `<div id="techSpecsExported" data-edit="tech" ondblclick="shootDayDblEdit(event)"></div>`;
+  el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body, shootDayEditing ? 'card editing' : 'card viewing');
+  if(shootDayEditing){
+    setTechSpecFields('ts', resolveTechSpecs(day));
+    renderCameraDesignations('day');
+    refreshTechSpecsBanner();
+  }
   renderTechExportedTable();
 }
 /* the read-only rows + camera table (shared markup with the exports), refreshed after every
@@ -10274,7 +10234,7 @@ function copyTechSpecs(){ return copyText(copyTechSpecsText()); }
 function positionsTableHTML(title, people, subtitle){
   if(!people || !people.length) return '';
   return `<h3>${esc(title)}${subtitle?` <span style="color:var(--muted); text-transform:none; font-weight:400;">${subtitle}</span>`:''}</h3><div class="tablewrap"><table><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th></tr>`+
-    people.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td>${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`;
+    people.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td data-edit="posn:${esc(r.id)}">${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`;
 }
 function renderPreviewCard(d){
   const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
@@ -10283,7 +10243,7 @@ function renderPreviewCard(d){
       <span class="dept-caret" id="pvc-callsheet">${open?'▾':'▸'}</span>
       <div>
         <div class="line1">${esc(d.prodCompany)}${d.shootTitle?(' · '+esc(d.shootTitle)):''}</div>
-        <div class="sub">${[fmtDate(d.shootDate),dayLine,d.allCrewCall?('All-crew call '+esc(d.allCrewCall)):''].filter(Boolean).join(' · ')}</div>
+        <div class="sub" data-edit="#sdDate">${[fmtDate(d.shootDate),dayLine,d.allCrewCall?('All-crew call '+esc(d.allCrewCall)):''].filter(Boolean).join(' · ')}</div>
       </div>
     </div>`;
   let h='';
@@ -10291,20 +10251,20 @@ function renderPreviewCard(d){
   /* ---- two-column key-info block at the top ---- */
   let col1='', col2='';
   const w=d.weather;
-  if(w&&(w.temp||w.precip||w.cond||w.sun)) col1+=`<div class="ki-item"><h4>Weather</h4><div>${[w.temp,w.precip,w.cond,w.sun&&('☀ '+w.sun)].filter(Boolean).map(esc).join(' · ')}</div></div>`;
+  if(w&&(w.temp||w.precip||w.cond||w.sun)) col1+=`<div class="ki-item" data-edit="#wxTemp"><h4>Weather</h4><div>${[w.temp,w.precip,w.cond,w.sun&&('☀ '+w.sun)].filter(Boolean).map(esc).join(' · ')}</div></div>`;
   if(d.primary){
-    col1+=`<div class="ki-item"><h4>Primary location</h4><div>${esc(d.primary.name)}<br>${esc(d.primary.address||'')}</div>`;
+    col1+=`<div class="ki-item" data-edit="#sdLocation"><h4>Primary location</h4><div>${esc(d.primary.name)}<br>${esc(d.primary.address||'')}</div>`;
     if(d.primary.onsiteContactName) col1+=`<div class="hint">Contact: ${esc(d.primary.onsiteContactName)}${d.primary.onsiteContactPhone?(' — '+esc(d.primary.onsiteContactPhone)):''}</div>`;
     col1+=`</div>`;
   }
   if(d.hospital) col1+=`<div class="ki-item"><h4>Nearest hospital</h4><div>${esc(d.hospital.name)}<br>${esc(d.hospital.address||'')} (~${esc(d.hospital.distanceKm)}km)</div></div>`;
-  if(d.brief.length) col2+=`<div class="ki-item"><h4>Production brief</h4><ul>${d.brief.map(l=>`<li>${esc(l)}</li>`).join('')}</ul></div>`;
-  if(d.parking) col2+=`<div class="ki-item"><h4>Parking / arrival</h4><div>${esc(d.parking).replace(/\n/g,'<br>')}</div></div>`;
-  if(d.notes) col2+=`<div class="ki-item"><h4>Production notes</h4><div>${esc(d.notes).replace(/\n/g,'<br>')}</div></div>`;
+  if(d.brief.length) col2+=`<div class="ki-item" data-edit="#sdBrief"><h4>Production brief</h4><ul>${d.brief.map(l=>`<li>${esc(l)}</li>`).join('')}</ul></div>`;
+  if(d.parking) col2+=`<div class="ki-item" data-edit="#sdParking"><h4>Parking / arrival</h4><div>${esc(d.parking).replace(/\n/g,'<br>')}</div></div>`;
+  if(d.notes) col2+=`<div class="ki-item" data-edit="#sdNotes"><h4>Production notes</h4><div>${esc(d.notes).replace(/\n/g,'<br>')}</div></div>`;
   if(col1||col2) h+=`<div class="key-info-grid"><div class="ki-col">${col1}</div><div class="ki-col">${col2}</div></div>`;
 
   if(d.addLocs.length) h+=`<h3>Additional locations</h3><ul>`+d.addLocs.map(l=>`<li>${esc(l.name)} — ${esc(l.address||'')}${l.note?(' ('+esc(l.note)+')'):''}</li>`).join('')+`</ul>`;
-  if(d.schedule.length){ h+=`<h3>Schedule</h3><div class="tablewrap"><table><tr><th>Time</th><th>Duration</th><th>Description</th></tr>`+d.schedule.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')+`</table></div>`; }
+  if(d.schedule.length){ h+=`<h3>Schedule</h3><div class="tablewrap"><table><tr><th>Time</th><th>Duration</th><th>Description</th></tr>`+d.schedule.map((r,i)=>`<tr><td data-edit="sched:${i}:0">${esc(r[0])}</td><td data-edit="sched:${i}:1">${esc(r[1])}</td><td data-edit="sched:${i}:2">${esc(r[2])}</td></tr>`).join('')+`</table></div>`; }
   // Client stands apart, ahead of the crew list; Talent stands apart, right after it (Phase N item 3)
   h += positionsTableHTML('Client', d.clientPositions);
   h += positionsTableHTML('Position assignments', d.positions);
@@ -10314,6 +10274,7 @@ function renderPreviewCard(d){
       h += positionsTableHTML(g.company, g.people, '(co-production)');
     });
   }
+  if(!h) h = `<div class="empty-note">Nothing on this day yet — press Edit, or double-click here, to fill it in.</div>`;
   const card = document.getElementById('previewCard'); if(!card) return;
   card.innerHTML = header + `<div id="pvb-callsheet" style="display:${open?'':'none'}; margin-top:14px;">${h}</div>`;
 }
@@ -10360,6 +10321,7 @@ function pushPeopleRows(aoa, heading, people){
   people.forEach(r=>aoa.push([DEPARTMENT_CODES[deptBucketKey(r.department)]||'',r.role,r.name,r.call,r.phone])); aoa.push([]);
 }
 async function downloadExcel(){
+  flushShootDayEdits();
   try{ await ensureXLSX(); }catch(e){ alert('Could not load the Excel export library — check your connection and try again.'); return; }
   const d=currentDay(); if(!d) return;
   const data=buildFullData(d); const aoa=[];
