@@ -4446,7 +4446,7 @@ function bulkActionBarHTML(){
     <strong>${projectCrewSelected.size} selected</strong>
     <button class="small" onclick="openCrewBulkEdit()">Edit</button>
     <button class="small danger" onclick="bulkRemoveSelectedFromProject()">Remove from project</button>
-    <span class="hint" style="cursor:pointer;" onclick="clearCrewSelection()">Clear selection</span>
+    <button class="small" onclick="clearCrewSelection()">Clear selection</button>
     ${propagateHint}
   </div>`;
 }
@@ -4461,7 +4461,9 @@ function toggleCrewSelectMode(){ crewSelectMode = !crewSelectMode; renderProject
 function crewToolbarSelectAll(idsCSV, allSelected, filterCount){
   return `<button type="button" class="bnr-tool ${crewSelectMode?'on':''}" onclick="toggleCrewSelectMode()"
       title="${crewSelectMode?'Leave select mode — the selection is kept':'Select mode: click lines to select them, then Edit'}">Select</button>`
-    + (crewSelectMode ? `<span onclick="toggleSelectAllFilteredCrew('${idsCSV}', ${!allSelected})">${allSelected?'Select none':`Select all${filterCount?' (filtered)':''}`}</span>` : '');
+    + (crewSelectMode ? `<button type="button" class="bnr-tool" onclick="toggleSelectAllFilteredCrew('${idsCSV}', true)" ${allSelected?'disabled style="opacity:.45; cursor:default;"':''}>Select all${filterCount?' (filtered)':''}</button>` : '')
+    // shown whenever anything is selected, in or out of select mode — the selection outlives the mode
+    + (projectCrewSelected.size ? `<button type="button" class="bnr-tool" onclick="clearCrewSelection()" title="Deselect everyone">Clear selection (${projectCrewSelected.size})</button>` : '');
 }
 let crewShowMoney = false;
 function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody(); }
