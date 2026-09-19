@@ -290,8 +290,8 @@
   .rows-sched .row{grid-template-columns:24px 30px 100px 90px 1fr 34px; position:relative;}
   .rows-sched .row .sc-select{align-self:center; width:16px; height:16px;}
   /* hover between schedule rows to insert a new blank row at that point, instead of
-     only being able to append at the bottom — sits ON the Time column's left edge (70px =
-     checkbox 24 + arrows 30 + two 8px gaps): at 50px it sat over the move arrows */
+     only being able to append at the bottom. (The Call Sheets edit card overrides the position:
+     there the + sits in the card's left gutter, on the row boundary.) */
   .sched-insert-hint{position:absolute; top:-10px; left:70px; width:18px; height:18px;
     display:flex; align-items:center; justify-content:center; opacity:0; z-index:2;
     cursor:pointer; transition:opacity .12s ease;}
@@ -380,17 +380,90 @@
   .card h3.sd-sec-toggle{cursor:pointer; user-select:none;}
   .card h3.sd-sec-toggle:hover{color:var(--text);}
   .card h3.sd-sec-toggle .dept-caret{font-size:11px; color:inherit;}
-  .sd-sub-edit{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; align-items:center;}
-  .card.editing .key-info-grid{margin-top:0;}
-  .card.editing .ki-item textarea{min-height:64px;}
-  .card.editing .ki-item .sd-info{font-size:var(--fs-field);}
-  .card.editing .ki-item .sd-weather-row{margin-top:6px;}
+  .card .key-info-grid{margin-top:0;}
+  .card h4.sd-subh{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--muted); font-weight:500; margin:12px 0 4px;}
+  /* one set of column widths for the finished tables AND the edit tables, so text doesn't move */
+  .card table.sd-sched, .card table.sd-posn{table-layout:fixed;}
+  .card table.sd-posn td, .card table.sd-sched td{overflow-wrap:anywhere;}
+  /* ⚠️ THE EDIT CARD IS THE FINISHED CARD WITH FIELDS IN IT (19 Sep 2026). Every plain text
+     field is type-matched to the text it replaces — no padding, inherited font and line-height,
+     the underline drawn as a box-shadow so it takes no room. Tools (fetch, row ×/move/select,
+     the insert +) are small and mostly appear on hover, so the two states line up. */
+  #sdEditCard input[type=text], #sdEditCard input[type=date], #sdEditCard textarea, #sdEditCard select{
+    padding:0; margin:0; font-size:inherit; line-height:inherit; color:inherit; height:auto; min-height:0;
+    border-bottom:none; box-shadow:0 1px 0 var(--field-line); border-radius:0;}
+  #sdEditCard input:hover, #sdEditCard textarea:hover, #sdEditCard select:hover{box-shadow:0 1px 0 var(--text);}
+  #sdEditCard input:focus, #sdEditCard textarea:focus, #sdEditCard select:focus{box-shadow:0 1.5px 0 var(--tape);}
+  #sdEditCard textarea{display:block; resize:none; overflow:hidden; min-height:1.5em;}
+  #sdEditCard #sdBrief{padding-left:18px;}
+  #sdEditCard input.sd-auto{width:6ch; min-width:3ch;}
+  #sdEditCard .sub input[type=date]{width:auto;}
+  .sd-wx-line{display:flex; flex-wrap:wrap; align-items:baseline; gap:0 5px;}
+  .ki-item h4{position:relative;}
+  .ki-tool{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; margin-left:4px;
+    border:none; background:transparent; color:var(--muted); vertical-align:-3px; border-radius:4px; position:relative;}
+  .ki-tool:hover{color:var(--tape); background:var(--tint-3);}
+  .ki-tool .ic{width:12px; height:12px;}
+  [data-tip]:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 4px); left:0; z-index:20;
+    background:var(--text); color:#fff; font-family:var(--body); font-size:11px; font-weight:400; letter-spacing:0;
+    text-transform:none; white-space:nowrap; padding:4px 7px; border-radius:5px; pointer-events:none;}
+  #sdLocationSummary a{color:inherit;}
+  .ki-status:empty{display:none;}
+  .ki-status{display:block; margin-top:2px;}
+  #sdEditCard tr.row, #sdEditCard tr.crewrow-select{display:table-row; border:none; width:auto; min-width:0;}
+  /* a touch more air than the finished table — room for the insert + on the row boundary */
+  #sdEditCard table.sd-sched td{padding:7px 6px;}
+  #sdEditCard td{position:relative;}
+  /* the finished tables sit in a .tablewrap (margin:0 -2px); the edit tables can't — its overflow
+     would clip the insert + — so they take the same 2px outdent by hand */
+  #sdEditCard table.sd-sched, #sdEditCard table.sd-posn{margin:0 -2px; width:calc(100% + 4px);}
+  #sdEditCard .sched-insert-hint{position:absolute; top:-8px; left:-15px; width:15px; height:15px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; opacity:0; z-index:2; cursor:pointer;
+    font-family:var(--label); font-size:12px; font-weight:600; line-height:1; color:var(--tape-ink); background:var(--tape);}
+  #sdEditCard tr.row:hover .sched-insert-hint, #sdEditCard .sched-insert-hint:hover{opacity:1;}
+  .sd-rowtools{white-space:nowrap; text-align:right; opacity:0; transition:opacity .12s ease;}
+  #sdEditCard td.sd-rowtools{padding-top:0; padding-bottom:0; vertical-align:middle;}
+  tr:hover > .sd-rowtools, tr:focus-within > .sd-rowtools, .sd-rowtools:has(.sc-select:checked){opacity:1;}
+  .sd-rowtools .sc-select{width:13px; height:13px; vertical-align:middle; margin:0 2px 0 0;}
+  .sd-rowtools .sc-move{display:inline-flex; flex-direction:column; vertical-align:middle;}
+  .sd-x{border:none; background:transparent; color:var(--muted); padding:0 4px; font-size:15px; line-height:1; font-weight:400; vertical-align:middle;}
+  .sd-x:hover{color:var(--danger);}
+  #sdEditCard .rows-add .row{grid-template-columns:minmax(0,260px) 1fr 24px; align-items:baseline; border:none; margin:0 0 4px; padding:0;}
+  /* fields here inherit their size (that is how they match the finished text) — so anything not
+     already inside a sized block needs one */
+  .sd-add-row, .sd-sched-tools, #sdEditCard .rows-add{font-size:var(--fs-field);}
+  .sd-add-row{display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; margin-top:8px;}
+  .sd-add-row select{width:auto; max-width:100%;}
+  .sd-sched-tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between; margin-top:8px;}
+  @media (hover:none){ .sd-rowtools{opacity:1;} #sdEditCard .sched-insert-hint{opacity:.55;} }
+  /* phones: the fixed columns need more room than the card has, so the edit tables scroll
+     sideways like the finished ones do. A scroller clips the gutter, so the + moves inside. */
+  @media(max-width:900px){
+    .sd-tablescroll{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-top:9px;}
+    #sdEditCard table.sd-sched{min-width:600px;} #sdEditCard table.sd-posn{min-width:560px;}
+    #sdEditCard .sched-insert-hint{left:0; top:-9px;}
+    #sdEditCard table.sd-sched td:first-child{padding-left:18px;}
+  }
+  @media (pointer:coarse){
+    #sdEditCard input[type=text], #sdEditCard input[type=date], #sdEditCard textarea, #sdEditCard select{font-size:16px;}
+  }
   .card > .sd-block-head{font-size:17px; color:var(--text);}
   .card > .sd-block-head .sd-block-head-toggle::after{display:none;}
   .card > .sd-block-head > button{margin-left:auto;}
   .card > .sd-block-head.flush{margin-bottom:0;}
   .card > .sd-block-head + div{margin-top:12px;}
-  #techSpecsExported > table:first-child th{border-bottom:none;}
+  #techSpecsExported > table:first-child th, table.sd-techedit th{border-bottom:none;}
+  table.sd-techedit th{width:140px;}
+  table.sd-techedit input[type=text]{padding:0; margin:0; font-size:inherit; line-height:inherit; height:auto; min-height:0;
+    border-bottom:none; box-shadow:0 1px 0 var(--field-line);}
+  table.sd-techedit input[type=text]:hover{box-shadow:0 1px 0 var(--text);}
+  table.sd-techedit input[type=text]:focus{box-shadow:0 1.5px 0 var(--tape);}
+  @media (pointer:coarse){ table.sd-techedit input[type=text]{font-size:16px;} }
+  .export-dialog-list{display:flex; flex-direction:column; gap:8px; margin:0 0 14px;}
+  .export-dialog-list label{font-family:var(--body); font-size:var(--fs-field); letter-spacing:0; text-transform:none; color:var(--text);
+    display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; font-weight:400;}
+  .export-dialog-list label.fixed{color:var(--muted); cursor:default;}
   .card:has(> .sd-block-head) > div:last-child > .hint:first-child{margin-top:0;}
   .sd-header-row{margin-bottom:12px;}
   .sd-header-row .crew-header-right{gap:6px;}
@@ -501,6 +574,25 @@
   .bulk-action-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--tint-3);
     border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:var(--fs-meta);}
   .bulk-select-cb{width:16px; height:16px; flex:0 0 auto;}
+  /* Crew tab select mode — the tick boxes are hidden plumbing (see crewSelectMode); the column
+     they sat in closes up, and a selected line is a highlighted line. Opaque mix, not --tint-3:
+     the sticky name/role cells paint their own background and would hide a translucent one. */
+  /* desktop only: ≤900px pins that column at a hard 60px (see the sticky block), so the variable
+     must keep its mobile value there. Roles has nothing left in the column; the other views
+     still keep their Edit pencil in it. */
+  @media(min-width:901px){
+    .crew-rowselect{--pb-controls-w:24px;}
+    .crew-rowselect.crew-rowselect-tight{--pb-controls-w:0px;}
+  }
+  .crew-rowselect .bulk-select-cb{display:none;}
+  .crew-rowselect .pb-head:has(.bulk-select-cb:checked),
+  .crew-rowselect .pb-head:has(.bulk-select-cb:checked) > *{background-color:color-mix(in srgb, var(--tape) 11%, var(--bg));}
+  .crew-rowselect .pb-head:has(.bulk-select-cb:checked){box-shadow:inset 3px 0 0 var(--tape);}
+  .crew-select-mode .pb-head{cursor:pointer;}
+  .crew-select-mode .pb-head *{pointer-events:none;}
+  .crew-select-mode .pb-head:hover, .crew-select-mode .pb-head:hover > *{background-color:color-mix(in srgb, var(--tape) 5%, var(--bg));}
+  .crew-select-mode .pb-head:has(.bulk-select-cb:checked):hover,
+  .crew-select-mode .pb-head:has(.bulk-select-cb:checked):hover > *{background-color:color-mix(in srgb, var(--tape) 15%, var(--bg));}
   .roles-grid{display:grid; align-items:center; column-gap:10px;
     grid-template-columns:var(--roles-cols, var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w)
       56px 56px 56px 60px minmax(110px,1fr));}
@@ -2074,18 +2166,6 @@ function deptLabelHTML(c){
 }
 /* Position Assignments identity line — at-a-glance info (role, phone) with a day-scoped
    edit pencil. No department pickers here by design: this screen is for call times. */
-/* the NAME is the way in to the per-day override form, as on Crew → Roles (19 Sep 2026 — the
-   pencil button is gone); click it again, or Cancel in the form, to close */
-function posnIdentityHTML(c, crewId, isEditing, overridden){
-  const bits = [c.role, c.phone].filter(Boolean).map(esc).join(' · ');
-  return `<div class="crew-ident one-line">
-    <strong class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${crewId}')"
-      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editCrew('${crewId}')}"
-      title="${isEditing?'Close':'Edit '+esc(c.name)+' for this day'}">${esc(c.name)}</strong>
-    ${overridden?`<span class="override-dot" title="Changed for this day only">●</span>`:''}
-    ${bits?`<span class="hint crew-ident-sub">${bits}</span>`:''}
-  </div>`;
-}
 function crewExpansionHTML(v, wrapClass){
   const isEntryView = !!v.crewId;
   const c = isEntryView ? crewById(v.crewId) : v;
@@ -2874,7 +2954,7 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
-      <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">SHOOT DAYS</div>
+      <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">CALL SHEETS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
       <div class="tab ${currentProjectTab==='notes'?'active':''}" onclick="goProjectTab('notes')">NOTES</div>
     </div>
@@ -2910,7 +2990,7 @@ function renderProjectOverview(body){
       </div>
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label>Shoot days</label><input type="text" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
-        <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Shoot Days tab — both stay in sync.</div></div>
+        <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Call Sheets tab — both stay in sync.</div></div>
       </div>
       ${shootDayReductionPanelHTML(days)}
       <label>Log line</label>
@@ -2941,7 +3021,7 @@ function renderProjectOverview(body){
 }
 /* ⚠️ REMOVED 14 Sep 2026: the Tech tab (T-4) — renderProjectTech(), techBlocks/techBlockHTML(),
    jumpToTechRoundup(), projectTechRoundupData(), renderTechSpecsRoundup(), copyProjectTechSpecs*().
-   Tech specs and camera designations are edited on the Shoot Days tab's Tech specs
+   Tech specs and camera designations are edited on the Call Sheets tab's Tech specs
    block (renderTechSpecsSection, T-7.3). Do not look for the old names. */
 let quickAddMode = null;                  // null | 'day' | 'loc' | 'crew' | 'ai' — one control open at a time
 let quickAddError = null;                 // e.g. "Pick a date first."
@@ -3096,7 +3176,7 @@ function quickAddSectionHTML(p){
       <label>The scenes / setups being shot today — one per line</label>
       <textarea id="quickDayBrief" oninput="quickDayDraft.brief=this.value;autoGrowTextarea(this)" style="overflow:hidden;resize:none;">${esc(quickDayDraft.brief)}</textarea>
       <div class="toolbar" style="margin-top:12px;"><button class="small primary" onclick="quickAddShootDay()">${icon('save')} Add shoot day</button></div>
-      <div class="hint" style="margin-top:6px;">Everything else — locations, schedule, crew, tech specs — is on the Shoot Days tab.</div>`;
+      <div class="hint" style="margin-top:6px;">Everything else — locations, schedule, crew, tech specs — is on the Call Sheets tab.</div>`;
   } else if(mode === 'loc'){
     // the Locations tab's own widget, ids and all — see the note above
     bodyHTML = `
@@ -4370,10 +4450,18 @@ function bulkActionBarHTML(){
     ${propagateHint}
   </div>`;
 }
+/* SELECT MODE (19 Sep 2026) — replaces the per-row tick box. The Select toggle turns the list
+   into a picker: a click anywhere on a line selects/deselects it (renderProjectCrew's capture
+   listener), and the row is highlighted. The .bulk-select-cb inputs are still rendered — hidden
+   — because they ARE the selection plumbing (the listener flips the row's own box and fires its
+   change handler), so nothing downstream of projectCrewSelected changed. Leaving select mode
+   keeps the selection, so the rows are editable again and an edit to one still applies to all. */
+let crewSelectMode = false;
+function toggleCrewSelectMode(){ crewSelectMode = !crewSelectMode; renderProjectBody(); }
 function crewToolbarSelectAll(idsCSV, allSelected, filterCount){
-  return `<label class="crew-header-selectall">
-      <input type="checkbox" ${allSelected?'checked':''} onchange="toggleSelectAllFilteredCrew('${idsCSV}', this.checked)"> Select all${filterCount?' (filtered)':''}
-    </label>`;
+  return `<button type="button" class="bnr-tool ${crewSelectMode?'on':''}" onclick="toggleCrewSelectMode()"
+      title="${crewSelectMode?'Leave select mode — the selection is kept':'Select mode: click lines to select them, then Edit'}">Select</button>`
+    + (crewSelectMode ? `<span onclick="toggleSelectAllFilteredCrew('${idsCSV}', ${!allSelected})">${allSelected?'Select none':`Select all${filterCount?' (filtered)':''}`}</span>` : '');
 }
 let crewShowMoney = false;
 function toggleCrewMoney(){ crewShowMoney = !crewShowMoney; renderProjectBody(); }
@@ -4547,6 +4635,22 @@ function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='',
     + (open ? `<div class="filter-panel">${panelHTML}</div>` : '');
 }
 function renderProjectCrew(body){
+  body.classList.add('crew-rowselect');
+  body.classList.toggle('crew-select-mode', crewSelectMode);
+  body.classList.toggle('crew-rowselect-tight', crewGridView==='roles');
+  if(!body._crewSelHooked){
+    body._crewSelHooked = true;
+    /* capture, and stopped here: in select mode a click on a line is ONLY a selection — it must
+       not also reach the name link, a day tick or a field underneath */
+    body.addEventListener('click', (e) => {
+      if(currentProjectTab!=='crew' || !crewSelectMode) return;
+      const row = e.target.closest && e.target.closest('.pb-head'); if(!row) return;
+      const cb = row.querySelector('.bulk-select-cb'); if(!cb) return;
+      e.preventDefault(); e.stopPropagation();
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change'));
+    }, true);
+  }
   const p = currentProject();
   const days = projectDays();
   const budgetData = ['roles','preprod','post'].includes(crewGridView) ? buildBudgetData() : null;
@@ -7080,74 +7184,84 @@ function shootDayHeaderRowHTML(){
       <div class="crew-header-right">
         <span class="status" id="sdStatus"></span>
         <button type="button" class="bnr-tool" id="eca-pv" onclick="toggleAllPreviewBlocks()">${allBlocksCollapsed(previewBlocks)?'Expand all':'Collapse all'}</button>
-        <button type="button" class="bnr-tool" onclick="copyExportOutput()" title="Copy this day as WhatsApp text, with the included sections appended">${icon('copy')} Copy WhatsApp</button>
-        <button type="button" class="bnr-tool" onclick="downloadExcel()" title="Download the .xlsx — one sheet per included section">${icon('download')} Export .xlsx</button>
+        <button type="button" class="bnr-tool" onclick="openExportDialog()" title="Copy for WhatsApp or download the .xlsx — choose what goes out">${icon('copy')} Copy / Export</button>
       </div>
     </div>`;
 }
-/* the call sheet card as an editor. ⚠️ Every field id is the old Shoot Day form's —
-   populateShootDay()/saveShootDay() read the same inputs wherever they sit. */
+/* section head + the opening tag of its body — the SAME markup in the edit card and the finished
+   card, on the shared pv block plumbing. The caller closes the </div>. */
+function sdSectionOpenHTML(key, title){
+  return `<h3 class="sd-sec-toggle" onclick="togglePreviewBlock('${key}')"><span class="dept-caret" id="pvc-${key}">${previewBlocks[key]?'▾':'▸'}</span> ${title}</h3>
+    <div id="pvb-${key}" style="display:${previewBlocks[key]?'':'none'}">`;
+}
+const SD_SCHED_COLS = '<col style="width:150px"><col style="width:110px"><col>';
+const SD_POSN_COLS  = '<col style="width:56px"><col style="width:27%"><col style="width:27%"><col style="width:84px"><col>';
+/* inline fields that should be as wide as what's in them (the date line, the weather line) */
+let _sdMeasureCtx = null;
+function sdAutoSize(el){
+  // measured, not counted in ch: Jost is proportional, and a field a few px too wide wraps the line
+  const cs = getComputedStyle(el);
+  _sdMeasureCtx = _sdMeasureCtx || document.createElement('canvas').getContext('2d');
+  _sdMeasureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  el.style.width = Math.ceil(_sdMeasureCtx.measureText(el.value || el.placeholder || '').width + 4) + 'px';
+}
+function sdAutoSizeAll(){
+  document.querySelectorAll('#sdEditCard input.sd-auto').forEach(sdAutoSize);
+  document.querySelectorAll('#sdEditCard textarea').forEach(autoGrowTextarea);
+}
+/* the call sheet card as an editor — laid out exactly as renderPreviewCard() lays out the
+   finished one. ⚠️ Every field id is the old Shoot Day form's — populateShootDay() /
+   saveShootDay() read the same inputs wherever they sit. */
 function shootDayEditCardHTML(d){
   const p = projById(d.projectId)||{};
-  // section head + body wrapper, on the shared pv block plumbing (togglePreviewBlock)
-  const secOpen = (key, title) => `<h3 class="sd-sec-toggle" onclick="togglePreviewBlock('${key}')"><span class="dept-caret" id="pvc-${key}">${previewBlocks[key]?'▾':'▸'}</span> ${title}</h3>
-    <div id="pvb-${key}" style="display:${previewBlocks[key]?'':'none'}">`;
   const shootTitle = [p.client,p.title].filter(Boolean).join(' — ');
+  const tool = (ic, tip, fn) => `<button type="button" class="ki-tool" data-tip="${esc(tip)}" aria-label="${esc(tip)}" onclick="${fn}">${icon(ic)}</button>`;
   return `<div class="card editing" id="sdEditCard">
     <div class="line1">${esc(p.company||COMPANY)}${shootTitle?(' · '+esc(shootTitle)):''}</div>
-    <div class="sd-sub-edit">
-      <div class="ts-field"><label>Shoot date</label><input type="date" id="sdDate" class="fld-date" onchange="onDayChanged()"></div>
-      <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"><label>of</label><input type="text" id="sdDayTotal" class="fld-xs" readonly tabindex="-1" title="Total shoot days on this project — add or remove days to change it"></div>
-      <div class="ts-field"><label>All-crew call</label><input type="text" id="sdAllCall" class="fld-sm" placeholder="08:00"></div>
-    </div>
-    ${secOpen('general','General information')}
+    <div class="sub"><input type="date" id="sdDate" onchange="onDayChanged()"> · Day <input type="text" id="sdDayNum" class="sd-auto"> of ${shootDayTotal(d)} · All-crew call <input type="text" id="sdAllCall" class="sd-auto" placeholder="08:00"></div>
+    ${sdSectionOpenHTML('general','General information')}
     <div class="key-info-grid">
       <div class="ki-col">
-        <div class="ki-item"><h4>Weather</h4>
-          <div class="ts-grid">
-            <div class="ts-field"><label>Temp</label><input type="text" id="wxTemp" class="fld-sm"></div>
-            <div class="ts-field"><label>Precip</label><input type="text" id="wxPrecip" class="fld-sm"></div>
-            <div class="ts-field"><label>Condition</label><input type="text" id="wxCond" class="fld-md"></div>
-            <div class="ts-field"><label>Sunrise/Sunset</label><input type="text" id="wxSun" class="fld-md"></div>
-          </div>
-          <div class="sd-weather-row"><button class="small" onclick="fetchWeatherForDay()">${icon('cloud')} Fetch</button><span id="weatherStatus" class="hint" style="margin:0;"></span></div>
+        <div class="ki-item"><h4>Weather${tool('cloud','Fetch the forecast for this date and location','fetchWeatherForDay()')}</h4>
+          <div class="sd-wx-line"><input type="text" id="wxTemp" class="sd-auto" placeholder="Temp"> · <input type="text" id="wxPrecip" class="sd-auto" placeholder="Precip"> · <input type="text" id="wxCond" class="sd-auto" placeholder="Condition"> · ☀ <input type="text" id="wxSun" class="sd-auto" placeholder="Sunrise / sunset"></div>
+          <span id="weatherStatus" class="hint ki-status"></span>
         </div>
         <div class="ki-item"><h4>Primary location</h4>
           <select id="sdLocation" onchange="onSdLocationChange(this)"></select>
-          <div id="sdLocationSummary" class="sd-info" style="margin-top:6px;"></div>
+          <div id="sdLocationSummary"></div>
         </div>
-        <div class="ki-item"><h4>Nearest hospital</h4>
-          <div id="sdHospitalInfo" class="sd-info"></div>
-          <div class="sd-weather-row"><button class="small" onclick="fetchDayAmenity('hospital')">${icon('hospital')} Fetch</button><span id="sdHospitalStatus" class="hint" style="margin:0;"></span></div>
+        <div class="ki-item"><h4>Nearest hospital${tool('hospital','Look up the nearest hospital to the primary location',"fetchDayAmenity('hospital')")}</h4>
+          <div id="sdHospitalInfo"></div>
+          <span id="sdHospitalStatus" class="hint ki-status"></span>
         </div>
-        <div class="ki-item"><h4>Nearest car park</h4>
-          <div id="sdParkingLookupInfo" class="sd-info"></div>
-          <div class="sd-weather-row"><button class="small" onclick="fetchDayAmenity('parking')">${icon('car')} Fetch</button><span id="sdCarParkStatus" class="hint" style="margin:0;"></span></div>
+        <div class="ki-item"><h4>Nearest car park${tool('car','Look up the nearest car park to the primary location',"fetchDayAmenity('parking')")}</h4>
+          <div id="sdParkingLookupInfo"></div>
+          <span id="sdCarParkStatus" class="hint ki-status"></span>
         </div>
       </div>
       <div class="ki-col">
         <div class="ki-item"><h4>Production brief</h4>
-          <textarea id="sdBrief" placeholder="The scenes / setups being shot today — one per line" oninput="autoGrowTextarea(this)" style="overflow:hidden;resize:none;"></textarea>
+          <textarea id="sdBrief" rows="1" placeholder="The scenes / setups being shot today — one per line"></textarea>
         </div>
-        <div class="ki-item"><h4>Parking / arrival / access</h4>
-          <textarea id="sdParking"></textarea>
-          <div class="hint">Pre-filled from the location's saved parking — edit freely for this day.</div>
-          <div id="sdAccessInfo" class="sd-info" style="margin-top:6px;"></div>
+        <div class="ki-item"><h4 data-tip="Pre-filled from the location's saved parking — edit freely for this day">Parking / arrival</h4>
+          <textarea id="sdParking" rows="1"></textarea>
+          <div id="sdAccessInfo" class="hint ki-status"></div>
         </div>
-        <div class="ki-item"><h4>Production notes</h4><textarea id="sdNotes"></textarea></div>
+        <div class="ki-item"><h4>Production notes</h4><textarea id="sdNotes" rows="1"></textarea></div>
       </div>
     </div>
-    <div class="subhead">Additional locations</div>
+    <h4 class="sd-subh">Additional locations</h4>
     <div class="rows-add" id="rows-sdaddloc"></div>
-    <button class="small" onclick="addSdLocRow()">+ Add location</button>
+    <button type="button" class="bnr-tool" onclick="addSdLocRow()">+ Add location</button>
     </div>
-    ${secOpen('schedule','Schedule')}
-    <div class="hint" style="margin:0 0 8px;">Time and Duration are linked — enter a time range (e.g. 08:00 - 12:00) and Duration fills in, or a start time plus a Duration (e.g. 4hrs) and the range fills in. Hover between rows for the + to insert one.</div>
-    <div class="rows-sched" id="rows-sched"></div>
-    <div class="toolbar sched-tools" style="margin-top:8px;">
-      <button class="small" onclick="addSchedRow()">+ Add schedule item</button>
+    ${sdSectionOpenHTML('schedule','Schedule')}
+    <div class="sd-tablescroll"><table class="sd-sched"><colgroup>${SD_SCHED_COLS}<col style="width:74px"></colgroup>
+      <thead><tr><th>Time</th><th>Duration</th><th>Description</th><th></th></tr></thead>
+      <tbody id="rows-sched"></tbody></table></div>
+    <div class="sd-sched-tools">
+      <button type="button" class="bnr-tool" onclick="addSchedRow()" data-tip="A time range fills in Duration; a start time plus a Duration fills in the range" style="position:relative;">+ Add schedule item</button>
       <span class="sched-shift">
-        <span class="hint">Shift selected</span>
+        <span class="hint">Shift ticked</span>
         <button class="small" onclick="shiftSelected(-1)" title="Earlier">&minus;</button>
         <select id="schedShiftAmount"><option value="5">5 min</option><option value="15" selected>15 min</option><option value="30">30 min</option><option value="60">60 min</option></select>
         <button class="small" onclick="shiftSelected(1)" title="Later">+</button>
@@ -7155,16 +7269,15 @@ function shootDayEditCardHTML(d){
       </span>
     </div>
     </div>
-    ${secOpen('positions','Position assignments')}
+    ${sdSectionOpenHTML('positions','Position assignments')}
     <div id="rows-posn"></div>
-    <div class="toolbar" style="margin-top:10px;">
-      <select id="addPosnPick" style="width:auto; max-width:100%;"></select>
-      <button class="small" onclick="addPosnToDay()">+ Add to this day</button>
+    <div class="sd-add-row">
+      <select id="addPosnPick"></select>
+      <button type="button" class="bnr-tool" onclick="addPosnToDay()" data-tip="Only crew assigned to the project appear here" style="position:relative;">+ Add to this day</button>
     </div>
-    <div class="hint">Only crew assigned to the project appear here. Grouped by company, then department, then position.</div>
     </div>
     <div class="toolbar" style="margin:18px 0 0; justify-content:space-between;">
-      ${feedbackButtonHTML('shoot-day-layout', 'the Shoot Day layout')}
+      ${feedbackButtonHTML('shoot-day-layout', 'the Call Sheet layout')}
       <button type="button" class="sd-delete-link" onclick="deleteShootDay(currentShootDayId)">Delete this shoot day</button>
     </div>
   </div>`;
@@ -7194,6 +7307,10 @@ function renderProjectDays(body){
   body.oninput = (e) => {
     if(!e.target || currentProjectTab!=='days') return;
     const id = e.target.id;
+    if(e.target.closest('#sdEditCard')){
+      if(e.target.classList.contains('sd-auto')) sdAutoSize(e.target);
+      else if(e.target.tagName==='TEXTAREA') autoGrowTextarea(e.target);
+    }
     if(id==='tsCostPublic' || id==='tsCostMileage')
       scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); });
     else if(TECHSPEC_FIELDS.some(f=>techSpecFieldId('ts',f)===id))
@@ -7216,10 +7333,11 @@ function renderProjectDays(body){
     }, true);
   }
 }
-/* general / schedule / positions are the edit card's own sections (19 Sep 2026); the rest are
-   the blocks of the finished page. One map, so Collapse all covers the lot. ⚠️ A collapsed
+/* general / schedule / positions are the call sheet card's sections — the SAME three in the edit
+   card and the finished card, so what is open stays open across Edit/Done; the rest are the
+   blocks below it. One map, so Collapse all covers the lot. ⚠️ A collapsed
    section is display:none, NOT removed — saveShootDay() still reads its fields. */
-let previewBlocks = { callsheet:true, general:true, schedule:true, positions:true, techspecs:true, catering:true };
+let previewBlocks = { general:true, schedule:true, positions:true, techspecs:true, catering:true };
 /* ---- collapsible block plumbing, shared by the Shoot Days page's blocks and Budget ----
    Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
    only thing that differed between them was the id prefix, so that's the parameter. */
@@ -7264,8 +7382,53 @@ function exportOutputText(){
   const d = currentDay(); if(!d) return '';
   return buildWAText(buildFullData(d));
 }
-/* flush first: Copy and Export read the saved day, and the form may be a second ahead of it */
-function copyExportOutput(){ flushShootDayEdits(); return copyText(exportOutputText(), 'Copied for WhatsApp'); }
+/* ---- the Copy / Export popup (19 Sep 2026) ----
+   One header-row button opens it. It holds its OWN copy of the four section switches, seeded
+   from the page's Include toggles, so choosing what goes out never rearranges the page.
+   buildWAText() and downloadExcel() read activeExportSections(), which is the popup's copy
+   while it is open and the page's otherwise. */
+let exportDialogSections = null;
+const activeExportSections = () => exportDialogSections || exportSections;
+function openExportDialog(){
+  flushShootDayEdits();          // both outputs read the saved day; the form may be a second ahead of it
+  exportDialogSections = Object.assign({}, exportSections);
+  renderExportDialog();
+}
+function closeExportDialog(){
+  exportDialogSections = null;
+  const el = document.getElementById('exportDialog'); if(el) el.remove();
+}
+function toggleExportDialogSection(key, on){ if(exportDialogSections) exportDialogSections[key] = on; }
+function renderExportDialog(){
+  const d = currentDay(); if(!d || !exportDialogSections) return;
+  let el = document.getElementById('exportDialog');
+  if(!el){ el = document.createElement('div'); el.id = 'exportDialog'; document.body.appendChild(el); }
+  const boxes = Object.keys(EXPORT_SECTION_LABELS).map(key=>
+    `<label><input type="checkbox" ${exportDialogSections[key]?'checked':''} onchange="toggleExportDialogSection('${key}', this.checked)"> ${esc(EXPORT_SECTION_LABELS[key])}</label>`).join('');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this) closeExportDialog()">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-label="Copy or export the call sheet">
+      <h3>Copy / Export — Day ${esc(d.dayNum||'?')}</h3>
+      <div class="export-dialog-list">
+        <label class="fixed"><input type="checkbox" checked disabled> Call sheet</label>
+        ${boxes}
+      </div>
+      <div class="toolbar" style="margin:0;">
+        <button class="primary" onclick="exportDialogCopy()">${icon('copy')} Copy for WhatsApp</button>
+        <button onclick="exportDialogExcel()">${icon('download')} Export .xlsx</button>
+        <button onclick="closeExportDialog()" style="margin-left:auto;">Close</button>
+      </div>
+      <div class="hint" id="exportDialogStatus">Ticked sections are appended to the WhatsApp text, and each becomes a sheet in the .xlsx. Untick Tech specs for the version that goes to the full crew.</div>
+    </div>
+  </div>`;
+}
+async function exportDialogCopy(){
+  await copyText(buildWAText(buildFullData(currentDay())));
+  const st = document.getElementById('exportDialogStatus');
+  if(st){ st.textContent = 'Copied — paste it into WhatsApp.'; st.style.color = 'var(--tape)'; }
+  setTimeout(closeExportDialog, 900);
+}
+async function exportDialogExcel(){ await downloadExcel(); closeExportDialog(); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && exportDialogSections) closeExportDialog(); });
 
 // UK standard rate. Not project-configurable — this phase is cost VISIBILITY,
 // not a real budgeting tool, so a fixed rate is the deliberate scope line.
@@ -9682,7 +9845,7 @@ function refreshLocationDropdowns(){
 }
 function addSdLocRow(vals){
   const c=document.getElementById('rows-sdaddloc'); const row=document.createElement('div'); row.className='row';
-  row.innerHTML=`<select class="sdaddloc-sel" onchange="onSdAddLocChange(this)">${locSelectOptionsHTML()}</select><input type="text" class="sdaddloc-note" placeholder="Note (optional)"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
+  row.innerHTML=`<select class="sdaddloc-sel" onchange="onSdAddLocChange(this)">${locSelectOptionsHTML()}</select><input type="text" class="sdaddloc-note" placeholder="Note (optional)"><button type="button" class="sd-x" title="Remove" onclick="this.closest('.row').remove()">×</button>`;
   c.appendChild(row);
   if(vals){ row.querySelector('.sdaddloc-sel').value=vals[0]||''; row.querySelector('.sdaddloc-note').value=vals[1]||''; }
 }
@@ -9725,19 +9888,6 @@ function onSdLocationChange(selectEl){
 function onSdAddLocChange(selectEl){
   if(selectEl.value==='__addloc__') quickAddLocationForDay(selectEl);
 }
-let collapsedPosnCompanies = new Set();
-let collapsedPosnDepts = new Set(); // keys are `${company}||${dept}`
-function togglePosnCompany(company){
-  captureInProgressPositions();
-  if(collapsedPosnCompanies.has(company)) collapsedPosnCompanies.delete(company); else collapsedPosnCompanies.add(company);
-  renderPositionAssignments();
-}
-function togglePosnDept(company, dept){
-  captureInProgressPositions();
-  const key = company+'||'+dept;
-  if(collapsedPosnDepts.has(key)) collapsedPosnDepts.delete(key); else collapsedPosnDepts.add(key);
-  renderPositionAssignments();
-}
 /* pulls whatever call time is currently sitting in the DOM into the saved day object,
    so collapsing a group or adding/removing someone never discards an in-progress edit */
 function captureInProgressPositions(){
@@ -9751,58 +9901,44 @@ function captureInProgressPositions(){
     return [cid, call, '', prev?(prev[3]||''):'', prev?(prev[4]||''):''];
   });
 }
+/* the people on a call sheet, in the groups and order they print — shared by the finished card
+   and the edit card so the two can't disagree. `d` is buildFullData() output. The lone "Crew"
+   group goes unlabelled: the section heading above it already says what it is. */
+function positionGroups(d){
+  const g = [];
+  if(d.clientPositions.length) g.push({title:'Client', people:d.clientPositions});
+  if(d.positions.length)       g.push({title:'Crew', people:d.positions});
+  if(d.talentPositions.length) g.push({title:'Talent', people:d.talentPositions});
+  (d.coProductionGroups||[]).forEach(x=>g.push({title:x.company, subtitle:'(co-production)', people:x.people}));
+  if(g.length===1 && g[0].title==='Crew') g[0].title = '';
+  return g;
+}
+/* edit state of T-5.4 — the finished sheet's own tables (same groups, order and column widths),
+   with the call time as a field, the NAME as the way in to the per-day override form (as on
+   Crew → Roles) and a hover × to take someone off the day. Rows keep .crewrow-select /
+   .posn-crew / .posn-call, which is all rowsOf() and saveShootDay() look for. */
 function renderPositionAssignments(){
   const el = document.getElementById('rows-posn'); if(!el) return;
   const day = currentDay(); if(!day) return;
-  const positions = day.positions || [];
-  if(!positions.length){ el.innerHTML = '<div class="empty-note">No one added to this day yet.</div>'; return; }
-  const companies = {};
-  // Phase BF — cid is an ENTRY id. Two entries for one person are two separate rows
-  // here on purpose: that is the whole reason the shoot day stores entry ids.
-  positions.forEach(([cid,call,note])=>{
-    const c = resolveCrewForDay(cid, day);
-    const company = c.coProductionCompany || COMPANY;
-    const dept = deptBucketKey(c.department);
-    companies[company] = companies[company] || {};
-    companies[company][dept] = companies[company][dept] || [];
-    companies[company][dept].push({cid, call, note, c});
-  });
-  const companyNames = Object.keys(companies).sort((a,b)=> a===COMPANY ? -1 : b===COMPANY ? 1 : a.localeCompare(b));
-  let html = '';
-  companyNames.forEach(company=>{
-    const deptMap = companies[company];
-    const depts = DEPARTMENTS.filter(d=>deptMap[d]&&deptMap[d].length);
-    const companyCollapsed = collapsedPosnCompanies.has(company);
-    const totalCount = depts.reduce((sum,d)=>sum+deptMap[d].length,0);
-    html += `<div class="posn-company-group">
-      <div class="posn-company-header" onclick="togglePosnCompany('${esc(company)}')">
-        <span class="dept-caret">${companyCollapsed?'▸':'▾'}</span> ${esc(company)} <span class="dept-count">(${totalCount})</span>
-      </div>
-      <div class="posn-company-body" style="display:${companyCollapsed?'none':'block'}">`;
-    depts.forEach(dept=>{
-      const key = company+'||'+dept;
-      const deptCollapsed = collapsedPosnDepts.has(key);
-      const entries = deptMap[dept].slice().sort((a,b)=>roleSeniorityRank(dept,a.c.role)-roleSeniorityRank(dept,b.c.role) || (a.c.role||'').localeCompare(b.c.role||'') || (a.c.name||'').localeCompare(b.c.name||''));
-      html += deptHeaderHTML(dept, entries.length, deptCollapsed, `togglePosnDept('${esc(company)}','${esc(dept)}')`)
-        + `<div class="dept-group" style="display:${deptCollapsed?'none':'block'}">`;
-      entries.forEach(en=>{
-        const c = en.c;
-        const isEditing = editingCrewId===en.cid;
-        const overridden = hasOverride(en.cid, day);
-        html += `<div class="crewrow-select posn-row ${overridden?'posn-row-overridden':''}">
-          <input type="hidden" class="posn-crew" value="${esc(en.cid)}">
-          <div class="posn-dept-badge">${esc(DEPARTMENT_CODES[dept]||'')}</div>
-          <div class="posn-name">${posnIdentityHTML(c, en.cid, isEditing, overridden)}</div>
-          <input type="text" class="posn-call" placeholder="Call time" value="${esc(en.call)}">
-          <button class="small rm danger" onclick="removePosnRow('${esc(en.cid)}')">${icon('close')}</button>
-          ${isEditing ? `<div class="crewgrid-editform">${dayOverrideFormHTML(en.cid)}</div>` : ''}
-        </div>`;
-      });
-      html += `</div>`;
-    });
-    html += `</div></div>`;
-  });
-  el.innerHTML = html;
+  if(!(day.positions||[]).length){ el.innerHTML = '<div class="empty-note">No one added to this day yet.</div>'; return; }
+  el.innerHTML = positionGroups(buildFullData(day)).map(g=>{
+    const rows = g.people.map(r=>{
+      const isEditing = editingCrewId===r.id;
+      return `<tr class="crewrow-select posn-row">
+          <td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}<input type="hidden" class="posn-crew" value="${esc(r.id)}"></td>
+          <td>${esc(r.role)}</td>
+          <td><span class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${esc(r.id)}')"
+                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editCrew('${esc(r.id)}')}"
+                title="${isEditing?'Close':'Edit '+esc(r.name)+' for this day'}">${esc(r.name)}</span>${r.overridden?` <span class="override-dot" title="Changed for this day only">●</span>`:''}</td>
+          <td><input type="text" class="posn-call" placeholder="Call" value="${esc(r.call)}"></td>
+          <td>${esc(r.phone)}</td>
+          <td class="sd-rowtools"><button type="button" class="sd-x" title="Take ${esc(r.name)} off this day" onclick="removePosnRow('${esc(r.id)}')">×</button></td>
+        </tr>${isEditing ? `<tr><td colspan="6"><div class="crewgrid-editform">${dayOverrideFormHTML(r.id)}</div></td></tr>` : ''}`;
+    }).join('');
+    return `${g.title?`<h4 class="sd-subh">${esc(g.title)}${g.subtitle?` <span style="text-transform:none; letter-spacing:0;">${g.subtitle}</span>`:''}</h4>`:''}
+      <div class="sd-tablescroll"><table class="sd-posn"><colgroup>${SD_POSN_COLS}<col style="width:28px"></colgroup>
+      <tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th><th></th></tr>${rows}</table></div>`;
+  }).join('');
 }
 function refreshAddPosnPick(){
   const sel = document.getElementById('addPosnPick'); if(!sel) return;
@@ -9830,9 +9966,14 @@ async function removePosnRow(entryId){
   renderPositionAssignments();
   refreshAddPosnPick();
 }
+/* one schedule row of the edit table. The + (insert above) sits in the card's left gutter on
+   the row boundary; select / move / × live in a tools cell that shows on hover or focus. */
 function addSchedRow(vals, insertBeforeEl){
-  const c=document.getElementById('rows-sched'); const row=document.createElement('div'); row.className='row';
-  row.innerHTML=`<div class="sched-insert-hint" onclick="insertSchedRowBefore(this)" title="Insert a row here"><span>+</span></div><input type="checkbox" class="sc-select" title="Select for bulk time shift"><span class="sc-move"><button class="icon-btn" onclick="moveSchedRow(this,-1)" title="Move up" aria-label="Move up">${icon('up')}</button><button class="icon-btn" onclick="moveSchedRow(this,1)" title="Move down" aria-label="Move down">${icon('down')}</button></span><input type="text" class="sc-time" placeholder="08:00" oninput="onScheduleTimeInput(this)"><input type="text" class="sc-dur" placeholder="4hrs" oninput="onScheduleDurationInput(this)"><input type="text" class="sc-desc" placeholder="Description"><button class="small rm danger" onclick="this.closest('.row').remove()">${icon('close')}</button>`;
+  const c=document.getElementById('rows-sched'); const row=document.createElement('tr'); row.className='row';
+  row.innerHTML=`<td><span class="sched-insert-hint" onclick="insertSchedRowBefore(this)" title="Insert a row here">+</span><input type="text" class="sc-time" placeholder="08:00" oninput="onScheduleTimeInput(this)"></td>
+    <td><input type="text" class="sc-dur" placeholder="4hrs" oninput="onScheduleDurationInput(this)"></td>
+    <td><input type="text" class="sc-desc" placeholder="Description"></td>
+    <td class="sd-rowtools"><input type="checkbox" class="sc-select" title="Tick to shift this row's time"><span class="sc-move"><button class="icon-btn" onclick="moveSchedRow(this,-1)" title="Move up" aria-label="Move up">${icon('up')}</button><button class="icon-btn" onclick="moveSchedRow(this,1)" title="Move down" aria-label="Move down">${icon('down')}</button></span><button type="button" class="sd-x" title="Remove row" onclick="this.closest('.row').remove()">×</button></td>`;
   if(insertBeforeEl && insertBeforeEl.parentNode===c){ c.insertBefore(row, insertBeforeEl); }
   else { c.appendChild(row); }
   if(vals){ row.querySelector('.sc-time').value=vals[0]||''; row.querySelector('.sc-dur').value=vals[1]||''; row.querySelector('.sc-desc').value=vals[2]||''; }
@@ -9945,20 +10086,20 @@ function rowsOf(containerId, classes){
 }
 function populateShootDay(d){
   // G19 — "of (total)" shows the DERIVED total and is read-only (see the field markup)
-  setv('sdDayNum',d.dayNum); setv('sdDayTotal',shootDayTotal(d)); setv('sdDate',d.date); setv('sdAllCall',d.allCrewCall);
+  setv('sdDayNum',d.dayNum); setv('sdDate',d.date); setv('sdAllCall',d.allCrewCall);
   refreshLocationDropdowns(); document.getElementById('sdLocation').value=d.locationId||'';
   updateLocationSummary();
   document.getElementById('rows-sdaddloc').innerHTML=''; (d.additionalLocationIds||[]).forEach(p=>addSdLocRow(p));
   const w=d.weather;
   setv('wxTemp',w?w.temp:''); setv('wxPrecip',w?w.precip:''); setv('wxCond',w?w.cond:''); setv('wxSun',w?w.sun:'');
   document.getElementById('weatherStatus').textContent = w&&w.fetchedAt?`Last fetched ${weatherFetchedLabel(w.fetchedAt)}`:'';
-  document.getElementById('rows-sched').innerHTML='<div class="row" style="border:none;padding:0;margin:0 0 2px;"><span></span><span></span><label>Time</label><label>Duration</label><label>Description</label><span></span></div>';
+  document.getElementById('rows-sched').innerHTML='';
   (d.schedule&&d.schedule.length?d.schedule:[[],[]]).forEach(r=>addSchedRow(r));
   renderPositionAssignments(); refreshAddPosnPick();
   setv('sdBrief',(d.brief||[]).join('\n')); setv('sdParking',d.parking); setv('sdNotes',d.notes);
-  autoGrowTextarea(document.getElementById('sdBrief'));
   updateHospitalDisplay();
   updateParkingLookupDisplay();
+  sdAutoSizeAll();
 }
 function onDayChanged(){ updateLocationSummary(); updateHospitalDisplay(); updateParkingLookupDisplay(); }
 function updateLocationSummary(){
@@ -9970,17 +10111,22 @@ function updateLocationSummary(){
   // the address opens in Maps — the sketch marks it "(clickable)"
   const addr = l.address
     ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}" target="_blank" rel="noopener">${esc(l.address)}</a>` : '';
-  el.innerHTML = `${addr}${l.onsiteContactName?('<br>On-site: '+esc(l.onsiteContactName)+(l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):'')):''}`;
+  // same two lines the finished card prints under the location's name
+  el.innerHTML = `${addr}${l.onsiteContactName?(`<div class="hint">Contact: ${esc(l.onsiteContactName)}${l.onsiteContactPhone?(' — '+esc(l.onsiteContactPhone)):''}</div>`):''}`;
   // access belongs with parking/arrival on the right, per the sketch
   if(accessEl) accessEl.innerHTML = l.accessInfo ? 'Access: '+esc(l.accessInfo) : '';
-  if(l.parkingInfo && !val('sdParking')) setv('sdParking', l.parkingInfo);
+  if(l.parkingInfo && !val('sdParking')){ setv('sdParking', l.parkingInfo); autoGrowTextarea(document.getElementById('sdParking')); }
 }
 /* both read-only day-form summaries are the same lookup with a different field/noun */
 function updateAmenityDisplay(elId, field, noun){
   const el=document.getElementById(elId); if(!el) return;
   const l=selectedDayLocation();
-  if(!l){ el.textContent=`Select a primary location to see its saved ${noun}.`; return; }
-  el.textContent = amenityLine(l[field]) || `No ${noun} saved for this location yet — add one in the Locations database.`;
+  const quiet = t => { el.innerHTML = `<span class="hint" style="margin:0;">${esc(t)}</span>`; };
+  if(!l){ quiet(`Select a primary location to see its saved ${noun}.`); return; }
+  const a = l[field];
+  // name / address (~km) on two lines, as the finished card prints the hospital
+  if(a) el.innerHTML = `${esc(a.name)}<br>${esc(a.address||'')} (~${esc(a.distanceKm)}km)`;
+  else quiet(`No ${noun} saved for this location yet — use the icon above, or add one in the Locations database.`);
 }
 function updateHospitalDisplay(){ updateAmenityDisplay('sdHospitalInfo','hospital','hospital'); }
 function updateParkingLookupDisplay(){ updateAmenityDisplay('sdParkingLookupInfo','nearestParking','parking'); }
@@ -10014,6 +10160,7 @@ async function fetchWeatherForDay(){
     const fetchedDay = currentDay();
     if(fetchedDay) fetchedDay.weather = Object.assign({}, fetchedDay.weather, {fetchedAt:new Date().toISOString()});
     s.textContent=`Fetched (${source}) just now.`;
+    sdAutoSizeAll();
     scheduleAutosave('shootday', () => saveShootDay(false));   // setv() fires no input event
   }catch(e){ s.textContent='Fetch failed — check your connection.'; }
 }
@@ -10134,7 +10281,7 @@ function buildFullData(d){
   const p=projById(d.projectId)||{};
   const primary=locById(d.locationId);
   const addLocs=(d.additionalLocationIds||[]).map(([id,note])=>{const l=locById(id);return l?{name:l.name,address:l.address,note}:null;}).filter(Boolean);
-  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{id:cid,role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',coProductionCompany:c.coProductionCompany||''};});
+  const allPositions=(d.positions||[]).map(([cid,call])=>{const c=resolveCrewForDay(cid, d);return{id:cid,overridden:hasOverride(cid, d),role:c.showAs||c.role,canonicalRole:c.role,name:c.name,call,phone:c.phone,department:c.department||'',coProductionCompany:c.coProductionCompany||''};});
   const crewOnly = allPositions.filter(r=>!r.coProductionCompany);
   // Client and Talent stand apart from the crew departments (Phase N item 3) — pulled
   // out of the canonical-department-order crew list into their own dedicated blocks
@@ -10174,16 +10321,16 @@ function renderTechSpecsSection(){
      as-exported table on the finished view (double-click it to get back to the fields) */
   const body = shootDayEditing ? `<div class="hint" style="margin:0 0 10px;">Camera/technical crew only — the call sheet card stays clear of this; it goes out with the WhatsApp text and the .xlsx only while Tech specs is included.</div>
     <div id="techSpecsBanner"></div>
-    ${techSpecFieldsHTML('ts')}
+    <table class="sd-techedit">${TECHSPEC_FIELDS.map(f=>`<tr><th>${esc(TECHSPEC_LABELS[f])}</th><td><input type="text" id="${techSpecFieldId('ts',f)}" placeholder="${esc(TECHSPEC_HINTS[f].ph)}"></td></tr>`).join('')}</table>
     <div class="toolbar" style="margin:10px 0 0;">
-      <button class="small" onclick="applyTechSpecsToProject()" title="Make these the project defaults and clear every day's own version">Use for every day</button>
+      <button type="button" class="bnr-tool" onclick="applyTechSpecsToProject()" title="Make these the project defaults and clear every day's own version">Use for every day</button>
       <span class="status" id="tsStatus"></span>
     </div>
     <h3>Camera designations</h3>
     <div class="hint" style="margin:0 0 10px;">The Cinematography crew booked on this day, in letter order (A, B, C…). Reorder with the arrows; add a second body or an unmanned camera below. Someone missing? Give them a position on this day first.</div>
     <div id="cameraDesigList"></div>`
   : `<div id="techSpecsExported" data-edit="tech" ondblclick="shootDayDblEdit(event)"></div>`;
-  el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body, shootDayEditing ? 'card editing' : 'card viewing');
+  el.innerHTML = pvBlockHTML('techspecs', 'Tech specs', headerActions, body, shootDayEditing ? 'card editing sd-techcard' : 'card viewing');
   if(shootDayEditing){
     setTechSpecFields('ts', resolveTechSpecs(day));
     renderCameraDesignations('day');
@@ -10246,27 +10393,21 @@ function copyTechSpecsText(){
   return techSpecsLines(buildFullData(d)).join('\n');
 }
 function copyTechSpecs(){ return copyText(copyTechSpecsText()); }
-/* one Dept/Position/Name/Call/Phone table, shared by Client, Talent and the main
-   Position assignments block on the call sheet preview */
+/* one Dept/Position/Name/Call/Phone table of the finished card, per positionGroups() group */
 function positionsTableHTML(title, people, subtitle){
   if(!people || !people.length) return '';
-  return `<h3>${esc(title)}${subtitle?` <span style="color:var(--muted); text-transform:none; font-weight:400;">${subtitle}</span>`:''}</h3><div class="tablewrap"><table><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th></tr>`+
+  return `${title?`<h4 class="sd-subh">${esc(title)}${subtitle?` <span style="text-transform:none; letter-spacing:0;">${subtitle}</span>`:''}</h4>`:''}<div class="tablewrap"><table class="sd-posn"><colgroup>${SD_POSN_COLS}</colgroup><tr><th>Dept</th><th>Position</th><th>Name</th><th>Call</th><th>Phone</th></tr>`+
     people.map(r=>`<tr><td>${esc(DEPARTMENT_CODES[deptBucketKey(r.department)]||'')}</td><td>${esc(r.role)}</td><td>${esc(r.name)}</td><td data-edit="posn:${esc(r.id)}">${esc(r.call)}</td><td>${esc(r.phone)}</td></tr>`).join('')+`</table></div>`;
 }
+/* the finished call sheet. Same three sections as shootDayEditCardHTML(), same collapse state. */
 function renderPreviewCard(d){
   const dayLine=(d.dayNum||d.dayTotal)?`Day ${d.dayNum||'?'}${d.dayTotal?(' of '+d.dayTotal):''}`:'';
-  const open = previewBlocks.callsheet;
-  const header=`<div class="sd-block-head-toggle" onclick="togglePreviewBlock('callsheet')">
-      <span class="dept-caret" id="pvc-callsheet">${open?'▾':'▸'}</span>
-      <div>
-        <div class="line1">${esc(d.prodCompany)}${d.shootTitle?(' · '+esc(d.shootTitle)):''}</div>
-        <div class="sub" data-edit="#sdDate">${[fmtDate(d.shootDate),dayLine,d.allCrewCall?('All-crew call '+esc(d.allCrewCall)):''].filter(Boolean).join(' · ')}</div>
-      </div>
-    </div>`;
+  const header=`<div class="line1">${esc(d.prodCompany)}${d.shootTitle?(' · '+esc(d.shootTitle)):''}</div>
+      <div class="sub" data-edit="#sdDate">${[fmtDate(d.shootDate),dayLine,d.allCrewCall?('All-crew call '+esc(d.allCrewCall)):''].filter(Boolean).join(' · ')}</div>`;
   let h='';
 
-  /* ---- two-column key-info block at the top ---- */
-  let col1='', col2='';
+  /* ---- General information: the two-column key-info block + additional locations ---- */
+  let col1='', col2='', g='';
   const w=d.weather;
   if(w&&(w.temp||w.precip||w.cond||w.sun)) col1+=`<div class="ki-item" data-edit="#wxTemp"><h4>Weather</h4><div>${[w.temp,w.precip,w.cond,w.sun&&('☀ '+w.sun)].filter(Boolean).map(esc).join(' · ')}</div></div>`;
   if(d.primary){
@@ -10278,22 +10419,17 @@ function renderPreviewCard(d){
   if(d.brief.length) col2+=`<div class="ki-item" data-edit="#sdBrief"><h4>Production brief</h4><ul>${d.brief.map(l=>`<li>${esc(l)}</li>`).join('')}</ul></div>`;
   if(d.parking) col2+=`<div class="ki-item" data-edit="#sdParking"><h4>Parking / arrival</h4><div>${esc(d.parking).replace(/\n/g,'<br>')}</div></div>`;
   if(d.notes) col2+=`<div class="ki-item" data-edit="#sdNotes"><h4>Production notes</h4><div>${esc(d.notes).replace(/\n/g,'<br>')}</div></div>`;
-  if(col1||col2) h+=`<div class="key-info-grid"><div class="ki-col">${col1}</div><div class="ki-col">${col2}</div></div>`;
+  if(col1||col2) g+=`<div class="key-info-grid"><div class="ki-col">${col1}</div><div class="ki-col">${col2}</div></div>`;
+  if(d.addLocs.length) g+=`<h4 class="sd-subh">Additional locations</h4><ul>`+d.addLocs.map(l=>`<li>${esc(l.name)} — ${esc(l.address||'')}${l.note?(' ('+esc(l.note)+')'):''}</li>`).join('')+`</ul>`;
+  if(g) h+=sdSectionOpenHTML('general','General information')+g+`</div>`;
 
-  if(d.addLocs.length) h+=`<h3>Additional locations</h3><ul>`+d.addLocs.map(l=>`<li>${esc(l.name)} — ${esc(l.address||'')}${l.note?(' ('+esc(l.note)+')'):''}</li>`).join('')+`</ul>`;
-  if(d.schedule.length){ h+=`<h3>Schedule</h3><div class="tablewrap"><table><tr><th>Time</th><th>Duration</th><th>Description</th></tr>`+d.schedule.map((r,i)=>`<tr><td data-edit="sched:${i}:0">${esc(r[0])}</td><td data-edit="sched:${i}:1">${esc(r[1])}</td><td data-edit="sched:${i}:2">${esc(r[2])}</td></tr>`).join('')+`</table></div>`; }
-  // Client stands apart, ahead of the crew list; Talent stands apart, right after it (Phase N item 3)
-  h += positionsTableHTML('Client', d.clientPositions);
-  h += positionsTableHTML('Position assignments', d.positions);
-  h += positionsTableHTML('Talent', d.talentPositions);
-  if(d.coProductionGroups && d.coProductionGroups.length){
-    d.coProductionGroups.forEach(g=>{
-      h += positionsTableHTML(g.company, g.people, '(co-production)');
-    });
-  }
-  if(!h) h = `<div class="empty-note">Nothing on this day yet — press Edit, or double-click here, to fill it in.</div>`;
+  if(d.schedule.length){ h+=sdSectionOpenHTML('schedule','Schedule')+`<div class="tablewrap"><table class="sd-sched"><colgroup>${SD_SCHED_COLS}</colgroup><tr><th>Time</th><th>Duration</th><th>Description</th></tr>`+d.schedule.map((r,i)=>`<tr><td data-edit="sched:${i}:0">${esc(r[0])}</td><td data-edit="sched:${i}:1">${esc(r[1])}</td><td data-edit="sched:${i}:2">${esc(r[2])}</td></tr>`).join('')+`</table></div></div>`; }
+  // Client stands apart, ahead of the crew list; Talent right after it (Phase N item 3)
+  const groups = positionGroups(d);
+  if(groups.length) h+=sdSectionOpenHTML('positions','Position assignments')+groups.map(x=>positionsTableHTML(x.title, x.people, x.subtitle)).join('')+`</div>`;
+  if(!h) h = `<div class="empty-note" style="margin-top:14px;">Nothing on this day yet — press Edit, or double-click here, to fill it in.</div>`;
   const card = document.getElementById('previewCard'); if(!card) return;
-  card.innerHTML = header + `<div id="pvb-callsheet" style="display:${open?'':'none'}; margin-top:14px;">${h}</div>`;
+  card.innerHTML = header + h;
 }
 /* pushes a "*HEADING*" line then one "*Role* — Name" / "Call · phone" pair per
    person — the shared WhatsApp-text block for Client, Position assignments,
@@ -10323,10 +10459,10 @@ function buildWAText(d){
   if(d.brief.length){ L.push('','*PRODUCTION BRIEF*'); d.brief.forEach(l=>L.push(`- ${l}`)); }
   if(d.parking) L.push('','*PARKING / ARRIVAL*',d.parking);
   if(d.notes) L.push('','*NOTES*',d.notes);
-  if(exportSections.tech){ L.push(''); techSpecsLines(d).forEach(l=>L.push(l)); }
-  if(exportSections.hotels){ const h=hotelSummaryLines(); if(h){ L.push('','*HOTELS*'); h.forEach(l=>L.push(l)); } }
-  if(exportSections.catering){ const c=cateringOrderLines(); if(c){ L.push('','*CATERING*'); c.forEach(l=>L.push(l)); } }
-  if(exportSections.travel){ const t=transportSummaryLines(); if(t){ L.push('','*TRAVEL*'); t.forEach(l=>L.push(l)); } }
+  if(activeExportSections().tech){ L.push(''); techSpecsLines(d).forEach(l=>L.push(l)); }
+  if(activeExportSections().hotels){ const h=hotelSummaryLines(); if(h){ L.push('','*HOTELS*'); h.forEach(l=>L.push(l)); } }
+  if(activeExportSections().catering){ const c=cateringOrderLines(); if(c){ L.push('','*CATERING*'); c.forEach(l=>L.push(l)); } }
+  if(activeExportSections().travel){ const t=transportSummaryLines(); if(t){ L.push('','*TRAVEL*'); t.forEach(l=>L.push(l)); } }
   return L.join('\n');
 }
 /* pushes a heading row, a Dept/Position/Name/Call/Phone header row, and one row per
@@ -10369,7 +10505,7 @@ async function downloadExcel(){
     if(cols) s['!cols']=cols;
     XLSX.utils.book_append_sheet(wb,s,name);
   };
-  if(exportSections.tech){
+  if(activeExportSections().tech){
     const tsRows=techSpecRows(data.techSpecs||{});
     const tsAoa=[['TECH SPECS — camera/technical crew reference'],[],...tsRows];
     if(data.cameraDesignations && data.cameraDesignations.length){
@@ -10378,7 +10514,7 @@ async function downloadExcel(){
     }
     addSheet('Tech Specs', tsAoa, [{wch:20},{wch:30}]);
   }
-  if(exportSections.hotels){
+  if(activeExportSections().hotels){
     const hotel=buildHotelSummary();
     if(hotel){
       const hAoa=[['HOTEL BOOKING', hotel.summary],[],['ROOM-BOOKING TABLE'],['Room No.','Name','Date from','Date to','Total nights']];
@@ -10388,7 +10524,7 @@ async function downloadExcel(){
       addSheet('Hotel', hAoa, [{wch:10},{wch:24},{wch:16},{wch:16},{wch:40}]);
     }
   }
-  if(exportSections.catering){
+  if(activeExportSections().catering){
     const catering=buildCateringExport();
     if(catering){
       const cAoa=[['CATERING ORDER'],[]];
@@ -10406,7 +10542,7 @@ async function downloadExcel(){
       addSheet('Catering', cAoa, [{wch:24},{wch:18},{wch:32}]);
     }
   }
-  if(exportSections.travel){
+  if(activeExportSections().travel){
     const travel=buildTransportSummary();
     if(travel){
       const tAoa=[['TRANSPORT SUMMARY'],[], ['Method', ...travel.cols.map(c=>c.label)]];
