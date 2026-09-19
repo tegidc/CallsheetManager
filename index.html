@@ -377,8 +377,11 @@
   .card.editing{border-color:var(--tape); box-shadow:0 0 0 3px var(--tint-2);}
   .card.viewing [data-edit]{cursor:text;}
   .card.viewing [data-edit]:hover{background:var(--tint-2); border-radius:4px;}
+  .card h3.sd-sec-toggle{cursor:pointer; user-select:none;}
+  .card h3.sd-sec-toggle:hover{color:var(--text);}
+  .card h3.sd-sec-toggle .dept-caret{font-size:11px; color:inherit;}
   .sd-sub-edit{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; align-items:center;}
-  .card.editing .key-info-grid{margin-top:12px;}
+  .card.editing .key-info-grid{margin-top:0;}
   .card.editing .ki-item textarea{min-height:64px;}
   .card.editing .ki-item .sd-info{font-size:var(--fs-field);}
   .card.editing .ki-item .sd-weather-row{margin-top:6px;}
@@ -2071,11 +2074,14 @@ function deptLabelHTML(c){
 }
 /* Position Assignments identity line — at-a-glance info (role, phone) with a day-scoped
    edit pencil. No department pickers here by design: this screen is for call times. */
+/* the NAME is the way in to the per-day override form, as on Crew → Roles (19 Sep 2026 — the
+   pencil button is gone); click it again, or Cancel in the form, to close */
 function posnIdentityHTML(c, crewId, isEditing, overridden){
   const bits = [c.role, c.phone].filter(Boolean).map(esc).join(' · ');
   return `<div class="crew-ident one-line">
-    <button class="icon-btn ${isEditing?'active':''}" onclick="editCrew('${crewId}')" title="${isEditing?'Close':'Edit for this day'}" aria-label="Edit for this day">${isEditing?icon('close'):icon('edit')}</button>
-    <strong>${esc(c.name)}</strong>
+    <strong class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${crewId}')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editCrew('${crewId}')}"
+      title="${isEditing?'Close':'Edit '+esc(c.name)+' for this day'}">${esc(c.name)}</strong>
     ${overridden?`<span class="override-dot" title="Changed for this day only">●</span>`:''}
     ${bits?`<span class="hint crew-ident-sub">${bits}</span>`:''}
   </div>`;
@@ -7044,6 +7050,7 @@ function shootDayDblEdit(ev){
   const hit = ev.target.closest('[data-edit]');
   const target = hit ? hit.getAttribute('data-edit') : '';
   if(target==='tech') previewBlocks.techspecs = true;
+  else ['general','schedule','positions'].forEach(k=>{ previewBlocks[k] = true; });   // the target field must be visible to take focus
   shootDayEditing = true; renderProjectBody();
   const sel = window.getSelection && window.getSelection(); if(sel) sel.removeAllRanges();
   let f = null;
@@ -7082,6 +7089,9 @@ function shootDayHeaderRowHTML(){
    populateShootDay()/saveShootDay() read the same inputs wherever they sit. */
 function shootDayEditCardHTML(d){
   const p = projById(d.projectId)||{};
+  // section head + body wrapper, on the shared pv block plumbing (togglePreviewBlock)
+  const secOpen = (key, title) => `<h3 class="sd-sec-toggle" onclick="togglePreviewBlock('${key}')"><span class="dept-caret" id="pvc-${key}">${previewBlocks[key]?'▾':'▸'}</span> ${title}</h3>
+    <div id="pvb-${key}" style="display:${previewBlocks[key]?'':'none'}">`;
   const shootTitle = [p.client,p.title].filter(Boolean).join(' — ');
   return `<div class="card editing" id="sdEditCard">
     <div class="line1">${esc(p.company||COMPANY)}${shootTitle?(' · '+esc(shootTitle)):''}</div>
@@ -7090,6 +7100,7 @@ function shootDayEditCardHTML(d){
       <div class="ts-field"><label>Day #</label><input type="text" id="sdDayNum" class="fld-xs"><label>of</label><input type="text" id="sdDayTotal" class="fld-xs" readonly tabindex="-1" title="Total shoot days on this project — add or remove days to change it"></div>
       <div class="ts-field"><label>All-crew call</label><input type="text" id="sdAllCall" class="fld-sm" placeholder="08:00"></div>
     </div>
+    ${secOpen('general','General information')}
     <div class="key-info-grid">
       <div class="ki-col">
         <div class="ki-item"><h4>Weather</h4>
@@ -7126,10 +7137,11 @@ function shootDayEditCardHTML(d){
         <div class="ki-item"><h4>Production notes</h4><textarea id="sdNotes"></textarea></div>
       </div>
     </div>
-    <h3>Additional locations</h3>
+    <div class="subhead">Additional locations</div>
     <div class="rows-add" id="rows-sdaddloc"></div>
     <button class="small" onclick="addSdLocRow()">+ Add location</button>
-    <h3>Schedule</h3>
+    </div>
+    ${secOpen('schedule','Schedule')}
     <div class="hint" style="margin:0 0 8px;">Time and Duration are linked — enter a time range (e.g. 08:00 - 12:00) and Duration fills in, or a start time plus a Duration (e.g. 4hrs) and the range fills in. Hover between rows for the + to insert one.</div>
     <div class="rows-sched" id="rows-sched"></div>
     <div class="toolbar sched-tools" style="margin-top:8px;">
@@ -7142,13 +7154,15 @@ function shootDayEditCardHTML(d){
         <button class="small" onclick="toggleSelectAllSched()" id="schedSelectAllBtn">Select all</button>
       </span>
     </div>
-    <h3>Position assignments</h3>
+    </div>
+    ${secOpen('positions','Position assignments')}
     <div id="rows-posn"></div>
     <div class="toolbar" style="margin-top:10px;">
       <select id="addPosnPick" style="width:auto; max-width:100%;"></select>
       <button class="small" onclick="addPosnToDay()">+ Add to this day</button>
     </div>
     <div class="hint">Only crew assigned to the project appear here. Grouped by company, then department, then position.</div>
+    </div>
     <div class="toolbar" style="margin:18px 0 0; justify-content:space-between;">
       ${feedbackButtonHTML('shoot-day-layout', 'the Shoot Day layout')}
       <button type="button" class="sd-delete-link" onclick="deleteShootDay(currentShootDayId)">Delete this shoot day</button>
@@ -7202,7 +7216,10 @@ function renderProjectDays(body){
     }, true);
   }
 }
-let previewBlocks = { callsheet:true, techspecs:true, catering:true };
+/* general / schedule / positions are the edit card's own sections (19 Sep 2026); the rest are
+   the blocks of the finished page. One map, so Collapse all covers the lot. ⚠️ A collapsed
+   section is display:none, NOT removed — saveShootDay() still reads its fields. */
+let previewBlocks = { callsheet:true, general:true, schedule:true, positions:true, techspecs:true, catering:true };
 /* ---- collapsible block plumbing, shared by the Shoot Days page's blocks and Budget ----
    Both keep an {key:isOpen} map and a pair of DOM ids per block (body + caret). The
    only thing that differed between them was the id prefix, so that's the parameter. */
