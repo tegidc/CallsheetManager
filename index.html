@@ -1262,6 +1262,18 @@
     font-family:var(--body); font-size:var(--fs-meta);}
   .budget-scope-row.itemized{grid-template-columns:8px 100px 40px minmax(0,1fr) 84px 68px 84px;}
   .budget-scope-lead{grid-column:1 / 5;}
+  /* by DEPARTMENT: one more column (% of the budget), so the figure columns tighten to keep the block's width */
+  .budget-scope-row.dept-mode{grid-template-columns:8px minmax(0,1fr) 40px 84px 40px;}
+  .budget-scope-row.dept-mode.itemized{grid-template-columns:8px minmax(0,1fr) 38px 78px 60px 78px 36px;}
+  .budget-scope-row.dept-mode .budget-scope-lead{grid-column:1 / 4;}
+  .budget-scope-row.dept-mode .budget-scope-name{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .budget-scope-row.dept-mode .budget-scope-count{grid-column:4 / -1;}
+  .bnr-left .bnr-toolrow:empty{display:none;}      /* Budget's head has no tool rows of its own — its total sits at the top */
+  .budget-scope-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .stage-dot.stage-dot-dept{background:var(--tape);}
+  .bnr-cut{cursor:pointer; user-select:none; opacity:.4;} .bnr-cut.on{opacity:1; color:var(--text);}
+  .bnr-cut:hover{opacity:1; color:var(--tape);} .bnr-cut:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .bnr-cut-sep{opacity:.4; margin:0 4px;}
   .budget-scope-all{font-weight:600;}
   .stage-dot{width:8px; height:8px; border-radius:50%; display:inline-block; flex:0 0 auto;}
   .stage-dot.stage-dot-all{background:var(--text);}
@@ -8870,9 +8882,52 @@ function stageFiguresFor(data, kind){
            totalEx: sumOf(mine,'subtotal') + (budgetScope.production ? extras : 0),
            totalVat: sumOf(mine,'vat') };
 }
+/* ---- STAGES / DEPT (20 Sep 2026) — the head's breakdown can be cut two ways ----
+   The right-hand block of every page head is the stage selector OR the same thing by department:
+   click a row to leave it out / bring it back, ONLY to isolate it, the All row to get everything
+   back. ⚠️ The two CROSS OVER: a department's figure is for the stages showing, and a stage's
+   figure is for the departments showing — both are just filters on the one budget build.
+   The department rows write the SHARED crew filter (projectCrewFilter.depts — empty = every
+   department), so Crew, Talent etc and Budget all narrow together, as the Filter popup's
+   department ticks always have. */
+let headBreakdown = 'stages';            // 'stages' | 'depts'
+function setHeadBreakdown(v){ headBreakdown = v; renderProjectBody(); }
+let headDeptPresent = [];                // the departments the last-drawn head listed
+const headDeptOn = d => !projectCrewFilter.depts.size || projectCrewFilter.depts.has(d);
+function toggleHeadDept(d){
+  let on = headDeptPresent.filter(headDeptOn);
+  on = on.includes(d) ? on.filter(x=>x!==d) : on.concat(d);
+  projectCrewFilter.depts = new Set((on.length===headDeptPresent.length || !on.length) ? [] : on);
+  renderProjectBody();
+}
+function onlyHeadDept(d){
+  const f = projectCrewFilter.depts;
+  projectCrewFilter.depts = new Set(f.size===1 && f.has(d) ? [] : [d]);
+  renderProjectBody();
+}
+function allHeadDepts(){ projectCrewFilter.depts = new Set(); renderProjectBody(); }
+/* every department's figure, whatever is muted — built with the department filter lifted, the
+   way budgetStageFigs() lifts the stage switches. `kind`: 'crew' | 'talent' | null (everyone). */
+function withAllDepts(fn){
+  const keep = projectCrewFilter.depts; projectCrewFilter.depts = new Set();
+  try{ return fn(); } finally { projectCrewFilter.depts = keep; }
+}
+function headDeptFigs(kind){
+  return withAllDepts(()=>{
+    const data = buildBudgetData(), by = {};
+    data.people.filter(pp=>kind==null || (!!pp.talentEtc)===(kind==='talent')).forEach(pp=>{
+      const f = by[pp.department] = by[pp.department] || {ex:0, vat:0, people:new Set()};
+      f.ex += pp.subtotal; f.vat += pp.vat; f.people.add(pp.crewId);
+    });
+    /* someone with no fee still belongs to a department — count them, as the stage rows count days */
+    projectEntryViews(currentProject()).filter(v=>kind==null || isTalentEtc(v)===(kind==='talent')).filter(personMatchesProjectFilter).forEach(v=>{
+      const d = deptBucketKey(v.department); (by[d] = by[d] || {ex:0, vat:0, people:new Set()}).people.add(v.crewId); });
+    return DEPARTMENTS.filter(d=>by[d]).map(d=>({ dept:d, ex:by[d].ex, vat:by[d].vat, inc:by[d].ex+by[d].vat, people:by[d].people.size }));
+  });
+}
 function budgetSummaryBarHTML(data, o){
   o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false, listToolsHTML:null, peopleKind:null,
-    topToolsHTML:null, totalsOverrideHTML:null, stageFigs:null}, o||{});   // the last three: the Budget page head — see budgetPageHeadHTML()
+    topToolsHTML:null, totalsOverrideHTML:null, stageFigs:null, deptFigs:null}, o||{});   // the last three: the Budget page head — see budgetPageHeadHTML()
   /* `peopleKind` ('crew' | 'talent') — the page head's scope; see stageFiguresFor() */
   const kindFigs = o.peopleKind ? stageFiguresFor(data, o.peopleKind) : null;
   /* the four figures the headline and the stack read, switched in ONE place */
@@ -8931,6 +8986,37 @@ function budgetSummaryBarHTML(data, o){
         : `<span class="budget-scope-amt">${fmt(f.ex)}</span>`; })()
         : `<span class="budget-scope-count">${esc(scopeMeta(key))}</span>`}
     </div>`;
+  /* ---- the same block, by DEPARTMENT ---- */
+  const deptMode = headBreakdown==='depts' && o.listToolsHTML!=null;
+  /* ⚠️ a department with PEOPLE in it is always listed, even at £0.00 — muting one department writes the
+     others into the filter, so a department missing from this list would silently vanish with it */
+  const deptFigs = deptMode ? (o.deptFigs || headDeptFigs(o.peopleKind)).filter(f=>f.inc || f.people) : [];
+  if(deptMode) headDeptPresent = deptFigs.map(f=>f.dept);
+  const deptTotal = deptFigs.reduce((n,f)=>n+(budgetVatToggle?f.inc:f.ex), 0);
+  const pctOf = v => deptTotal ? Math.round(v/deptTotal*100)+'%' : '—';
+  const deptCells = f => o.showTotals ? figuresHTML(f) + `<span class="budget-scope-pct">${pctOf(budgetVatToggle?f.inc:f.ex)}</span>`
+    : `<span class="budget-scope-count">${f.people} ${f.people===1?'person':'people'}</span>`;
+  const isoDept = projectCrewFilter.depts.size===1 ? [...projectCrewFilter.depts][0] : null;
+  const rowCls = on => `budget-scope-row dept-mode${budgetVatToggle&&o.showTotals?' itemized':''}${on?'':' off'}`;
+  const allDeptRow = () => {
+    /* every department's figures, whatever is muted — the way back, as All stages is */
+    const sum = deptFigs.reduce((a,f)=>({ex:a.ex+f.ex, vat:a.vat+f.vat, inc:a.inc+f.inc, people:a.people+f.people}), {ex:0,vat:0,inc:0,people:0});
+    const all = !projectCrewFilter.depts.size;
+    return `<div class="${rowCls(all)} budget-scope-all" role="button" tabindex="0" aria-pressed="${all}" onclick="allHeadDepts()"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allHeadDepts();}" title="Show every department">
+      <span class="stage-dot stage-dot-all"></span><span class="budget-scope-name">All departments</span><span></span>
+      ${deptCells(sum)}</div>`;
+  };
+  const deptRow = f => { const on = headDeptOn(f.dept), d = escA(f.dept).replace(/'/g,"\\'");
+    return `<div class="${rowCls(on)}" role="button" tabindex="0" aria-pressed="${on}" onclick="toggleHeadDept('${d}')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleHeadDept('${d}');}"
+      title="${esc(f.dept)} — ${on?'showing, click to leave it out':'left out, click to include it'}">
+      <span class="stage-dot stage-dot-dept"></span>
+      <span class="budget-scope-name">${esc(f.dept)}</span>
+      <button type="button" class="stage-only${isoDept===f.dept?' on':''}" aria-pressed="${isoDept===f.dept}"
+        onclick="event.stopPropagation();onlyHeadDept('${d}')" onkeydown="event.stopPropagation()"
+        title="${isoDept===f.dept?'Back to every department':'Show only '+esc(f.dept)}">Only</button>
+      ${deptCells(f)}</div>`; };
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   /* the Budget head's format on every tab: ONE big figure, then plain sub-lines beneath it */
   const totalsHTML = o.showTotals
@@ -8955,16 +9041,20 @@ function budgetSummaryBarHTML(data, o){
          Kit rows — Roles' Kit / Labour columns follow it), and what a person costs besides their fee is
          the Budget's catering, travel and hotel rows. */
     ].join('') : '';
-  const headRowHTML = foldHTML => (o.showTotals || foldHTML) ? `<div class="budget-scope-row${budgetVatToggle&&o.showTotals?' itemized':''} budget-scope-head">
+  const headRowHTML = foldHTML => (o.showTotals || foldHTML) ? `<div class="budget-scope-row${deptMode?' dept-mode':''}${budgetVatToggle&&o.showTotals?' itemized':''} budget-scope-head">
         <span class="budget-scope-name budget-scope-lead">${foldHTML||''}</span>${o.showTotals ? `${budgetVatToggle ? `<span class="budget-scope-ex">xVAT</span>
-        <span class="budget-scope-vat">VAT</span>` : ''}<span class="budget-scope-amt">Total</span>` : ''}
+        <span class="budget-scope-vat">VAT</span>` : ''}<span class="budget-scope-amt">Total</span>${deptMode ? '<span class="budget-scope-pct" title="Share of the budget">%</span>' : ''}` : ''}
       </div>` : '';
   const noteHTML = o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every stage is off, so nothing is being costed and only crew in no stage at all are listed. Click All stages — or Pre-production, Production or Post.</div>` : '';
   /* the page head (Crew, Talent etc): see pageHeadHTML() */
   if(o.listToolsHTML!=null){
+    /* ▾ folds the head; STAGES / DEPT — the lit word is the cut showing, the faded one switches to it */
+    const cutBtn = (v, label) => `<span class="bnr-cut${headBreakdown===v?' on':''}" role="button" tabindex="0" aria-pressed="${headBreakdown===v}"
+        onclick="setHeadBreakdown('${v}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setHeadBreakdown('${v}');}"
+        title="${headBreakdown===v ? 'Showing by '+label.toLowerCase() : 'Show by '+label.toLowerCase()+' instead'}">${label}</span>`;
     const foldHTML = `<span class="bnr-fold" role="button" tabindex="0" onclick="setHeadFolded(true)"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setHeadFolded(true);}"
-        title="Collapse the head to one line"><span class="dept-caret">▾</span> Stages</span>`;
+        title="Collapse the head to one line"><span class="dept-caret">▾</span></span> ${cutBtn('stages','Stages')}<span class="bnr-cut-sep">/</span>${cutBtn('depts','Dept')}`;
     /* THE CHIP — the folded selector. Its colour IS the selection: the stage's own colour when one
        is isolated, ink black for all stages or a mix (a mix also shows its stages' dots). */
     const on = BUDGET_SCOPES.filter(([k])=>budgetScope[k]);
@@ -8980,7 +9070,8 @@ function budgetSummaryBarHTML(data, o){
       budgetRowHTML: o.topToolsHTML!=null ? o.topToolsHTML : moneyHTML + moneyToolsHTML,
       totalsHTML: o.totalsOverrideHTML!=null ? o.totalsOverrideHTML : o.showTotals ? totalsHTML : '',
       toolsHTML: o.listToolsHTML,
-      stageHTML: `${headRowHTML(foldHTML)}${allRow()}${BUDGET_SCOPES.map(scopeRow).join('')}`,
+      stageHTML: deptMode ? `${headRowHTML(foldHTML)}${allDeptRow()}${deptFigs.map(deptRow).join('')}`
+                          : `${headRowHTML(foldHTML)}${allRow()}${BUDGET_SCOPES.map(scopeRow).join('')}`,
       chipHTML, noteHTML });
   }
   return `<div class="phase-banner">
@@ -9337,6 +9428,15 @@ function buildBudgetLines(data){
     rateCard.find(r=>r.line.key===key).order = i;
   });
   rateCard.sort((a,b)=>a.order-b.order);
+  /* DEPARTMENT — a person's rows (kit included) belong to the person's department; everything else
+     to the department its CODE names. ⚠️ The engine only filters PEOPLE by department, so the
+     rows with no person are dropped here when their department is switched off — otherwise
+     muting Catering & Travel in the head would leave the catering standing. Done after the
+     reconciliation above, which has to see everything the engine counted. */
+  sections.forEach(sec=>sec.lines.forEach(l=>{
+    l.dept = l.entryId ? sec.title : (CODE_DEPARTMENTS[l.code] || 'Other'); }));
+  if(projectCrewFilter.depts.size) sections.forEach(sec=>{
+    sec.lines = sec.lines.filter(l=>l.entryId || l.locked || (projectCrewFilter.depts.has(l.dept) !== !!projectCrewFilter.inverse)); });
   [...new Set([...all(), ...rateCard.map(r=>r.line)])].forEach(l=>{
     const ch = sheet.charged[l.key];
     l.chRate = (hasVal(ch) && !l.locked) ? Number(ch) : null;
@@ -9423,6 +9523,14 @@ function budgetStageFigs(mode){
   Object.values(out).forEach(f=>{ f.inc = f.ex + f.vat; });
   return out;
 }
+function budgetDeptFigs(mode){
+  return withAllDepts(()=>{
+    const B = buildBudgetLines(buildBudgetData()), by = {};
+    B.lines.forEach(l=>{ const f = B.fig(l, mode), r = by[l.dept] = by[l.dept] || {ex:0, vat:0, people:new Set()};
+      r.ex += f.ex + f.fl; r.vat += f.vat; if(l.crewId) r.people.add(l.crewId); });
+    return DEPARTMENTS.filter(d=>by[d]).map(d=>({ dept:d, ex:by[d].ex, vat:by[d].vat, inc:by[d].ex+by[d].vat, people:by[d].people.size }));
+  });
+}
 function budgetPageHeadHTML(data, B){
   const fmt = budgetFmt, T = B.totals, set = B.sheet.settings;
   const chVat = budgetVatToggle ? B.lines.reduce((n,l)=>n+l.chVat, 0) : 0;
@@ -9435,7 +9543,8 @@ function budgetPageHeadHTML(data, B){
     margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span>`, pct],
     floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee %', B.sheet.feePct+'%', ''] };
   const strip = BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>stat[k]).concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack), '']] : []);
-  return budgetSummaryBarHTML(data, { listToolsHTML:'', topToolsHTML:'', totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode), showTotals:true })
+  return budgetSummaryBarHTML(data, { listToolsHTML:'', topToolsHTML:'', totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode),
+      deptFigs: headBreakdown==='depts' ? budgetDeptFigs(budgetMode) : null, showTotals:true })
     + `<div class="bhead-strip">${strip.map(([l,v,note])=>`<div class="budget-stat"><div class="num">${v}</div><div class="lbl">${l}${note?`<span class="budget-stat-note">${note}</span>`:''}</div></div>`).join('')}</div>`;
 }
 /* the one tool row, under the divider and on the sheet */
