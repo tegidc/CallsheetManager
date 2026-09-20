@@ -513,6 +513,29 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   `resetBudgetSettings()` go through `xlsCommit`. ⚠️ Charged rates are ALWAYS stored as labour `e:` + kit `k:`
   parts, so flipping Kit rows never changes what anyone is charged (verified: identical charged total both ways);
   a folded row carries `foldedKit` / `kitCharged` and writes through `setBudgetChargedPerson()`.
+- **The Budget page head (third pass, 20 Sep 2026)** — `budgetPageHeadHTML(data, B)`, drawn through the SAME
+  `pageHeadHTML()` Crew wears (`budgetSummaryBarHTML` gained `topToolsHTML`, `totalsOverrideHTML`, `stageFigs`).
+  The "Budget at a glance" heading, its hint, the + Add person / Filter / Copy · Export row, the day-chip row
+  and the five-figure strip above each sheet are all GONE. Top: Cost | Charged · Lines · Export. Middle: ONE
+  total that follows the switch (Final total when Charged, Total cost when Cost) plus the small figures chosen
+  in Settings ▸ View (`BUDGET_VIEW_STATS`, `budgetViewShows()`, `setBudgetViewStat()` → `settings.view`, diffs
+  only; Fee total / Fee % / Charged / Cost / Margin / Float total / Float %; VAT reclaimed joins by itself).
+  Bottom: Settings, then Edit | Filter | VAT joined like Crew's + Add | Filter | Select. The stage selector
+  shows the budget being shown — `budgetStageFigs(mode)` rebuilds the lines with every stage on so muted
+  rows still carry their figure. Filter (`filterDialogHTML(budgetFilterPanelHTML())` — shoot days live here
+  now), Export (`budgetOutputDialogHTML()`), Settings and the shoot-day ticks are popups. `renderProjectBudget`
+  builds `B` once and hands it to the head and the view. REMOVED: `budgetSheetTopHTML`, `outputMenuRowHTML`,
+  `budgetDayChipsHTML`, `toggleBudgetDayChip`, `onlyBudgetDay`.
+- **EDIT** (`budgetEdit`, `toggleBudgetEdit()`) — off, the cost side is read-only (Charged and Float are the
+  budget's own and always typeable). On, shaded `.xls-ed` cells write THROUGH THE OWNING TAB'S SETTER, so every
+  other page agrees: person Pre / Post → `setPhaseDays()`, Shoot → a button opening `budgetShootDialogHTML()`
+  (ticks via `toggleRolesShootDay()` — a count can't be typed), OT → `setEntryOvertime()`, Rate →
+  `saveEntryRate()` (⚠️ a split row shows LABOUR, so the kit is added back before saving; kit rows stay
+  read-only — kit lives on the crew record); catering / travel / hotel rates → `setBudgetCostRate()` via
+  `line.costField`; venue fee → `setLocationCostField(locId,'rate')` (not hourly), venue extras →
+  `setLocationExtra()`, vendors → `setVendorCostField()` (quote if quoted, else estimate; not when following
+  the catering estimate). Typed lines, their + and × only appear with Edit on. `xlsEdit(promise)` restores
+  focus (`xlsLastFk`) after those setters' own re-render. Per Person and Costs gate the same cells.
 - Export: money cells are `{v}` — formatted text for Copy, real numbers with a £ format in the .xlsx.
 
 Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already

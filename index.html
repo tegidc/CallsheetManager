@@ -1090,16 +1090,26 @@
   .xls-pct input[type=text]{width:44px; padding:3px 4px; text-align:right; font-size:var(--fs-meta);}
   /* a lit button that happens to be first in a joined group keeps its lit ink (Cost | Charged) */
   .bnr-group .bnr-tool.on:first-child, .bnr-group .bnr-tool.on:first-child:hover{color:var(--tape-ink);}
-  .xls-days{justify-content:flex-start; margin:-6px 0 16px;} .xls-days.off{opacity:.38;}
   .bset-box{max-width:560px;}
   .bset-row{display:grid; grid-template-columns:150px minmax(0,1fr); gap:2px 14px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line);}
   .bset-name{font-size:var(--fs-field);}
   .bset-hint{grid-column:2; margin-top:0;}
+  .bset-chips{display:flex; flex-wrap:wrap; gap:4px 14px;} .bset-chips label{display:inline-flex; align-items:center; gap:5px; margin:0; font-size:var(--fs-field);}
   .bset-box .tabs{border-bottom:none; gap:4px;} .bset-box .tab{padding:5px 10px;}
-  .xls-top{display:flex; justify-content:space-between; align-items:flex-end; gap:14px 24px; flex-wrap:wrap; margin:0 0 14px;}
-  .xls-stats{display:flex; gap:10px 26px; flex-wrap:wrap;}
-  .xls-stats .budget-stat .num{font-size:21px; line-height:1.2;}
-  .xls-stats .budget-stat .num.xls-pos{color:var(--tape);} .xls-stats .budget-stat .num.xls-neg{color:var(--danger);}
+  /* the Budget page head's own pieces, inside the shared .bnr-head */
+  .bhead-totals{display:flex; flex-direction:column; gap:4px; min-width:0;}
+  .bhead-minis{display:flex; flex-wrap:wrap; gap:2px 16px;}
+  .bhead-mini{display:inline-flex; align-items:baseline; gap:6px; white-space:nowrap;}
+  .bhead-mini .lbl{font-family:var(--label); font-size:10px; letter-spacing:1.1px; text-transform:uppercase; color:var(--tape);}
+  .bhead-mini .val{font-family:var(--label); font-weight:600; font-size:14px; letter-spacing:.3px; font-variant-numeric:tabular-nums;}
+  .bhead-note{font-family:var(--body); font-weight:400; font-size:var(--fs-meta); color:var(--muted);}
+  .bhead-tools{display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
+  /* Edit on: the cells that write back to another tab are shaded, so it is plain what just unlocked */
+  .section table.xls td.xls-ed{background:var(--tint-3);}
+  .section table.xls td.xls-btn{padding:0;}
+  .section table.xls td.xls-btn button{width:100%; height:25px; border:none; background:transparent; cursor:pointer; color:#1F5FBF;
+    font-family:var(--body); font-size:var(--fs-meta);}
+  .section table.xls td.xls-btn button:hover{text-decoration:underline;}
   .xls-fx{display:flex; align-items:center; gap:0; border:1px solid var(--line); border-bottom:none; height:26px;
     font-size:var(--fs-meta); background:var(--panel);}
   .xls-fx span{padding:0 9px; line-height:26px; white-space:nowrap;}
@@ -5312,14 +5322,6 @@ function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
     </div>`;
 }
 
-function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='', filterHTML='', filterPanelHTML=''} = {}){
-  const trigger = `<span class="output-menu"><span onclick="${onToggle}"${titleText?` title="${esc(titleText)}"`:''}>
-      <span class="dept-caret">${open?'▾':'▸'}</span>${icon('copy')} Copy<span class="output-menu-sep">·</span>${icon('download')} Export
-    </span></span>`;
-  return crewToolbarHTML('', filterHTML, trigger)
-    + (filterPanelHTML||'')
-    + (open ? `<div class="filter-panel">${panelHTML}</div>` : '');
-}
 /* SELECT MODE's click hook — Crew and Talent etc. Capture, and stopped here: in select mode a
    click on a line is ONLY a selection — it must not also reach the name link, a day tick or a
    field underneath. Hooked once per body element. */
@@ -8861,7 +8863,8 @@ function stageFiguresFor(data, kind){
            totalVat: sumOf(mine,'vat') };
 }
 function budgetSummaryBarHTML(data, o){
-  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false, listToolsHTML:null, peopleKind:null, sheetTools:false}, o||{});
+  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false, listToolsHTML:null, peopleKind:null, sheetTools:false,
+    topToolsHTML:null, totalsOverrideHTML:null, stageFigs:null}, o||{});   // the last three: the Budget page head — see budgetPageHeadHTML()
   /* `peopleKind` ('crew' | 'talent') — the page head's scope; see stageFiguresFor() */
   const kindFigs = o.peopleKind ? stageFiguresFor(data, o.peopleKind) : null;
   /* the four figures the headline and the stack read, switched in ONE place */
@@ -8875,6 +8878,7 @@ function budgetSummaryBarHTML(data, o){
     budgetVatToggle ? `xVAT ${fmt(totalEx)}` : '']];
   const rawOf = key => kindFigs ? kindFigs.byScope[key] : ((data.phaseRaw||{})[key] || {});
   const phaseFigures = key => {
+    if(o.stageFigs) return o.stageFigs[key];
     const r = kindFigs ? kindFigs.byScope[key] : ((data.phaseRaw||{})[key] || {ex:0, vat:0});
     /* crewEx exists on production only — the other two are crew fee already */
     const ex = (!kindFigs && o.crewOnly && r.crewEx!=null) ? r.crewEx : (r.ex||0);
@@ -8965,8 +8969,8 @@ function budgetSummaryBarHTML(data, o){
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setHeadFolded(false);}" title="Open the stage selector">
         ${!iso && !allStagesOn() ? on.map(([k])=>`<span class="stage-dot ${STAGE_CLASS[k]}"></span>`).join('') : ''}${chipLabel}${chipMeta?`<span class="stage-chip-meta">${chipMeta}</span>`:''}<span class="dept-caret">▸</span></span>`;
     return pageHeadHTML({
-      budgetRowHTML: moneyHTML + moneyToolsHTML,
-      totalsHTML: o.showTotals ? totalsHTML : '',
+      budgetRowHTML: o.topToolsHTML!=null ? o.topToolsHTML : moneyHTML + moneyToolsHTML,
+      totalsHTML: o.totalsOverrideHTML!=null ? o.totalsOverrideHTML : o.showTotals ? totalsHTML : '',
       toolsHTML: o.listToolsHTML,
       stageHTML: `${headRowHTML(foldHTML)}${allRow()}${BUDGET_SCOPES.map(scopeRow).join('')}`,
       chipHTML, noteHTML });
@@ -9238,6 +9242,7 @@ function buildBudgetLines(data){
      ['del','Delivery',drops,cateringCosts.delivery,'delivery']].forEach(([k,item,qty,rate,field])=>{
       const line = extra('cat:'+k, 'CAT/TRA', item, k==='del'?'per drop':'per head', qty, rate,
         { vatPct:vatCat, costVat:qty*rate*prodOn*vatCat/100, dist:{ days:Object.fromEntries(cols.map(c=>[c.dayId, k==='del' ? dropsOn(c) : c[k]])) } });
+      line.costField = { store:'cateringCosts', field };
       rateCard.push({ group:'Catering', store:'cateringCosts', field, line });
       if(qty && rate) X['x:catering'].lines.push(line); });
   }
@@ -9250,6 +9255,7 @@ function buildBudgetLines(data){
       const vat = data.people.reduce((n,pp)=>n + ((pp.vatRegistered && (p.travelMethods||{})[pp.crewId]===m) ? pp.travelCost*VAT_RATE : 0), 0);
       const line = extra('trv:'+m, 'CAT/TRA', m, unit, qty, rate, { vatPct: vat ? null : 0, costVat: vat, bbc:'8',
         dist:{ days:Object.fromEntries(cols.map(c=>[c.dayId, c.counts[m]||0])) } });
+      line.costField = { store:'transportCosts', field: m==='Own car' ? 'mileage' : 'publicPerDay' };
       rateCard.push({ group:'Travel', store:'transportCosts', field: m==='Own car' ? 'mileage' : 'publicPerDay', line });
       if(qty && rate) X['x:travel'].lines.push(line);
     });
@@ -9257,6 +9263,7 @@ function buildBudgetLines(data){
   if(talentCosts.trip) X['x:travel'].lines.push(extra('trv:talent', 'CAT/TRA', 'Talent travel', 'booked by us', 1, talentCosts.trip, {bbc:'8'}));
   const roomsLine = extra('htl:rooms', 'CAT/TRA', 'Hotel rooms', 'per room per night', hotelRoomNights, hotelCosts.perRoomNight,
     { vatPct:vatHtl, costVat:hotelRoomNights*hotelCosts.perRoomNight*prodOn*vatHtl/100, dist:{ days: perDayW((d,i)=>dayHotelRooms[i] + (i===0 ? preNightRooms : 0)) } });   // the night before folds into Day 1, as in Per Day
+  roomsLine.costField = { store:'hotelCosts', field:'perRoomNight' };
   rateCard.push({ group:'Hotel', store:'hotelCosts', field:'perRoomNight', line:roomsLine });
   if(hotelRoomNights && hotelCosts.perRoomNight) X['x:hotel'].lines.push(roomsLine);
   if(talentCosts.stay) X['x:hotel'].lines.push(extra('htl:talent', 'CAT/TRA', 'Talent hotels', 'booked by us', 1, talentCosts.stay,
@@ -9271,17 +9278,18 @@ function buildBudgetLines(data){
     const vr = c.vat==='Yes' ? VAT_RATE : 0;
     const modeNote = c.mode==='buyout' ? 'buyout' : c.mode==='hourly' ? `${c.hours||0} hrs a day` : 'per day';
     const usedAll = locDaysUsed(locId, p).length;
-    if(fee || rate) X['x:loc'].lines.push(mk({ key:'loc:'+locId, code:'SET', item:loc.name||'Location', name:modeNote, bbc:'7',
+    if(fee || rate) X['x:loc'].lines.push(mk({ key:'loc:'+locId, code:'SET', item:loc.name||'Location', name:modeNote, bbc:'7', locId, locMode:c.mode,
       dist: used ? { days: perDayW(d=>locationFeeFor(locId, [d], p, usedAll)) } : { proj:1 },
       qty: c.mode==='buyout' ? 1 : used, rate, vatPct:vr*100, units:(rate ? fee/rate : 0)*prodOn, costEx:fee*prodOn, costVat:fee*prodOn*vr }));
     c.extras.forEach((x,i)=>{ const amt = parseRateNumber(x.amount)||0;
-      if(amt) X['x:loc'].lines.push(extra(`lx:${locId}:${i}`, 'SET', x.label||'Extra', loc.name||'', 1, amt, { vatPct:vr*100, costVat:amt*prodOn*vr, bbc:'7' })); });
+      if(amt) X['x:loc'].lines.push(extra(`lx:${locId}:${i}`, 'SET', x.label||'Extra', loc.name||'', 1, amt, { vatPct:vr*100, costVat:amt*prodOn*vr, bbc:'7', locId, extraId:x.id })); });
   });
   vendorBookings.forEach(vc=>{
     const v = vendorById(vc.vendorId) || {type:'Other', name:'Vendor'};
     const eff = vendorCostEff(vc, cateringRaw);
     if(eff.eff) X['x:vendors'].lines.push(extra('v:'+vc.id, VENDOR_TYPE_CODES[v.type]||'—', v.name||'Vendor',
-      `${v.type||'Other'} — ${eff.quoted?'quote':'estimate'}`, 1, eff.eff, { bbc: ({Equipment:'6', Transport:'8', Catering:'9', Post:'10'})[v.type] || '13' }));
+      `${v.type||'Other'} — ${eff.quoted?'quote':'estimate'}`, 1, eff.eff, { bbc: ({Equipment:'6', Transport:'8', Catering:'9', Post:'10'})[v.type] || '13',
+        vcId:vc.id, vcField: eff.quoted ? 'quote' : 'estimate', vcLocked: !!vc.useCateringEstimate && !eff.quoted }));
   });
   (p.additionalCosts||[]).forEach(c=>{ const amt = parseRateNumber(c.amount)||0;
     if(amt) X['x:other'].lines.push(extra('a:'+c.id, 'PROD', c.label||'Additional cost', c.confirmed?'confirmed':'estimate', 1, amt, { bbc:'13', additionalId:c.id })); });
@@ -9377,30 +9385,90 @@ function xlsSheetHTML(cols, rows){
     <tr><th class="xls-hd"></th>${cols.map((c,i)=>`<th class="xls-hd">${String.fromCharCode(65+i)}</th>`).join('')}</tr>
     ${tr({cls:'xls-cols', cells: cols.map(c=>({h:c[1], c:c[2]||''}))})}${rows.map(tr).join('')}</table></div>`;
 }
-/* the strip every sheet view wears: the five figures, Cost | Charged, float and fee */
-function budgetSheetTopHTML(B, o){
-  const fmt = budgetFmt, T = B.totals, mode = budgetMode;
-  const stat = (num, lbl, note, cls) => `<div class="budget-stat"><div class="num ${cls||''}">${num}</div><div class="lbl">${lbl}${note?`<span class="budget-stat-note">${note}</span>`:''}</div></div>`;
-  const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
-  const modeBtn = (m, label, title) => `<button type="button" class="bnr-tool${mode===m?' on':''}" aria-pressed="${mode===m}" onclick="setBudgetMode('${m}')" title="${title}">${label}</button>`;
-  return `<div class="xls-top">
-      <div class="xls-stats">
-        ${stat(fmt(T.cost), 'Cost', budgetVatToggle?'':'ex-VAT')}
-        ${stat(fmt(T.charged), 'Charged', 'inc. float')}
-        ${stat(fmt(T.fee), `Production fee ${B.sheet.feePct}%`)}
-        ${stat(fmt(T.final), 'Final total', B.sheet.settings.vatBack && budgetVatToggle ? 'VAT in, final' : '')}
-        ${T.vatBack ? stat(fmt(T.vatBack), 'VAT reclaimed') : ''}
-        ${stat((T.margin<0?'−':'+')+fmt(Math.abs(T.margin)), 'Margin', pct + (B.sheet.settings.floatInMargin ? '' : ' · ex float'), T.margin<0?'xls-neg':'xls-pos')}
-      </div>
-      <div class="bnr-toolrow">
-        <button type="button" class="bnr-tool" onclick="toggleBudgetSettings()" title="How this project's budget is worked out — VAT, kit, float, production fee, overtime">Settings</button>
-        ${o && o.lines ? `<button type="button" class="bnr-tool${budgetShowLines?' on':''}" aria-pressed="${budgetShowLines}" onclick="toggleBudgetShowLines()" title="List the rows behind each heading">Lines</button>` : ''}
-        ${toolGroupHTML([modeBtn('cost','Cost','True costs — no float, no production fee'), modeBtn('charged','Charged','What the client is charged — charged rates, float and production fee')])}
-        <label class="xls-pct">Float <input type="text" inputmode="decimal" value="${B.sheet.floatPct}" onchange="setBudgetSheetPct('floatPct',this.value)" title="Contingency — % of each line's ex-VAT figure, unless the line has its own">%</label>
-        <label class="xls-pct">Fee <input type="text" inputmode="decimal" value="${B.sheet.feePct}" onchange="setBudgetSheetPct('feePct',this.value)" title="Production fee — % of the charged total">%</label>
-      </div>
-    </div>`;
+/* THE BUDGET PAGE HEAD (20 Sep 2026, second pass) — the same pageHeadHTML() Crew wears:
+     top     Cost | Charged · Lines (where a view has them) · Export
+     middle  ONE total that follows the switch — Final total when Charged, Total cost when Cost —
+             then the smaller figures chosen in Settings ▸ View (BUDGET_VIEW_STATS)
+     bottom  Settings, then Edit | Filter | VAT joined like + Add | Filter | Select on Crew
+     right   the stage selector, showing the same budget (cost or charged) as the total.
+   Filter, Export, Settings and the shoot-day ticks are all popups; nothing pushes the sheet down. */
+const BUDGET_VIEW_STATS = [['fee','Fee total',true], ['feePct','Fee %',false], ['charged','Charged',true], ['cost','Cost',true],
+  ['margin','Margin',true], ['floatTotal','Float total',false], ['floatPct','Float %',false]];
+const budgetViewShows = (set, key) => { const v = (set.view||{})[key]; return v!=null ? !!v : (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2]; };
+let budgetEdit = false;
+function toggleBudgetEdit(){ budgetEdit = !budgetEdit; renderProjectBody(); }
+/* every stage's figures for the budget being shown, whatever is muted — so the rows are the way
+   back, as on Crew. Built with every stage on; float rides with the ex-VAT column. */
+function budgetStageFigs(mode){
+  const keep = Object.assign({}, budgetScope);
+  BUDGET_SCOPES.forEach(([k])=>{ budgetScope[k] = true; });
+  let B; try{ B = buildBudgetLines(buildBudgetData()); } finally { Object.assign(budgetScope, keep); }
+  const out = { preproduction:{ex:0,vat:0}, production:{ex:0,vat:0}, post:{ex:0,vat:0} };
+  B.lines.forEach(l=>{
+    ['ex','fl','vat'].forEach(k=>{ const sp = B.split(l, mode, k), col = k==='vat' ? 'vat' : 'ex';
+      out.preproduction[col] += sp.pre; out.post[col] += sp.post;
+      out.production[col] += sp.proj + Object.values(sp.days).reduce((n,v)=>n+v, 0); });
+  });
+  Object.values(out).forEach(f=>{ f.inc = f.ex + f.vat; });
+  return out;
 }
+function budgetPageHeadHTML(data, B){
+  const fmt = budgetFmt, T = B.totals, set = B.sheet.settings, isCost = budgetMode==='cost';
+  const btn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}" aria-pressed="${on?'true':'false'}" onclick="${call}" title="${escA(title)}">${label}</button>`;
+  const filters = budgetActiveFilterCount();
+  const top = toolGroupHTML([btn(isCost, 'Cost', `setBudgetMode('cost')`, 'True costs — no float, no production fee'),
+                             btn(!isCost, 'Charged', `setBudgetMode('charged')`, 'What the client is charged — charged rates, float and production fee')])
+    + (['department','day','bbc'].includes(budgetView) ? btn(budgetShowLines, 'Lines', 'toggleBudgetShowLines()', 'List the rows behind each heading') : '')
+    + btn(false, 'Export', 'toggleBudgetOutputPanel()', 'Copy as text, or download an Excel file');
+  const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
+  const mini = { fee:['Fee '+B.sheet.feePct+'%', fmt(T.fee)], feePct:['Fee %', B.sheet.feePct+'%'], charged:['Charged', fmt(T.charged)], cost:['Cost', fmt(T.cost)],
+    margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span> <span class="bhead-note">${pct}</span>`],
+    floatTotal:['Float total', fmt(T.float)], floatPct:['Float %', B.sheet.floatPct+'%'] };
+  const minis = isCost ? [] : BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>mini[k])
+    .concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack)]] : []);
+  const vatNote = !budgetVatToggle ? 'ex-VAT' : set.vatBack ? 'VAT in, final' : data.vatTotal>0 ? 'inc. VAT' : '';
+  const totals = `<div class="bhead-totals"><div class="budget-stat"><div class="num">${fmt(isCost ? T.cost : T.final)}</div>
+      <div class="lbl">${isCost ? 'Total cost' : 'Final total'}${vatNote?`<span class="budget-stat-note">${vatNote}</span>`:''}</div></div>
+    ${minis.length ? `<div class="bhead-minis">${minis.map(([l,v])=>`<span class="bhead-mini"><span class="lbl">${l}</span><span class="val">${v}</span></span>`).join('')}</div>` : ''}</div>`;
+  const tools = `<div class="bhead-tools">${btn(false, 'Settings', 'toggleBudgetSettings()', "How this project's budget is worked out, and what this head shows")}
+    ${toolGroupHTML([btn(budgetEdit, 'Edit', 'toggleBudgetEdit()', budgetEdit ? 'Lock the costs again' : 'Change costs, days and rates here — they write back to Crew, the cost tabs and Venues — and add lines of your own'),
+                     btn(false, 'Filter'+(filters?` (${filters})`:''), 'toggleBudgetFilterPanel()', 'Shoot days, departments, sort order'),
+                     btn(budgetVatToggle, budgetVatToggle?'VAT':'xVAT', `toggleBudgetVat(${!budgetVatToggle})`, budgetVatToggle ? 'Showing with VAT — click for ex-VAT only' : 'Showing ex-VAT only — click to include VAT')])}</div>`;
+  return budgetSummaryBarHTML(data, { listToolsHTML: tools, topToolsHTML: top, totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode), showTotals:true });
+}
+function budgetOutputDialogHTML(){
+  return `<div class="modal-overlay" onclick="if(event.target===this) toggleBudgetOutputPanel()">
+    <div class="modal-box filter-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Export the budget">
+      <h3>Export</h3>
+      ${budgetOutputPanelHTML()}
+      <div class="toolbar" style="margin:12px 0 0;"><button onclick="toggleBudgetOutputPanel()">Done</button></div>
+    </div></div>`;
+}
+/* Edit ▸ Shoot: a count can't be typed — days on the shoot are ticks — so the cell opens them */
+let budgetShootFor = null;
+function openBudgetShootDays(entryId){ budgetShootFor = entryId; renderProjectBody(); }
+function budgetShootDialogHTML(){
+  const p = currentProject(), v = projectEntryViews(p).find(x=>x.id===budgetShootFor);
+  const days = projectDays();
+  return `<div class="modal-overlay" onclick="if(event.target===this) openBudgetShootDays(null)">
+    <div class="modal-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
+      <h3>Days on the shoot</h3>
+      <div class="hint" style="margin:-6px 0 10px;">${v ? esc(v.name)+' — '+esc(v.showAs||v.role||'') : ''}. The same ticks as Crew ▸ Roles ▸ Shoot.</div>
+      ${days.length ? `<div class="filter-chips" style="display:flex; flex-direction:column; gap:6px;">${days.map(d=>`<label><input type="checkbox" ${entryOnDay(budgetShootFor, d)?'checked':''}
+          onchange="toggleRolesShootDay('${budgetShootFor}','${d.id}',this.checked)"> ${esc(shootDayLabel(d))}</label>`).join('')}</div>` : '<div class="empty-note">Add shoot days first, on Call Sheets.</div>'}
+      <div class="toolbar" style="margin:14px 0 0;"><button class="primary" onclick="openBudgetShootDays(null)">Done</button></div>
+    </div></div>`;
+}
+/* a cost written through ANOTHER tab's own setter (saveEntryRate, setPhaseDays, …): they re-render
+   after their save, so put the focus back where the user had moved to */
+let xlsLastFk = null;
+async function xlsEdit(promise){
+  try{ await promise; } finally {
+    setTimeout(()=>{ if(document.activeElement && document.activeElement!==document.body) return;
+      const el = xlsLastFk && [...document.querySelectorAll('[data-fk]')].find(x=>x.dataset.fk===xlsLastFk); if(el) el.focus(); }, 0);
+  }
+}
+const xlsRaw = `this.value.replace(/[£,\\s]/g,'')`;
 function budgetSheetModel(view, data, B){
   B = B || buildBudgetLines(data);
   const fmt = budgetFmt, mode = budgetMode, isCost = mode==='cost', vatOn = budgetVatToggle, T = B.totals;
@@ -9474,6 +9542,7 @@ function budgetSheetModel(view, data, B){
     const sumK = (lines, k) => lines.reduce((n,l)=>n+B.fig(l,mode)[k], 0);
     const people = B.lines.filter(l=>l.entryId), rest = B.lines.filter(l=>!l.entryId);
     const exOf = l => B.fig(l,mode).ex;
+    const edc = cell => Object.assign(cell, { c: cell.c+' xls-ed' });
     const kitFracOf = l => !l.foldedKit ? 0 : isCost ? l.foldedKit/(l.rate||1) : l.kitCharged/((l.chRate!=null ? l.chRate : l.rate)||1);
     const rows = [{ cls:'xls-tot', cells:[{h:'Totals', span:2}, M(tot(B.lines)), {h:'', span:7},
       M(people.reduce((n,l)=>n + (l.isKit ? 0 : exOf(l)*(1-kitFracOf(l))), 0)), M(people.reduce((n,l)=>n + (l.isKit ? exOf(l) : exOf(l)*kitFracOf(l)), 0)),
@@ -9489,9 +9558,12 @@ function budgetSheetModel(view, data, B){
       const same = i>0 && ordered[i-1].crewId===pp.crewId;
       const inp = (col, value, ph, call, cls) => ({ c:'xls-in', x:value, h:`<input type="text" class="${cls||''}" inputmode="decimal" data-fk="${escA(pp.id)}|${col}" data-col="${col}" data-ref="" data-fx="${escA(value||ph)}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}">` });
       rows.push({ cells:[ same ? '' : esc(pp.name), {h:esc(pp.role||'') + (kit || folded ? ' <span class="mu">+ kit</span>' : ''), t:pp.role||''}, M(tot(mine)),
-        {h:pp.prepDays||'', c:'c'+(budgetScope.preproduction?'':' mu')}, {h:pp.daysWorked||'', c:'c'+(budgetScope.production?'':' mu')}, {h:pp.postDays||'', c:'c'+(budgetScope.post?'':' mu')},
-        {h: pp.isBuyout ? '<span class="mu">fee</span>' : (pp.prepDays+pp.daysWorked+pp.postDays||''), c:'c', x: pp.isBuyout ? 'fee' : undefined}, {h:pp.isBuyout?'':(pp.otUnits||''), c:'c mu'},
-        inp('rate', pp.hasRate ? fmt(pp.rate) : '', '—', `saveEntryRate('${pp.id}', this.value.replace(/[£,\s]/g,''))`),
+        budgetEdit ? edc(inp('pre', String(pp.prepDays||''), '—', `xlsEdit(setPhaseDays('preprod','${pp.id}',this.value))`, 'c')) : {h:pp.prepDays||'', c:'c'+(budgetScope.preproduction?'':' mu')},
+        budgetEdit ? {c:'xls-btn xls-ed', x:pp.daysWorked||'', h:`<button type="button" onclick="openBudgetShootDays('${pp.id}')" title="Tick the days on the shoot">${pp.daysWorked||'—'}</button>`} : {h:pp.daysWorked||'', c:'c'+(budgetScope.production?'':' mu')},
+        budgetEdit ? edc(inp('post', String(pp.postDays||''), '—', `xlsEdit(setPhaseDays('post','${pp.id}',this.value))`, 'c')) : {h:pp.postDays||'', c:'c'+(budgetScope.post?'':' mu')},
+        {h: pp.isBuyout ? '<span class="mu">fee</span>' : (pp.prepDays+pp.daysWorked+pp.postDays||''), c:'c', x: pp.isBuyout ? 'fee' : undefined},
+        (budgetEdit && !pp.isBuyout) ? edc(inp('ot', String(pp.otUnits||''), '—', `xlsEdit(setEntryOvertime('${pp.id}',this.value))`, 'c')) : {h:pp.isBuyout?'':(pp.otUnits||''), c:'c mu'},
+        budgetEdit ? edc(inp('rate', pp.hasRate ? fmt(pp.rate) : '', '—', `xlsEdit(saveEntryRate('${pp.id}', ${xlsRaw}))`)) : {h: pp.hasRate ? fmt(pp.rate) : '<span class="budget-noRate">no rate</span>', c:'n', v: pp.hasRate ? pp.rate : undefined},
         inp('charged', chFull!=null ? fmt(chFull) : '', fmt(pp.rate), `setBudgetChargedPerson('${pp.id}', this.value, ${pp.rate}, ${labourRate}, ${kitCh})`),
         M(exOf(lab)*(1-kitFrac)), kit ? M(exOf(kit)) : folded ? M(exOf(lab)*kitFrac) : {h:dash, c:'n'},
         ...(vatOn ? [{h:pp.vatRegistered?'20%':'0%', c:'c mu'}, M(sumK(mine,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(mine,'fl')) ] });
@@ -9501,7 +9573,7 @@ function budgetSheetModel(view, data, B){
     const noRate = data.people.filter(pp=>!pp.hasRate).length;
     return { cols:[[150,'Name'],[170,'Role'],[96,'Total','n'],[40,'Pre','c'],[48,'Shoot','c'],[40,'Post','c'],[46,'Days','c'],[36,'OT','c'],[80,'Rate','n'],[88,'Charged','n'],
         [92,'Labour','n'],[84,'Kit','n'], ...(vatOn ? [[46,'VAT','c'],[80,'VAT £','n']] : []), [76,'Float £','n']], rows,
-      notes:[`<strong>Rate</strong> is the project day rate, the same field as Crew ▸ Roles. <strong>Charged</strong> is the same cell as on Line Items — change it in either place. Labour and Kit are ex-VAT; a VAT-registered person's travel VAT is on the Travel row, not here.`,
+      notes:[`<strong>Charged</strong> is the same cell as on Line Items — change it in either place. With <strong>Edit</strong> on, Rate, Pre, Shoot, Post and OT are the same fields as Crew ▸ Roles. Labour and Kit are ex-VAT; a VAT-registered person's travel VAT is on the Travel row, not here.`,
         noRate ? `${noRate} crew member${noRate>1?'s have':' has'} no day rate on file — enter one in the Rate column, or on their crew database record.` : ''].filter(Boolean) };
   }
   /* costs — the rate card */
@@ -9512,20 +9584,20 @@ function budgetSheetModel(view, data, B){
     mine.forEach(r=>{ const l = r.line;
       const inp = (col, value, ph, call) => ({ c:'xls-in', x:value, h:`<input type="text" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}" data-ref="" data-fx="${escA(value||ph)}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}">` });
       rows.push({ cells:[{h:esc(l.code), c:'mu'}, esc(l.item), {h:esc(l.name), c:'mu'}, {h:l.qty||'', c:'c'},
-        inp('rate', l.rate ? fmt(l.rate) : '', '0.00', `setBudgetCostRate('${r.store}','${r.field}',this.value)`),
+        budgetEdit ? Object.assign(inp('rate', l.rate ? fmt(l.rate) : '', '0.00', `setBudgetCostRate('${r.store}','${r.field}',this.value)`), {c:'xls-in xls-ed'})
+                   : {h: l.rate ? fmt(l.rate) : dash, c:'n', v:l.rate},
         inp('charged', l.chRate!=null ? fmt(l.chRate) : '', fmt(l.rate), `setBudgetCharged('${escA(l.key)}',this.value,${l.rate})`),
         ...(vatOn ? [M(B.fig(l,mode).vat)] : []), M(B.fig(l,mode).tot)] }); });
   });
   return { cols:[[66,'Code'],[140,'Item'],[150,'Unit'],[50,'Qty','c'],[90,'Rate','n'],[90,'Charged','n'], ...(vatOn?[[76,'VAT £','n']]:[]), [100,'Total','n']], rows,
-    notes:[`<strong>Rate</strong> is your estimate per unit — the same fields as the Catering, Travel and Hotel tabs under Crew, so a change here or there updates both. <strong>Qty</strong> is counted from the call sheets: meal ticks, travel methods and hotel nights.`,
+    notes:[`<strong>Rate</strong> is your estimate per unit — the same fields as the Catering, Travel and Hotel tabs under Crew, so a change here or there updates both. Turn on <strong>Edit</strong> to change one here. <strong>Qty</strong> is counted from the call sheets: meal ticks, travel methods and hotel nights.`,
            `Anything else that needs costing — a skip, a permit, insurance — is a line of your own: the + in the left margin of Line Items.`] };
 }
-function budgetSheetViewHTML(view, data){
+function budgetSheetViewHTML(view, data, B){
   if(view!=='costs' && !data.hasCrew && !data.extrasTotal) return '<div class="empty-note">No crew assigned to this project yet.</div>';
-  const B = buildBudgetLines(data), m = budgetSheetModel(view, data, B);
+  const m = budgetSheetModel(view, data, B);
   const err = budgetXlsError; budgetXlsError = '';
-  return `${budgetSheetTopHTML(B, {lines: view==='department' || view==='day' || view==='bbc'})}
-    <div class="${view==='day'||view==='person' ? 'roles-widezone' : ''}">${xlsSheetHTML(m.cols, m.rows)}
+  return `<div class="${view==='day'||view==='person' ? 'roles-widezone' : ''}">${xlsSheetHTML(m.cols, m.rows)}
       <div class="xls-bar"><span class="${err?'err':''}">${err ? esc(err) : `Showing ${budgetMode==='cost'?'cost — true costs, no float or fee':'charged — charged rates and float'}`}</span><span>${esc(budgetScopeLabel())}</span></div></div>
     ${(m.notes||[]).map(t=>`<div class="hint" style="margin-top:8px;">${t}</div>`).join('')}
     ${view==='bbc' ? feedbackButtonHTML('bbc-view', 'the BBC view') : ''}`;
@@ -9551,28 +9623,6 @@ function setBudgetCostRate(store, field, raw){
     p[store] = Object.assign({}, p[store]||{}, { [field]: v });
   });
 }
-/* the DAY switches — the shoot-day filter, worn as buttons beside the stage selector.
-   ⚠️ budgetDayFilter's own rule stands: an EMPTY set means every day. */
-function toggleBudgetDayChip(dayId){
-  const all = projectDays().map(d=>d.id);
-  let on = budgetDayFilter.size ? all.filter(id=>budgetDayFilter.has(id)) : all.slice();
-  on = on.includes(dayId) ? on.filter(id=>id!==dayId) : on.concat(dayId);
-  budgetDayFilter = new Set((on.length===all.length || !on.length) ? [] : on);
-  renderProjectBody();
-}
-function onlyBudgetDay(dayId){
-  budgetDayFilter = new Set(budgetDayFilter.size===1 && budgetDayFilter.has(dayId) ? [] : [dayId]);
-  renderProjectBody();
-}
-function budgetDayChipsHTML(){
-  const days = projectDays(); if(days.length<2) return '';
-  const isOn = d => !budgetDayFilter.size || budgetDayFilter.has(d.id);
-  return `<div class="bnr-toolrow xls-days${budgetScope.production?'':' off'}"><span class="xls-pct">Days</span>
-    ${days.map(d=>`<button type="button" class="bnr-tool${isOn(d)?' on':''}" aria-pressed="${isOn(d)}" onclick="event.shiftKey ? onlyBudgetDay('${d.id}') : toggleBudgetDayChip('${d.id}')"
-      title="${esc(shootDayLabel(d))} — click to leave it out or bring it back, shift-click for this day only">Day ${esc(d.dayNum||'?')}</button>`).join('')}
-    ${budgetDayFilter.size ? `<button type="button" class="bnr-tool" onclick="budgetDayFilter=new Set();renderProjectBody()" title="Every shoot day">All days</button>` : ''}</div>`;
-}
-
 /* ---- BUDGET SETTINGS popup — see BUDGET_SETTING_DEFAULTS for what each one means ---- */
 let budgetSettingsOpen = false;
 function toggleBudgetSettings(){ budgetSettingsOpen = !budgetSettingsOpen; renderProjectBody(); }
@@ -9588,6 +9638,15 @@ function setBudgetSetting(key, value){
     if(value===BUDGET_SETTING_DEFAULTS[key]) delete s.settings[key]; else s.settings[key] = value;   // store only what differs
   });
 }
+function setBudgetViewStat(key, on){
+  xlsCommit(s=>{
+    s.settings = s.settings || {};
+    const view = Object.assign({}, s.settings.view||{});
+    const dflt = (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2];
+    if(on===dflt) delete view[key]; else view[key] = on;            // store only what differs
+    if(Object.keys(view).length) s.settings.view = view; else delete s.settings.view;
+  });
+}
 function resetBudgetSettings(){ xlsCommit(s=>{ delete s.settings; }); }
 function budgetSettingsDialogHTML(){
   const p = currentProject(), sheet = budgetSheetOf(p), set = sheet.settings;
@@ -9597,13 +9656,20 @@ function budgetSettingsDialogHTML(){
   const pct = (fk, value, call, title) => `<label class="xls-pct" title="${escA(title||'')}"><input type="text" inputmode="decimal" data-fk="set|${fk}" value="${escA(String(value))}" onchange="${call}">%</label>`;
   const row = (title, controlHTML, hint) => `<div class="bset-row"><div class="bset-name">${title}</div><div class="bset-ctl">${controlHTML}</div>
       ${hint ? `<div class="hint bset-hint">${hint}</div>` : ''}</div>`;
-  const changed = Object.keys(BUDGET_SETTING_DEFAULTS).some(k=>set[k]!==BUDGET_SETTING_DEFAULTS[k]);
+  const changed = Object.keys(BUDGET_SETTING_DEFAULTS).some(k=>set[k]!==BUDGET_SETTING_DEFAULTS[k]) || Object.keys(set.view||{}).length>0;
   return `<div class="modal-overlay" onclick="if(event.target===this) toggleBudgetSettings()">
     <div class="modal-box filter-box bset-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Budget settings">
       <h3>Budget settings</h3>
       <div class="hint" style="margin:-6px 0 12px;">How <strong>this project's</strong> budget is worked out. Changes apply straight away, on every Budget view and in the export.</div>
       ${err ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(err)}</div>` : ''}
-      <div class="subhead">Client</div>
+      <div class="subhead">Float and fee</div>
+      ${row('Float', pct('floatPct', sheet.floatPct, `setBudgetSheetPct('floatPct', this.value)`), 'Contingency, as a % of each line. Any line can still carry its own % in the Float column.')}
+      ${row('Production fee', pct('feePct', sheet.feePct, `setBudgetSheetPct('feePct', this.value)`), 'A % of the charged total.')}
+      <div class="subhead" style="margin-top:16px;">View — what the total shows</div>
+      ${row('Beside the total', `<div class="filter-chips bset-chips"><label title="Always shown"><input type="checkbox" checked disabled> Final total</label>${BUDGET_VIEW_STATS.map(([k,label])=>
+        `<label><input type="checkbox" ${budgetViewShows(set,k)?'checked':''} onchange="setBudgetViewStat('${k}', this.checked)"> ${label}</label>`).join('')}</div>`,
+        'The big figure follows Cost | Charged: Final total when Charged, Total cost when Cost. These sit beside it when Charged is showing. VAT reclaimed joins them by itself for an overseas client.')}
+      <div class="subhead" style="margin-top:16px;">Client</div>
       ${row('Client is', pick('vatBack', [[false,'UK — normal VAT'], [true,'Overseas (e.g. USA) — VAT reclaimed']]),
         `Overseas: everything is charged with VAT in it, as a final figure, and you reclaim the VAT you paid suppliers afterwards. That VAT shows as <strong>VAT reclaimed</strong> and counts towards Margin.${set.vatBack && !budgetVatToggle ? ' <strong>Switch Show VAT to With VAT for this to apply.</strong>' : ''}`)}
       <div class="subhead" style="margin-top:16px;">VAT</div>
@@ -9616,11 +9682,9 @@ function budgetSettingsDialogHTML(){
       ${row('Kit rows', pick('kitRows', [['split','Own row','Kit is its own EQUIP row, charged separately'], ['folded','Inside the person','One row per person — the kit stays in their day rate']]),
         'Own row puts kit under Equipment in Per Department and BBC. Inside the person keeps it in their department. What anyone is charged does not change when you flip this.')}
       <div class="subhead" style="margin-top:16px;">Float</div>
-      ${row('Default float', pct('floatPct', sheet.floatPct, `setBudgetSheetPct('floatPct', this.value)`), 'Any line can still carry its own % in the Float column.')}
       ${row('Float is a % of', pick('floatBase', [['ex','The ex-VAT figure'], ['inc','The figure with VAT']]))}
       ${row('Unspent float', pick('floatInMargin', [[true,'Is kept — counts as margin'], [false,'Goes back to the client']]), 'Goes back: float is still charged, but Margin leaves it out.')}
       <div class="subhead" style="margin-top:16px;">Production fee</div>
-      ${row('Fee', pct('feePct', sheet.feePct, `setBudgetSheetPct('feePct', this.value)`))}
       ${row('Fee is charged on', pick('feeBase', [['all','Everything'], ['exFloat','Everything except float']]))}
       <div class="subhead" style="margin-top:16px;">Overtime</div>
       ${row('Overtime is charged', pick('otCharged', [['charged','At the charged rate'], ['cost','At the cost rate']]), 'Only matters for someone whose Charged rate differs from their day rate.')}
@@ -9633,8 +9697,8 @@ function budgetSettingsDialogHTML(){
 }
 
 let budgetXlsError = '';
-function budgetLinesViewHTML(data){
-  const fmt = budgetFmt, B = buildBudgetLines(data), T = B.totals, mode = budgetMode, isCost = mode==='cost', vatOn = budgetVatToggle;
+function budgetLinesViewHTML(data, B){
+  const fmt = budgetFmt, T = B.totals, mode = budgetMode, isCost = mode==='cost', vatOn = budgetVatToggle;
   const dash = '<span class="mu">—</span>', z = v => v ? v : '', money = v => Math.abs(v)<0.005 ? dash : fmt(v);
   const cols = [['gut',46,''], ['code',70,'Code'], ['item',150,'Item'], ['name',140,'Name'], ['total',92,'Total','n'],
     ['pre',40,'Pre','c'], ['shoot',48,'Shoot','c'], ['post',40,'Post','c'], ['qty',44,'Qty','c'], ['days',44,'Days','c'], ['ot',36,'OT','c'],
@@ -9654,7 +9718,7 @@ function budgetLinesViewHTML(data){
   const inCell = (l, col, cls, value, ph, call, fx) => `<td class="xls-in"><input type="text" class="${cls}" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}"
       data-ref="${letter[col]}${n}" data-fx="${escA(fx||'')}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}"></td>`;
   const body = B.sections.map(sec=>{
-    const secRow = `<tr class="xls-sec">${gut(addBtn(sec.key,''))}<td colspan="3">${esc(sec.title)}</td><td class="n">${fmt(sumOf(sec.lines,'tot'))}</td><td colspan="${cols.length-5}"></td></tr>`;
+    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n">${fmt(sumOf(sec.lines,'tot'))}</td><td colspan="${cols.length-5}"></td></tr>`;
     n++;
     return secRow + sec.lines.map(l=>{
       const f = B.fig(l, mode), key = escA(l.key), days = l.pre+l.shoot+l.post+l.qty;
@@ -9662,20 +9726,48 @@ function budgetLinesViewHTML(data){
       const custom = l.custom, id = l.id;
       const txt = (field, cls, v, ph) => `<td class="xls-in"><input type="text" class="${cls}" data-fk="${key}|${field}" data-col="${field}" data-ref="${letter[field]||''}${n}" data-fx="${escA(v)}"
         value="${escA(v)}" placeholder="${ph}" onchange="setBudgetLineField('${id}','${field}',this.value)"></td>`;
-      const num = (field, v, editable) => (custom && editable) ? txt(field, 'c', v||'', '') : dayCell(field==='pre'?'preproduction':field==='post'?'post':'production', l.isBuyout && field!=='qty' ? 0 : v);
-      const delCall = custom ? `deleteBudgetLine('${id}')` : l.additionalId ? `deleteAdditionalCost('${l.additionalId}')` : '';
-      const row = `<tr>${gut((delCall?`<button type="button" class="del" onclick="${delCall}" title="Delete this line" aria-label="Delete this line">×</button>`:'') + (l.locked?'':addBtn(sec.key, l.key)))}
-        ${custom ? `<td class="xls-in"><select data-fk="${key}|code" onchange="setBudgetLineField('${id}','code',this.value)">${[...new Set(Object.values(DEPARTMENT_CODES))].map(c=>`<option${c===l.code?' selected':''}>${esc(c)}</option>`).join('')}</select></td>`
+      /* EDIT — what each kind of row lets you change, and the tab's own setter it writes through.
+         A typed line is only typeable with Edit on too: it is a cost like any other. */
+      const E = budgetEdit && !l.locked;
+      const ed = (col, cls, value, call, title) => `<td class="xls-in xls-ed" title="${escA(title||'')}"><input type="text" class="${cls}" inputmode="decimal" data-fk="${key}|${col}" data-col="${col}"
+        data-ref="${letter[col]||''}${n}" data-fx="${escA(String(value))}" value="${escA(String(value))}" placeholder="—" onchange="${call}"></td>`;
+      const person = E && l.entryId && !l.isKit;
+      const stageOf = field => field==='pre' ? 'preproduction' : field==='post' ? 'post' : 'production';
+      const num = (field, v, dayCol) => {
+        if(custom && E && (dayCol || field==='qty')) return txt(field, 'c', v||'', '').replace('class="xls-in"', 'class="xls-in xls-ed"');
+        if(person && field==='pre')  return ed('pre', 'c', l.pre||'', `xlsEdit(setPhaseDays('preprod','${l.entryId}',this.value))`, 'Prep days — the same number as Crew ▸ Roles');
+        if(person && field==='post') return ed('post', 'c', l.post||'', `xlsEdit(setPhaseDays('post','${l.entryId}',this.value))`, 'Edit days — the same number as Crew ▸ Roles');
+        if(person && field==='shoot') return `<td class="xls-btn xls-ed"><button type="button" onclick="openBudgetShootDays('${l.entryId}')" title="Tick the days on the shoot">${l.shoot||'—'}</button></td>`;
+        return dayCell(stageOf(field), l.isBuyout && field!=='qty' ? 0 : v);
+      };
+      const plain = v => `<td${v.cls?` class="${v.cls}"`:''}${v.t?` title="${escA(v.t)}"`:''}>${v.h}</td>`;
+      const rateCell = (()=>{
+        const shown = l.hasRate ? fmt(l.rate) : '';
+        if(custom) return E ? txt('rate','', l.rate?fmt(l.rate):'', '0.00').replace('class="xls-in"', 'class="xls-in xls-ed"') : plain({cls:'n', h:l.rate?fmt(l.rate):dash});
+        if(!E) return plain({cls:'n', h: l.hasRate ? fmt(l.rate) : '<span class="budget-noRate">no rate</span>'});
+        if(person){ const kit = l.foldedKit ? 0 : Math.round((l.fullRate - l.rate)*100)/100;       // split rows show labour; the day rate is labour + kit
+          return ed('rate', '', shown, `xlsEdit(saveEntryRate('${l.entryId}', (v=>v===''?'':String(Number(v)+${kit}))(${xlsRaw})))`, kit ? `Labour part of the day rate — £${kit} of kit is added back on Crew ▸ Roles` : 'The project day rate — the same field as Crew ▸ Roles'); }
+        if(l.isKit) return plain({cls:'n', h:shown, t:'Kit is set per role on the crew record'});
+        if(l.costField) return ed('rate', '', shown, `setBudgetCostRate('${l.costField.store}','${l.costField.field}',this.value)`, 'The same rate as the cost tabs under Crew');
+        if(l.locId && l.extraId) return ed('rate', '', shown, `xlsEdit(setLocationExtra('${l.locId}','${l.extraId}','amount',${xlsRaw}))`, 'This venue extra — the same figure as on Venues');
+        if(l.locId && l.locMode!=='hourly') return ed('rate', '', shown, `xlsEdit(setLocationCostField('${l.locId}','rate',${xlsRaw}))`, "This project's fee for the venue — the same figure as on Venues");
+        if(l.vcId && !l.vcLocked) return ed('rate', '', shown, `xlsEdit(setVendorCostField('${l.vcId}','${l.vcField}',${xlsRaw}))`, `The vendor's ${l.vcField} — the same figure as on the vendor booking`);
+        return plain({cls:'n', h:shown||dash, t:'Changed where it is set'});
+      })();
+      const otCell = (person && !l.isBuyout) ? ed('ot', 'c', l.ot||'', `xlsEdit(setEntryOvertime('${l.entryId}',this.value))`, 'Overtime units × the day rate — the same number as Crew ▸ Roles') : `<td class="c mu">${z(l.ot)}</td>`;
+      const delCall = !E ? '' : custom ? `deleteBudgetLine('${id}')` : l.additionalId ? `deleteAdditionalCost('${l.additionalId}')` : '';
+      const row = `<tr>${gut((delCall?`<button type="button" class="del" onclick="${delCall}" title="Delete this line" aria-label="Delete this line">×</button>`:'') + (l.locked||!budgetEdit?'':addBtn(sec.key, l.key)))}
+        ${custom && E ? `<td class="xls-in xls-ed"><select data-fk="${key}|code" onchange="setBudgetLineField('${id}','code',this.value)">${[...new Set(Object.values(DEPARTMENT_CODES))].map(c=>`<option${c===l.code?' selected':''}>${esc(c)}</option>`).join('')}</select></td>`
                  : `<td class="mu">${esc(l.code)}</td>`}
-        ${custom ? txt('item','l',l.item,'Item') + txt('name','l',l.name,'Detail') : `<td title="${escA(l.item)}">${esc(l.item)}</td><td class="mu" title="${escA(l.name)}">${esc(l.name)}</td>`}
+        ${custom && E ? (txt('item','l',l.item,'Item') + txt('name','l',l.name,'Detail')).replace(/class="xls-in"/g, 'class="xls-in xls-ed"') : `<td title="${escA(l.item)}">${esc(l.item)}</td><td class="mu" title="${escA(l.name)}">${esc(l.name)}</td>`}
         <td class="n">${money(f.tot)}</td>
-        ${num('pre', l.pre, sec.dayCols)}${num('shoot', l.shoot, sec.dayCols)}${num('post', l.post, sec.dayCols)}${num('qty', l.qty, true)}
-        <td class="c">${l.isBuyout ? '<span class="mu">fee</span>' : z(days)}</td><td class="c mu">${z(l.ot)}</td>
-        ${custom ? txt('rate','', l.rate?fmt(l.rate):'', '0.00') : `<td class="n">${l.hasRate ? fmt(l.rate) : '<span class="budget-noRate">no rate</span>'}</td>`}
+        ${num('pre', l.pre, sec.dayCols)}${num('shoot', l.shoot, sec.dayCols)}${num('post', l.post, sec.dayCols)}${num('qty', l.qty, false)}
+        <td class="c">${l.isBuyout ? '<span class="mu">fee</span>' : z(days)}</td>${otCell}
+        ${rateCell}
         ${l.locked ? `<td class="n mu">—</td>` : inCell(l, 'charged', '', l.chRate!=null?fmt(l.chRate):'', fmt(l.rate),
             l.foldedKit ? `setBudgetChargedPerson('${l.entryId}',this.value,${l.rate},${l.rate-l.foldedKit},${l.kitCharged})` : `setBudgetCharged('${key}',this.value,${l.rate})`,
             l.chRate!=null?l.chRate.toFixed(2):`=${letter.rate}${n}`)}
-        ${vatOn ? (custom ? txt('vat','c', l.vatPct?l.vatPct+'%':'', '0%') : `<td class="c mu">${l.vatPct==null?'mixed':l.vatPct+'%'}</td>`) + `<td class="n">${money(f.vat)}</td>` : ''}
+        ${vatOn ? (custom && E ? txt('vat','c', l.vatPct?l.vatPct+'%':'', '0%').replace('class="xls-in"', 'class="xls-in xls-ed"') : `<td class="c mu">${l.vatPct==null?'mixed':l.vatPct+'%'}</td>`) + `<td class="n">${money(f.vat)}</td>` : ''}
         ${isCost||l.locked ? `<td class="c mu">—</td><td class="n mu">—</td>`
           : inCell(l, 'flp', 'c', l.floatOwn!=null?l.floatOwn+'%':'', B.sheet.floatPct+'%', `setBudgetLineFloat('${key}',this.value)`, l.floatPct+'%') + `<td class="n">${money(f.fl)}</td>`}
       </tr>`;
@@ -9684,18 +9776,19 @@ function budgetLinesViewHTML(data){
   }).join('');
   const overridden = B.lines.filter(l=>l.chRate!=null).length;
   const err = budgetXlsError; budgetXlsError = '';
-  return `${budgetSheetTopHTML(B)}
-    <div class="roles-widezone">
+  return `<div class="roles-widezone">
       <div class="xls-fx"><span id="xlsRef"></span><span class="mu"><em>fx</em></span><span id="xlsFx"></span></div>
       <div class="xls-wrap" onfocusin="xlsFocus(event)" onkeydown="xlsKey(event)">
         <table class="xls" style="width:${cols.reduce((n,c)=>n+c[1], 0)}px; min-width:100%"><colgroup>${cols.map(c=>`<col style="width:${c[1]}px">`).join('')}</colgroup>${head}${totalsRow}${body}</table>
       </div>
-      <div class="xls-bar"><span class="${err?'err':''}">${err ? esc(err) : 'Charged overrides the rate — type a figure, or +20% / −10%. Clear it to charge at cost. + in the left margin adds a line of your own.'}</span>
+      <div class="xls-bar"><span class="${err?'err':''}">${err ? esc(err) : budgetEdit ? 'Edit is on — the shaded cells write back to where that cost lives: Crew ▸ Roles, the cost tabs, Venues. + in the left margin adds a line of your own.'
+          : 'Charged overrides the rate — type a figure, or +20% / −10%; clear it to charge at cost. Turn on Edit to change costs, days and rates, or to add a line.'}</span>
         <span>Showing ${isCost?'cost':'charged'} · ${overridden} of ${B.lines.length} rates overridden</span></div>
     </div>`;
 }
 function xlsFocus(e){
-  const el = e.target; if(!el.dataset || !el.dataset.ref) return;
+  const el = e.target; if(el.dataset && el.dataset.fk) xlsLastFk = el.dataset.fk;
+  if(!el.dataset || !el.dataset.ref) return;
   const ref = document.getElementById('xlsRef'), fx = document.getElementById('xlsFx');
   if(ref) ref.textContent = el.dataset.ref; if(fx) fx.textContent = el.dataset.fx || el.value || '';
   if(el.select) el.select();
@@ -9780,37 +9873,18 @@ async function deleteBudgetLine(id){
 
 function renderProjectBudget(body){
   applyStageColour(body);
-  const data = buildBudgetData();
-  const viewLabels = BUDGET_VIEW_LABELS;
+  const data = buildBudgetData(), B = buildBudgetLines(data);
   const viewSwitcher = `<div class="tabs">
-    ${Object.keys(viewLabels).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${viewLabels[v]}</div>`).join('')}
+    ${Object.keys(BUDGET_VIEW_LABELS).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${BUDGET_VIEW_LABELS[v]}</div>`).join('')}
   </div>`;
-  // Same construction as the Crew tab's Filter and Preview & Export's Format panel:
-  // one toggle in a crewToolbarHTML() row, panel rendered below the row, not in it.
-  const activeFilters = budgetActiveFilterCount();
-  const filterToggleSpan = filterToggleHTML({
-    open: budgetFilterOpen, count: activeFilters, onToggle: 'toggleBudgetFilterPanel()'
-  });
-  const filterRow = outputMenuRowHTML({
-    open: budgetOutputOpen,
-    onToggle: 'toggleBudgetOutputPanel()',
-    titleText: `Export ${BUDGET_VIEW_LABELS[budgetExportViewEff()]}`,
-    panelHTML: budgetOutputPanelHTML(),
-    filterHTML: filterToggleSpan,
-    filterPanelHTML: budgetFilterOpen ? budgetFilterPanelHTML() : ''
-  });
-  const viewHTML = budgetView==='lines' ? budgetLinesViewHTML(data) : budgetSheetViewHTML(budgetView, data);
+  const viewHTML = budgetView==='lines' ? budgetLinesViewHTML(data, B) : budgetSheetViewHTML(budgetView, data, B);
   body.innerHTML = `
     <div class="section">
-      <h2>Budget at a glance</h2>
-      <div class="hint">Everything the project costs — crew day rates, and the catering, travel, hotel and venue costs
-        entered on their own tabs. <strong>Line Items</strong> is the working budget: what you charge, float, production fee and lines of your own.</div>
-      ${filterRow}
-      <div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(data, {sheetTools:true})}</div>
-      ${budgetDayChipsHTML()}
+      <div id="budgetSummaryBarWrap">${budgetPageHeadHTML(data, B)}</div>
       ${viewSwitcher}
       ${viewHTML}
-    </div>${budgetSettingsOpen ? budgetSettingsDialogHTML() : ''}`;
+    </div>${budgetSettingsOpen ? budgetSettingsDialogHTML() : ''}${budgetFilterOpen ? filterDialogHTML(budgetFilterPanelHTML(), 'toggleBudgetFilterPanel()') : ''}${
+      budgetOutputOpen ? budgetOutputDialogHTML() : ''}${budgetShootFor ? budgetShootDialogHTML() : ''}`;
   body.oninput = null;
 }
 function selectShootDay(id){ flushShootDayEdits(); currentShootDayId=id; renderProjectBody(); }
