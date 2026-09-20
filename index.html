@@ -248,26 +248,25 @@
   .sheet-sync-notice{font-size:var(--fs-meta); color:var(--tape); margin:-4px 0 10px; padding:0 10px;}
   .sheet-sync-notice.err{color:var(--danger);}
   /* Project Notes (T-9) — ruled rows, borderless bodies: a scratchpad, not a form */
-  /* Talent etc (T-10) — the call-sheet card, with type-matched fields like the Call Sheets edit card */
-  .te-card h3{margin-top:18px;}
-  .te-table{table-layout:fixed;}
-  .te-table .te-c{text-align:center;}
-  .te-table td{vertical-align:middle;}
-  .te-table input[type=text]{padding:0; margin:0; height:auto; min-height:0; font-size:inherit; line-height:inherit; border-bottom:none; box-shadow:0 1px 0 var(--field-line);}
-  .te-table input[type=text]:hover{box-shadow:0 1px 0 var(--text);}
-  .te-table input[type=text]:focus{box-shadow:0 1.5px 0 var(--tape);}
-  .te-money{white-space:nowrap;} .te-money input[type=text]{width:64px;}
-  .te-row td{padding-bottom:2px;}
-  .te-sub td{padding-top:0; padding-bottom:10px; border-bottom:1px solid var(--line); font-size:var(--fs-meta); color:var(--muted);}
-  .te-line{display:inline-flex; align-items:baseline; gap:6px; margin:0 18px 2px 0; flex-wrap:wrap;}
-  .te-lbl{font-family:var(--label); font-size:10px; letter-spacing:1.1px; text-transform:uppercase; color:var(--tape); width:42px;}
-  .te-table input.te-wide{width:190px;} .te-table input.te-num{width:42px; text-align:center;}
-  .te-by{display:inline-flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; margin-left:4px; align-self:center;}
+  /* Talent etc — the SAME row as the Crew sub-tabs (.crewgrid's lead columns, header type,
+     name weight, tick size); only the middle columns differ per view, set inline as --te-cols */
+  .tegrid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) var(--te-cols);
+    align-items:center; column-gap:10px;}
+  .talent-tab{--pb-name-w:160px; --pb-role-w:126px;}
+  .talent-tab.roles-tags-text{--pb-name-w:236px;}
+  .tegrid .crewgrid-header.te-l{text-align:left;}
+  .tegrid input[type=text]{padding:0; margin:0; height:auto; min-height:0; width:100%; font-size:var(--fs-meta); line-height:1.6; border-bottom:none; box-shadow:0 1px 0 var(--field-line);}
+  .tegrid input[type=text]:hover{box-shadow:0 1px 0 var(--text);}
+  .tegrid input[type=text]:focus{box-shadow:0 1.5px 0 var(--tape);}
+  .tegrid input.te-num{text-align:center;}
+  .te-role{font-size:var(--fs-meta); color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .te-total{font-size:var(--fs-meta); text-align:right; font-variant-numeric:tabular-nums;}
+  .te-by{display:inline-flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; justify-self:center;}
   .te-by span{font-family:var(--label); font-size:9.5px; letter-spacing:1px; text-transform:uppercase; padding:1px 7px; cursor:pointer; color:var(--muted); user-select:none;}
   .te-by span.on{background:var(--tape); color:var(--tape-ink);}
   .te-by span.on.them{background:var(--muted);}
-  @media (pointer:coarse){ .te-table input[type=text]{font-size:16px;} }
-  @media(max-width:900px){ .te-table{min-width:560px;} }
+  @media (pointer:coarse){ .tegrid input[type=text]{font-size:16px;} }
+  @media(max-width:900px){ .tegrid{min-width:560px;} }
   .task-field{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; color:var(--text);}
   .list-card .meta .task-field, .list-card .meta .task-field span{color:var(--text); font-size:var(--fs-field); margin-top:0;}
   .list-card .meta .task-field{margin-top:8px;}
@@ -935,7 +934,6 @@
     padding-left:0; padding-right:0;}
   .roles-name-text{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   /* the name on a Roles row opens the person's record in the edit pop-up (crewEditModalHTML) */
-  .roles-footnote .roles-tips-toggle{white-space:nowrap;}
   .roles-name-link{cursor:pointer;} .roles-name-link:hover{color:var(--tape); text-decoration:underline; text-underline-offset:2px;}
   .roles-inline{display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px;}
   .formgroup{border:none; border-radius:0; padding:0; margin-bottom:16px; background:none;}
@@ -987,6 +985,24 @@
   .crewgrid-check input{width:16px; height:16px;}
   /* catering: three stacked rows per person (Breakfast/Lunch/Dinner), kept compact
      so three rows don't feel like three times the space of one */
+  /* catering: B / L / D sit INSIDE each day column, on the person's own line */
+  .meal-trio, .meal-trio-head{display:flex; justify-content:center; gap:5px;}
+  .crewgrid-check.meal-trio input{width:14px; height:14px;}
+  .crewgrid-check.meal-trio input::after{font-size:12px;}
+  .meal-trio-head span{width:14px; text-align:center; font-family:var(--body); font-size:9.5px; font-weight:400; letter-spacing:0; color:var(--muted); cursor:pointer; user-select:none; border-radius:3px;}
+  .meal-trio-head span:hover{color:var(--tape); background:var(--tint-3);}
+  .meal-trio-head span:focus-visible{outline:2px solid var(--tape); outline-offset:1px;}
+  .meal-fill-table{width:100%; border-collapse:collapse;}
+  .meal-fill-table th, .meal-fill-table td{text-align:left; padding:6px 16px 6px 0; font-size:var(--fs-field); border-bottom:1px solid var(--line); white-space:nowrap;}
+  .meal-fill-table th{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);}
+  .crewview-tabs .crew-header-row .bnr-tool{font-family:var(--label);}
+  .meal-tail{gap:12px; min-width:0; padding-left:12px;}
+  .meal-diet{flex:1 1 auto; min-width:0; text-align:left; font-size:var(--fs-meta); color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .meal-all.open .meal-all-key{font-family:var(--label); font-size:10px; letter-spacing:.8px; border:1px solid var(--line); border-radius:4px; padding:0 5px; line-height:16px;}
+  .meal-all.open .meal-all-key:hover{border-color:var(--tape);}
+  .meal-all.open > .meal-row-all:last-child{color:var(--tape);}
+  .meal-all{display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-meta); color:var(--muted);}
+  .meal-own .meal-trio{opacity:.35;}
   .crewgrid-catering-person{padding-bottom:6px; margin-bottom:6px;}
   .crewgrid-catering-person:last-child{margin-bottom:0;}
   .meal-subrow{margin-top:1px;}
@@ -1060,6 +1076,45 @@
   .bnr-tool.on{background:var(--tape); border-color:var(--tape); color:var(--tape-ink); font-weight:600;}
   .bnr-tool:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .bnr-scope-note{grid-column:1/-1; margin:0;}
+  /* ---- THE PAGE HEAD (20 Sep 2026) — Crew and Talent etc share it; see pageHeadHTML().
+     No rule of its own: the sub-tab row underneath draws the line. */
+  .phase-banner.bnr-head{grid-template-columns:minmax(0,1fr) var(--bnr-stage-w); grid-template-areas:"left stage"; align-items:stretch; margin:6px 0 14px; padding-bottom:0; border-bottom:none;}
+  /* ⚠️ min-height + space-between: Budget top, list tools bottom, and the total's slot between
+     them is RESERVED — the head is the same height with Budget on or off. */
+  .bnr-left{grid-area:left; display:flex; flex-direction:column; justify-content:space-between; gap:6px; min-width:0; min-height:98px;}
+  .bnr-head .bnr-toolrow{justify-content:flex-start;}
+  /* the total is ONE line here (figure, label, VAT notes on a shared baseline) so the reserved
+     slot is a single row tall and the head stays close to the stage selector's own height */
+  .bnr-head .bnr-totals{grid-area:auto; min-height:28px; align-items:center;}
+  .bnr-head .budget-stat{display:flex; align-items:baseline; flex-wrap:wrap; gap:0 9px;}
+  .bnr-head .budget-stat .num{font-size:21px; line-height:1.2;}
+  .bnr-head .budget-stat .lbl, .bnr-head .budget-stat-sub{margin-top:0;}
+  .bnr-toolrow .status{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);}
+  /* + Add | Filter | Select — one joined control, hairlines between */
+  .bnr-group{display:inline-flex; flex-wrap:wrap;}
+  .bnr-group .bnr-tool{border-radius:0; margin-left:-1px;}
+  .bnr-group .bnr-tool:first-child{border-radius:5px 0 0 5px; margin-left:0; color:var(--text);}
+  .bnr-group .bnr-tool:last-child{border-radius:0 5px 5px 0;}
+  .bnr-group .bnr-tool:only-child{border-radius:5px;}
+  .bnr-group .bnr-tool:hover, .bnr-group .bnr-tool.on, .bnr-group .bnr-tool:focus-visible{position:relative; z-index:1;}
+  .bnr-group .bnr-tool:first-child:hover{color:var(--tape);}
+  .bnr-fold{cursor:pointer; user-select:none;} .bnr-fold:hover{color:var(--tape);}
+  /* folded: the whole head on one line; the chip's colour is the stage selection (--tape follows
+     applyStageColour: black for all / a mix, the stage's own colour when one is isolated) */
+  .phase-banner.bnr-head.bnr-folded{display:flex; align-items:center; flex-wrap:wrap; gap:6px;}
+  .bnr-folded .bnr-grow{flex:1 1 auto;}
+  .stage-chip{display:inline-flex; align-items:center; gap:7px; border-radius:5px; padding:4px 10px; cursor:pointer; user-select:none;
+    background:var(--tape); border:1px solid var(--tape); color:#fff; white-space:nowrap; line-height:1.35;
+    font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px; text-transform:uppercase; font-weight:500;}
+  .stage-chip .stage-chip-meta{font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none; font-weight:400; opacity:.85;}
+  .stage-chip .stage-dot{box-shadow:0 0 0 1.5px rgba(255,255,255,.85);}
+  .stage-chip.none{background:transparent; color:var(--muted); border-color:var(--line);}
+  .stage-chip:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  /* Summary / Collapse all ride at the right-hand end of the sub-tab row */
+  .crewview-tabs .crew-header-row{margin:0 0 0 auto; align-self:center;}
+  /* the filter popup: the one filter panel, without its box — the dialog is the box */
+  .modal-box.filter-box{max-width:660px; max-height:calc(100vh - 32px); overflow:auto;}
+  .filter-box .filter-panel{border:none; padding:0; margin:0; background:none;}
   .budget-rate-input{width:64px; text-align:left;}
   .money-field{display:inline-flex; align-items:baseline; gap:1px; min-width:0;}
   .money-field::before{content:'£'; color:var(--muted); font-size:var(--fs-meta); flex:0 0 auto;}
@@ -1456,6 +1511,8 @@
     .roles-tablewrap .roles-grid-header-row{position:static;}
     .phase-banner{grid-template-columns:minmax(0,1fr);
       grid-template-areas:"totals" "stage" "tools"; gap:14px 0;}
+    .phase-banner.bnr-head{grid-template-columns:minmax(0,1fr); grid-template-areas:"left" "stage";}
+    .bnr-left{min-height:0; gap:10px;} .bnr-head .bnr-totals{min-height:0;}
     .bnr-totals{gap:22px; flex-wrap:wrap;}
     .phase-banner .budget-scope-stack{width:100%;}
     /* Budget stays last in its row on mobile too, so it keeps holding one position — but the
@@ -1532,7 +1589,8 @@ const FONT_CHOICES = {
 const SETTINGS_DEFAULTS = { headerFont:'fraunces', labelFont:'oswald', bodyFont:'jost',
                             brand:'#017756', brandLight:'#0FA47A', rolesColumnOrder:null,
                             sheetSync:null, /* {url, sheetUrl, sheetName, lastPush, lastPull} — see GOOGLE SHEET SYNC */
-                            hideRolesTips:false /* Roles table: "Hide tips" under the grid (rolesFootnoteHTML) */ };
+                            hideRolesTips:false /* retired 20 Sep 2026 — no longer read */,
+                            headFolded:false /* Crew / Talent etc page head folded to one line (pageHeadHTML) */ };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -1566,7 +1624,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -2871,7 +2929,7 @@ function mostRecentProject(){
 function goRecentProject(){ const p=mostRecentProject(); if(p) openProject(p.id); }
 /* ⚠️ Phase BW — closes the Dates popup. It lives on #globalOverlay, outside #main, so a tab
    change alone would leave it floating over a screen that has nothing to do with it. */
-function goProjectTab(tab){ flushShootDayEdits(); flushNotesEdits(); currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
+function goProjectTab(tab){ flushShootDayEdits(); flushNotesEdits(); if(tab!==currentProjectTab){ projectCrewSelected.clear(); crewSelectMode = false; bulkEditOpen = false; projectCrewFilterOpen = false; mealFillOpen = false; } currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
 
 function renderMain(){
   const m = document.getElementById('main');
@@ -3051,17 +3109,17 @@ function renderProject(m){
    a toggle meant hunting for the person you had been looking at. renderProjectBody() now notes the
    page position and every inner scroller's position before the rebuild and puts them back after —
    but only when it is still the same screen (tab + sub-view); a tab change still starts at the top. */
-const SCROLL_KEEPERS = '.roles-tablewrap, .tablewrap, .sd-tablescroll';
+const SCROLL_KEEPERS = '.roles-tablewrap, .tablewrap, .sd-tablescroll, .filter-box';
 let _lastBodyScreen = '';
 function renderProjectBody(){
   const body = document.getElementById('projectBody');
   if(!body) return;
-  const screen = [currentProjectId, currentProjectTab, crewGridView, budgetView].join('|');
+  const screen = [currentProjectId, currentProjectTab, crewGridView, talentView, budgetView].join('|');
   const same = screen===_lastBodyScreen;
   const pageY = window.scrollY, pageX = window.scrollX;
   const inner = same ? [...body.querySelectorAll(SCROLL_KEEPERS)].map(el=>[el.scrollTop, el.scrollLeft]) : [];
   renderProjectBodyNow(body);
-  _lastBodyScreen = [currentProjectId, currentProjectTab, crewGridView, budgetView].join('|');
+  _lastBodyScreen = [currentProjectId, currentProjectTab, crewGridView, talentView, budgetView].join('|');
   if(!same) return;
   [...body.querySelectorAll(SCROLL_KEEPERS)].forEach((el,i)=>{ if(inner[i]){ el.scrollTop = inner[i][0]; el.scrollLeft = inner[i][1]; } });
   if(window.scrollY!==pageY || window.scrollX!==pageX) window.scrollTo(pageX, pageY);
@@ -3334,55 +3392,149 @@ function talentSummaryHTML(p){
   const list = projectEntries(p).filter(isTalentEtc);
   const fees = list.reduce((s,e)=> s + (Object.prototype.hasOwnProperty.call(e,'rate') ? numOf(e.rate) : 0), 0);
   const c = talentEtcCosts(p);
-  const bits = [`Fees ${fees?budgetFmt(fees):'—'}`, `Hotels we book ${c.stay?budgetFmt(c.stay):'—'}`, `Travel we book ${c.trip?budgetFmt(c.trip):'—'}`];
-  return `${bits.join(' · ')} <span style="color:var(--muted)">— these are what Budget counts; anything arranged by them costs nothing here.</span>`;
+  // each sub-tab totals its own column — all three are what Budget counts
+  if(talentView==='hotel')  return `Hotels we book ${c.stay?budgetFmt(c.stay):'—'}`;
+  if(talentView==='travel') return `Travel we book ${c.trip?budgetFmt(c.trip):'—'}`;
+  return `Fees ${fees?budgetFmt(fees):'—'}`;
 }
-function refreshTalentSummary(){ const el = document.getElementById('talentSummary'); if(el) el.innerHTML = talentSummaryHTML(currentProject()); }
-function talentGroupHTML(kind, views, days){
-  if(!views.length) return '';
+function refreshTalentSummary(){
+  const el = document.getElementById('talentSummary'); if(el) el.innerHTML = talentSummaryHTML(currentProject());
+  // the Hotel row's own total, without re-rendering the row being typed in
   const p = currentProject();
-  const bySwitch = (id, group, by) => `<span class="te-by" title="Who arranges and pays for it">
-      <span class="${by==='us'?'on':''}" onclick="setTalentField('${id}','${group}','by','us')">Us</span><span class="${by==='them'?'on them':''}" onclick="setTalentField('${id}','${group}','by','them')">Them</span></span>`;
-  const rows = views.map(v=>{
-    const e = entryById(v.id, p), s = stayOf(e), t = tripOf(e);
-    const fee = Object.prototype.hasOwnProperty.call(e,'rate') ? e.rate : '';
-    return `<tr class="te-row">
-        <td><span class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${v.id}')" title="Open ${esc(v.name)}'s record">${esc(v.name)}</span></td>
-        <td>${esc(v.showAs||v.role||'')}</td>
-        ${days.map(d=>`<td class="te-c"><input type="checkbox" ${entryOnDay(v.id,d)?'checked':''} onchange="toggleCrewOnDay('${v.id}','${d.id}',this.checked)" title="On the call sheet for Day ${esc(d.dayNum||'?')}${d.date?' — '+esc(fmtDate(d.date)):''}"></td>`).join('')}
-        <td class="te-money">£ <input type="text" inputmode="decimal" value="${esc(fee)}" placeholder="—" onchange="setTalentFee('${v.id}', this.value)" title="Optional. Costed in Budget only if you enter one — never flagged as missing"></td>
-        <td class="sd-rowtools"><button type="button" class="sd-x" title="Take ${esc(v.name)} off the project" onclick="removeTalentFromProject('${v.id}','${esc(v.name).replace(/'/g,'&#39;')}')">×</button></td>
-      </tr>
-      <tr class="te-sub"><td colspan="${days.length+4}">
-        <span class="te-line"><span class="te-lbl">Hotel</span><input type="text" class="te-wide" value="${esc(s.hotel)}" placeholder="Hotel name" oninput="setTalentField('${v.id}','stay','hotel',this.value)">
-          <input type="text" class="te-num" inputmode="numeric" value="${esc(s.nights)}" placeholder="0" oninput="setTalentField('${v.id}','stay','nights',this.value)"><span>nights × £</span><input type="text" class="te-num" inputmode="decimal" value="${esc(s.perNight)}" placeholder="0" oninput="setTalentField('${v.id}','stay','perNight',this.value)">${bySwitch(v.id,'stay',s.by)}</span>
-        <span class="te-line"><span class="te-lbl">Travel</span><input type="text" class="te-wide" value="${esc(t.note)}" placeholder="Car, train, flight, who is booking…" oninput="setTalentField('${v.id}','trip','note',this.value)">
-          <span>£</span><input type="text" class="te-num" inputmode="decimal" value="${esc(t.cost)}" placeholder="0" oninput="setTalentField('${v.id}','trip','cost',this.value)">${bySwitch(v.id,'trip',t.by)}</span>
-      </td></tr>`;
-  }).join('');
-  return `<h3>${kind}</h3><div class="sd-tablescroll"><table class="te-table"><colgroup><col style="width:24%"><col>${days.map(()=>'<col style="width:38px">').join('')}<col style="width:96px"><col style="width:28px"></colgroup>
-    <tr><th>Name</th><th>Role</th>${days.map(d=>`<th class="te-c" title="${d.date?esc(fmtDate(d.date)):''}">D${esc(d.dayNum||'?')}</th>`).join('')}<th>Fee</th><th></th></tr>${rows}</table></div>`;
+  document.querySelectorAll('[data-te-staytotal]').forEach(cell=>{
+    const e = entryById(cell.dataset.teStaytotal, p); if(!e) return;
+    const st = stayOf(e), t = numOf(st.nights) * numOf(st.perNight);
+    cell.textContent = t ? budgetFmt(t) : '—';
+  });
+}
+/* ⚠️ 20 Sep 2026 — SPLIT ACROSS THE CREW SUB-TABS. It was one card with everything per person
+   stacked under their name; it is now Roles (day ticks + fee) / Hotel (e.stay) / Travel (e.trip)
+   / Catering (the SAME meal ticks Crew's Catering writes — toggleMeal), under the same page
+   head, sub-tab row, department headings and row grid as Crew. Same data, same savers. */
+let talentView = 'roles';
+function setTalentView(v){ talentView = v; renderProjectBody(); }
+let collapsedTalentGroups = new Set();
+function toggleTalentGroup(kind){ collapsedTalentGroups.has(kind) ? collapsedTalentGroups.delete(kind) : collapsedTalentGroups.add(kind); renderProjectBody(); }
+function talentColumns(days){
+  const money = crewShowMoney;
+  const dayCols = days.length ? `repeat(${days.length}, 38px) ` : '';
+  const dayHeads = days.map(d=>({head:`D${esc(d.dayNum||'?')}`, title:`Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`}));
+  const byHead = {head:'Booked by', title:'Who arranges and pays for it — only Us is costed'};
+  /* money columns (fee, per night, cost, totals) follow the Budget toggle, exactly as on Crew */
+  if(talentView==='hotel') return {tail:false, template:`minmax(110px,1fr) 56px ${money?'76px ':''}84px${money?' 72px':''}`,
+    heads:[{head:'Hotel', left:true}, {head:'Nights'}].concat(money?[{head:'Per night'}]:[], [byHead], money?[{head:'Total'}]:[])};
+  if(talentView==='travel') return {tail:false, template:`minmax(140px,1fr) ${money?'76px ':''}84px`,
+    heads:[{head:'Travel', left:true}].concat(money?[{head:'Cost'}]:[], [byHead])};
+  return {tail:true, template:`46px ${dayCols}46px ${money?'84px ':''}minmax(0,1fr)`,
+    heads:[{head:'Prep', title:'Booked pre-production days'}].concat(dayHeads, [{head:'Post', title:'Booked edit days'}],
+      money?[{head:'Fee', title:'Optional. Costed in Budget only if you enter one — never flagged as missing'}]:[])};
+}
+function talentRowHTML(v, days, cols){
+  const p = currentProject();
+  const money = crewShowMoney;
+  const e = entryById(v.id, p), s = stayOf(e), t = tripOf(e);
+  const bySwitch = (group, by) => `<span class="te-by" title="Who arranges and pays for it">
+      <span class="${by==='us'?'on':''}" onclick="setTalentField('${v.id}','${group}','by','us')">Us</span><span class="${by==='them'?'on them':''}" onclick="setTalentField('${v.id}','${group}','by','them')">Them</span></span>`;
+  const lead = `<div class="crewgrid-controls">${entrySelectCbHTML(v)}<button class="icon-btn" onclick="editCrew('${v.id}')" title="Edit" aria-label="Edit">${icon('edit')}</button></div>
+      <div class="crewgrid-row-name"><div class="crew-ident one-line"><strong class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${v.id}')" title="Open ${esc(v.name)}'s record">${esc(v.name)}</strong></div>${talentView==='roles'?stageTagsHTML(v.id, p):''}</div>
+      <div class="te-role" title="${esc(v.showAs||v.role||'')}">${esc(v.showAs||v.role||'')}</div>`;
+  const row = (cells, right) => `<div class="tegrid crewgrid-row pb-head" style="--te-cols:${cols.template};">${lead}${cells}${cols.tail ? `<div class="crewgrid-remove">${right||''}</div>` : ''}</div>`;
+  if(talentView==='hotel'){
+    const total = numOf(s.nights) * numOf(s.perNight);
+    return row(`<input type="text" value="${esc(s.hotel)}" placeholder="Hotel name" oninput="setTalentField('${v.id}','stay','hotel',this.value)">
+      <input type="text" class="te-num" inputmode="numeric" value="${esc(s.nights)}" placeholder="0" oninput="setTalentField('${v.id}','stay','nights',this.value)">
+      ${money?`<span class="money-field"><input type="text" inputmode="decimal" value="${esc(s.perNight)}" placeholder="0" oninput="setTalentField('${v.id}','stay','perNight',this.value)"></span>`:''}
+      ${bySwitch('stay', s.by)}
+      ${money?`<span class="te-total" data-te-staytotal="${v.id}">${total?budgetFmt(total):'—'}</span>`:''}`);
+  }
+  if(talentView==='travel'){
+    return row(`<input type="text" value="${esc(t.note)}" placeholder="Car, train, flight, who is booking…" oninput="setTalentField('${v.id}','trip','note',this.value)">
+      ${money?`<span class="money-field"><input type="text" inputmode="decimal" value="${esc(t.cost)}" placeholder="0" oninput="setTalentField('${v.id}','trip','cost',this.value)"></span>`:''}
+      ${bySwitch('trip', t.by)}`);
+  }
+  /* Roles — Prep and Post are the SAME numbers Crew's Roles writes (setPhaseDays), so a client in
+     for a recce or a viewing is in that stage, and the stage selector finds them */
+  const phaseField = ph => { const n = phaseDaysOf(ph.view, v.id, p);
+    return `<input type="text" class="te-num" inputmode="numeric" value="${n!=null&&n>0?n:''}" placeholder="—" onclick="event.stopPropagation()" onchange="setPhaseDays('${ph.view}','${v.id}', this.value)" title="${esc(ph.headTitle)}">`; };
+  const fee = Object.prototype.hasOwnProperty.call(e,'rate') ? e.rate : '';
+  return row(phaseField(phaseByView('preprod'))
+      + days.map(d=>`<div class="crewgrid-check"><input type="checkbox" ${entryOnDay(v.id,d)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewOnDay('${v.id}','${d.id}',this.checked)" title="On the call sheet for Day ${esc(d.dayNum||'?')}${d.date?' — '+esc(fmtDate(d.date)):''}"></div>`).join('')
+      + phaseField(phaseByView('post'))
+      + (money ? `<span class="money-field"><input type="text" inputmode="decimal" value="${esc(fee)}" placeholder="—" onchange="setTalentFee('${v.id}', this.value)" title="Optional. Costed in Budget only if you enter one — never flagged as missing"></span>` : ''),
+    `<button class="icon-btn danger-ic" onclick="removeTalentFromProject('${v.id}','${esc(v.name).replace(/'/g,'&#39;')}')" title="Take ${esc(v.name)} off the project" aria-label="Remove from project">${icon('trash')}</button>`);
+}
+function talentGroupHTML(kind, views, days, cols){
+  if(!views.length) return '';
+  const collapsed = collapsedTalentGroups.has(kind);
+  const rows = talentView==='catering'
+    ? buildPersonBlocks(views).map(b=>crewCateringBlockHTML(b, days)).join('')
+    : views.map(v=>talentRowHTML(v, days, cols)).join('');
+  return deptHeaderHTML(kind, views.length, collapsed, `toggleTalentGroup('${kind}')`, '')
+    + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${rows}</div>`;
 }
 function renderProjectTalent(body){
   const p = currentProject(); if(!p) return;
   const days = projectDays(p.id);
-  const views = projectEntryViews(p).filter(isTalentEtc).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  /* the same body classes Crew sets — select mode, the stage colour, stage tags as words */
+  body.classList.add('crew-rowselect', 'talent-tab');
+  body.classList.toggle('crew-select-mode', crewSelectMode);
+  body.classList.remove('crew-rowselect-tight');
+  body.classList.toggle('roles-tags-text', talentView==='roles' && rolesTagsAsText());
+  applyStageColour(body);
+  hookCrewSelectClicks(body);
+  repeatedInView = new Set();   // Crew's "listed twice" stars mean nothing here — and the set outlives the tab
+  const all = projectEntryViews(p).filter(isTalentEtc);
+  let views = all.filter(personMatchesProjectFilter).filter(v=>entryInSelectedStage(v.id, p))
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  // Catering lists who is on set, as on Crew. Hotel and Travel do NOT: a client can be flown in for a viewing.
+  if(talentView==='catering') views = views.filter(v=>entryOnShoot(v.id, p));
   const of = kind => views.filter(v=>deptBucketKey(v.department)===kind);
+  const cols = talentColumns(days);
+  const kinds = ['Client','Talent'].filter(k=>of(k).length);
+  const allCollapsed = kinds.length>0 && kinds.every(k=>collapsedTalentGroups.has(k));
+  const rightHTML = (talentView==='catering' ? `${days.length && all.length ? mealFillButtonHTML() : ''}<span onclick="jumpToSummary('catering')">Summary</span>` : '')
+    + (kinds.length>1 ? `<span class="crew-header-expandall" onclick="${allCollapsed?'collapsedTalentGroups.clear()':`collapsedTalentGroups=new Set(['Client','Talent'])`};renderProjectBody();">${allCollapsed?'Expand all':'Collapse all'}</span>` : '');
+  const isCatering = talentView==='catering';
+  const headerRow = isCatering
+    ? (days.length ? `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length}; --daycolwidth:${CATERING_DAYCOL};">
+        ${pbHeadLeadCellsHTML('crewgrid-header')}${cateringDayHeadsHTML(days)}${CATERING_DIET_HEAD}</div>` : '')
+    : `<div class="tegrid crewgrid-header-row" style="--te-cols:${cols.template};">
+      ${pbHeadLeadCellsHTML('crewgrid-header')}
+      ${cols.heads.map(h=>`<div class="crewgrid-header${h.left?' te-l':''}"${h.title?` title="${h.title}"`:''}>${h.head}</div>`).join('')}
+      ${cols.tail ? '<div class="crewgrid-header"></div>' : ''}
+    </div>`;
+  const filterCount = projectCrewActiveFilterCount();
+  const ids = views.map(v=>v.id);
+  const listToolsHTML = toolGroupHTML([
+    `<button type="button" class="bnr-tool" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button>`,
+    filterButtonHTML({count: filterCount, onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse}),
+    crewToolbarSelectAll(ids.join(','), ids.length>0 && ids.every(id=>projectCrewSelected.has(id)), filterCount)]);
+  const tableHTML = !all.length ? '<div class="empty-note">No talent or clients on this project yet.</div>'
+    : (isCatering && !days.length) ? '<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>'
+    : `<div class="tablewrap">${headerRow}${views.length
+        ? talentGroupHTML('Client', of('Client'), days, cols) + talentGroupHTML('Talent', of('Talent'), days, cols)
+        : `<div class="empty-note">${isCatering && !filterCount ? 'Nobody here is on the shoot in the selected stages.' : 'Nobody matches the selected stages or filter.'}</div>`}${
+        isCatering ? cateringOtherSideHTML(false, days) : ''}</div>`;
   body.innerHTML = `
-    <div class="crew-header-row">
-      <div class="crew-header-left"><button type="button" class="bnr-tool" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button></div>
-      <div class="crew-header-right"><span class="status" id="talentStatus"></span></div>
+    <div class="section">
+      <div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(buildBudgetData(), {
+        showTotals: crewShowMoney, showMoneyToggle: true, peopleKind: 'talent', listToolsHTML })}</div>
+      ${crewSubTabsHTML(talentView, 'setTalentView', rightHTML)}
+      ${bulkActionBarHTML()}
+      ${tableHTML}
+      ${views.length && !isCatering && crewShowMoney ? `<div class="hint" id="talentSummary" style="margin-top:14px;">${talentSummaryHTML(p)}</div>` : ''}
+      <span class="status" id="talentStatus"></span>
     </div>
-    <div class="card te-card">
-      <div class="line1">Talent etc</div>
-      <div class="sub">Talent and client — not crew: no day rate, no stage, their own hotel and travel. Tick the days they attend; that is what puts them on the call sheet.</div>
-      ${views.length ? talentGroupHTML('Client', of('Client'), days) + talentGroupHTML('Talent', of('Talent'), days)
-        : '<div class="empty-note" style="margin-top:14px;">Nobody here yet — press + Add talent / client.</div>'}
-      ${views.length ? `<div class="hint" id="talentSummary" style="margin-top:14px;">${talentSummaryHTML(p)}</div>` : ''}
-      ${views.length && !days.length ? '<div class="hint">Add shoot days (Call Sheets tab) to tick who attends which.</div>' : ''}
-    </div>
+    ${isCatering ? cateringSummaryHTML() : ''}
     ${addPersonDialogHTML()}
-    ${crewEditModalHTML()}`;
+    ${crewEditModalHTML()}
+    ${projectCrewFilterOpen ? filterDialogHTML(projectCrewFilterPanelHTML(all, days), 'toggleProjectCrewFilterPanel()') : ''}
+    ${isCatering ? mealFillDialogHTML() : ''}`;
+  /* Crew sets body.oninput per view and the body element outlives the tab switch — the catering
+     summary's cost fields need the same saver here, and nothing else on this tab may inherit one */
+  body.oninput = isCatering
+    ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); refreshCateringSummaryFigures(); })
+    : null;
 }
 function addPersonDialogHTML(){
   if(!addPersonOpen) return '';
@@ -4453,6 +4605,22 @@ function filterPanelFootHTML({controls='', hint='', active=false, onClear=''} = 
   </div>`;
 }
 
+/* Crew tab (20 Sep 2026): Filter is a button like its neighbours, and the panel opens as a
+   popup rather than pushing the table down. Budget and the Crew Database still use the
+   disclosure below. */
+function filterButtonHTML({count=0, onToggle='', inverted=false} = {}){
+  return `<button type="button" class="bnr-tool" onclick="${onToggle}"
+      title="${inverted?'Inverted — showing everyone who does NOT match':'Filter, group and sort this list'}">Filter${count?` (${count})`:''}${inverted?' · inverted':''}</button>`;
+}
+function filterDialogHTML(panelHTML, onClose){
+  return `<div class="modal-overlay" onclick="if(event.target===this) ${onClose}">
+    <div class="modal-box filter-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
+      <h3>Filter</h3>
+      ${panelHTML}
+      <div class="toolbar" style="margin:12px 0 0;"><button onclick="${onClose}">Done</button></div>
+    </div>
+  </div>`;
+}
 function filterToggleHTML({open=false, count=0, onToggle='', inverted=false} = {}){
   return `<span class="filter-toggle" onclick="${onToggle}">
     <span class="dept-caret">${open?'▾':'▸'}</span> Filter${count?` (${count})`:''}${
@@ -5093,31 +5261,36 @@ function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='',
     + (filterPanelHTML||'')
     + (open ? `<div class="filter-panel">${panelHTML}</div>` : '');
 }
+/* SELECT MODE's click hook — Crew and Talent etc. Capture, and stopped here: in select mode a
+   click on a line is ONLY a selection — it must not also reach the name link, a day tick or a
+   field underneath. Hooked once per body element. */
+function hookCrewSelectClicks(body){
+  if(body._crewSelHooked) return;
+  body._crewSelHooked = true;
+  body.addEventListener('click', (e) => {
+    if(!['crew','talent'].includes(currentProjectTab) || !crewSelectMode) return;
+    const row = e.target.closest && e.target.closest('.pb-head'); if(!row) return;
+    const cb = row.querySelector('.bulk-select-cb'); if(!cb) return;
+    e.preventDefault(); e.stopPropagation();
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change'));
+  }, true);
+}
 function renderProjectCrew(body){
   if(['preprod','days','post'].includes(crewGridView)) crewGridView = 'roles';   // retired tabs — a stale value lands on Roles
   body.classList.add('crew-rowselect');
   body.classList.toggle('crew-select-mode', crewSelectMode);
   body.classList.toggle('crew-rowselect-tight', crewGridView==='roles');
-  if(crewGridView==='roles') applyStageColour(body); else ['stage-all','stage-pre','stage-prod','stage-post'].forEach(c=>body.classList.remove(c));
+  applyStageColour(body);   // every sub-tab — the stage selector is in the head on all of them
   body.classList.toggle('roles-tags-text', crewGridView==='roles' && rolesTagsAsText());
-  if(!body._crewSelHooked){
-    body._crewSelHooked = true;
-    /* capture, and stopped here: in select mode a click on a line is ONLY a selection — it must
-       not also reach the name link, a day tick or a field underneath */
-    body.addEventListener('click', (e) => {
-      if(currentProjectTab!=='crew' || !crewSelectMode) return;
-      const row = e.target.closest && e.target.closest('.pb-head'); if(!row) return;
-      const cb = row.querySelector('.bulk-select-cb'); if(!cb) return;
-      e.preventDefault(); e.stopPropagation();
-      cb.checked = !cb.checked;
-      cb.dispatchEvent(new Event('change'));
-    }, true);
-  }
+  body.classList.remove('talent-tab');
+  hookCrewSelectClicks(body);
   const p = currentProject();
   const days = projectDays();
-  const budgetData = ['roles','preprod','post'].includes(crewGridView) ? buildBudgetData() : null;
-  /* Talent etc have their own tab. Catering is the one view that keeps them: a lunch is a lunch */
-  const assigned = projectEntryViews(p).filter(v => crewGridView==='catering' || !isTalentEtc(v));
+  const budgetData = buildBudgetData();
+  /* Talent etc have their own tab — including their own Catering sub-tab since 20 Sep 2026, so
+     every Crew view is crew only. The catering SUMMARY still counts everyone: a lunch is a lunch. */
+  const assigned = projectEntryViews(p).filter(v => !isTalentEtc(v));
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   /* ⚠️ REMOVED in Phase CM: `unassigned` — it existed only to fill the retired "Add from crew
      database" <select>. The Add person popup filters crewDB against the roster itself, in
@@ -5134,15 +5307,10 @@ function renderProjectCrew(body){
       .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryInPhase(ph.scope, e.id, p))}))
       .filter(b=>b.entries.length);
   }
-  if(crewGridView==='roles'){
-    const inSelectedPhase = e => {
-      const mine = entryPhases(e.id, p);
-      return !mine.length || mine.some(scope=>budgetScope[scope]);
-    };
-    filtered = filtered
-      .map(b=>Object.assign({}, b, {entries: b.entries.filter(inSelectedPhase)}))
-      .filter(b=>b.entries.length);
-  }
+  /* the stage selector filters EVERY sub-tab (20 Sep 2026) — it is in the head on all of them */
+  filtered = filtered
+    .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryInSelectedStage(e.id, p))}))
+    .filter(b=>b.entries.length);
   const seenEntries = {};
   filtered.forEach(b=>b.entries.forEach(e=>{ seenEntries[e.crewId] = (seenEntries[e.crewId]||0)+1; }));
   repeatedInView = new Set(Object.keys(seenEntries).filter(id=>seenEntries[id]>1));
@@ -5155,21 +5323,17 @@ function renderProjectCrew(body){
      selector (All stages / Only) does their filtering, its Prep / Post columns hold their numbers,
      Shoot opens the day ticks and Dates opens the calendar. The views' render code is still below
      (isPhaseTab / 'days') but nothing routes to it — see the coercion at the top of this function. */
-  const viewLabels = {roles:'Roles', hotel:'Hotel', travel:'Travel', catering:'Catering'};
-  const viewSwitcher = `<div class="tabs crewview-tabs">
-    ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
-  </div>`;
   const filterCount = projectCrewActiveFilterCount();
-  const filterToggleSpan = filterToggleHTML({
-    open: projectCrewFilterOpen, count: filterCount,
-    onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse
+  const filterBtnHTML = filterButtonHTML({
+    count: filterCount, onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse
   });
-  const filterPanelHTML = projectCrewFilterOpen ? projectCrewFilterPanelHTML(assigned, days) : '';
+  const filterDialog = projectCrewFilterOpen
+    ? filterDialogHTML(projectCrewFilterPanelHTML(assigned, days), 'toggleProjectCrewFilterPanel()') : '';
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
   let selectAllHTML = '', rightHeaderHTML = '';
   if(assigned.length && !filtered.length){
-    assignedHTML = '<div class="empty-note">No crew match the current filter.</div>';
+    assignedHTML = '<div class="empty-note">No crew match the selected stages or filter.</div>';
   } else if(filtered.length){
     const groups = buildProjectCrewGroups(filtered, p, days);
     const groupsCSV = groups.map(g=>g.key).join(',');
@@ -5248,35 +5412,39 @@ function renderProjectCrew(body){
       assignedHTML = `<div class="tablewrap">${travelHeaderRow}${groupsHTML}</div>`;
     } else {
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
+      const isCatering = crewGridView==='catering';
       const dayHeaderRow = days.length ? `
-        <div class="crewgrid crewgrid-header-row" style="--daycols:${colCount};">
+        <div class="crewgrid crewgrid-header-row" style="--daycols:${colCount};${isCatering?` --daycolwidth:${CATERING_DAYCOL};`:''}">
           ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
-          ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
-          <div class="crewgrid-header"></div>
+          ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
+          ${isCatering ? CATERING_DIET_HEAD : '<div class="crewgrid-header"></div>'}
         </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${dayHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap">${dayHeaderRow}${groupsHTML}${isCatering && days.length ? cateringOtherSideHTML(true, days) : ''}</div>`;
     }
   }
 
-  const headerRow = crewToolbarHTML(selectAllHTML, filterToggleSpan, rightHeaderHTML) + filterPanelHTML;
-
-  const bannerHTML = budgetData ? `<div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(budgetData, {
+  /* ⚠️ 20 Sep 2026 — THE PAGE HEAD (pageHeadHTML): Budget on top, + Add person | Filter | Select on
+     the bottom line, the stage selector on the right on every sub-tab. The sub-tabs come AFTER
+     it, directly on the table they switch; the old toolbar row is gone — its right-hand links
+     (Summary, Collapse all) ride the sub-tab row. */
+  const listToolsHTML = toolGroupHTML([`<button type="button" class="bnr-tool crew-add-person" onclick="openAddPerson()"
+      title="Search the crew database and add someone to this project">+ Add person</button>`, filterBtnHTML, selectAllHTML || crewToolbarSelectAll('', true, filterCount)]);
+  const headHTML = `<div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(budgetData, {
       showTotals: crewShowMoney,
-      showStage:  crewGridView==='roles',
       showMoneyToggle: true,
-      crewOnly: true
-    })}</div>` : '';
+      crewOnly: true, peopleKind: 'crew',
+      listToolsHTML
+    })}</div>`;
+  const viewSwitcher = crewSubTabsHTML(crewGridView, 'setCrewGridView', (crewGridView==='catering' && days.length ? mealFillButtonHTML() : '') + rightHeaderHTML);
 
   body.innerHTML = `
     <div class="section">
-      <h2>Crew on this project</h2>
-      ${viewSwitcher}
-      ${bannerHTML}
+      ${headHTML}
       ${/* ⚠️ ROLES WITH BUDGET ON, and the zone starts BELOW the banner — see .roles-widezone.
             The toolbar and the bulk bar are inside it with the table on purpose: Select all
             sits over the first column and Collapse all over the last, so a toolbar left at
@@ -5288,7 +5456,7 @@ function renderProjectCrew(body){
             as the banner above it — a table floating 200px wider than everything else on the
             page for no gain reads as a layout fault, which is exactly what it was called. */''}
       <div class="${crewGridView==='roles' ? 'roles-zone' : ''}${crewGridView==='roles' && crewShowMoney ? ' roles-widezone' : ''}">
-        ${headerRow}
+        ${viewSwitcher}
         ${bulkActionBarHTML()}
         ${assignedHTML}
       </div>
@@ -5306,7 +5474,9 @@ function renderProjectCrew(body){
       <h2>New crew member</h2>
       <div class="inline-form-card" id="crewFormWrap">${crewFormHTML({name:newCrewPrefillName})}</div>
     </div>` : ''}
-    ${addPersonDialogHTML()}`;
+    ${addPersonDialogHTML()}
+    ${filterDialog}
+    ${crewGridView==='catering' ? mealFillDialogHTML() : ''}`;
   // Phase BX — after this render's innerHTML lands, so the box can measure where it started.
   // Same idiom as renderMain()'s refreshTabScrollCues().
   setTimeout(() => { sizeRolesTablewrap(); restoreRolesFocus(); }, 0);
@@ -5500,48 +5670,13 @@ function onRolesColKey(ev, id){
   if(j<0 || j>=ids.length) return;
   saveRolesColumnOrder(reorderRolesColumns(ids, id, ids[j], ev.key==='ArrowRight'), id);
 }
-/* The line under the table. One place, because what it has to say depends on the mode and
-   on which phases are on, and three near-identical sentences competing under one grid is
-   how the old one ended up describing a Shoot checkbox that no longer exists. */
-function rolesFootnoteHTML(data){
-  /* Two kinds of sentence live here and they are treated differently (14 Sep 2026):
-     TIPS — how the table works — can be hidden with "Hide tips" (appSettings.hideRolesTips,
-     db:settings, so it sticks on every device) and brought back with "Tips";
-     STATUS — "your own column order", "a phase is switched off" — always shows, because
-     it describes something you did that would otherwise read as a bug. */
-  const tipsHidden = !!appSettings.hideRolesTips;
-  const tips = [];
-  const status = [];
-  tips.push('One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records.');
-  tips.push('<strong>The Prep and Post numbers are what put someone in a stage</strong> — type one and they are in it, clear it and they are out. <strong>Dates</strong> opens that person’s calendar — every role they hold, all three phases on one month.');
-  /* the caret alone does not tell you what is behind it — and once it IS open, that it writes
-     the same ticks as the Production tab is the thing you need to know before touching it */
-  if(projectDays().length){
-    tips.push(rolesShootOpen()
-      ? 'Ticking a day puts that person on the shoot for it. Click <strong>Shoot</strong> again to close the day ticks.'
-      : 'Click <strong>Shoot</strong> to open the day ticks.');
-  }
-  tips.push('<strong>Arrow keys</strong> move between fields — down a column for the same field on the next person — and space ticks a box.');
-  /* "you can do this" is a tip; "you have done this, here is the way back" is status */
-  if(appSettings.rolesColumnOrder && appSettings.rolesColumnOrder.length){
-    status.push('These columns are in <strong>your own order</strong> — drag a heading to move one, or <span class="filter-clear" role="button" tabindex="0" onclick="resetRolesColumnOrder()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();resetRolesColumnOrder();}">put them back</span>.');
-  } else {
-    tips.push('<strong>Drag a column heading</strong> to reorder the table — the order is kept for every project.');
-  }
-  const off = BUDGET_SCOPES.filter(([k])=>!budgetScope[k]).map(([,l])=>l);
-  if(off.length){
-    status.push(`<strong>${off.join(' and ')} ${off.length>1?'are':'is'} switched off</strong>, so ${off.length>1?'those phases’':'that phase’s'} crew ${off.length>1?'are':'is'} hidden and uncosted. Anyone in no phase at all still shows.`);
-  }
-  const toggle = tipsHidden
-    ? `<span class="filter-clear roles-tips-toggle" role="button" tabindex="0" onclick="setRolesTipsHidden(false)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setRolesTipsHidden(false);}" title="Show how this table works">Tips</span>`
-    : `<span class="filter-clear roles-tips-toggle" role="button" tabindex="0" onclick="setRolesTipsHidden(true)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setRolesTipsHidden(true);}" title="Hide these tips — Tips brings them back">Hide tips</span>`;
-  const text = (tipsHidden ? status : tips.concat(status)).join(' ');
-  return `<div class="hint roles-footnote" style="margin-top:8px;">${text}${text?' ':''}${toggle}</div>`;
-}
-async function setRolesTipsHidden(hidden){
-  appSettings.hideRolesTips = !!hidden;
-  await saveAppSettings();
-  renderProjectBody();
+/* The line under the table. ⚠️ 20 Sep 2026 — the TIPS are gone (how-the-table-works guidance,
+   and the Hide tips / Tips toggle with them; appSettings.hideRolesTips is no longer read).
+   What is left is the one STATUS line that is also a control: a custom column order has no
+   other way back. A stage being off is shown by the stage selector itself. */
+function rolesFootnoteHTML(){
+  if(!(appSettings.rolesColumnOrder && appSettings.rolesColumnOrder.length)) return '';
+  return `<div class="hint roles-footnote" style="margin-top:8px;">These columns are in <strong>your own order</strong> — <span class="filter-clear" role="button" tabindex="0" onclick="resetRolesColumnOrder()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resetRolesColumnOrder();}">put them back</span>.</div>`;
 }
 function crewRolesRowHTML(e, spec, data){
   const p = currentProject();
@@ -5672,6 +5807,12 @@ const entryPhases = (entryId, p) =>
   CREW_PHASES.filter(ph=>entryInPhase(ph.scope, entryId, p)).map(ph=>ph.scope);
 
 const entryOnShoot = (entryId, p) => entryInPhase('production', entryId, p);
+/* the stage selector's row test — in none of the stages is always visible (nothing could
+   switch them back on); otherwise at least one of theirs has to be showing */
+function entryInSelectedStage(entryId, p){
+  const mine = entryPhases(entryId, p);
+  return !mine.length || mine.some(scope=>budgetScope[scope]);
+}
 /* person-level, for the things a HUMAN has rather than a role — a bed, a lunch, a lift.
    On the shoot in any role is on the shoot. */
 function crewOnShoot(crewId, p){
@@ -5800,34 +5941,188 @@ function crewAssignRowHTML(block, days){
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
+/* CATERING — ⚠️ ONE LINE PER PERSON (20 Sep 2026). Breakfast / Lunch / Dinner used to be three
+   sub-rows under each name, which made this the only sub-tab whose ticks did not sit on the
+   name's own line. They are three small ticks INSIDE each day column now (B L D, labelled in
+   the header — cateringDayHeadsHTML). Used by BOTH tabs: crew and talent eat from one kitchen,
+   so each tab lists its own people and folds the other side underneath (cateringOtherSideHTML).
+   Talent / client rows carry Shared | Own — see entryOwnCatering(). */
+const CATERING_DAYCOL = '62px';
+const MEAL_KEYS = [['b','Breakfast'],['l','Lunch'],['d','Dinner']];
+const CATERING_DIET_HEAD = `<div class="crewgrid-header" style="grid-column:span 2; text-align:left; padding-left:12px;" title="From each person's record — anything other than the standard diet, plus their specific notes">Dietary</div>`;
+function cateringDayHeadsHTML(days){
+  return days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}<div class="meal-trio-head">${MEAL_KEYS.map(([k,label])=>
+      `<span role="button" tabindex="0" onclick="toggleMealColumn('${d.id}','${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealColumn('${d.id}','${k}');}" title="${label}, Day ${esc(d.dayNum||'?')} — tick or untick everyone listed below">${k.toUpperCase()}</span>`).join('')}</div></div>`).join('');
+}
+/* the header's B / L / D: that meal, that day, for EVERYONE LISTED BENEATH IT — read from the rows
+   on screen, so the filter, the stage selector and a folded group (its rows are hidden, so they
+   are left alone) all mean what they look like they mean. All on → all off; otherwise all on. */
+function toggleMealColumn(dayId, mealKey){
+  const d = dayById(dayId); if(!d) return;
+  const boxes = [...document.querySelectorAll(`.meal-trio input[data-day-id="${dayId}"][data-meal="${mealKey}"]`)]
+    .filter(el=>el.offsetParent!==null);
+  if(!boxes.length) return;
+  const on = !boxes.every(el=>el.checked);
+  d.cateringMeals = d.cateringMeals || {};
+  [...new Set(boxes.map(el=>el.dataset.crew))].forEach(id=>{
+    const m = d.cateringMeals[id] = d.cateringMeals[id] || {b:false, l:false, d:false};
+    m[mealKey] = on;
+    if(!m.b && !m.l && !m.d) delete d.cateringMeals[id];
+  });
+  renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
+}
 function crewCateringBlockHTML(block, days){
   const isEditing = editingCrewId===block.id;
   const crewId = block.crewId;
-  const mealRow = (mealKey, label) => {
-    const cells = days.map(d=>{
-      const meals = getCateringMeals(d.id, crewId);
-      const checked = !!meals[mealKey];
-      return `<div class="crewgrid-check meal-cell" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${checked?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${mealKey}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}"></div>`;
-    }).join('');
-    return `<div class="crewgrid meal-subrow" style="--daycols:${days.length};">
-      <div class="meal-row-label-wrap" style="grid-column:1/4;">
-        <span class="meal-row-label">${label}</span>
-      </div>
-      ${cells}
-      <div class="crewgrid-remove" style="grid-column:${days.length+4};"><span class="meal-row-all" onclick="toggleAllMealForPerson('${crewId}','${mealKey}')" title="Toggle ${label} on/off for every day">All</span></div>
-    </div>`;
-  };
-  const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${days.length};">
+  const talent = isTalentEtc(block);
+  const own = talent && crewOwnCatering(crewId);
+  const cells = days.map(d=>{
+    const meals = getCateringMeals(d.id, crewId);
+    return `<div class="crewgrid-check meal-trio" data-day="D${esc(d.dayNum||'?')}">${MEAL_KEYS.map(([k,label])=>
+      `<input type="checkbox" data-crew="${crewId}" data-day-id="${d.id}" data-meal="${k}" ${meals[k]?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${k}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}">`).join('')}</div>`;
+  }).join('');
+  /* "All" is a disclosure: closed it is one word; open it offers B / L / D, each toggling that meal
+     across every day for this person. One row open at a time (mealAllOpenFor). */
+  const allOpen = mealAllOpenFor===crewId;
+  const allHTML = `<span class="meal-all${allOpen?' open':''}">${allOpen ? MEAL_KEYS.map(([k,label])=>
+      `<span class="meal-row-all meal-all-key" onclick="toggleAllMealForPerson('${crewId}','${k}')" title="${label} — every day, on or off">${k.toUpperCase()}</span>`).join('') : ''}<span class="meal-row-all" role="button" tabindex="0" aria-expanded="${allOpen?'true':'false'}"
+        onclick="toggleMealAllOpen('${crewId}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealAllOpen('${crewId}');}"
+        title="${allOpen?'Close':'Tick a whole meal across every day'}">All</span></span>`;
+  /* what makes this person's plate different — the standard diet says nothing, so it shows nothing */
+  const rec = crewById(crewId) || {};
+  const diet = [rec.dietaryGeneral && rec.dietaryGeneral!==DIETARY_OPTIONS[0] ? rec.dietaryGeneral : '', rec.dietarySpecific || rec.dietary || ''].filter(Boolean).join(' · ');
+  const dietHTML = `<span class="meal-diet" title="${esc(diet)}">${esc(diet)}</span>`;
+  const ownHTML = talent ? `<span class="te-by" title="Own — their own arrangement (a rider, eating elsewhere). Their ticks are kept but not counted in the caterer's covers or cost.">
+      <span class="${own?'':'on'}" onclick="setCrewOwnCatering('${crewId}', false)">Shared</span><span class="${own?'on them':''}" onclick="setCrewOwnCatering('${crewId}', true)">Own</span></span>` : '';
+  const roleHTML = talent ? `<span class="te-role" title="${esc(block.role||'')}">${esc(topSeniorityEntry(block.entries).showAs||block.role||'')}</span>`
+                          : `<span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span>`;
+  const head = `<div class="crewgrid crewgrid-row pb-head${own?' meal-own':''}" style="--daycols:${days.length}; --daycolwidth:${CATERING_DAYCOL};">
       <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
       <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}${repeatStarHTML(block.crewId)}</div>
-      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span></div>
+      <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleHTML}</div>
+      ${cells}
+      <div class="crewgrid-remove meal-tail" style="grid-column:${days.length+4} / -1;">${dietHTML}${ownHTML}${allHTML}</div>
     </div>`;
-  /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch —
-     so a second row here would duplicate the first. */
-  return personBlockWrapHTML(block,
-    head + mealRow('b','Breakfast') + mealRow('l','Lunch') + mealRow('d','Dinner'),
-    { editing:isEditing, open:false, extraClass:'crewgrid-catering-person',
-      expansionHTML:crewExpansionHTML(block, 'pb-editform') });
+  /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch. */
+  return personBlockWrapHTML(block, head,
+    { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
+}
+/* OWN CATERING — a talent / client override, on the project ENTRY (e.ownCatering). Person-level in
+   effect (a lunch belongs to a human): any of their entries carrying it takes them out of the
+   covers, the dietaries and the cost. The ticks themselves are kept, so switching back restores them. */
+let mealAllOpenFor = null;
+function toggleMealAllOpen(crewId){ mealAllOpenFor = mealAllOpenFor===crewId ? null : crewId; renderProjectBody(); }
+const crewOwnCatering = (crewId, p) => entriesForCrew(crewId, p || currentProject()).some(e=>e.ownCatering);
+async function setCrewOwnCatering(crewId, on){
+  const p = currentProject(); if(!p) return;
+  entriesForCrew(crewId, p).forEach(v=>{ const e = entryById(v.id, p); if(!e) return; if(on) e.ownCatering = true; else delete e.ownCatering; });
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+/* ============ AUTO-FILL MEALS (20 Sep 2026) ============
+   Works meals out from who is booked on which day and the day's call and wrap:
+     call before 08:30 → breakfast · on site across 13:00 → lunch · wrap after 18:00 → dinner
+   Call = the person's own call on that day's Position assignments (earliest, if they hold two
+   roles), else the all-crew call. Wrap = the schedule's WRAP row. ⚠️ THE BACKUP: a day with
+   neither gives LUNCH ONLY — on site means lunch, the most common case; a day with only one of
+   them decides what it can and assumes lunch. Crew AND talent, whichever tab it is opened from
+   (one kitchen); people on Own catering are left alone. Undoable. */
+const MEAL_RULES = { breakfastBefore: 8*60+30, lunchAt: 13*60, dinnerAfter: 18*60 };
+function looseTimeToMins(str){
+  const t = String(str||'').trim(); if(!t) return null;
+  const viaColon = parseTimeStrToMins(t.replace('.',':')); if(viaColon!=null) return viaColon;
+  const m = t.match(/^(\d{1,2})(\d{2})?\s*(am|pm)?$/i); if(!m) return null;
+  let h = parseInt(m[1],10); const min = m[2] ? parseInt(m[2],10) : 0;
+  if(m[3] && /pm/i.test(m[3]) && h<12) h += 12;
+  if(m[3] && /am/i.test(m[3]) && h===12) h = 0;
+  return (h>23 || min>59) ? null : h*60+min;
+}
+function dayWrapMins(d){
+  const row = (d.schedule||[]).filter(r=>/\bwrap\b/i.test(r[2]||'')).pop(); if(!row) return null;
+  const range = parseTimeRangeToMins(row[0]);
+  return range ? range.start : looseTimeToMins(row[0]);
+}
+function personCallMins(crewId, d, p){
+  const mine = new Set(entriesForCrew(crewId, p).map(e=>e.id));
+  const own = (d.positions||[]).filter(pos=>mine.has(pos[0])).map(pos=>looseTimeToMins(pos[1])).filter(v=>v!=null);
+  return own.length ? Math.min(...own) : looseTimeToMins(d.allCrewCall);
+}
+function suggestedMeals(callMins, wrapMins){
+  if(callMins==null && wrapMins==null) return {b:false, l:true, d:false, guessed:true};
+  return { b: callMins!=null && callMins < MEAL_RULES.breakfastBefore,
+           l: (callMins==null || callMins < MEAL_RULES.lunchAt) && (wrapMins==null || wrapMins > MEAL_RULES.lunchAt),
+           d: wrapMins!=null && wrapMins > MEAL_RULES.dinnerAfter,
+           guessed: callMins==null || wrapMins==null };
+}
+let mealFillOpen = false;
+function toggleMealFill(){ mealFillOpen = !mealFillOpen; renderProjectBody(); }
+const mealFillButtonHTML = () => `<button type="button" class="bnr-tool" onclick="toggleMealFill()"
+    title="Tick meals from who is booked on which day and the call and wrap times">Auto-fill meals</button>`;
+const mealFillPeople = p => [...new Set(projectEntries(p).map(e=>e.crewId))].filter(id=>!crewOwnCatering(id, p));
+function mealFillDialogHTML(){
+  if(!mealFillOpen) return '';
+  const p = currentProject(), days = projectDays();
+  const ids = mealFillPeople(p);
+  const rows = days.map(d=>{
+    const on = ids.filter(id=>crewOnDay(id, d, p));
+    const call = looseTimeToMins(d.allCrewCall), wrap = dayWrapMins(d);
+    const m = suggestedMeals(call, wrap);
+    const ownCalls = on.filter(id=>personCallMins(id, d, p)!==call).length;
+    const meals = MEAL_KEYS.filter(([k])=>m[k]).map(([,l])=>l).join(', ') || 'no meals';
+    const basis = call==null && wrap==null ? 'no call or wrap time — lunch only'
+      : `${call!=null?'call '+formatMinsAsTime(call):'no call time'} · ${wrap!=null?'wrap '+formatMinsAsTime(wrap):'no wrap time'}`;
+    return `<tr><td><strong>D${esc(d.dayNum||'?')}</strong>${d.date?' · '+esc(fmtDate(d.date)):''}</td><td>${basis}</td><td>${meals}</td>
+      <td>${on.length} ${on.length===1?'person':'people'}${ownCalls?` <span class="hint">(${ownCalls} on their own call)</span>`:''}</td></tr>`;
+  }).join('');
+  return `<div class="modal-overlay" onclick="if(event.target===this) toggleMealFill()">
+    <div class="modal-box filter-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
+      <h3>Auto-fill meals</h3>
+      <div class="hint" style="margin-bottom:10px;">Breakfast if called before 08:30 · Lunch if on site across 13:00 · Dinner if wrap is after 18:00.
+        With no times on a day, it is lunch for everyone on site. Crew and talent together; anyone on Own catering is left alone.</div>
+      ${days.length ? `<div class="tablewrap"><table class="meal-fill-table"><tr><th>Day</th><th>Working from</th><th>Meals</th><th>Booked</th></tr>${rows}</table></div>`
+        : '<div class="empty-note">Add shoot days first.</div>'}
+      <div class="toolbar" style="margin:14px 0 0;">
+        ${days.length ? `<button class="primary" onclick="applyMealFill('gaps')" title="Only people-days with nothing ticked yet — what you have ticked by hand stays">Fill the gaps</button>
+        <button onclick="applyMealFill('all')" title="Re-work every person and day from the rules, replacing what is ticked">Replace everything</button>` : ''}
+        <button onclick="toggleMealFill()">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function applyMealFill(mode){
+  const p = currentProject(); if(!p) return;
+  const days = projectDays(), ids = mealFillPeople(p);
+  const snaps = beginUndo(['db:shootdays']);
+  let changed = 0;
+  days.forEach(d=>{
+    d.cateringMeals = d.cateringMeals || {};
+    const wrap = dayWrapMins(d);
+    ids.forEach(id=>{
+      const had = d.cateringMeals[id];
+      if(mode==='gaps' && had) return;                       // ticked by hand — leave it
+      const m = crewOnDay(id, d, p) ? suggestedMeals(personCallMins(id, d, p), wrap) : {b:false, l:false, d:false};
+      const next = (m.b||m.l||m.d) ? {b:m.b, l:m.l, d:m.d} : null;
+      if(JSON.stringify(had||null)!==JSON.stringify(next)) changed++;
+      if(next) d.cateringMeals[id] = next; else delete d.cateringMeals[id];
+    });
+  });
+  mealFillOpen = false;
+  renderProjectBody();
+  await saveDB('db:shootdays', shootDaysDB);
+  finishUndo(changed ? `Auto-filled meals — ${changed} ${changed===1?'change':'changes'}.` : 'Auto-fill meals — nothing needed changing.', snaps);
+}
+/* the OTHER tab's people, folded under this tab's list — same rows, same ticks, one kitchen */
+let cateringOtherCollapsed = true;
+function toggleCateringOther(){ cateringOtherCollapsed = !cateringOtherCollapsed; renderProjectBody(); }
+function cateringOtherSideHTML(showTalent, days){
+  const p = currentProject();
+  const blocks = buildPersonBlocks(projectEntryViews(p).filter(v=>isTalentEtc(v)===showTalent))
+    .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryOnShoot(e.id, p) && entryInSelectedStage(e.id, p))}))
+    .filter(b=>b.entries.length);
+  if(!blocks.length) return '';
+  return deptHeaderHTML(showTalent ? 'Talent & client' : 'Crew', blocks.length, cateringOtherCollapsed, 'toggleCateringOther()', '')
+    + `<div class="dept-group" style="display:${cateringOtherCollapsed?'none':'block'}">${blocks.map(b=>crewCateringBlockHTML(b, days)).join('')}</div>`;
 }
 async function toggleHotelNight(crewId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
@@ -6081,8 +6376,9 @@ async function saveCateringCosts(){
   await saveDB('db:projects', projectsDB);
 }
 function buildCateringSummaryGrid(personOk){
-  personOk = personOk || (()=>true);
+  const scopeOk = personOk || (()=>true);
   const p = currentProject(); if(!p) return null;
+  personOk = id => scopeOk(id) && !crewOwnCatering(id, p);   // Own = their ticks are kept, not counted
   const days = projectDays();
   if(!days.length) return null;
   const costs = getCateringCosts(p);
@@ -8206,7 +8502,7 @@ function buildBudgetData(){
         + days.filter(d=>(d.hotelNights||[]).includes(c.crewId)).length
       : 0;
     const hotelCost = hotelNights * hotelCosts.perRoomNight * prodOn;
-    const mealCost = claimsPerson ? days.reduce((sum,d)=>{
+    const mealCost = (claimsPerson && !crewOwnCatering(c.crewId, p)) ? days.reduce((sum,d)=>{
       const m = (d.cateringMeals||{})[c.crewId];
       if(!m) return sum;
       return sum + (m.b?cateringCosts.b:0) + (m.l?cateringCosts.l:0) + (m.d?cateringCosts.d:0);
@@ -8437,25 +8733,89 @@ function buildBudgetData(){
   };
 }
 
+/* THE PAGE HEAD — Crew and Talent etc (20 Sep 2026, second pass). CSS: .bnr-head.
+     left   Budget (+ what it unlocks) on top · the total in a RESERVED slot · the list's own
+            buttons on the bottom line, right above the table. The slot is always there, so
+            turning Budget on fills a gap rather than growing the head.
+     right  the stage selector — on EVERY sub-tab, so nothing moves when you switch.
+   ▾ Stages folds the whole head to one line (appSettings.headFolded, db:settings); the chip
+   that stands in for the selector carries the selection's colour — see stageChipHTML(). */
+function pageHeadHTML({budgetRowHTML='', totalsHTML='', toolsHTML='', stageHTML='', chipHTML='', noteHTML=''} = {}){
+  if(appSettings.headFolded) return `<div class="phase-banner bnr-head bnr-folded">
+      ${budgetRowHTML}${toolsHTML}<span class="bnr-grow"></span>${chipHTML}${noteHTML}
+    </div>`;
+  return `<div class="phase-banner bnr-head">
+    <div class="bnr-left">
+      <div class="bnr-toolrow">${budgetRowHTML}</div>
+      <div class="bnr-totals">${totalsHTML}</div>
+      <div class="bnr-toolrow">${toolsHTML}</div>
+    </div>
+    <div class="budget-scope-stack">${stageHTML}</div>
+    ${noteHTML}
+  </div>`;
+}
+async function setHeadFolded(on){
+  appSettings.headFolded = !!on;
+  renderProjectBody();
+  await saveAppSettings();
+}
+/* + Add | Filter | Select — one joined control; `items` are ready-made .bnr-tool buttons */
+const toolGroupHTML = items => `<span class="bnr-group">${items.filter(Boolean).join('')}</span>`;
+/* the sub-tab row both tabs use; `rightHTML` is the row's own links (Summary, Collapse all) */
+function crewSubTabsHTML(current, setterName, rightHTML){
+  const labels = {roles:'Roles', travel:'Travel', catering:'Catering', hotel:'Hotel'};
+  return `<div class="tabs crewview-tabs">
+    ${Object.keys(labels).map(v=>`<div class="tab ${current===v?'active':''}" onclick="${setterName}('${v}')">${labels[v]}</div>`).join('')}
+    ${rightHTML ? `<div class="crew-header-row crew-header-right">${rightHTML}</div>` : ''}
+  </div>`;
+}
+/* Whose figures the head shows. The Crew tab counts crew, Talent etc counts talent and clients —
+   money from the budget build's people (talent appear there only once they have a fee), head-
+   counts from the entries themselves so a no-fee client still counts as a person in a stage.
+   Talent's Production figure includes the hotels and travel WE book for them (talentEtcCosts). */
+function stageFiguresFor(data, kind){
+  const p = currentProject();
+  const wantTalent = kind==='talent';
+  const mine = data.people.filter(pp=>!!pp.talentEtc===wantTalent);
+  const entries = projectEntryViews(p).filter(v=>isTalentEtc(v)===wantTalent).filter(personMatchesProjectFilter);
+  const days = budgetFilteredDays();
+  const extras = wantTalent ? (c=>c.stay+c.trip)(talentEtcCosts(p)) : 0;
+  const sumOf = (list, k) => list.reduce((n,x)=>n+(x[k]||0), 0);
+  const daysOf = { preproduction:e=>prepDaysOf(e.id,p)||0, production:e=>entryDayCount(e.id,days), post:e=>postDaysOf(e.id,p)||0 };
+  const keys = { preproduction:['prepRaw','prepVatRaw'], production:['prodRaw','prodVatRaw'], post:['postRaw','postVatRaw'] };
+  const out = {};
+  BUDGET_SCOPES.forEach(([k])=>{
+    const members = entries.filter(e=>entryInPhase(k, e.id, p));
+    out[k] = { ex: sumOf(mine, keys[k][0]) + (k==='production' ? extras : 0), vat: sumOf(mine, keys[k][1]),
+               peopleCount: new Set(members.map(e=>e.crewId)).size,
+               daysTotal: members.reduce((n,e)=>n+daysOf[k](e), 0) };
+  });
+  return { byScope: out,
+           totalEx: sumOf(mine,'subtotal') + (budgetScope.production ? extras : 0),
+           totalVat: sumOf(mine,'vat') };
+}
 function budgetSummaryBarHTML(data, o){
-  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false}, o||{});
+  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false, listToolsHTML:null, peopleKind:null}, o||{});
+  /* `peopleKind` ('crew' | 'talent') — the page head's scope; see stageFiguresFor() */
+  const kindFigs = o.peopleKind ? stageFiguresFor(data, o.peopleKind) : null;
   /* the four figures the headline and the stack read, switched in ONE place */
-  const totalEx  = o.crewOnly ? data.crewTotalExVat : data.totalExVat;
-  const totalVat = o.crewOnly ? data.people.reduce((s,pp)=>s+pp.vat, 0) : data.vatTotal;
+  const totalEx  = kindFigs ? kindFigs.totalEx : o.crewOnly ? data.crewTotalExVat : data.totalExVat;
+  const totalVat = kindFigs ? kindFigs.totalVat : o.crewOnly ? data.people.reduce((s,pp)=>s+pp.vat, 0) : data.vatTotal;
   const totalInc = totalEx + totalVat;
   const fmt = budgetFmt;
-  const stats = [[o.crewOnly ? 'Crew total' : 'Total',
+  const stats = [[o.peopleKind==='talent' ? 'Talent total' : o.crewOnly ? 'Crew total' : 'Total',
     budgetVatToggle ? totalInc : totalEx,
     budgetVatToggle ? (totalVat>0 ? `inc. ${fmt(totalVat)} VAT` : '') : 'ex-VAT',
     budgetVatToggle ? `xVAT ${fmt(totalEx)}` : '']];
+  const rawOf = key => kindFigs ? kindFigs.byScope[key] : ((data.phaseRaw||{})[key] || {});
   const phaseFigures = key => {
-    const r = (data.phaseRaw||{})[key] || {ex:0, vat:0};
+    const r = kindFigs ? kindFigs.byScope[key] : ((data.phaseRaw||{})[key] || {ex:0, vat:0});
     /* crewEx exists on production only — the other two are crew fee already */
-    const ex = (o.crewOnly && r.crewEx!=null) ? r.crewEx : (r.ex||0);
+    const ex = (!kindFigs && o.crewOnly && r.crewEx!=null) ? r.crewEx : (r.ex||0);
     return {ex, vat:r.vat||0, inc:ex+(r.vat||0)};
   };
   const scopeMeta = key => {
-    const r = (data.phaseRaw||{})[key] || {};
+    const r = rawOf(key);
     const n = r.peopleCount||0, d = r.daysTotal||0;
     return `${n} ${n===1?'person':'people'} · ${d} ${d===1?'day':'days'}`;
   };
@@ -8468,7 +8828,7 @@ function budgetSummaryBarHTML(data, o){
   /* All stages — every stage's figures, whatever is muted: it is the way back, and says what is there */
   const allRow = () => {
     const sum = BUDGET_SCOPES.map(([k])=>phaseFigures(k)).reduce((a,f)=>({ex:a.ex+f.ex, vat:a.vat+f.vat, inc:a.inc+f.inc}), {ex:0,vat:0,inc:0});
-    const days = BUDGET_SCOPES.reduce((n,[k])=>n+(((data.phaseRaw||{})[k]||{}).daysTotal||0), 0);
+    const days = BUDGET_SCOPES.reduce((n,[k])=>n+(rawOf(k).daysTotal||0), 0);
     return `<div class="budget-scope-row budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${allStagesOn()?'':' off'}"
       role="button" tabindex="0" aria-pressed="${allStagesOn()?'true':'false'}" onclick="allBudgetScopes()"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allBudgetScopes();}" title="Show every stage">
@@ -8496,7 +8856,7 @@ function budgetSummaryBarHTML(data, o){
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   const totalsHTML = o.showTotals
     ? stats.map(([lbl,v,note,sub])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div>${sub?`<div class="budget-stat-sub">${esc(sub)}</div>`:''}</div>`).join('')
-    : `<div class="bnr-totals-off">Rates and totals hidden. Turn on <strong>Budget</strong> to cost this list — the stage selector still filters who is on it.</div>`;
+    : '';
   const toolBtn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}"
       aria-pressed="${on?'true':'false'}" onclick="${call}" title="${esc(title)}">${label}</button>`;
   /* ⚠️ REMOVED in Phase CF: `modeHTML` and the `.bnr-modes` STAGE | DAYS picker. Roles has
@@ -8516,6 +8876,34 @@ function budgetSummaryBarHTML(data, o){
       toolBtn(budgetCostsPP, 'Costs PP', `toggleBudgetCostsPP(${!budgetCostsPP})`,
         "Show what each person costs besides their fee — their hotel, travel and meals")
     ].join('') : '';
+  const headRowHTML = foldHTML => (o.showTotals || foldHTML) ? `<div class="budget-scope-row${budgetVatToggle&&o.showTotals?' itemized':''} budget-scope-head">
+        <span class="budget-scope-name budget-scope-lead">${foldHTML||''}</span>${o.showTotals ? `${budgetVatToggle ? `<span class="budget-scope-ex">xVAT</span>
+        <span class="budget-scope-vat">VAT</span>` : ''}<span class="budget-scope-amt">Total</span>` : ''}
+      </div>` : '';
+  const noteHTML = o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every stage is off, so nothing is being costed and only crew in no stage at all are listed. Click All stages — or Pre-production, Production or Post.</div>` : '';
+  /* the page head (Crew, Talent etc): see pageHeadHTML() */
+  if(o.listToolsHTML!=null){
+    const foldHTML = `<span class="bnr-fold" role="button" tabindex="0" onclick="setHeadFolded(true)"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setHeadFolded(true);}"
+        title="Collapse the head to one line"><span class="dept-caret">▾</span> Stages</span>`;
+    /* THE CHIP — the folded selector. Its colour IS the selection: the stage's own colour when one
+       is isolated, ink black for all stages or a mix (a mix also shows its stages' dots). */
+    const on = BUDGET_SCOPES.filter(([k])=>budgetScope[k]);
+    const onFigs = on.map(([k])=>phaseFigures(k));
+    const chipLabel = allStagesOn() ? 'All stages' : iso ? esc(on[0][1]) + ' only' : on.length ? on.map(([,l])=>esc(l)).join(' + ') : 'No stage';
+    const chipMeta = !on.length ? '' : o.showTotals
+      ? fmt(onFigs.reduce((n,f)=>n+(budgetVatToggle?f.inc:f.ex), 0))
+      : iso ? esc(scopeMeta(iso)) : (d=>`${d} ${d===1?'day':'days'}`)(on.reduce((n,[k])=>n+(rawOf(k).daysTotal||0), 0));
+    const chipHTML = `<span class="stage-chip${on.length?'':' none'}" role="button" tabindex="0" onclick="setHeadFolded(false)"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setHeadFolded(false);}" title="Open the stage selector">
+        ${!iso && !allStagesOn() ? on.map(([k])=>`<span class="stage-dot ${STAGE_CLASS[k]}"></span>`).join('') : ''}${chipLabel}${chipMeta?`<span class="stage-chip-meta">${chipMeta}</span>`:''}<span class="dept-caret">▸</span></span>`;
+    return pageHeadHTML({
+      budgetRowHTML: moneyHTML + moneyToolsHTML,
+      totalsHTML: o.showTotals ? totalsHTML : '',
+      toolsHTML: o.listToolsHTML,
+      stageHTML: `${headRowHTML(foldHTML)}${allRow()}${BUDGET_SCOPES.map(scopeRow).join('')}`,
+      chipHTML, noteHTML });
+  }
   return `<div class="phase-banner">
     <div class="bnr-totals">${o.showTotals||o.showStage ? totalsHTML : ''}</div>
     <div class="budget-scope-stack">${o.showStage ? `${o.showTotals ? `<div class="budget-scope-row${budgetVatToggle?' itemized':''} budget-scope-head" aria-hidden="true">
