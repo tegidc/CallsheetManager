@@ -1090,9 +1090,9 @@
   .xls-pct input[type=text]{width:44px; padding:3px 4px; text-align:right; font-size:var(--fs-meta);}
   /* a lit button that happens to be first in a joined group keeps its lit ink (Cost | Charged) */
   .bnr-group .bnr-tool.on:first-child, .bnr-group .bnr-tool.on:first-child:hover{color:var(--tape-ink);}
-  /* 70% see-through and no dimming, docked right — so the totals and the sheet can be watched changing */
+  /* 90% opaque (70% was unreadable over the sheet) and no dimming, docked right — so the totals and the sheet can be watched changing */
   .modal-overlay.bset-overlay{background:transparent; justify-content:flex-end; align-items:flex-start;}
-  .modal-box.bset-box{max-width:440px; background:rgba(255,255,255,.7); backdrop-filter:none;}
+  .modal-box.bset-box{max-width:440px; background:rgba(255,255,255,.9); backdrop-filter:none;}
   .bset-box .bset-row{grid-template-columns:120px minmax(0,1fr);}
   .bset-row{display:grid; grid-template-columns:150px minmax(0,1fr); gap:2px 14px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line);}
   .bset-name{font-size:var(--fs-field);}
