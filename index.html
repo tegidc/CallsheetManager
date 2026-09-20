@@ -3015,8 +3015,28 @@ function renderProject(m){
     <div id="projectBody"></div>`;
   renderProjectBody();
 }
+/* ⚠️ EVERY RE-RENDER KEEPS YOUR PLACE (20 Sep 2026). A tab is rebuilt wholesale by innerHTML, which
+   used to throw away where you were: the page could shift, and any scroll box inside the tab —
+   Roles' own frozen-pane list above all — snapped back to its top, so one click on Only / a tick /
+   a toggle meant hunting for the person you had been looking at. renderProjectBody() now notes the
+   page position and every inner scroller's position before the rebuild and puts them back after —
+   but only when it is still the same screen (tab + sub-view); a tab change still starts at the top. */
+const SCROLL_KEEPERS = '.roles-tablewrap, .tablewrap, .sd-tablescroll';
+let _lastBodyScreen = '';
 function renderProjectBody(){
   const body = document.getElementById('projectBody');
+  if(!body) return;
+  const screen = [currentProjectId, currentProjectTab, crewGridView, budgetView].join('|');
+  const same = screen===_lastBodyScreen;
+  const pageY = window.scrollY, pageX = window.scrollX;
+  const inner = same ? [...body.querySelectorAll(SCROLL_KEEPERS)].map(el=>[el.scrollTop, el.scrollLeft]) : [];
+  renderProjectBodyNow(body);
+  _lastBodyScreen = [currentProjectId, currentProjectTab, crewGridView, budgetView].join('|');
+  if(!same) return;
+  [...body.querySelectorAll(SCROLL_KEEPERS)].forEach((el,i)=>{ if(inner[i]){ el.scrollTop = inner[i][0]; el.scrollLeft = inner[i][1]; } });
+  if(window.scrollY!==pageY || window.scrollX!==pageX) window.scrollTo(pageX, pageY);
+}
+function renderProjectBodyNow(body){
   setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
@@ -4900,6 +4920,7 @@ function outputMenuRowHTML({open=false, onToggle='', panelHTML='', titleText='',
     + (open ? `<div class="filter-panel">${panelHTML}</div>` : '');
 }
 function renderProjectCrew(body){
+  if(['preprod','days','post'].includes(crewGridView)) crewGridView = 'roles';   // retired tabs — a stale value lands on Roles
   body.classList.add('crew-rowselect');
   body.classList.toggle('crew-select-mode', crewSelectMode);
   body.classList.toggle('crew-rowselect-tight', crewGridView==='roles');
@@ -4955,7 +4976,11 @@ function renderProjectCrew(body){
       Object.assign({}, e, {crewId:e.crewId, entries:[e], isPersonBlock:true})));
   }
 
-  const viewLabels = {roles:'Roles', preprod:'Pre-Prod', days:'Production', post:'Post', hotel:'Hotel', travel:'Travel', catering:'Catering'};
+  /* ⚠️ 20 Sep 2026 — the Pre-Prod, Production and Post tabs are GONE from the switcher: Roles' stage
+     selector (All stages / Only) does their filtering, its Prep / Post columns hold their numbers,
+     Shoot opens the day ticks and Dates opens the calendar. The views' render code is still below
+     (isPhaseTab / 'days') but nothing routes to it — see the coercion at the top of this function. */
+  const viewLabels = {roles:'Roles', hotel:'Hotel', travel:'Travel', catering:'Catering'};
   const viewSwitcher = `<div class="tabs crewview-tabs">
     ${Object.keys(viewLabels).map(v=>`<div class="tab ${crewGridView===v?'active':''}" onclick="setCrewGridView('${v}')">${viewLabels[v]}</div>`).join('')}
   </div>`;
@@ -5313,12 +5338,12 @@ function rolesFootnoteHTML(data){
   const tips = [];
   const status = [];
   tips.push('One row per role. Someone booked in two departments appears in both, marked <span class="role-dupe-star">*</span> — it is the same person, not two records.');
-  tips.push('Prep and Post are the same numbers those tabs hold, and <strong>the numbers are what put someone in a phase</strong> — type one and they are in it, clear it and they are out. <strong>Dates</strong> opens that person’s calendar — every role they hold, all three phases on one month.');
+  tips.push('<strong>The Prep and Post numbers are what put someone in a stage</strong> — type one and they are in it, clear it and they are out. <strong>Dates</strong> opens that person’s calendar — every role they hold, all three phases on one month.');
   /* the caret alone does not tell you what is behind it — and once it IS open, that it writes
      the same ticks as the Production tab is the thing you need to know before touching it */
   if(projectDays().length){
     tips.push(rolesShootOpen()
-      ? 'The day ticks are the <strong>Production</strong> tab\'s own — a tick here is a tick there, and ticking one puts that person on the shoot. Click <strong>Shoot</strong> again to close them.'
+      ? 'Ticking a day puts that person on the shoot for it. Click <strong>Shoot</strong> again to close the day ticks.'
       : 'Click <strong>Shoot</strong> to open the day ticks.');
   }
   tips.push('<strong>Arrow keys</strong> move between fields — down a column for the same field on the next person — and space ticks a box.');
@@ -5429,7 +5454,7 @@ function phaseCellHTML(e, ph, pp){
     return `<div class="roles-grid-cell roles-num${canOpen?' roles-shoot-total':''}" data-label="Shoot"
       ${canOpen?`role="button" tabindex="0" onclick="event.stopPropagation();toggleRolesShootColumn()"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRolesShootColumn();}"`:''}
-      title="${member?(canOpen?openTitle+' — days on the shoot are ticked day by day':'Days on the shoot — ticked day by day on the Production tab'):'Not on the shoot — tick a day here or on the Production tab to put them on it'}">${n||dash}</div>`;
+      title="${member?(canOpen?openTitle+' — days on the shoot are ticked day by day':'Days on the shoot — ticked day by day'):'Not on the shoot — open Shoot and tick a day to put them on it'}">${n||dash}</div>`;
   }
   const days = phaseDaysOf(ph.view, e.id, p);
   const value = member && days!=null ? days : '';
@@ -5446,11 +5471,11 @@ function entrySelectCbHTML(e){
 }
 const CREW_PHASES = [
   {scope:'preproduction', view:'preprod', head:'Prep',  members:'preprodMembers', init:'preprodMembersInit',
-   headTitle:'Booked pre-production days — the same number the Pre-Prod tab holds'},
+   headTitle:'Booked pre-production days'},
   {scope:'production',    view:'days',    head:'Shoot', members:'onShoot',        init:'onShootInit',
-   headTitle:'Days on the shoot — ticked day by day on the Production tab'},
+   headTitle:'Days on the shoot — click to open the day ticks'},
   {scope:'post',          view:'post',    head:'Post',  members:'postMembers',    init:'postMembersInit',
-   headTitle:'Booked edit days — the same number the Post tab holds'}
+   headTitle:'Booked edit days'}
 ];
 const phaseByScope = scope => CREW_PHASES.find(ph=>ph.scope===scope);
 const phaseByView  = view  => CREW_PHASES.find(ph=>ph.view===view);
@@ -6807,7 +6832,7 @@ function datesDialogHTML(){
         Marking more days than booked is fine — five days' work can spread over six — but fewer means a booking with nowhere to sit.</span>
     </div>` : '';
   const countHTML = readonly
-    ? `<span class="dates-count">${sel.tally.marked} shoot day${sel.tally.marked===1?'':'s'} — set on the Production tab</span>`
+    ? `<span class="dates-count">${sel.tally.marked} shoot day${sel.tally.marked===1?'':'s'} — set from the Shoot column on Roles</span>`
     : `<span class="dates-count">${sel.tally.booked||'No'} day${sel.tally.booked===1?'':'s'} booked · ${sel.tally.marked} marked</span>`;
   return `<div class="modal-overlay" onclick="if(event.target===this) closeDatesDialog()">
     <div class="modal-box dates-box" onclick="event.stopPropagation()">
@@ -6841,7 +6866,7 @@ function datesDialogHTML(){
         <button class="small" style="margin-left:auto;" onclick="closeDatesDialog()">Done</button>
       </div>
       <div class="hint" style="margin-top:8px;">${readonly
-        ? 'Shoot dates come from the shoot days this person is on — tick those on the Production tab, or from the Shoot column on Roles.'
+        ? 'Shoot dates come from the shoot days this person is on — tick those from the Shoot column on Roles.'
         : `Click or drag to mark the days. Dots under a date are ${multi?'this person’s other roles and phases':'the other phases'}, so you can see where they overlap.`}${
         multi ? ' You are marking <strong>'+esc(e.role||'no role')+'</strong> — a bracketed <em>(n)</em> above is days held by their other role; use the buttons to switch to it.' : ''}</div>
     </div>
@@ -8457,16 +8482,16 @@ function budgetPersonViewHTML(data){
     return `<td${travelNote}>${pp.vat ? fmt(pp.vat) : '<span class="budget-noRate">—</span>'}</td>`;
   };
   const countCols = [
-    {on:data.prepOn, head:'Prep', title:'Pre-Prod days',    tab:'Pre-Prod', value:pp=>pp.prepDays},
+    {on:data.prepOn, head:'Prep', title:'Pre-production days booked on Crew → Roles', tab:'Prep', value:pp=>pp.prepDays},
     {on:data.prodOn, head:'Days', title:'Production days',  tab:null,       value:pp=>pp.daysWorked},
-    {on:data.postOn, head:'Edit', title:'Edit days booked on the Post tab', tab:'Post', value:pp=>pp.postDays}
+    {on:data.postOn, head:'Edit', title:'Edit days booked on Crew → Roles', tab:'Post', value:pp=>pp.postDays}
   ].filter(c=>c.on);
   /* The one note covering whichever non-shoot columns are showing — two near-identical
      sentences stacked under the table said the same thing twice. */
   const offShoot = countCols.filter(c=>c.tab);
   const offShootNote = offShoot.length ? `<div class="hint" style="margin-top:8px;">${
       offShoot.map(c=>c.head).join(' and ')} ${offShoot.length>1?'are':'is'} the ${
-      offShoot.map(c=>c.tab).join(' and ')} tab${offShoot.length>1?'s\'':'\'s'} booked days, at the same day rate — ${
+      offShoot.map(c=>c.tab).join(' and ')} day${offShoot.length>1?'s':''} booked on Crew → Roles, at the same day rate — ${
       offShoot.length>1?'neither is':'it is not'} filtered by the shoot-day filter, because ${
       offShoot.length>1?'neither is a shoot day':'a '+offShoot[0].head.toLowerCase()+' day isn\'t a shoot day'}.</div>` : '';
   const anySplit = data.people.some(pp=>pp.kit!=null);
