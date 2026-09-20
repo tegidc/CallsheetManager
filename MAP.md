@@ -534,6 +534,12 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   then ONE tool row, `budgetToolRowHTML()`: **View ▾** (a select — the tab strip is gone) | VAT | Settings | Days,
   with Lines · Edit · Export pushed right. "Days" opens the filter popup and reads `Days (n of N)` when days are
   filtered, `· filtered` when a shared Crew filter is on. Where this note and the one above disagree, this wins.
+- **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
+  plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
+  View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`
+  in the page's own type (`budgetViewMenuOpen`, `toggleBudgetViewMenu()`, `pickBudgetView()`), not a native
+  select. The Settings popup is 70% see-through with NO dimming and docked top-right (`.bset-overlay`,
+  `.bset-box`), so the totals and the sheet can be watched changing while a setting is flipped.
 - **EDIT** (`budgetEdit`, `toggleBudgetEdit()`) — off, the cost side is read-only (Charged and Float are the
   budget's own and always typeable). On, shaded `.xls-ed` cells write THROUGH THE OWNING TAB'S SETTER, so every
   other page agrees: person Pre / Post → `setPhaseDays()`, Shoot → a button opening `budgetShootDialogHTML()`

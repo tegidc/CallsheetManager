@@ -1090,7 +1090,10 @@
   .xls-pct input[type=text]{width:44px; padding:3px 4px; text-align:right; font-size:var(--fs-meta);}
   /* a lit button that happens to be first in a joined group keeps its lit ink (Cost | Charged) */
   .bnr-group .bnr-tool.on:first-child, .bnr-group .bnr-tool.on:first-child:hover{color:var(--tape-ink);}
-  .bset-box{max-width:560px;}
+  /* 70% see-through and no dimming, docked right — so the totals and the sheet can be watched changing */
+  .modal-overlay.bset-overlay{background:transparent; justify-content:flex-end; align-items:flex-start;}
+  .modal-box.bset-box{max-width:440px; background:rgba(255,255,255,.7); backdrop-filter:none;}
+  .bset-box .bset-row{grid-template-columns:120px minmax(0,1fr);}
   .bset-row{display:grid; grid-template-columns:150px minmax(0,1fr); gap:2px 14px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line);}
   .bset-name{font-size:var(--fs-field);}
   .bset-hint{grid-column:2; margin-top:0;}
@@ -1099,16 +1102,24 @@
   /* the Budget page head's own pieces, inside the shared .bnr-head */
   .bnr-head .budget-stat.bhead-final{display:block;}
   .bnr-head .budget-stat.bhead-final .num{font-size:26px; line-height:1.15;}
-  .bhead-sub{font-family:var(--body); font-size:var(--fs-meta); color:var(--text); margin-top:2px; font-variant-numeric:tabular-nums;}
-  .bhead-sub .lbl{display:inline; margin-right:4px;}
+  .bhead-sub{font-family:var(--body); font-size:var(--fs-meta); font-weight:400; color:var(--text); margin-top:2px; font-variant-numeric:tabular-nums;}
+  .bhead-sub .mu{color:var(--muted);}
   .bhead-strip{display:flex; flex-wrap:wrap; gap:10px 34px; margin:2px 0 14px; padding-bottom:14px; border-bottom:1px solid var(--line);}
-  .bhead-strip .budget-stat .num{font-size:21px; line-height:1.2;}
+  /* the figures under the Final total are lighter than it, so there is one headline in the head */
+  .bhead-strip .budget-stat .num{font-size:21px; line-height:1.2; font-weight:400;}
   .bhead-row{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
   .bhead-row .bnr-grow{flex:1 1 auto;}
-  .bhead-view{display:inline-flex; align-items:center; gap:6px; padding-right:4px; color:var(--text);}
-  .bhead-view select{width:auto; border:none; padding:0 2px; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px;
-    text-transform:uppercase; font-weight:600; color:var(--text); background:transparent; cursor:pointer;}
-  .bhead-view select:focus{box-shadow:none;}
+  .bhead-view{position:relative; display:inline-flex;}
+  .bhead-view > .bnr-tool{color:var(--text); font-weight:600;}
+  .bhead-view-k{color:var(--muted); font-weight:400; margin-right:3px;}
+  .bhead-view-shade{position:fixed; inset:0; z-index:40;}
+  .bhead-view-menu{position:absolute; top:calc(100% + 4px); left:0; z-index:41; display:flex; flex-direction:column; min-width:170px;
+    background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:4px; box-shadow:0 8px 24px rgba(17,10,8,.14);}
+  .bhead-view-menu button{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px; text-transform:uppercase; text-align:left;
+    color:var(--muted); background:transparent; border:none; border-radius:3px; padding:7px 9px; cursor:pointer; white-space:nowrap;}
+  .bhead-view-menu button:hover{background:var(--tint-2); color:var(--tape);}
+  .bhead-view-menu button.on{color:var(--text); font-weight:600; background:var(--tint-3);}
+  .bhead-view-menu button:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
   /* Edit on: the cells that write back to another tab are shaded, so it is plain what just unlocked */
   .section table.xls td.xls-ed{background:var(--tint-3);}
   .section table.xls td.xls-btn{padding:0;}
@@ -9424,11 +9435,10 @@ function budgetPageHeadHTML(data, B){
   const fmt = budgetFmt, T = B.totals, set = B.sheet.settings;
   const chVat = budgetVatToggle ? B.lines.reduce((n,l)=>n+l.chVat, 0) : 0;
   const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
-  const totals = `<div class="budget-stat bhead-final"><div class="num">${fmt(T.final)}</div>
-      <div class="lbl">Final total</div>
-      <div class="bhead-sub"><span class="lbl">Prod fee</span> ${fmt(T.fee)} <span class="budget-stat-note">${B.sheet.feePct}%</span></div>
-      <div class="bhead-sub"><span class="lbl">Total</span> <span class="budget-stat-note">${!budgetVatToggle ? 'ex-VAT' : chVat>0 ? `inc. ${fmt(chVat)} VAT${set.vatBack?' — final':''}` : 'no VAT in it'}</span></div>
-      ${budgetVatToggle ? `<div class="bhead-sub"><span class="lbl">xVAT</span> ${fmt(T.final - chVat)}</div>` : ''}</div>`;
+  const totals = `<div class="budget-stat bhead-final"><div class="num" title="Final total — charged, plus the production fee">${fmt(T.final)}</div>
+      <div class="bhead-sub">Prod fee ${fmt(T.fee)} <span class="mu">${B.sheet.feePct}%</span></div>
+      <div class="bhead-sub">Total ${!budgetVatToggle ? 'ex-VAT' : chVat>0 ? `inc. ${fmt(chVat)} VAT${set.vatBack?' — final':''}` : '— no VAT in it'}</div>
+      ${budgetVatToggle ? `<div class="bhead-sub">xVAT ${fmt(T.final - chVat)}</div>` : ''}</div>`;
   const stat = { cost:['Cost', fmt(T.cost), ''], charged:['Charged', fmt(T.charged), 'inc. float'], floatTotal:['Float', fmt(T.float), B.sheet.floatPct+'%'],
     margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span>`, pct],
     floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee %', B.sheet.feePct+'%', ''] };
@@ -9437,19 +9447,28 @@ function budgetPageHeadHTML(data, B){
     + `<div class="bhead-strip">${strip.map(([l,v,note])=>`<div class="budget-stat"><div class="num">${v}</div><div class="lbl">${l}${note?`<span class="budget-stat-note">${note}</span>`:''}</div></div>`).join('')}</div>`;
 }
 /* the one tool row, under the divider and on the sheet */
+let budgetViewMenuOpen = false;
+function toggleBudgetViewMenu(on){ budgetViewMenuOpen = on==null ? !budgetViewMenuOpen : !!on; renderProjectBody(); }
+function pickBudgetView(v){ budgetViewMenuOpen = false; setBudgetView(v); }
 function budgetToolRowHTML(){
   const btn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}" aria-pressed="${on?'true':'false'}" onclick="${call}" title="${escA(title)}">${label}</button>`;
   const filters = budgetActiveFilterCount(), dayN = budgetDayFilterCount();
+  /* the view picker — a button and a menu in the page's own type, not a native select */
+  const viewMenu = `<span class="bhead-view">
+      <button type="button" class="bnr-tool" aria-haspopup="listbox" aria-expanded="${budgetViewMenuOpen}" onclick="toggleBudgetViewMenu()"
+        onkeydown="if(event.key==='Escape') toggleBudgetViewMenu(false)" title="Which way to cut the budget"><span class="bhead-view-k">View</span> ${esc(BUDGET_VIEW_LABELS[budgetView])} <span class="dept-caret">${budgetViewMenuOpen?'▴':'▾'}</span></button>
+      ${budgetViewMenuOpen ? `<span class="bhead-view-shade" onclick="toggleBudgetViewMenu(false)"></span>
+      <span class="bhead-view-menu" role="listbox">${Object.keys(BUDGET_VIEW_LABELS).map(v=>`<button type="button" role="option" aria-selected="${budgetView===v}" class="${budgetView===v?'on':''}"
+        onclick="pickBudgetView('${v}')">${esc(BUDGET_VIEW_LABELS[v])}</button>`).join('')}</span>` : ''}</span>`;
   return `<div class="bhead-row">
-    <label class="bnr-tool bhead-view" title="Which way to cut the budget">View
-      <select onchange="setBudgetView(this.value)" aria-label="Budget view">${Object.keys(BUDGET_VIEW_LABELS).map(v=>`<option value="${v}"${budgetView===v?' selected':''}>${BUDGET_VIEW_LABELS[v]}</option>`).join('')}</select></label>
+    ${viewMenu}
+    ${btn(budgetEdit, 'Edit', 'toggleBudgetEdit()', budgetEdit ? 'Lock the costs again' : 'Change costs, days and rates here — they write back to Crew, the cost tabs and Venues — and add lines of your own')}
     ${btn(budgetVatToggle, budgetVatToggle?'VAT':'xVAT', `toggleBudgetVat(${!budgetVatToggle})`, budgetVatToggle ? 'Showing with VAT — click for ex-VAT only' : 'Showing ex-VAT only — click to include VAT')}
     ${btn(false, 'Settings', 'toggleBudgetSettings()', "How this project's budget is worked out, and what the totals show")}
     ${btn(dayN>0, 'Days'+(dayN ? ` (${dayN} of ${projectDays().length})` : '')+(filters>dayN ? ' · filtered' : ''), 'toggleBudgetFilterPanel()',
         filters>dayN ? 'A department or company filter is on too — it is shared with the Crew tab. Click to see it.' : 'Which shoot days are costed — and departments, and the Per Person sort')}
     <span class="bnr-grow"></span>
     ${['department','day','bbc'].includes(budgetView) ? btn(budgetShowLines, 'Lines', 'toggleBudgetShowLines()', 'List the rows behind each heading') : ''}
-    ${btn(budgetEdit, 'Edit', 'toggleBudgetEdit()', budgetEdit ? 'Lock the costs again' : 'Change costs, days and rates here — they write back to Crew, the cost tabs and Venues — and add lines of your own')}
     ${btn(false, 'Export', 'toggleBudgetOutputPanel()', 'Copy as text, or download an Excel file')}
   </div>`;
 }
@@ -9674,7 +9693,7 @@ function budgetSettingsDialogHTML(){
   const row = (title, controlHTML, hint) => `<div class="bset-row"><div class="bset-name">${title}</div><div class="bset-ctl">${controlHTML}</div>
       ${hint ? `<div class="hint bset-hint">${hint}</div>` : ''}</div>`;
   const changed = Object.keys(BUDGET_SETTING_DEFAULTS).some(k=>set[k]!==BUDGET_SETTING_DEFAULTS[k]) || Object.keys(set.view||{}).length>0;
-  return `<div class="modal-overlay" onclick="if(event.target===this) toggleBudgetSettings()">
+  return `<div class="modal-overlay bset-overlay" onclick="if(event.target===this) toggleBudgetSettings()">
     <div class="modal-box filter-box bset-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Budget settings">
       <h3>Budget settings</h3>
       <div class="hint" style="margin:-6px 0 12px;">How <strong>this project's</strong> budget is worked out. Changes apply straight away, on every Budget view and in the export.</div>
