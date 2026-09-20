@@ -433,6 +433,42 @@ id and come in as new people on the next load.
 
 ## Budget
 
+### Line Items — the working budget (20 Sep 2026, branch `budget-line-items`)
+
+**The first Budget view, and the first thing on the tab that OWNS data.** A spreadsheet-style
+sheet (column letters, row numbers, full grid, formula bar — `.xls*` CSS) listing every cost
+in the project one row each, modelled on the Excel budgets it replaces. Stage 1 of a staged
+rebuild: the other five views are still the old ones and get the same treatment next
+(agreed mockups: Per Department by code with Cost/Charged/%, Per Day as a dept × day grid,
+Per Person with kit folded in, Costs as a rate card, BBC by code; day toggles beside the stage ones).
+
+- `p.budgetSheet` — `{ charged:{lineKey:rate}, floatPct, floatLines:{lineKey:pct}, feePct, lines:[…] }`.
+  Read through `budgetSheetOf(p)` (defaults: float 5%, fee 10%), written through `budgetSheetRec(p)`.
+- **COST vs CHARGED** (`budgetMode`, `setBudgetMode()`) — Cost = true costs, no float, no fee.
+  Charged = charged rates + float + production fee. **Charged overrides the RATE**, not the
+  total, so days changing elsewhere flow through. Blank = charged at cost. Float is % of the
+  line's **ex-VAT** figure. Margin = final − cost, float and fee included (unspent float is kept).
+- `buildBudgetLines(data)` — turns `buildBudgetData()`'s result into `{sections, lines, fig(l,mode), totals}`.
+  Line keys: `e:<entryId>` labour, `k:<entryId>` kit (⚠️ kit is its OWN row coded EQUIP, as in the
+  Excel — labour rate is `rate − kit`), `cat:b|l|d|del`, `trv:<method>`, `trv:talent`, `htl:rooms`,
+  `htl:talent`, `loc:<locId>`, `lx:<locId>:<i>` (venue extras), `v:<vendorCostId>`, `a:<additionalCostId>`,
+  `c:<id>` typed lines. ⚠️ A VAT-registered person's TRAVEL VAT sits on the travel row, not their own,
+  so the rows still sum to `pp.vat`. ⚠️ If the rows ever fail to add up to `data.totalExVat` /
+  `data.vatTotal`, a locked "Unitemised difference" row appears rather than money going missing —
+  verified zero on all four live projects plus a synthetic kit + VAT venue + extra.
+- `buildBudgetData()` gained `src` (the grids and figures the line builder itemises from, so nothing
+  is re-derived), `customTotal` / `customVat`, and typed lines are inside `extrasTotal`, `vatTotal`
+  and `phaseRaw` — so the banner, the stage stack and every old view include them.
+  `sheetLineFigures(l)` is the one place a typed line is costed (shoot days + qty = Production).
+- Typed lines: `addBudgetLine(sec, after)` (the + in the left margin; code defaults to the section's
+  department, dropdown of `DEPARTMENT_CODES`; department sections get Pre/Shoot/Post/Qty, extras
+  sections Qty only), `setBudgetLineField()`, `deleteBudgetLine()` (undoable). They supersede the
+  Additional-costs demo, which still shows as read-only rows under Other costs.
+- `xlsCommit(mutate)` — ⚠️ every write goes through it: mutates, waits a tick so the field just
+  tabbed INTO is known, re-renders, restores focus by `data-fk`, then saves. `xlsKey` = Enter moves
+  down the column; `xlsFocus` feeds the formula bar. `budgetXlsError` is the one-shot status-bar error.
+- Export: `budgetExportRows(data,'lines')`. `.xls-wrap` is in `SCROLL_KEEPERS`.
+
 Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already
 entered elsewhere in the app rather than owning any of its own — including hotel cost
 per room/night (`getHotelCosts()`/`saveHotelCosts()`, Phase Budget originally, moved to
