@@ -248,6 +248,16 @@
   .sheet-sync-notice{font-size:var(--fs-meta); color:var(--tape); margin:-4px 0 10px; padding:0 10px;}
   .sheet-sync-notice.err{color:var(--danger);}
   /* Project Notes (T-9) — ruled rows, borderless bodies: a scratchpad, not a form */
+  .task-field{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; color:var(--text);}
+  .list-card .meta .task-field, .list-card .meta .task-field span{color:var(--text); font-size:var(--fs-field); margin-top:0;}
+  .list-card .meta .task-field{margin-top:8px;}
+  .list-card .meta .task-field .task-field-msg{font-size:var(--fs-meta);}
+  .flag-box{max-width:520px;}
+  .flag-list{max-height:50vh; overflow:auto; border-top:1px solid var(--line);}
+  .flag-row{display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--line); font-size:var(--fs-field);}
+  .flag-row-label{flex:1; min-width:0;}
+  .flag-row.handled .flag-row-label{color:var(--muted);}
+  .flag-row-state{font-size:var(--fs-meta); color:var(--tape); white-space:nowrap;}
   .notes-bar{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;}
   .notes-search{flex:1 1 260px;}
   .note-row{padding:10px 0; border-top:1px solid var(--line);}
@@ -2433,7 +2443,21 @@ function mergeDB(base, mine, theirs){
   return mine;
 }
 
-async function saveDB(key, value){
+/* ⚠️ ONE WRITE PER KEY AT A TIME (20 Sep 2026). saveDBNow()'s guarded write compares against the
+   stamp of the last write this tab SAW LAND — so two saves of the same key in flight together
+   race each other: the second is "beaten" by the first, re-reads, retries, and a burst of quick
+   clicks (Add, Add, Add in the flag popup; a run of meal ticks) could lose all three attempts and
+   be reported as "not saved — another writer". Queuing per key removes the self-inflicted
+   conflict; the merge path is still there for a genuine second tab or device. `value` is the
+   live array/object, so a queued save writes the state as it is when its turn comes. */
+const _saveChains = {};
+function saveDB(key, value){
+  const run = () => saveDBNow(key, value);
+  const p = (_saveChains[key] || Promise.resolve()).then(run, run);
+  _saveChains[key] = p.catch(()=>{});
+  return p;
+}
+async function saveDBNow(key, value){
   const stamp = () => new Date().toISOString();
   // `value` is reassigned by the merge below, so this deliberately reads it at
   // call time: a retry should push the merged value, not the pre-merge one.
@@ -2787,7 +2811,7 @@ function mostRecentProject(){
 function goRecentProject(){ const p=mostRecentProject(); if(p) openProject(p.id); }
 /* ⚠️ Phase BW — closes the Dates popup. It lives on #globalOverlay, outside #main, so a tab
    change alone would leave it floating over a screen that has nothing to do with it. */
-function goProjectTab(tab){ flushShootDayEdits(); currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
+function goProjectTab(tab){ flushShootDayEdits(); flushNotesEdits(); currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
 
 function renderMain(){
   const m = document.getElementById('main');
@@ -2956,7 +2980,6 @@ function renderProject(m){
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">CALL SHEETS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
-      <div class="tab ${currentProjectTab==='notes'?'active':''}" onclick="goProjectTab('notes')">NOTES</div>
     </div>
     <div id="projectBody"></div>`;
   renderProjectBody();
@@ -2969,7 +2992,8 @@ function renderProjectBody(){
   if(currentProjectTab==='locations') return renderProjectLocations(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
-  if(currentProjectTab==='notes') return renderProjectNotes(body);
+  // 'notes' was its own tab until 20 Sep 2026 — it is a section of Overview now
+  if(currentProjectTab==='notes'){ currentProjectTab='overview'; notesSectionOpen = true; return renderProjectOverview(body); }
   // 'preview' was the Preview & Export tab, folded into Shoot Days on 19 Sep 2026
   if(currentProjectTab==='preview'){ currentProjectTab='days'; return renderProjectDays(body); }
 }
@@ -2977,6 +3001,7 @@ function renderProjectBody(){
 function renderProjectOverview(body){
   const p = currentProject();
   const days = projectDays(p.id);
+  flushNotesEdits();            // this rebuilds the note editors — bank what's typed in them first
   body.innerHTML = `
     <div class="section">
       <h2>Project details</h2>
@@ -3003,6 +3028,7 @@ function renderProjectOverview(body){
       ${quickAddSectionHTML(p)}
     </div>
     ${renderTasksSection(p, days)}
+    ${notesSectionHTML(p)}
     ${deliverablesSectionHTML(p)}
     <div class="section">
       <h2>Danger zone</h2>
@@ -3010,7 +3036,15 @@ function renderProjectOverview(body){
     </div>`;
   // autosave: ~1s after the user stops typing anywhere in this tab, save project
   // details silently (no alert, no button flash — just the existing "Saved" text)
-  body.oninput = () => scheduleAutosave('overview', () => saveProjectOverview());
+  // — except typing in a note (its own autosave) or in the Tasks / Notes sections' own fields
+  body.oninput = (e) => {
+    const t = e && e.target;
+    if(t && t.classList && t.classList.contains('note-text')){ noteAutoList(e); noteAfterEdit(t); return; }
+    if(t && t.closest && t.closest('#tasksSection, #notesSection')) return;
+    scheduleAutosave('overview', () => saveProjectOverview());
+  };
+  wireNotesHandlers(body);
+  renderNotesList();
   // Quick add: land the cursor in the field the user just opened, same as the
   // Locations tab does for its own search box.
   if(quickAddMode === 'loc') document.getElementById('locAddSearch')?.focus();
@@ -3225,28 +3259,211 @@ function toggleTasksSection(){ tasksSectionOpen = !tasksSectionOpen; renderProje
 let showCompletedTasks = false;
 function toggleShowCompletedTasks(){ showCompletedTasks = !showCompletedTasks; renderProjectBody(); }
 
-function buildTaskFlags(p, days){
-  const items = [];
-  const noDateDays = days.filter(d=>!d.date);
-  if(noDateDays.length) items.push({ label:`${noDateDays.length} shoot day${noDateDays.length>1?'s':''} missing a date`, onclick:`currentShootDayId='${noDateDays[0].id}';goProjectTab('days')` });
-  if(!(p.locationIds||[]).length) items.push({ label:'No venues added yet', onclick:`goProjectTab('locations')` });
-  if(!projectEntries(p).length) items.push({ label:'No crew assigned yet', onclick:`goProjectTab('crew')` });
-
-  days.filter(d=>!d.locationId).forEach(d=>{
-    items.push({ label:`No location — ${shootDayLabel(d)}`, onclick:`currentShootDayId='${d.id}';goProjectTab('days')` });
-  });
-  days.filter(d=>!(d.positions||[]).length).forEach(d=>{
-    items.push({ label:`No crew — ${shootDayLabel(d)}`, onclick:`crewGridView='days';goProjectTab('crew')` });
-  });
+/* ---- FLAGS (20 Sep 2026) ----
+   A flag GROUP is one pill ("3 crew members with no day rate set"); its ELEMENTS are the
+   individual things behind it (one per person / per day), each with a stable key:
+     date:<dayId>  loc:<dayId>  daycrew:<dayId>  rate:<entryId>  venues  crew
+   Clicking a pill opens the flag popup, where each element is either ADDED to the task list
+   (a task carrying flagKey — and the field that fixes it, see taskFieldHTML) or IGNORED
+   (p.ignoredFlags). An element stops being a flag once it is ignored or has an open task. */
+function buildTaskFlagGroups(p, days){
+  const plural = (n, one, many) => `${n} ${n===1?one:many}`;
+  const groups = [];
+  const add = (key, els, titleFn, go) => { if(els.length) groups.push({key, elements:els, titleFn, go}); };
+  const dayEl = (kind, d, what) => ({ key:`${kind}:${d.id}`, label:shootDayLabel(d), task:`${what} — Day ${d.dayNum||'?'}${d.date?' ('+fmtDate(d.date)+')':''}` });
+  add('date', days.filter(d=>!d.date).map(d=>dayEl('date', d, 'Shoot date')),
+      n=>`${plural(n,'shoot day','shoot days')} missing a date`, `goProjectTab('days')`);
+  add('venues', (p.locationIds||[]).length ? [] : [{key:'venues', label:'This project has no venues yet', task:'Add a venue to the project'}],
+      ()=>'No venues added yet', `goProjectTab('locations')`);
+  add('crew', projectEntries(p).length ? [] : [{key:'crew', label:'This project has no crew yet', task:'Add crew to the project'}],
+      ()=>'No crew assigned yet', `goProjectTab('crew')`);
+  add('loc', days.filter(d=>!d.locationId).map(d=>dayEl('loc', d, 'Location')),
+      n=>`${plural(n,'shoot day','shoot days')} with no location`, `goProjectTab('days')`);
+  add('daycrew', days.filter(d=>!(d.positions||[]).length).map(d=>dayEl('daycrew', d, 'Crew')),
+      n=>`${plural(n,'shoot day','shoot days')} with no crew`, `goProjectTab('days')`);
   if(typeof resolveEntryRate==='function'){
-    const noRateCount = projectEntries(p).filter(e=>!resolveEntryRate(e.id,p).hasRate).length;
-    if(noRateCount) items.push({ label:`${noRateCount} crew member${noRateCount>1?'s':''} with no day rate set`, onclick:`budgetView='person';goProjectTab('budget')` });
+    add('rate', projectEntryViews(p).filter(v=>!resolveEntryRate(v.id,p).hasRate).map(v=>({
+          key:`rate:${v.id}`, label:`${v.name||'(no name)'}${v.role?' — '+v.role:''}`, task:`Day rate — ${v.name||'(no name)'}${v.role?' ('+v.role+')':''}` })),
+      n=>`${plural(n,'crew member','crew members')} with no day rate set`, `budgetView='person';goProjectTab('budget')`);
   }
-  return items;
+  return groups;
 }
-function taskFlagPillsHTML(items){
-  if(!items.length) return '<div class="empty-note">No flags right now.</div>';
-  return `<div class="taglist">${items.map(it=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="${it.onclick}" title="Click to fix">⚠ ${esc(it.label)}</span>`).join('')}</div>`;
+/* the groups as they should be SHOWN: minus what is ignored or already an open task */
+function buildTaskFlags(p, days){
+  const hidden = new Set([...(p.ignoredFlags||[]), ...(p.tasks||[]).filter(t=>t.flagKey && !t.completed).map(t=>t.flagKey)]);
+  return buildTaskFlagGroups(p, days).map(g=>{
+    const els = g.elements.filter(e=>!hidden.has(e.key));
+    // the pill counts what is LEFT to deal with, not everything behind the flag
+    return els.length ? Object.assign({}, g, { elements:els, label:g.titleFn(els.length) }) : null;
+  }).filter(Boolean);
+}
+function taskFlagPillsHTML(groups){
+  if(!groups.length) return '<div class="empty-note">No flags right now.</div>';
+  return `<div class="taglist">${groups.map(g=>`<span class="pill" style="cursor:pointer;border:1px solid var(--danger);color:var(--danger)" onclick="openFlagDialog('${g.key}')" title="Click to add to your tasks, or ignore">⚠ ${esc(g.label)}</span>`).join('')}</div>`;
+}
+/* a flag-task whose problem has gone away (fixed from its own field, or anywhere else in the
+   app) ticks itself off; one whose subject no longer exists does too */
+function syncFlagTasks(p, days){
+  const live = new Set(buildTaskFlagGroups(p, days).flatMap(g=>g.elements.map(e=>e.key)));
+  let changed = false;
+  (p.tasks||[]).forEach(t=>{ if(t.flagKey && !t.completed && !live.has(t.flagKey)){ t.completed = true; changed = true; } });
+  if(changed) saveInBackground('db:projects', projectsDB);
+}
+/* ---- the flag popup ----
+   ⚠️ It stays open until Done (or Esc / a click outside) — the point is to work through several
+   elements in one sitting. The rows are a SNAPSHOT taken on open (flagDialogRows); a row that has
+   been dealt with stays in the list, marked Added / Ignored with an Undo, rather than vanishing. */
+let flagDialogKey = null;
+let flagDialogRows = [];          // [{key,label,task}] as they were when the popup opened
+let flagDialogHandled = {};       // key -> 'add' | 'ignore', this sitting only
+let flagDialogTitle = '', flagDialogGo = '';
+function openFlagDialog(key){
+  const p = currentProject(); if(!p) return;
+  const g = buildTaskFlags(p, projectDays(p.id)).find(x=>x.key===key); if(!g) return;
+  flagDialogKey = key; flagDialogRows = g.elements.slice(); flagDialogHandled = {};
+  flagDialogTitle = g.label; flagDialogGo = g.go;
+  renderFlagDialog();
+}
+function closeFlagDialog(){ flagDialogKey = null; flagDialogRows = []; flagDialogHandled = {}; const el = document.getElementById('flagDialog'); if(el) el.remove(); }
+function renderFlagDialog(){
+  if(!flagDialogKey) return;
+  let el = document.getElementById('flagDialog');
+  if(!el){ el = document.createElement('div'); el.id = 'flagDialog'; document.body.appendChild(el); }
+  const list = el.querySelector('.flag-list'), scroll = list ? list.scrollTop : 0;
+  const left = flagDialogRows.filter(e=>!flagDialogHandled[e.key]);
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this) closeFlagDialog()">
+    <div class="modal-box flag-box" role="dialog" aria-modal="true" aria-label="${esc(flagDialogTitle)}">
+      <h3>⚠ ${esc(flagDialogTitle)}</h3>
+      <div class="hint" style="margin:0 0 10px;"><strong>Add</strong> puts it on your task list, with the field to fix it right there. <strong>Ignore</strong> stops flagging it. Work through as many as you like, then press Done.</div>
+      <div class="flag-list">${flagDialogRows.map(e=>{
+        const h = flagDialogHandled[e.key];
+        return h ? `<div class="flag-row handled">
+            <span class="flag-row-label">${esc(e.label)}</span>
+            <span class="flag-row-state">${h==='add'?'✓ Added to tasks':'Ignored'}</span>
+            <button class="small" onclick="flagUndo('${esc(e.key)}')">Undo</button>
+          </div>`
+        : `<div class="flag-row">
+            <span class="flag-row-label">${esc(e.label)}</span>
+            <button class="small primary" onclick="flagAdd('${esc(e.key)}')">Add</button>
+            <button class="small" onclick="flagIgnore('${esc(e.key)}')">Ignore</button>
+          </div>`; }).join('')}</div>
+      <div class="toolbar" style="margin:14px 0 0;">
+        ${left.length>1 ? `<button class="small" onclick="flagAddAll()">Add all (${left.length})</button><button class="small" onclick="flagIgnoreAll()">Ignore all</button>` : ''}
+        <span class="hint" style="margin:0; cursor:pointer;" onclick="const go=flagDialogGo; closeFlagDialog(); new Function(go)();">Open the page instead →</span>
+        <button class="primary" onclick="closeFlagDialog()" style="margin-left:auto;">Done</button>
+      </div>
+    </div>
+  </div>`;
+  const list2 = el.querySelector('.flag-list'); if(list2) list2.scrollTop = scroll;   // stay where you were in a long list
+}
+function flagApply(keys, mode){
+  const p = currentProject(); if(!p || !flagDialogKey) return;
+  flagDialogRows.filter(e=>keys.includes(e.key) && !flagDialogHandled[e.key]).forEach(e=>{
+    if(mode==='add'){
+      p.tasks = p.tasks || [];
+      p.tasks.push({ id:uid(), title:e.task, note:'', completed:false, createdAt:new Date().toISOString(), flagKey:e.key });
+      tasksSectionOpen = true;
+    } else {
+      p.ignoredFlags = p.ignoredFlags || [];
+      if(!p.ignoredFlags.includes(e.key)) p.ignoredFlags.push(e.key);
+    }
+    flagDialogHandled[e.key] = mode;
+  });
+  renderProjectBody();               // G14 — render first, save after
+  renderFlagDialog();
+  saveInBackground('db:projects', projectsDB);
+}
+function flagAdd(key){ flagApply([key], 'add'); }
+function flagIgnore(key){ flagApply([key], 'ignore'); }
+function flagAddAll(){ flagApply(flagDialogRows.map(e=>e.key), 'add'); }
+function flagIgnoreAll(){ flagApply(flagDialogRows.map(e=>e.key), 'ignore'); }
+function flagUndo(key){
+  const p = currentProject(); if(!p) return;
+  if(flagDialogHandled[key]==='add') p.tasks = (p.tasks||[]).filter(t=>!(t.flagKey===key && !t.completed));
+  else p.ignoredFlags = (p.ignoredFlags||[]).filter(k=>k!==key);
+  delete flagDialogHandled[key];
+  renderProjectBody(); renderFlagDialog();
+  saveInBackground('db:projects', projectsDB);
+}
+/* ignored keys that still point at a live problem — the only ones worth offering back */
+function liveIgnoredFlagCount(p, days){
+  const live = new Set(buildTaskFlagGroups(p, days).flatMap(g=>g.elements.map(e=>e.key)));
+  return (p.ignoredFlags||[]).filter(k=>live.has(k)).length;
+}
+function restoreIgnoredFlags(){
+  const p = currentProject(); if(!p) return;
+  p.ignoredFlags = [];
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && flagDialogKey) closeFlagDialog(); });
+
+/* ---- a flag-task's own field: fix it here, no page flipping ----
+   The value goes to the SAME place the app's own screen would put it (e.rate, d.date,
+   d.locationId, d.positions, p.locationIds), then the task is ticked. */
+function taskFieldHTML(t){
+  if(!t.flagKey || t.completed) return '';
+  const p = currentProject(); if(!p) return '';
+  const [kind, id] = t.flagKey.split(':');
+  const fid = `tf-${t.id}`;
+  const enter = `onkeydown="if(event.key==='Enter'){event.preventDefault();completeFlagTask('${t.id}');}"`;
+  const done = `<button class="small primary" onclick="completeFlagTask('${t.id}')">Done</button><span class="hint task-field-msg" id="${fid}-msg"></span>`;
+  let field = '';
+  if(kind==='rate') field = `<span>£</span><input type="text" inputmode="decimal" id="${fid}" placeholder="Day rate" style="width:90px;" ${enter}><span>/ day</span>`;
+  else if(kind==='date') field = `<input type="date" id="${fid}" style="width:150px;" ${enter}>`;
+  else if(kind==='loc' || kind==='venues'){
+    if(!locationsDB.length) return `<div class="task-field"><span class="hint" style="margin:0;">No venues in the database yet.</span><button class="small" onclick="goProjectTab('locations')">Open Venues</button></div>`;
+    // a day's location: this project's venues first
+    const mine = new Set(p.locationIds||[]);
+    const list = kind==='loc' ? locationsDB.slice().sort((a,b)=>(mine.has(b.id)?1:0)-(mine.has(a.id)?1:0)) : locationsDB;
+    field = `<select id="${fid}" style="width:auto; max-width:260px;"><option value="">— Select a venue —</option>${list.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>`;
+  }
+  else if(kind==='daycrew'){
+    const crew = projectEntryViews(p);
+    if(!crew.length) return `<div class="task-field"><span class="hint" style="margin:0;">No crew on the project yet.</span><button class="small" onclick="goProjectTab('crew');openAddPerson()">+ Add person</button></div>`;
+    field = `<select id="${fid}" style="width:auto; max-width:260px;"><option value="">— Select crew —</option>${groupedCrewOptionsHTML(crew)}</select>`;
+  }
+  else if(kind==='crew') return `<div class="task-field"><button class="small primary" onclick="goProjectTab('crew');openAddPerson()">+ Add person</button><span class="hint" style="margin:0;">Ticks itself off once someone is on the project.</span></div>`;
+  else return '';
+  return `<div class="task-field">${field}${done}</div>`;
+}
+async function completeFlagTask(taskId){
+  const p = currentProject(); if(!p) return;
+  const t = (p.tasks||[]).find(x=>x.id===taskId); if(!t || !t.flagKey) return;
+  const [kind, id] = t.flagKey.split(':');
+  const v = val(`tf-${taskId}`);
+  const say = (m) => { const el = document.getElementById(`tf-${taskId}-msg`); if(el){ el.textContent = m; el.style.color = 'var(--danger)'; } };
+  const day = dayById(id);
+  let saveDays = false;
+  if(kind==='rate'){
+    const n = Number(v.replace(/[£,\s]/g,''));
+    if(!v || isNaN(n) || n<0){ say('Enter a number'); return; }
+    const e = entryById(id, p); if(!e){ say('No longer on the project'); return; }
+    e.rate = n;                                   // same field Budget → Per Person writes (saveEntryRate)
+  } else if(kind==='date'){
+    if(!v){ say('Pick a date'); return; }
+    if(!day){ say('That day no longer exists'); return; }
+    day.date = v; saveDays = true;
+  } else if(kind==='loc'){
+    if(!v){ say('Pick a venue'); return; }
+    if(!day){ say('That day no longer exists'); return; }
+    day.locationId = v; saveDays = true;
+    const l = locById(v); if(l && l.parkingInfo && !day.parking) day.parking = l.parkingInfo;   // as the day form pre-fills it
+    p.locationIds = p.locationIds || []; if(!p.locationIds.includes(v)) p.locationIds.push(v);
+  } else if(kind==='venues'){
+    if(!v){ say('Pick a venue'); return; }
+    p.locationIds = p.locationIds || []; if(!p.locationIds.includes(v)) p.locationIds.push(v);
+  } else if(kind==='daycrew'){
+    if(!v){ say('Pick someone'); return; }
+    if(!day){ say('That day no longer exists'); return; }
+    day.positions = day.positions || [];
+    if(!day.positions.some(x=>x[0]===v)) day.positions.push([v,'','','','']);
+    saveDays = true;
+  } else return;
+  t.completed = true;
+  renderProjectBody();                            // G14 — render first, save after
+  if(saveDays) await saveDB('db:shootdays', shootDaysDB);
+  await saveDB('db:projects', projectsDB);
 }
 let taskDraftTitle = '';
 let taskDraftNote  = '';
@@ -3283,9 +3500,10 @@ function taskListItemHTML(t){
         <strong style="${t.completed?'text-decoration:line-through; color:var(--muted);':''}">${esc(t.title)}</strong>
       </label>
       ${t.note ? `<div>${esc(t.note)}</div>` : ''}
+      ${taskFieldHTML(t)}
     </div>
     <div class="actions">
-      <button class="icon-btn danger-ic" onclick="deleteProjectTask('${t.id}')" title="Delete task" aria-label="Delete task">${icon('trash')}</button>
+      <button class="icon-btn danger-ic" onclick="deleteProjectTask('${t.id}')" title="Delete task${t.flagKey&&!t.completed?' — it goes back to being a flag':''}" aria-label="Delete task">${icon('trash')}</button>
     </div>
   </div>`;
 }
@@ -3388,10 +3606,22 @@ function fmtDateTime(iso){
   return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
 const projectNotes = (p) => ((p||currentProject()||{}).notes||[]);
-function renderProjectNotes(body){
-  const p = currentProject(); if(!p) return;
-  body.innerHTML = `<div class="section">
-      <div class="notes-bar">
+/* T-9 is a SECTION OF OVERVIEW since 20 Sep 2026 (it was its own tab). notesSectionHTML() is the
+   markup, wireNotesHandlers() the key/paste plumbing; the Overview's own body.oninput routes
+   .note-text typing to noteAfterEdit(). */
+let notesSectionOpen = true;
+function toggleNotesSection(){ flushNotesEdits(); notesSectionOpen = !notesSectionOpen; renderProjectBody(); }
+/* ⚠️ saveProjectNotes() READS THE EDITORS. Anything that rebuilds or leaves them calls this first,
+   or the last second of typing (the autosave debounce) is lost. The DOM reads happen before the
+   first await, so callers needn't await it. */
+function flushNotesEdits(){
+  if(!document.querySelector('.note-text')) return;
+  clearTimeout(autosaveTimers.notes);
+  saveProjectNotes();
+}
+function notesSectionHTML(p){
+  const n = projectNotes(p).length;
+  const inner = `<div class="notes-bar">
         <div class="notes-search">
           <label for="notesSearch">Search notes</label>
           <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="notesQuery=this.value;renderNotesList()">
@@ -3399,16 +3629,14 @@ function renderProjectNotes(body){
         <button class="primary" onclick="addProjectNote()">+ Note</button>
         <span class="status" id="notesStatus"></span>
       </div>
-      <div id="notesList"></div>
-    </div>`;
-  renderNotesList();
+      <div id="notesList"></div>`;
+  return collapsibleSectionHTML({
+    state: notesSectionOpen, id: 'notesSection',
+    title: `Notes${n?` (${n})`:''}`, inner, onToggle: 'toggleNotesSection()'
+  });
+}
+function wireNotesHandlers(body){
   try{ document.execCommand('defaultParagraphSeparator', false, 'div'); }catch(e){}
-  // only the note bodies autosave; the search box has its own handler and never writes
-  body.oninput = (e) => {
-    if(!e.target || !e.target.classList || !e.target.classList.contains('note-text')) return;
-    noteAutoList(e);
-    noteAfterEdit(e.target);
-  };
   // Tab / Shift+Tab nests a list item (anywhere else Tab keeps its normal job);
   // Enter on an empty item steps out one level, so Enter twice ends the list
   body.onkeydown = (e) => {
@@ -3428,7 +3656,7 @@ function renderProjectNotes(body){
     document.execCommand('insertHTML', false, html ? sanitizeNoteHTML(html) : esc(text).replace(/\r?\n/g,'<br>'));
     noteAfterEdit(ed);
   };
-  if(!renderProjectNotes._sel){ renderProjectNotes._sel = true; document.addEventListener('selectionchange', ()=>{ if(document.querySelector('.note-tools')) refreshNoteTools(); }); }
+  if(!wireNotesHandlers._sel){ wireNotesHandlers._sel = true; document.addEventListener('selectionchange', ()=>{ if(document.querySelector('.note-tools')) refreshNoteTools(); }); }
 }
 function renderNotesList(){
   const el = document.getElementById('notesList'); if(!el) return;
@@ -3460,6 +3688,7 @@ function renderNotesList(){
 }
 async function addProjectNote(){
   const p = currentProject(); if(!p) return;
+  flushNotesEdits();
   p.notes = p.notes || [];
   const now = new Date().toISOString();
   const n = { id:uid(), html:'', text:'', createdAt:now, updatedAt:now };
@@ -3555,10 +3784,13 @@ async function deleteDeliverable(id){
   renderProjectBody();
 }
 function renderTasksSection(p, days){
+  syncFlagTasks(p, days);
   const flagItems = buildTaskFlags(p, days);
+  const ignoredN = liveIgnoredFlagCount(p, days);
   const openTaskCount = (p.tasks||[]).filter(t=>!t.completed).length;
   const inner = `
       ${taskFlagPillsHTML(flagItems)}
+      ${ignoredN ? `<div class="hint">${ignoredN} ignored · <span style="cursor:pointer; color:var(--tape);" onclick="restoreIgnoredFlags()">Restore</span></div>` : ''}
       <div class="subhead" style="margin-top:18px;">Add a task</div>
       <div class="grid g2" style="margin-bottom:8px;">
         <div><label>Title</label><input type="text" id="taskTitleInput" value="${esc(taskDraftTitle)}" placeholder="e.g. Confirm parking permit" oninput="taskDraftTitle=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
@@ -3569,7 +3801,7 @@ function renderTasksSection(p, days){
     `;
   return collapsibleSectionHTML({
     state: tasksSectionOpen, id: 'tasksSection',
-    title: `Tasks${flagItems.length||openTaskCount?` (${flagItems.length+openTaskCount})`:''}`,
+    title: `Tasks${flagItems.length||openTaskCount?` (${flagItems.reduce((n,g)=>n+g.elements.length,0)+openTaskCount})`:''}`,
     inner, onToggle: 'toggleTasksSection()'
   });
 }
