@@ -248,6 +248,26 @@
   .sheet-sync-notice{font-size:var(--fs-meta); color:var(--tape); margin:-4px 0 10px; padding:0 10px;}
   .sheet-sync-notice.err{color:var(--danger);}
   /* Project Notes (T-9) — ruled rows, borderless bodies: a scratchpad, not a form */
+  /* Talent etc (T-10) — the call-sheet card, with type-matched fields like the Call Sheets edit card */
+  .te-card h3{margin-top:18px;}
+  .te-table{table-layout:fixed;}
+  .te-table .te-c{text-align:center;}
+  .te-table td{vertical-align:middle;}
+  .te-table input[type=text]{padding:0; margin:0; height:auto; min-height:0; font-size:inherit; line-height:inherit; border-bottom:none; box-shadow:0 1px 0 var(--field-line);}
+  .te-table input[type=text]:hover{box-shadow:0 1px 0 var(--text);}
+  .te-table input[type=text]:focus{box-shadow:0 1.5px 0 var(--tape);}
+  .te-money{white-space:nowrap;} .te-money input[type=text]{width:64px;}
+  .te-row td{padding-bottom:2px;}
+  .te-sub td{padding-top:0; padding-bottom:10px; border-bottom:1px solid var(--line); font-size:var(--fs-meta); color:var(--muted);}
+  .te-line{display:inline-flex; align-items:baseline; gap:6px; margin:0 18px 2px 0; flex-wrap:wrap;}
+  .te-lbl{font-family:var(--label); font-size:10px; letter-spacing:1.1px; text-transform:uppercase; color:var(--tape); width:42px;}
+  .te-table input.te-wide{width:190px;} .te-table input.te-num{width:42px; text-align:center;}
+  .te-by{display:inline-flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; margin-left:4px; align-self:center;}
+  .te-by span{font-family:var(--label); font-size:9.5px; letter-spacing:1px; text-transform:uppercase; padding:1px 7px; cursor:pointer; color:var(--muted); user-select:none;}
+  .te-by span.on{background:var(--tape); color:var(--tape-ink);}
+  .te-by span.on.them{background:var(--muted);}
+  @media (pointer:coarse){ .te-table input[type=text]{font-size:16px;} }
+  @media(max-width:900px){ .te-table{min-width:560px;} }
   .task-field{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; color:var(--text);}
   .list-card .meta .task-field, .list-card .meta .task-field span{color:var(--text); font-size:var(--fs-field); margin-top:0;}
   .list-card .meta .task-field{margin-top:8px;}
@@ -1595,6 +1615,15 @@ async function moveRoleSeniority(dept, role, dir){
 function departmentForRolePath(rolePath){ const i = rolePath.indexOf('/'); return i>=0 ? rolePath.slice(0,i) : ''; }
 /* single source of truth for department order — used for grouping crew lists AND ordering the final call sheet */
 function deptBucketKey(dept){ return DEPARTMENTS.includes(dept) ? dept : 'Other'; }
+/* ⚠️ TALENT ETC (20 Sep 2026) — Talent and Client are NOT crew. They are still crew-database
+   records and still project entries (so shoot-day positions, call times and the call sheet's own
+   Client / Talent blocks are untouched), but inside a project they live on their own tab
+   (renderProjectTalent) and follow their own rules: no day rate expected and never flagged for
+   one; a FEE only if one is entered (an entry-level buyout); their own hotel and travel per
+   person (e.stay / e.trip), never the crew rooming list. isTalentEtc() is the ONE test — it takes
+   anything with a `department` (a crew record, an entry, an entry view). */
+const TALENT_ETC_DEPTS = ['Talent','Client'];
+const isTalentEtc = v => !!v && TALENT_ETC_DEPTS.includes(deptBucketKey(v.department));
 function pbHeadLeadCellsHTML(cellClass){
   return `<div class="${cellClass} pb-head-blank"></div>
     <div class="${cellClass} pb-head-name">Name</div>
@@ -3008,6 +3037,7 @@ function renderProject(m){
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
+      <div class="tab ${currentProjectTab==='talent'?'active':''}" onclick="goProjectTab('talent')">TALENT ETC</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">CALL SHEETS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
@@ -3040,6 +3070,7 @@ function renderProjectBodyNow(body){
   setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
+  if(currentProjectTab==='talent') return renderProjectTalent(body);
   if(currentProjectTab==='locations') return renderProjectLocations(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
@@ -3166,7 +3197,15 @@ function crewSearchResultsHTML(query, onCreateJS, limit){
   /* name, role AND department all match, so "cam" finds the Camera Operators and "grip"
      finds the department — the thing you remember is not always the name */
   const blob = c => (c.name+' '+(c.role||'')+' '+(c.department||'')).toLowerCase();
-  const matches = crewDB.filter(c=>!assignedIds.includes(c.id)).filter(c=>!ql || blob(c).includes(ql)).slice(0, limit||8);
+  // scoped to the kind being added (see addPersonKind); the Talent etc tab is the only 'talent' caller
+  const wantTalent = currentProjectTab==='talent' && addPersonKind==='talent';
+  const inScope = c => addPersonEveryone || isTalentEtc(c)===wantTalent;
+  const pool = crewDB.filter(c=>!assignedIds.includes(c.id)).filter(c=>!ql || blob(c).includes(ql));
+  const matches = pool.filter(inScope).slice(0, limit||8);
+  const hiddenN = pool.length - pool.filter(inScope).length;
+  const everyoneLink = addPersonEveryone
+    ? `<div class="sritem" style="cursor:pointer; color:var(--tape);" onclick="setAddPersonEveryone(false)">Showing everyone — back to ${wantTalent?'talent &amp; clients':'crew'} only</div>`
+    : ((ql && hiddenN) ? `<div class="sritem" style="cursor:pointer; color:var(--muted);" onclick="setAddPersonEveryone(true)">${hiddenN} more outside ${wantTalent?'talent &amp; clients':'crew'} — search everyone</div>` : '');
   const rows = matches.map(c=>`<div class="sritem" onclick="addCrewToProject('${c.id}')">
       <strong>${esc(c.name)}</strong>${(c.role||c.department)?`<div class="hint">${esc([c.role,c.department].filter(Boolean).join(' — '))}</div>`:''}
     </div>`).join('');
@@ -3175,28 +3214,43 @@ function crewSearchResultsHTML(query, onCreateJS, limit){
     const alreadyOn = ql && crewDB.some(c=>assignedIds.includes(c.id) && blob(c).includes(ql));
     note = `<div class="sritem" style="cursor:default; color:var(--muted);">${
       alreadyOn ? 'Already on this project.'
-      : q ? `No saved crew member matches “${esc(q)}”.`
-      : 'Everyone in the database is already on this project.'}</div>`;
+      : q ? `No saved ${wantTalent?'talent or client':'crew member'} matches “${esc(q)}”.`
+      : `Every ${wantTalent?'talent and client':'crew member'} in the database is already on this project.`}</div>`;
   }
-  return rows + note + `<div class="sritem" style="color:var(--tape);" onclick="${onCreateJS}">${
-    q ? `+ Create new crew member “${esc(q)}”` : '+ Create a new crew member'}</div>`;
+  const noun = wantTalent ? 'talent / client' : 'crew member';
+  return rows + note + everyoneLink + `<div class="sritem" style="color:var(--tape);" onclick="${onCreateJS}">${
+    q ? `+ Create new ${noun} “${esc(q)}”` : `+ Create a new ${noun}`}</div>`;
 }
 function quickCrewResultsHTML(){ return crewSearchResultsHTML(quickCrewQuery, 'startNewCrewFromSearch()'); }
 
 let addPersonOpen = false;
 let addPersonQuery = '';
-function openAddPerson(){
+/* ⚠️ THE SEARCH IS SCOPED (20 Sep 2026): Crew's Add person finds crew, Talent etc's finds talent
+   and clients — so neither list is padded with the other's people. "Search everyone" lifts it
+   for the rare time you need to. Overview's Quick add is a crew search. */
+let addPersonKind = 'crew';            // 'crew' | 'talent'
+let addPersonEveryone = false;
+let addTalentNewOpen = false;
+function setAddPersonEveryone(on){
+  addPersonEveryone = !!on;
+  const el = document.getElementById('addPersonResults');
+  if(el) el.innerHTML = crewSearchResultsHTML(addPersonQuery, addPersonCreateJS(), 12);
+  const q = document.getElementById('quickCrewResults'); if(q) q.innerHTML = quickCrewResultsHTML();
+}
+const addPersonCreateJS = () => addPersonKind==='talent' ? 'startNewTalentFromAddPerson()' : 'startNewCrewFromAddPerson()';
+function openAddPerson(kind){
+  addPersonKind = kind==='talent' ? 'talent' : 'crew'; addPersonEveryone = false; addTalentNewOpen = false;
   addPersonOpen = true; addPersonQuery = '';
   renderProjectBody();
   document.getElementById('addPersonSearch')?.focus();
 }
-function closeAddPerson(){ addPersonOpen = false; addPersonQuery = ''; renderProjectBody(); }
+function closeAddPerson(){ addPersonOpen = false; addPersonQuery = ''; addPersonEveryone = false; addTalentNewOpen = false; renderProjectBody(); }
 /* ⚠️ RESULTS ONLY, never a tab re-render — the same reason onQuickCrewInput does it: replacing
    the body while somebody is typing takes the focus and the half-typed word with it. */
 function onAddPersonInput(q){
   addPersonQuery = q;
   const el = document.getElementById('addPersonResults');
-  if(el) el.innerHTML = crewSearchResultsHTML(addPersonQuery, 'startNewCrewFromAddPerson()', 12);
+  if(el) el.innerHTML = crewSearchResultsHTML(addPersonQuery, addPersonCreateJS(), 12);
 }
 /* "create new" hands off to the tab's OWN new-crew form rather than growing a second one in
    the popup — that form is the full crew record, and a cut-down copy of it in a modal is how
@@ -3210,17 +3264,138 @@ function startNewCrewFromAddPerson(){
   document.getElementById('ncName')?.focus();
 }
 let newCrewPrefillName = '';
+/* Talent etc's "create new": three fields in the popup itself — a talent or client record
+   needs far less than the full crew form, and the full record is one click on their name away */
+let addTalentDraft = { name:'', dept:'Talent', role:'' };
+function startNewTalentFromAddPerson(){
+  addTalentDraft = { name: addPersonQuery.trim(), dept:'Talent', role:'' };
+  addTalentNewOpen = true; renderProjectBody();
+  document.getElementById('atName')?.focus();
+}
+function addTalentNewFormHTML(){
+  const d = addTalentDraft;
+  return `<div class="filter-panel" style="margin-bottom:10px;">
+      <div class="grid g3" style="margin-bottom:8px;">
+        <div><label>Name</label><input type="text" id="atName" value="${esc(d.name)}" oninput="addTalentDraft.name=this.value"></div>
+        <div><label>Type</label><select onchange="addTalentDraft.dept=this.value">${TALENT_ETC_DEPTS.map(x=>`<option ${d.dept===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div><label>Role</label><input type="text" value="${esc(d.role)}" placeholder="Presenter, Brand lead…" oninput="addTalentDraft.role=this.value"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();saveNewTalent();}"></div>
+      </div>
+      <div class="toolbar" style="margin:0;"><button class="small primary" onclick="saveNewTalent()">Add to project</button>
+        <button class="small" onclick="addTalentNewOpen=false;renderProjectBody();">Cancel</button></div>
+    </div>`;
+}
+async function saveNewTalent(){
+  const name = (addTalentDraft.name||'').trim(); if(!name) return;
+  await addNewCrewFromProposal(name, addTalentDraft.dept, (addTalentDraft.role||'').trim());
+  addTalentNewOpen = false; addPersonQuery = '';
+  renderProjectBody();
+}
+
+/* ============================================================ TALENT ETC (T-10)
+   Talent and Client on a project — see isTalentEtc(). One card in the call-sheet style: a Client
+   group and a Talent group; per person a tick for each shoot day (the SAME d.positions the call
+   sheet reads — toggleCrewOnDay), an optional fee, and beneath it their own hotel and travel.
+     e.rate + e.buyout   the fee (a buyout, so Budget costs it once, not per day) — only if typed
+     e.stay = {hotel, nights, perNight, by}     e.trip = {note, cost, by}     by: 'us' | 'them'
+   Only by:'us' is costed (talentEtcCosts → Budget's Hotels / Travel lines). */
+const stayOf = e => Object.assign({hotel:'', nights:'', perNight:'', by: deptBucketKey(e.department)==='Client' ? 'them' : 'us'}, e.stay||{});
+const tripOf = e => Object.assign({note:'', cost:'', by: deptBucketKey(e.department)==='Client' ? 'them' : 'us'}, e.trip||{});
+const numOf = v => { const n = Number(String(v==null?'':v).replace(/[£,\s]/g,'')); return isNaN(n) ? 0 : n; };
+function talentEtcCosts(p){
+  let stay = 0, trip = 0;
+  projectEntries(p).filter(isTalentEtc).forEach(e=>{
+    const s = stayOf(e), t = tripOf(e);
+    if(s.by==='us') stay += numOf(s.nights) * numOf(s.perNight);
+    if(t.by==='us') trip += numOf(t.cost);
+  });
+  return {stay, trip};
+}
+async function setTalentFee(entryId, raw){
+  const p = currentProject(), e = entryById(entryId, p); if(!e) return;
+  const v = String(raw||'').trim();
+  if(!v){ delete e.rate; delete e.buyout; }
+  else { const n = numOf(v); if(n<=0){ renderProjectBody(); return; } e.rate = n; e.buyout = true; }
+  flashSaveResult('talentStatus', await saveDB('db:projects', projectsDB));
+  refreshTalentSummary();
+}
+function setTalentField(entryId, group, field, value){
+  const p = currentProject(), e = entryById(entryId, p); if(!e) return;
+  e[group] = Object.assign({}, group==='stay' ? stayOf(e) : tripOf(e), {[field]: value});
+  if(field==='by') renderProjectBody();               // the switch is drawn from state
+  else refreshTalentSummary();
+  scheduleAutosave('talent', async () => flashSaveResult('talentStatus', await saveDB('db:projects', projectsDB)));
+}
+async function removeTalentFromProject(entryId, name){
+  if(!confirm(`Take ${name||'this person'} off the project? They stay in the database.`)) return;
+  await removeCrewFromProject(entryId);
+}
+function talentSummaryHTML(p){
+  const list = projectEntries(p).filter(isTalentEtc);
+  const fees = list.reduce((s,e)=> s + (Object.prototype.hasOwnProperty.call(e,'rate') ? numOf(e.rate) : 0), 0);
+  const c = talentEtcCosts(p);
+  const bits = [`Fees ${fees?budgetFmt(fees):'—'}`, `Hotels we book ${c.stay?budgetFmt(c.stay):'—'}`, `Travel we book ${c.trip?budgetFmt(c.trip):'—'}`];
+  return `${bits.join(' · ')} <span style="color:var(--muted)">— these are what Budget counts; anything arranged by them costs nothing here.</span>`;
+}
+function refreshTalentSummary(){ const el = document.getElementById('talentSummary'); if(el) el.innerHTML = talentSummaryHTML(currentProject()); }
+function talentGroupHTML(kind, views, days){
+  if(!views.length) return '';
+  const p = currentProject();
+  const bySwitch = (id, group, by) => `<span class="te-by" title="Who arranges and pays for it">
+      <span class="${by==='us'?'on':''}" onclick="setTalentField('${id}','${group}','by','us')">Us</span><span class="${by==='them'?'on them':''}" onclick="setTalentField('${id}','${group}','by','them')">Them</span></span>`;
+  const rows = views.map(v=>{
+    const e = entryById(v.id, p), s = stayOf(e), t = tripOf(e);
+    const fee = Object.prototype.hasOwnProperty.call(e,'rate') ? e.rate : '';
+    return `<tr class="te-row">
+        <td><span class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${v.id}')" title="Open ${esc(v.name)}'s record">${esc(v.name)}</span></td>
+        <td>${esc(v.showAs||v.role||'')}</td>
+        ${days.map(d=>`<td class="te-c"><input type="checkbox" ${entryOnDay(v.id,d)?'checked':''} onchange="toggleCrewOnDay('${v.id}','${d.id}',this.checked)" title="On the call sheet for Day ${esc(d.dayNum||'?')}${d.date?' — '+esc(fmtDate(d.date)):''}"></td>`).join('')}
+        <td class="te-money">£ <input type="text" inputmode="decimal" value="${esc(fee)}" placeholder="—" onchange="setTalentFee('${v.id}', this.value)" title="Optional. Costed in Budget only if you enter one — never flagged as missing"></td>
+        <td class="sd-rowtools"><button type="button" class="sd-x" title="Take ${esc(v.name)} off the project" onclick="removeTalentFromProject('${v.id}','${esc(v.name).replace(/'/g,'&#39;')}')">×</button></td>
+      </tr>
+      <tr class="te-sub"><td colspan="${days.length+4}">
+        <span class="te-line"><span class="te-lbl">Hotel</span><input type="text" class="te-wide" value="${esc(s.hotel)}" placeholder="Hotel name" oninput="setTalentField('${v.id}','stay','hotel',this.value)">
+          <input type="text" class="te-num" inputmode="numeric" value="${esc(s.nights)}" placeholder="0" oninput="setTalentField('${v.id}','stay','nights',this.value)"><span>nights × £</span><input type="text" class="te-num" inputmode="decimal" value="${esc(s.perNight)}" placeholder="0" oninput="setTalentField('${v.id}','stay','perNight',this.value)">${bySwitch(v.id,'stay',s.by)}</span>
+        <span class="te-line"><span class="te-lbl">Travel</span><input type="text" class="te-wide" value="${esc(t.note)}" placeholder="Car, train, flight, who is booking…" oninput="setTalentField('${v.id}','trip','note',this.value)">
+          <span>£</span><input type="text" class="te-num" inputmode="decimal" value="${esc(t.cost)}" placeholder="0" oninput="setTalentField('${v.id}','trip','cost',this.value)">${bySwitch(v.id,'trip',t.by)}</span>
+      </td></tr>`;
+  }).join('');
+  return `<h3>${kind}</h3><div class="sd-tablescroll"><table class="te-table"><colgroup><col style="width:24%"><col>${days.map(()=>'<col style="width:38px">').join('')}<col style="width:96px"><col style="width:28px"></colgroup>
+    <tr><th>Name</th><th>Role</th>${days.map(d=>`<th class="te-c" title="${d.date?esc(fmtDate(d.date)):''}">D${esc(d.dayNum||'?')}</th>`).join('')}<th>Fee</th><th></th></tr>${rows}</table></div>`;
+}
+function renderProjectTalent(body){
+  const p = currentProject(); if(!p) return;
+  const days = projectDays(p.id);
+  const views = projectEntryViews(p).filter(isTalentEtc).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const of = kind => views.filter(v=>deptBucketKey(v.department)===kind);
+  body.innerHTML = `
+    <div class="crew-header-row">
+      <div class="crew-header-left"><button type="button" class="bnr-tool" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button></div>
+      <div class="crew-header-right"><span class="status" id="talentStatus"></span></div>
+    </div>
+    <div class="card te-card">
+      <div class="line1">Talent etc</div>
+      <div class="sub">Talent and client — not crew: no day rate, no stage, their own hotel and travel. Tick the days they attend; that is what puts them on the call sheet.</div>
+      ${views.length ? talentGroupHTML('Client', of('Client'), days) + talentGroupHTML('Talent', of('Talent'), days)
+        : '<div class="empty-note" style="margin-top:14px;">Nobody here yet — press + Add talent / client.</div>'}
+      ${views.length ? `<div class="hint" id="talentSummary" style="margin-top:14px;">${talentSummaryHTML(p)}</div>` : ''}
+      ${views.length && !days.length ? '<div class="hint">Add shoot days (Call Sheets tab) to tick who attends which.</div>' : ''}
+    </div>
+    ${addPersonDialogHTML()}
+    ${crewEditModalHTML()}`;
+}
 function addPersonDialogHTML(){
   if(!addPersonOpen) return '';
   return `<div class="modal-overlay" onclick="if(event.target===this) closeAddPerson()">
     <div class="modal-box add-person-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
-      <h3>Add person</h3>
+      <h3>${addPersonKind==='talent' ? 'Add talent or client' : 'Add person'}</h3>
+      ${addTalentNewOpen ? addTalentNewFormHTML() : ''}
       <input type="text" id="addPersonSearch" class="add-person-search" placeholder="Search by name, role or department…"
         value="${esc(addPersonQuery)}" oninput="onAddPersonInput(this.value)"
         onkeydown="if(event.key==='Escape'){event.preventDefault();closeAddPerson();}"
         autocomplete="off" spellcheck="false">
       <div class="searchres add-person-results" id="addPersonResults">${
-        crewSearchResultsHTML(addPersonQuery, 'startNewCrewFromAddPerson()', 12)}</div>
+        crewSearchResultsHTML(addPersonQuery, addPersonCreateJS(), 12)}</div>
       <div class="toolbar" style="margin:12px 0 0;"><button onclick="closeAddPerson()">Done</button></div>
     </div>
   </div>`;
@@ -3333,7 +3508,7 @@ function buildTaskFlagGroups(p, days){
   add('daycrew', days.filter(d=>!(d.positions||[]).length).map(d=>dayEl('daycrew', d, 'Crew')),
       n=>`${plural(n,'shoot day','shoot days')} with no crew`, `goProjectTab('days')`);
   if(typeof resolveEntryRate==='function'){
-    add('rate', projectEntryViews(p).filter(v=>!resolveEntryRate(v.id,p).hasRate).map(v=>({
+    add('rate', projectEntryViews(p).filter(v=>!isTalentEtc(v) && !resolveEntryRate(v.id,p).hasRate).map(v=>({
           key:`rate:${v.id}`, label:`${v.name||'(no name)'}${v.role?' — '+v.role:''}`, task:`Day rate — ${v.name||'(no name)'}${v.role?' ('+v.role+')':''}` })),
       n=>`${plural(n,'crew member','crew members')} with no day rate set`, `budgetView='person';goProjectTab('budget')`);
   }
@@ -4311,7 +4486,7 @@ function filterPanelHTML(spec){
   return `<div class="filter-panel">${selectsRow}${sections}${filterPanelFootHTML(spec.foot||{})}</div>`;
 }
 
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:true, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
 let projectCrewFilterOpen = false;
 let projectCrewFilterRolesOpen = false;
 function toggleProjectFilterRolesSection(){ projectCrewFilterRolesOpen = !projectCrewFilterRolesOpen; renderProjectBody(); }
@@ -4321,7 +4496,7 @@ function matchesCrewFilterState(c, f){
   if(f.company==='__blank__' && (c.coProductionCompany||'')) return false;
   else if(f.company && f.company!=='__blank__' && (c.coProductionCompany||'')!==f.company) return false;
   if(f.roles.size && !(c.roles||[]).some(r=>f.roles.has(r))) return false;
-  if(f.excludeTalent && deptBucketKey(c.department)==='Talent') return false;
+  if(f.excludeTalent && isTalentEtc(c)) return false;
   if(f.excludeOtherCompanies && (c.coProductionCompany||'')) return false;
   return true;
 }
@@ -4505,8 +4680,7 @@ function projectCrewFilterPanelHTML(assignedAll, days){
       </div>` },
     ],
     foot: {
-      controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="toggleProjectFilterFlag('excludeTalent', this.checked)"> Exclude Talent</label>
-      <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
+      controls: `<label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="toggleProjectFilterFlag('excludeOtherCompanies', this.checked)"> Exclude other companies</label>
       <label title="Show everyone who does NOT match the filter above, instead of everyone who does"><input type="checkbox" ${f.inverse?'checked':''} onchange="toggleProjectFilterFlag('inverse', this.checked)"> Inverse</label>`,
       hint: activeCount ? `${activeCount} filter${activeCount>1?'s':''} active — the list below is narrowed.`
                         : 'Showing everyone on this project. Tick anything above to narrow the list.',
@@ -4942,7 +5116,8 @@ function renderProjectCrew(body){
   const p = currentProject();
   const days = projectDays();
   const budgetData = ['roles','preprod','post'].includes(crewGridView) ? buildBudgetData() : null;
-  const assigned = projectEntryViews(p);
+  /* Talent etc have their own tab. Catering is the one view that keeps them: a lunch is a lunch */
+  const assigned = projectEntryViews(p).filter(v => crewGridView==='catering' || !isTalentEtc(v));
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   /* ⚠️ REMOVED in Phase CM: `unassigned` — it existed only to fill the retired "Add from crew
      database" <select>. The Add person popup filters crewDB against the roster itself, in
@@ -7755,6 +7930,8 @@ const entryRolePath = e => (e && e.department && e.role) ? `${e.department}/${e.
 const labourOf = (rate, kit) => Math.max(0, (Number(rate)||0) - (Number(kit)||0));
 function resolveEntryRate(entryId, p){
   const e = entryById(entryId, p || currentProject());
+  /* Talent etc: ONLY a fee typed on this project counts — never the database's rate fallbacks */
+  if(e && isTalentEtc(e) && !Object.prototype.hasOwnProperty.call(e, 'rate')) return { rate:0, hasRate:false, isOverride:false, kit:null };
   const c = e ? crewById(e.crewId) : null;
   const rr = roleRateFor(c, entryRolePath(e));
   const kit = (rr && rr.kit!=null && !isNaN(Number(rr.kit))) ? Number(rr.kit) : null;
@@ -7965,7 +8142,7 @@ function budgetFilterPanelHTML(){
         body: filterChipsHTML(present.map(d=>({checked:f.depts.has(d), onchange:`toggleProjectFilterDept('${d}', this.checked); renderProjectBody();`, label:esc(d)})), 'No crew on this project yet.') },
     ],
     foot: {
-      controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="projectCrewFilter.excludeTalent=this.checked; renderProjectBody();"> Exclude Talent</label>
+      controls: `<label><input type="checkbox" ${f.excludeTalent?'checked':''} onchange="projectCrewFilter.excludeTalent=this.checked; renderProjectBody();" title="Leave talent and client fees out of these figures"> Exclude Talent etc</label>
       <label><input type="checkbox" ${f.excludeOtherCompanies?'checked':''} onchange="projectCrewFilter.excludeOtherCompanies=this.checked; renderProjectBody();"> Exclude other companies</label>`,
       hint: scope.length ? `Costing ${scope.join(' · ')} — every figure below is for those only.`
                          : 'Whole project. Tick any day or department to narrow it.',
@@ -8054,6 +8231,7 @@ function buildBudgetData(){
     const vat = prodVat + prepVat + postVat;
     return {
       id:c.id, crewId:c.crewId, name:c.name, role:c.showAs||c.role, department:deptBucketKey(c.department),
+      talentEtc: isTalentEtc(c),
       rate, hasRate, isOverride, kit, kitSubtotal, labourSubtotal,
       hotelCost, mealCost, estCosts: hotelCost + mealCost + travelCost,
       isBuyout, prodRaw, prepRaw, postRaw, travelCostRaw,
@@ -8066,7 +8244,7 @@ function buildBudgetData(){
       travelRate, travelCost, vatRegistered, vat, prodVat, prepVat, postVat,
       display: budgetPersonDisplay(subtotal, vat)
     };
-  });
+  }).filter(pp => !(pp.talentEtc && !pp.hasRate));   // Talent etc cost nothing unless a fee was entered — no £0 rows
 
   const deptTotals = {}, deptCounts = {}, deptExVat = {}, deptVat = {};
   people.forEach(pp=>{
@@ -8144,7 +8322,7 @@ function buildBudgetData(){
   const sumDailyCost = g => g ? g.cols.filter(c=>dayIdsInScope.has(c.dayId))
                                       .reduce((s,c)=>s+c.dailyCost, 0) : 0;
   const cateringRaw = sumDailyCost(cateringGrid);
-  const travelRaw = sumDailyCost(transportSummary);
+  const travelRaw = sumDailyCost(transportSummary) + talentEtcCosts(p).trip;
   const cateringTotal = cateringRaw * prodOn;
   const travelTotal = travelRaw * prodOn;
   const firstProjectDay = projectDays()[0];
@@ -8152,7 +8330,10 @@ function buildBudgetData(){
     ? (p.hotelNightBefore||[]).filter(id=>crewOnShoot(id, p) && personInScope(id)).length : 0;
   const onShootRooms = list => (list||[]).filter(id=>crewOnShoot(id, p) && personInScope(id)).length;
   const dayHotelRooms = days.map(d=>onShootRooms(d.hotelNights));
-  const hotelRaw = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight;
+  /* + Talent etc's own hotels and travel where WE book them (e.stay / e.trip, by:'us'). Project-wide,
+     like a location booked on no day: they join the Hotels / Travel lines but no single day's column. */
+  const talentCosts = talentEtcCosts(p);
+  const hotelRaw = (preNightRooms + dayHotelRooms.reduce((s,n)=>s+n,0)) * hotelCosts.perRoomNight + talentCosts.stay;
   const hotelTotal = hotelRaw * prodOn;
 
   /* IDEAS DEMO — Vendors + Additional costs join the extras. A catering vendor
@@ -9371,7 +9552,7 @@ let viewingCrewId = null;
    a collapsed block at the top of the crew list; it is the Settings TAB now, so being on
    it is the "open" state and there is nothing left to toggle. */
 function refreshCrewScreen(){
-  if(route.screen==='project' && currentProjectTab==='crew') renderProjectBody();
+  if(route.screen==='project' && (currentProjectTab==='crew' || currentProjectTab==='talent')) renderProjectBody();
   else if(route.screen==='project' && currentProjectTab==='days'){
     if(shootDayEditing){ captureInProgressPositions(); renderPositionAssignments(); } else renderProjectBody();
   }
