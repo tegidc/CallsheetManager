@@ -437,10 +437,8 @@ id and come in as new people on the next load.
 
 **The first Budget view, and the first thing on the tab that OWNS data.** A spreadsheet-style
 sheet (column letters, row numbers, full grid, formula bar — `.xls*` CSS) listing every cost
-in the project one row each, modelled on the Excel budgets it replaces. Stage 1 of a staged
-rebuild: the other five views are still the old ones and get the same treatment next
-(agreed mockups: Per Department by code with Cost/Charged/%, Per Day as a dept × day grid,
-Per Person with kit folded in, Costs as a rate card, BBC by code; day toggles beside the stage ones).
+in the project one row each, modelled on the Excel budgets it replaces. **Stage 2 (same day)
+rebuilt the other five views as sheets on the same rows** — see "The five re-cuts" below.
 
 - `p.budgetSheet` — `{ charged:{lineKey:rate}, floatPct, floatLines:{lineKey:pct}, feePct, lines:[…] }`.
   Read through `budgetSheetOf(p)` (defaults: float 5%, fee 10%), written through `budgetSheetRec(p)`.
@@ -467,7 +465,41 @@ Per Person with kit folded in, Costs as a rate card, BBC by code; day toggles be
 - `xlsCommit(mutate)` — ⚠️ every write goes through it: mutates, waits a tick so the field just
   tabbed INTO is known, re-renders, restores focus by `data-fk`, then saves. `xlsKey` = Enter moves
   down the column; `xlsFocus` feeds the formula bar. `budgetXlsError` is the one-shot status-bar error.
-- Export: `budgetExportRows(data,'lines')`. `.xls-wrap` is in `SCROLL_KEEPERS`.
+- `.xls-wrap` is in `SCROLL_KEEPERS`. ⚠️ `table-layout:fixed` only holds with an explicit width — every
+  sheet sets `width:<sum of columns>px; min-width:100%` or one long cell widens its column.
+
+**The five re-cuts** — `budgetSheetViewHTML(view, data)` → `budgetSheetModel(view, data, B)` returns
+`{cols, rows, notes}`; `xlsSheetHTML()` draws it and `budgetExportRows()` exports it, so screen and
+export can't differ. A cell is a string or `{h, c, span, t, v, x}` (`v` = number for Excel, `x` = export
+text). All five follow Cost | Charged, float, fee, stages and days because they only regroup `B.lines`.
+Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewId`, and
+`dist {pre, post, proj, days:{dayId:w}}` — WEIGHTS for where its money falls, read by `B.split(l, mode, k)`.
+- **Per Department** — by line CODE, not section (kit → EQUIP, venues → SET, catering/travel/hotel →
+  CAT/TRA): Cost | Charged | %, then Total / Production fee / Final total / Margin. **BBC** is the same
+  table grouped by `l.bbc` (people via `BBC_STRUCTURE` tests, kit → 6, typed lines via `bbcOfCode`);
+  empty categories stay listed. The **Lines** tool (`budgetShowLines`) lists the rows under each heading.
+- **Per Day** — departments × (Pre-prod | each shoot day | Post | Project), plus Ex-VAT / VAT / Float rows.
+  Buyouts, catering, travel, hotels and venue fees fall on the days used; "Project" is whatever belongs
+  to no day. Column totals and the Total column both reconcile to `B.totals` (verified, 4 projects).
+- **Per Person** — one row per entry in `budgetOrderedPeople()` order, kit FOLDED IN (Labour / Kit columns).
+  Rate edits `saveEntryRate()`. Charged shows labour + kit as one figure; `setBudgetChargedPerson()`
+  writes the difference onto the labour key so it can't disagree with Line Items. A last row carries
+  everything with no person so the sheet still sums to the total. (The save-to-database icon and the
+  VAT-reg tick live on Crew ▸ Roles only now.)
+- **Costs** — the rate card: `B.rateCard` lists all seven cost rates whether used or not (`setBudgetCostRate()`
+  writes `p.cateringCosts` / `p.transportCosts` / `p.hotelCosts`, the same fields as the Crew cost tabs),
+  Qty from the call sheets, and a Charged rate per row. The Additional-costs demo form is gone — typed
+  lines replace it; existing `p.additionalCosts` still cost and can be deleted from Line Items.
+- **Day switches** — `budgetDayChipsHTML()` under the banner: the existing `budgetDayFilter` worn as lit
+  buttons (⚠️ empty set still means every day). Click = leave out / bring back, shift-click = only
+  (`toggleBudgetDayChip()`, `onlyBudgetDay()`). Dimmed when Production is off.
+- The banner on Budget is called with `{sheetTools:true}`, which drops Split kit & labour and Costs PP —
+  they only ever changed the old tables (they still work on Crew ▸ Roles).
+- REMOVED with the old views: `budgetDeptExtrasTableHTML`, `budgetDepartmentViewHTML`, `budgetBBCViewHTML`,
+  `budgetPersonViewHTML`, `budgetDayViewHTML`, `budgetCostsViewHTML`, `additionalCostsSectionHTML`,
+  `addAdditionalCost`, `setAdditionalCostField`, `toggleAdditionalCostConfirmed`, `renderBudgetSummaryBar`,
+  `budgetDayBlocks*`, `budgetCostBlocks*`. Notes further down this section that mention them are history.
+- Export: money cells are `{v}` — formatted text for Copy, real numbers with a £ format in the .xlsx.
 
 Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already
 entered elsewhere in the app rather than owning any of its own — including hotel cost
