@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Style check — Crew, Talent, Venues and the rest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied from index.html :root — the samples below are styled by the app's own values. */
+  :root{
+    --bg:#FFFFFF; --panel-2:#EEF5F2; --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30);
+    --tape:#017756; --tape-ink:#FFFFF5; --text:#110A08; --muted:#6f6a63; --danger:#a4321f;
+    --disp:'Fraunces', Georgia, serif; --label:'Oswald', sans-serif; --body:'Jost','Futura PT',sans-serif;
+    --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05); --tint-3:rgba(1,119,86,.10);
+    --phase-prep:#8A5A0B; --phase-shoot:#017756; --phase-post:#4A3C8C;
+    --fs-name:14px; --fs-field:13px; --fs-meta:12px; --fs-ctl:11px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:var(--body); font-size:var(--fs-field); line-height:1.5; -webkit-font-smoothing:antialiased;}
+  .main{max-width:1020px; margin:0 auto; padding:0 22px 120px;}
+
+  /* page head — the app's own */
+  .page-head{padding:26px 0 14px;}
+  .page-head h1{font-family:var(--disp); font-weight:700; font-size:22px; letter-spacing:.4px; text-transform:uppercase; margin:0;}
+  .page-head .eyebrow{color:var(--muted); font-size:var(--fs-field);}
+  .page-head .code{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--tape); margin-top:2px;}
+  .lede{max-width:70ch; color:var(--text); margin:10px 0 0;}
+  .lede + .lede{margin-top:6px;}
+  .mu{color:var(--muted);}
+
+  /* sticky progress bar */
+  .bar{position:sticky; top:0; z-index:20; background:rgba(255,255,255,.96); backdrop-filter:blur(6px); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; padding:9px 0; flex-wrap:wrap;}
+  .bar .count{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
+  .bar .count b{color:var(--text); font-weight:600;}
+  .bar .jump{display:flex; gap:2px; flex-wrap:wrap; margin-left:6px;}
+  .bar .jump a{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:5px;}
+  .bar .jump a:hover{color:var(--tape); background:var(--tint-1);}
+  .bar .sp{flex:1;}
+  .bnr-tool{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px; text-transform:uppercase; color:var(--muted);
+    background:transparent; border:1px solid var(--line); border-radius:5px; padding:4px 9px; cursor:pointer; white-space:nowrap; line-height:1.35; font-weight:600;}
+  .bnr-tool:hover{border-color:var(--tape); color:var(--tape);}
+  .bnr-tool.on{background:var(--tape); border-color:var(--tape); color:var(--tape-ink);}
+  .bnr-tool.ink{color:var(--text);}
+  .bnr-tool:focus-visible, .opt:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
+  .seg{display:inline-flex;} .seg .bnr-tool{border-radius:0; margin-left:-1px;}
+  .seg .bnr-tool:first-child{border-radius:5px 0 0 5px; margin-left:0;} .seg .bnr-tool:last-child{border-radius:0 5px 5px 0;}
+
+  /* headings */
+  h2.part{font-family:var(--disp); font-weight:700; font-size:17px; letter-spacing:.2px; margin:44px 0 4px; display:flex; align-items:center; gap:10px; scroll-margin-top:60px;}
+  h2.part::after{content:''; flex:1; height:1px; background:var(--line);}
+  .part-sub{color:var(--muted); font-size:var(--fs-meta); margin:0 0 14px; max-width:78ch;}
+  .subhead{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); font-weight:500; margin:18px 0 6px;}
+
+  /* agreed list */
+  .agreed{align-items:stretch; display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:4px 28px; margin:8px 0 0; padding:0; list-style:none;}
+  .agreed li{padding:5px 0 5px 20px; position:relative; font-size:var(--fs-field); border-bottom:1px solid var(--line);}
+  .agreed li::before{content:'\00D7'; position:absolute; left:0; top:6px; width:12px; height:12px; border:1.5px solid var(--text); border-radius:3px; font-size:11px; line-height:9px; text-align:center; font-weight:600;}
+  .agreed li span{color:var(--muted); font-size:var(--fs-meta);}
+
+  /* the sheet — a card, like the call sheet */
+  .card{background:#fff; border:1px solid rgba(17,10,8,.20); border-radius:8px; padding:14px 16px; margin:12px 0;}
+  .card-h{display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;}
+  .card-h .t{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; font-weight:700; color:var(--tape);}
+  .card-h .sp{flex:1;}
+  .scroll{overflow-x:auto;}
+  .ba{display:grid; grid-template-columns:1fr; gap:0;}
+  .tag-now, .tag-new{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; border-radius:3px; padding:0 5px; line-height:15px; font-weight:500; display:inline-block;}
+  .tag-now{background:rgba(17,10,8,.07); color:var(--muted);} .tag-new{background:var(--tape); color:#fff;}
+
+  /* ── the person grid (mock of .roles-grid / .crewgrid) ── */
+  .g{display:grid; align-items:center; column-gap:10px; min-height:30px; min-width:max-content;}
+  .g.hd{min-height:26px; border-bottom:1px solid var(--line); margin-bottom:2px;}
+  .g.hd > div{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; white-space:nowrap;}
+  .hd-ink .g.hd > div{color:var(--text);}
+  .hd-green .g.hd > div{color:var(--tape);}
+  .hd-muted .g.hd > div{color:var(--muted);}
+  .hd-muted .g.hd{border-bottom:1.5px solid rgba(17,10,8,.35);}
+  .c{text-align:center; justify-self:center;} .g.hd > div.c{justify-self:center;}
+  .caret{font-size:9px; margin-right:4px; color:inherit;}
+  .grp{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; margin:10px 0 2px; font-weight:500;}
+  .grp .n{color:var(--muted); font-weight:400;}
+  .sh-muted .grp{color:var(--muted);} .sh-ink .grp{color:var(--text);} .sh-green .grp{color:var(--tape);}
+
+  .nm{font-size:var(--fs-name); font-weight:600; white-space:nowrap; cursor:pointer;}
+  .nm:hover{text-decoration:underline; text-decoration-color:var(--field-line); text-underline-offset:3px;}
+  .star{font-weight:700;}
+  /* dept */
+  .dp-pill{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; padding:2px 8px; border-radius:20px; background:rgba(17,10,8,.07); display:inline-block;}
+  .dp-pill.green{background:var(--tint-3); color:var(--tape);}
+  .dp-text{font-size:var(--fs-field);}
+  .dp-osw{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; color:var(--muted);}
+  /* role */
+  .rl-chip{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; border:1.5px solid var(--text); border-radius:3px; padding:2px 7px; display:inline-block; white-space:nowrap; cursor:pointer;}
+  .rl-talent{font-size:var(--fs-meta); color:var(--muted); white-space:nowrap; cursor:pointer;}
+  .rl-sheet{font-size:var(--fs-field); color:var(--text); white-space:nowrap; cursor:pointer;}
+  .rl-talent:hover, .rl-sheet:hover{color:var(--tape); text-decoration:underline; text-underline-offset:3px;}
+  /* stage */
+  .stg{display:inline-flex; align-items:center; gap:4px; margin-left:7px; vertical-align:middle; position:relative; top:-1px;}
+  .stg i{font-style:normal; font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:#fff; border-radius:3px; padding:0 5px; line-height:15px; font-weight:500;}
+  .stg.dots i{width:7px; height:7px; padding:0; border-radius:50%; font-size:0; line-height:0; display:inline-block;}
+  .stg .pre{background:var(--phase-prep);} .stg .prod{background:var(--phase-shoot);} .stg .post{background:var(--phase-post);}
+  /* fields */
+  .fld{display:inline-block; font-family:var(--body); font-size:var(--fs-field); color:var(--text); box-shadow:0 1px 0 var(--field-line); padding:3px 4px; min-height:24px; width:44px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .fld.l{text-align:left;} .fld.w{width:100%;} .fld.ph{color:var(--muted);}
+  .fld.s12{font-size:12px;}
+  .big16{font-size:16px;}
+  .cb{width:16px; height:16px; border:1.5px solid rgba(17,10,8,.45); border-radius:3px; display:inline-block; position:relative; vertical-align:middle; background:#fff;}
+  .cb.on{border-color:var(--text);} .cb.on::after{content:'\00D7'; position:absolute; inset:0; font-size:15px; line-height:12px; text-align:center; font-weight:600;}
+  .dates{font-family:var(--label); font-size:var(--fs-ctl); font-weight:600; letter-spacing:.8px; border:1px solid var(--line); border-radius:5px; padding:3px 8px; white-space:nowrap;}
+  .ico{width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; color:var(--muted);}
+  .ico svg{width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;}
+  .alllink{font-size:var(--fs-meta); color:var(--muted);}
+
+  /* ── decisions ── */
+  .dec{margin:26px 0 0; padding-top:4px; scroll-margin-top:60px;}
+  .dec-h{display:flex; align-items:baseline; gap:10px;}
+  .dec-n{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--tape); font-weight:600; min-width:22px;}
+  .dec h3{font-family:var(--body); font-size:15px; font-weight:600; margin:0;}
+  .dec .done{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--tape); margin-left:auto; visibility:hidden;}
+  .dec.picked .done{visibility:visible;}
+  .found{color:var(--muted); font-size:var(--fs-meta); margin:3px 0 10px 32px; max-width:82ch;}
+  .found b{color:var(--text); font-weight:600;}
+  .opts{display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:10px; margin-left:32px;}
+  .opt{display:flex; flex-direction:column; justify-content:flex-start; align-items:stretch; width:100%; text-align:left; font:inherit; color:inherit; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 12px 11px; cursor:pointer; position:relative; min-width:0;}
+  .opt:hover{border-color:var(--field-line);}
+  .opt.sel{border-color:var(--tape); box-shadow:0 0 0 1px var(--tape); background:var(--tint-1);}
+  .opt-t{display:flex; align-items:center; gap:7px; font-weight:600; font-size:var(--fs-field);}
+  .opt-t .box{flex:0 0 auto;}
+  .rec{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--tape); border:1px solid var(--tape); border-radius:3px; padding:0 4px; line-height:14px; font-weight:500;}
+  .isnow{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); border:1px solid var(--line); border-radius:3px; padding:0 4px; line-height:14px; font-weight:500;}
+  .opt-s{margin:9px 0 8px; padding:8px 8px; border-radius:6px; background:#fff; border:1px dashed var(--line); overflow:hidden;}
+  .opt.sel .opt-s{border-color:rgba(1,119,86,.25);}
+  .opt-s{flex:0 0 auto;} .opt-d{color:var(--muted); font-size:var(--fs-meta); line-height:1.45;}
+  .note{margin:8px 0 0 32px;}
+  .note textarea{width:100%; font:inherit; font-size:var(--fs-field); border:none; box-shadow:0 1px 0 var(--field-line); padding:5px 4px; resize:vertical; min-height:30px; height:30px; background:transparent; color:var(--text);}
+  .note textarea:focus{outline:none; box-shadow:0 1.5px 0 var(--tape);}
+  .note textarea::placeholder{color:var(--muted);}
+
+  /* misc samples */
+  .btn-mint{font-family:var(--body); font-weight:600; font-size:12px; border:1px solid var(--line); background:var(--panel-2); border-radius:7px; padding:5px 10px; display:inline-block;}
+  .btn-prim{font-family:var(--body); font-weight:600; font-size:12px; background:var(--tape); color:var(--tape-ink); border-radius:7px; padding:6px 12px; display:inline-block;}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .bh{font-family:var(--disp); font-weight:700; letter-spacing:.2px; display:flex; align-items:center; gap:8px;}
+  .bh::after{content:''; flex:1; height:1px; background:var(--line);}
+  .vn{display:grid; grid-template-columns:minmax(220px,1fr) repeat(3,34px) 26px; column-gap:10px; align-items:center; padding:5px 0; min-width:max-content;}
+  .vn-name-now{font-size:16px; font-weight:700;} .vn-addr{font-size:var(--fs-meta); color:var(--muted);}
+  .vn-addr.one{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px;}
+  table.drift{width:100%; border-collapse:collapse; font-size:var(--fs-field); margin-top:6px;}
+  table.drift th{padding:5px 6px; text-align:left; border-bottom:1.5px solid rgba(17,10,8,.35); color:var(--muted); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
+  table.drift td{padding:6px 6px; vertical-align:top;}
+  table.drift td:first-child{white-space:nowrap; font-weight:600;}
+  .lad{display:inline-block; border:1px solid var(--line); border-radius:3px; padding:0 5px; margin:1px 2px 1px 0; font-size:var(--fs-meta); color:var(--muted);}
+  .lad.keep{border-color:var(--tape); color:var(--tape);}
+
+  /* export */
+  #out{width:100%; min-height:220px; font-family:ui-monospace,monospace; font-size:12px; border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:10px; display:none; color:var(--text);}
+  .flash{font-size:var(--fs-meta); color:var(--tape); margin-left:6px;}
+
+  @media(max-width:700px){ .found,.opts,.note{margin-left:0;} .bar .jump{display:none;} }
+</style>
+</head>
+<body>
+<div class="main">
+
+  <div class="page-head">
+    <h1>Style check</h1>
+    <div class="eyebrow">Crew · Talent etc · Venues · and a sweep of the rest of the site</div>
+    <div class="code">20 SEPT 2026 · measured on Fashion Files London</div>
+    <p class="lede">The functionality is in good shape; what has slipped is that the same thing is now drawn three or four different ways depending on which tab built it. I measured the live fonts, sizes, colours and alignments on every screen and compared them against the Call Sheet card, which you named as the reference.</p>
+    <p class="lede mu">The first block is what you already asked for — no decision needed. Below it are <b id="nDec" style="color:var(--text)"></b> places where there is a real choice. Click an option; the two preview sheets update live. The ticked option is my recommendation until you pick. When done, <b style="color:var(--text)">Export decisions</b> and paste the block back to me.</p>
+  </div>
+
+  <div class="bar">
+    <span class="count"><b id="nPicked">0</b> of <span id="nTotal">0</span> decided</span>
+    <span class="jump"><a href="#preview">Preview</a><a href="#p1">Rows</a><a href="#p2">Fields</a><a href="#p3">Venues</a><a href="#p4">Site-wide</a></span>
+    <span class="sp"></span>
+    <button class="bnr-tool" onclick="acceptAll()" title="Tick the recommended option on anything not yet decided">Accept recommendations</button>
+    <button class="bnr-tool ink" onclick="exportDecisions()">Export decisions</button>
+  </div>
+
+  <h2 class="part">Already agreed</h2>
+  <p class="part-sub">From your brief, plus the fixes that only have one sensible answer. These go ahead whatever you choose below.</p>
+  <ul class="agreed">
+    <li>Column order is <b>DEPT | ROLE | NAME</b> <span>— on all four Crew sub-tabs and all four Talent sub-tabs. Today: Roles is DEPT·NAME·ROLE, Travel/Catering/Hotel have no DEPT at all, Talent has none.</span></li>
+    <li>Role is drawn as <b>plain text</b>, Talent's way <span>— the boxed Oswald chip goes from Crew. It stays clickable (opens the roles menu).</span></li>
+    <li><b>Pencil removed</b> <span>— from Crew Travel / Catering / Hotel and every Talent row. Clicking the name already opens the record.</span></li>
+    <li>Names collapse to <b>initials</b>, roles to <b>3–4 letter codes</b> <span>— today it is “Tegid C.” and a mix of “CO”, “SR” and the full word “Producer”.</span></li>
+    <li>Short input fields are <b>centred</b> <span>— today Crew's numbers are centred but Call Sheet times, durations and call times are left.</span></li>
+    <li>Talent's number fields 12px → <b>13px</b> <span>— they are the only fields on the site off the field size.</span></li>
+    <li>SHOOT total and the “—” placeholder 16px → <b>13px</b> <span>— they sit in a row of 13px fields and read as a different table.</span></li>
+    <li>Venue names 16px/700 → <b>14px/600</b> <span>— the name size used for every other person or record.</span></li>
+  </ul>
+
+  <h2 class="part" id="preview">Live preview</h2>
+  <p class="part-sub">Both sheets are drawn by the same renderer, which is the point: after this pass Crew and Talent should be one component with different columns.</p>
+
+  <div class="card">
+    <div class="card-h">
+      <span class="t">Crew · Roles</span>
+      <span class="sp"></span>
+      <span class="seg" id="segState">
+        <button class="bnr-tool" data-v="now" onclick="setView('now')">As it is now</button>
+        <button class="bnr-tool on" data-v="col" onclick="setView('col')">Proposed · collapsed</button>
+        <button class="bnr-tool" data-v="exp" onclick="setView('exp')">Proposed · expanded</button>
+      </span>
+    </div>
+    <div class="scroll" id="pvCrew"></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="t">Talent etc · Roles</span></div>
+    <div class="scroll" id="pvTalent"></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="t">Crew · Hotel</span> <span class="mu" style="font-size:12px">— the day-tick tabs (Travel, Catering, Hotel) get the same three lead columns</span></div>
+    <div class="scroll" id="pvHotel"></div>
+  </div>
+
+  <h2 class="part" id="p1">1 · The person row</h2>
+  <p class="part-sub">How DEPT, ROLE and NAME are each drawn, and what the collapsed state looks like.</p>
+  <div id="decs1"></div>
+
+  <h2 class="part" id="p2">2 · Fields and small marks</h2>
+  <p class="part-sub">Centring, stage marks, and the one leftover row control.</p>
+  <div id="decs2"></div>
+
+  <h2 class="part" id="p3">3 · Venues</h2>
+  <p class="part-sub">Venues was built before the Crew page head and toolbar existed, and it shows: a green Fraunces heading where Crew has a toolbar, a green centred column label, a 16px bold name, and its Add button living under a heading of its own.</p>
+  <div class="card">
+    <div class="card-h"><span class="t">Venues</span><span class="sp"></span><span class="mu" style="font-size:12px">follows your pick in decision <span id="venN"></span></span></div>
+    <div class="scroll" id="pvVenues"></div>
+  </div>
+  <div id="decs3"></div>
+
+  <h2 class="part" id="p4">4 · Site-wide</h2>
+  <p class="part-sub">The subtle drift. None of this is wrong on its own screen — it only shows when you move between tabs.</p>
+  <div id="decs4"></div>
+
+  <div class="subhead" style="margin-top:34px">What the numbers say</div>
+  <table class="drift">
+    <tr><th>Thing</th><th>In use today</th><th>Proposed ladder</th></tr>
+    <tr><td>Text sizes</td><td><span class="lad">9</span><span class="lad">9.5</span><span class="lad">10</span><span class="lad">10.5</span><span class="lad">11</span><span class="lad">11.5</span><span class="lad">12</span><span class="lad">12.5</span><span class="lad">13</span><span class="lad">13.5</span><span class="lad">14</span><span class="lad">15</span><span class="lad">16</span><span class="lad">17</span><span class="lad">18</span><span class="lad">19</span><span class="lad">20</span><span class="lad">21</span><span class="lad">22</span><span class="lad">26</span><br><span class="mu" style="font-size:12px">85 hard-coded sizes sit alongside the 130 that use the four tokens.</span></td><td><span class="lad keep">9 micro tag</span><span class="lad keep">11 label</span><span class="lad keep">12 meta</span><span class="lad keep">13 field</span><span class="lad keep">14 name</span><span class="lad keep">15 heading</span><span class="lad keep">17 card title</span><span class="lad keep">22 page</span><span class="lad keep">26 figure</span></td></tr>
+    <tr><td>Oswald label weight</td><td><span class="lad">400</span><span class="lad">500</span><span class="lad">600</span><span class="lad">700</span> <span class="mu" style="font-size:12px">— tabs 500, toolbar buttons 600, card section heads 700, group sub-heads 400, Budget labels 400</span></td><td><span class="lad keep">500 labels &amp; headers</span><span class="lad keep">600 things you click</span></td></tr>
+    <tr><td>Oswald tracking</td><td><span class="lad">1.2</span><span class="lad">1.1</span><span class="lad">1.0</span><span class="lad">0.8</span><span class="lad">0.6</span><span class="lad">0.5</span><span class="lad">0.4</span><span class="lad">0.3</span> <span class="mu" style="font-size:12px">— MAP.md says “every Oswald label is 11px / 1.2px”; the newer toolbar is 1.1</span></td><td><span class="lad keep">1.2 at 11px</span><span class="lad keep">0.8 at 9px</span><span class="lad keep">0.4 figures</span></td></tr>
+    <tr><td>Corner radius</td><td><span class="lad">2</span><span class="lad">3</span><span class="lad">4</span><span class="lad">5</span><span class="lad">6</span><span class="lad">7</span><span class="lad">8</span><span class="lad">9</span><span class="lad">10</span><span class="lad">20</span></td><td><span class="lad keep">3 ticks &amp; tags</span><span class="lad keep">5 controls</span><span class="lad keep">8 boxes</span></td></tr>
+    <tr><td>Column-header colour</td><td>ink on Crew and Talent · muted grey on the Call Sheet · brand green on Venues</td><td>decision below</td></tr>
+    <tr><td>Inline <code>style="…"</code></td><td>318 in index.html — this is where most of the drift hides, because an inline style never shows up when you change the class</td><td>fold the repeated ones into classes as each screen is touched; no big-bang rewrite</td></tr>
+  </table>
+
+  <h2 class="part" id="export">Export</h2>
+  <p class="part-sub">Compiles every pick and note into one block to paste back. Anything you have not picked is exported as “recommendation accepted”.</p>
+  <div class="row">
+    <button class="bnr-tool ink" onclick="exportDecisions()">Export decisions</button>
+    <button class="bnr-tool" onclick="copyOut()">Copy</button>
+    <button class="bnr-tool" onclick="resetAll()">Reset picks</button>
+    <span class="flash" id="flash"></span>
+  </div>
+  <textarea id="out" readonly></textarea>
+</div>
+
+<script>
+/* ───────── data (the real rows on Fashion Files London) ───────── */
+const CREW = [
+  {dept:'PROD', name:'Tegid Cartwright', role:'Producer',        code:'PROD', st:['pre','post'], prep:'3', shoot:'—', post:'3', dates:'6 dates', star:true, hotel:[0,0,0,0]},
+  {dept:'CIN',  name:'Tegid Cartwright', role:'DOP',             code:'DOP',  st:['prod'], shoot:'2', dates:'2 dates', star:true, hotel:[0,0,0,0]},
+  {dept:'CIN',  name:'Adam Waugh',       role:'Camera Operator', code:'CAM',  st:['prod'], shoot:'1', dates:'1 date',  hotel:[0,0,0,0]},
+  {dept:'CIN',  name:'George Pearton',   role:'Camera Operator', code:'CAM',  st:['prod'], shoot:'1', dates:'1 date',  hotel:[0,0,0,0]},
+  {dept:'CIN',  name:'Karim D Clarke',   role:'Camera Operator', code:'CAM',  st:['prod'], shoot:'2', dates:'2 dates', star:true, hotel:[0,1,1,0]},
+  {dept:'AUD',  name:'Rufus Ambler',     role:'Sound Recordist', code:'SND',  st:['prod'], shoot:'1', dates:'1 date', showAs:'Soundie', hotel:[0,0,0,0]},
+  {dept:'POST', name:'Karim D Clarke',   role:'Editor',          code:'EDIT', st:['post'], shoot:'—', post:'4', dates:'4 dates', star:true, hotel:[0,0,0,0]},
+];
+const TALENT = [
+  {grp:'Client', name:'Olivia Arnold', role:'OFTV - UK',      code:'OFTV', days:[1,1,1]},
+  {grp:'Talent', name:'Dalia',         role:'Talent',         code:'TAL',  days:[1,1,1]},
+  {grp:'Talent', name:'Drea',          role:'Talent / Model', code:'MOD',  days:[1,1,0]},
+  {grp:'Talent', name:'Leah',          role:'Host',           code:'HOST', days:[1,1,1]},
+  {grp:'Talent', name:'Natasha',       role:'Designer',       code:'DES',  days:[1,1,1]},
+  {grp:'Talent', name:'Sam',           role:'Stylist',        code:'STY',  days:[1,1,1]},
+];
+const VENUES = [
+  {name:'Natasha Workshop', addr:'Smith & Brooks, North Acton, Park Royal, 1a Lower Park, London W3 6XA', days:[1,0,0]},
+  {name:'LFW Show OFTV 2026', addr:'Collins Hall, 10-11 Islington Grn, London N1 2XH', days:[0,1,0]},
+  {name:'LFW OFTV 2026 Pop-up event - Natasha Zinko', addr:'Never Fade, 17, Brewer Street, Soho, City of Westminster, Greater London, England, W1F 0RJ, United Kingdom', days:[0,0,1]},
+];
+const IC = {
+  pencil:'<span class="ico"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>',
+  trash:'<span class="ico"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>',
+  cal:'<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-1px;margin-right:4px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'
+};
+
+/* ───────── decisions ───────── */
+const D = [
+ {id:'role', part:1, t:'How the role is drawn',
+  found:'Three versions today: a <b>boxed Oswald chip</b> on Crew (11px, 1.5px ink border), <b>muted Jost 12px</b> text on Talent, and <b>ink Jost 13px</b> text on the Call Sheet. You prefer Talent\'s; the only open point is whether it takes the Call Sheet\'s size and colour.',
+  opts:[
+   {v:'talent', rec:1, t:'Talent\'s — muted, 12px', d:'Role steps back, the name leads. Matches what you pointed at. Hover turns it green and underlines it so it still reads as the way into the roles menu.'},
+   {v:'sheet', t:'Call Sheet\'s — ink, 13px', d:'Same weight as every other cell, as on the printed sheet. Slightly busier: three ink columns side by side.'},
+   {v:'chip', now:1, t:'Boxed chip', d:'For comparison only — this is what Crew does now.'} ]},
+ {id:'dept', part:1, t:'How the department code is drawn',
+  found:'<b>Grey Oswald pill</b> on project Crew, <b>green Oswald pill</b> in the Crew database, <b>plain ink text</b> on the Call Sheet, <b>plain muted text</b> in Budget. Four looks for one three-letter code.',
+  opts:[
+   {v:'text', rec:1, t:'Plain text, as on the Call Sheet', d:'Jost 13px ink in its own DEPT column. No pill anywhere, including the Crew database. The column header does the labelling.'},
+   {v:'osw', t:'Oswald code, muted, no pill', d:'Keeps a hint of “this is a code, not a word” by using the label font, without the capsule.'},
+   {v:'pill', now:1, t:'Keep the grey pill', d:'Current project-Crew look, moved into the DEPT column. The Crew database\'s green pill would change to match.'} ]},
+ {id:'name', part:1, t:'Collapsed name',
+  found:'Today <code>rolesShortName()</code> gives first name plus surname initial — <b>“Tegid C.”</b>, <b>“Karim D.C.”</b> — which saves little. Single-word names (Dalia, Drea, Leah) cannot sensibly collapse to one letter, so they stay whole in every option.',
+  opts:[
+   {v:'TC', rec:1, t:'TC · KDC', d:'Plain capitals. Full name on hover and in the expanded column. If two different people on one project share initials, the surname gains a letter (AWa / AWi).'},
+   {v:'T.C.', t:'T.C. · K.D.C.', d:'Dotted. Reads more like a name and less like a code, but is half as wide again.'},
+   {v:'first', now:1, t:'Tegid C. · Karim D.C.', d:'What it does now.'} ]},
+ {id:'code', part:1, t:'Where role codes come from',
+  found:'Today <code>rolesShortRole()</code> takes the initials of multi-word roles and leaves single words whole — so <b>Camera Operator → CO</b>, <b>Sound Recordist → SR</b>, but <b>Producer → Producer</b> and <b>Editor → Editor</b>. A pure rule can reach 3–4 letters, but it gives TALE, DESI and STYL.',
+  opts:[
+   {v:'curated', rec:1, t:'A code saved with each role', d:'Settings ▸ Departments & roles gains a short Code field per role — DOP, CAM, SND, PROD, EDIT, 1AD, GAF. Pre-filled by the rule on the right, so nothing needs typing unless you dislike the guess. Codes then match across Crew, Talent, Budget and exports.'},
+   {v:'algo', t:'Rule only', d:'Multi-word → initials (CO, SR); single word → first four letters (PROD, EDIT, HOST, DESI, STYL). No new setting, but no way to fix an ugly one.'} ]},
+ {id:'collapse', part:1, t:'Which tabs can collapse',
+  found:'The ▸ NAME / ▸ ROLE toggles exist only on <b>Crew ▸ Roles</b>. Travel, Catering, Hotel and all of Talent always show full names and full roles, so switching sub-tab makes the columns jump.',
+  opts:[
+   {v:'all', rec:1, t:'Every sub-tab, one shared state', d:'Collapse on Roles and it is collapsed on Travel, Catering, Hotel and on Talent too. The three lead columns never move when you switch tab.'},
+   {v:'roles', now:1, t:'Roles only', d:'As now. The day-tick tabs have room for full names, so the argument for leaving it is fair — but the jump stays.'} ]},
+ {id:'group', part:1, t:'Grouping',
+  found:'Talent is always split under <b>CLIENT (1)</b> / <b>TALENT (5)</b> sub-heads. Crew ▸ Roles is a flat list with the department on the row. With a DEPT column on both, the sub-heads repeat what the column already says.',
+  opts:[
+   {v:'flat', rec:1, t:'Flat list, DEPT column does the work', d:'Both pages. Sub-heads appear only when Filter ▸ Group by is switched on — and then identically on both.'},
+   {v:'grouped', t:'Always grouped under sub-heads', d:'Both pages get department sub-heads (collapsible, with counts). More structure on a 60-person crew; more rules on a 6-person one.'} ]},
+ {id:'tcodes', part:1, t:'Talent and Client department codes',
+  found:'The Call Sheet prints <b>TALENT</b> and <b>CLIENT</b> in full in its DEPT column, which is twice the width of every crew code beside it.',
+  opts:[
+   {v:'short', rec:1, t:'TAL · CLI', d:'Three letters, same as CIN / AUD. Also used on the Call Sheet card so the column is one width.'},
+   {v:'long', now:1, t:'TALENT · CLIENT', d:'Unambiguous, but sets the DEPT column width for everyone.'} ]},
+ {id:'head', part:1, t:'Column headers',
+  found:'<b>Ink</b> on Crew and Talent, <b>muted grey with a 1.5px rule</b> on the Call Sheet, <b>brand green, centred</b> on Venues. MAP.md still documents green, so two of three screens have already drifted from the written rule.',
+  opts:[
+   {v:'muted', rec:1, t:'Call Sheet\'s — muted, firm rule under', d:'Headers recede, data leads, and the one strong line makes it read as a printed table. Becomes the documented rule.'},
+   {v:'ink', t:'Ink, hairline under', d:'What Crew and Talent do now.'},
+   {v:'green', t:'Brand green', d:'What Venues does now and what MAP.md says.'} ]},
+
+ {id:'center', part:2, t:'What “centred inputs” covers',
+  found:'Crew\'s PREP / OT / POST fields are already centred. The <b>Call Sheet\'s</b> time, duration and call-time fields are left-aligned, as are Overview\'s Shoot days and the Tech-spec values.',
+  opts:[
+   {v:'short', rec:1, t:'Short values centred, sentences left', d:'Numbers, times, durations, call times, rates, day counts — centred. Anything you would write a sentence in (description, log line, notes, Show as, addresses) stays left, because centred prose is hard to scan down a column.'},
+   {v:'all', t:'Every field centred', d:'Literal reading of the brief. Looks tidy on one row; ragged both sides down a schedule.'} ]},
+ {id:'stage', part:2, t:'Stage marks beside the name',
+  found:'Rows carry text tags — <b>PRE</b> <b>PROD</b> <b>POST</b>. With DEPT now a column, a producer\'s row reads “PROD … PROD”: the department and the Production stage are the same four letters.',
+  opts:[
+   {v:'dots', rec:1, t:'Coloured dots', d:'The stage selector directly above is already the key (● Pre-production ● Production ● Post). Removes the PROD / PROD clash and frees ~60px per row. Hover names the stage.'},
+   {v:'tags', now:1, t:'Text tags', d:'As now. Self-explanatory without looking up, at the cost of the clash.'} ]},
+ {id:'trash', part:2, t:'Talent\'s row bin',
+  found:'Talent rows end in a <b>bin icon</b>. Crew rows have none — you remove people with Select ▸ Remove. With the pencil gone this would be the only per-row icon left on either page.',
+  opts:[
+   {v:'select', rec:1, t:'Remove it — use Select, as Crew does', d:'One way to remove a person on both pages, with Undo. Rows end cleanly.'},
+   {v:'keep', now:1, t:'Keep the bin on Talent', d:'Faster for a six-person list. If kept, Crew should arguably gain one too.'} ]},
+
+ {id:'venues', part:3, t:'How far to take Venues',
+  found:'Differences measured against Crew: no toolbar (Add lives under its own <b>“Add venue”</b> heading as a mint Jost button), a <b>green Fraunces</b> page heading Crew does not have, <b>green centred</b> column label, <b>16px / 700</b> names, address wrapping to two lines, explanatory paragraph always showing.',
+  opts:[
+   {v:'full', rec:1, t:'Match Crew fully', d:'Toolbar row with + ADD VENUE · SELECT, headers and names in the shared style, address on one muted line, the how-it-works paragraph moves to a footnote with Hide tips (as on Roles). Vendors below follows the same pattern.'},
+   {v:'light', t:'Type and colour only', d:'Fix the header colour, name size and button style; leave the layout and the headings where they are.'} ]},
+
+ {id:'addbtn', part:4, t:'One “+ Add” button',
+  found:'The same action is drawn three ways: <b>Oswald outlined</b> (+ ADD PERSON, + ADD SCHEDULE ITEM, + ADD TO THIS DAY), <b>mint Jost</b> (+ Add venue, + Add camera, + Shoot date, + New vendor), and <b>solid green</b> (+ Note).',
+  opts:[
+   {v:'oswald', rec:1, t:'Oswald outlined everywhere', d:'The Call Sheet\'s and the toolbar\'s. Mint Jost stays for neutral actions (Edit, Send to sheet); solid green is reserved for the one primary action in a dialog.'},
+   {v:'mint', t:'Mint Jost everywhere', d:'Softer and friendlier, but it would mean restyling the Crew / Budget toolbars you have just finished.'} ]},
+ {id:'blockhead', part:4, t:'Block headings',
+  found:'<b>Fraunces 17px ink</b> on Call Sheet blocks (Tech specs, Catering order), <b>15px ink</b> on Crew\'s summaries (Hotel summary), <b>15px green</b> on Overview, Venues and the databases (Project details, All locations).',
+  opts:[
+   {v:'ink', rec:1, t:'Ink everywhere — 15px on the page, 17px as a card title', d:'Follows the Call Sheet. Green is then left for things that are live: the active tab, the selected option, links.'},
+   {v:'green', t:'Green 15px everywhere', d:'MAP.md\'s documented Pattern A. The Call Sheet blocks would go back to green.'} ]},
+ {id:'subhead', part:4, t:'Group sub-heads',
+  found:'<b>Muted grey 500</b> on the Call Sheet (CLIENT / CREW / TALENT), <b>ink 400</b> on Talent (CLIENT (1)), <b>green 400</b> in the Crew database (PROD PRODUCTION (8)).',
+  opts:[
+   {v:'muted', rec:1, t:'Muted, as on the Call Sheet', d:'One step quieter than the column headers\' rule, so the hierarchy is heading › sub-head › header › row.'},
+   {v:'ink', t:'Ink', d:'Talent\'s current look.'},
+   {v:'green', t:'Green', d:'The Crew database\'s current look.'} ]},
+ {id:'tidy', part:4, t:'Token tidy-up',
+  found:'See <b>What the numbers say</b> below: 20 text sizes, 4 Oswald weights, 8 trackings, 10 radii. Each is a pixel or a half off its neighbour — invisible alone, which is exactly the “subtle but there” feeling.',
+  opts:[
+   {v:'yes', rec:1, t:'Snap to the proposed ladders', d:'Done screen by screen as part of this pass, each change checked in the browser. Nothing moves by more than a pixel or so; the Budget spreadsheet keeps its own 12px grid idiom.'},
+   {v:'no', t:'Leave the tokens, fix only what is listed above', d:'Smaller change, but the drift keeps accruing.'} ]},
+ {id:'db', part:4, t:'The two databases',
+  found:'Crew and Locations databases still use <b>bordered cards</b> with mint Edit / Delete buttons and green pills — the pre-“no frame” look. The project tabs have all moved to frameless rows.',
+  opts:[
+   {v:'later', rec:1, t:'Second pass, after this one lands', d:'Take the DEPT | ROLE | NAME row and the text role into the Crew database once it has settled on the project tabs. Pills and sub-head colour change now, since they are shared classes.'},
+   {v:'now', t:'Bring them across in this pass', d:'Bigger change in one go; more to check.'},
+   {v:'leave', t:'Leave them — a database can look like a database', d:'Cards suit browsing records. Only the shared bits (pill, sub-head) would change.'} ]},
+];
+
+/* ───────── state ───────── */
+const KEY='styleCheck-2026-09-20';
+let S={pick:{},note:{},view:'col'};
+try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.pick) S=Object.assign(S,s); }catch(e){}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+const recOf = d => (d.opts.find(o=>o.rec)||d.opts[0]).v;
+const eff = (over) => { const p={}; D.forEach(d=>p[d.id]=S.pick[d.id]||recOf(d)); return Object.assign(p, over||{}); };
+const NOW = {role:'chip',dept:'pill',name:'first',code:'now',collapse:'roles',group:'now',tcodes:'long',head:'ink',center:'short',stage:'tags',trash:'keep',subhead:'ink',venues:'now'};
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ───────── renderers ───────── */
+function shortName(n, mode){
+  const w=n.trim().split(/\s+/); if(w.length===1) return n;
+  if(mode==='TC') return w.map(x=>x[0].toUpperCase()).join('');
+  if(mode==='T.C.') return w.map(x=>x[0].toUpperCase()+'.').join('');
+  return w[0]+' '+w.slice(1).map(x=>x[0].toUpperCase()+'.').join('');
+}
+function shortRole(r, mode){
+  if(mode==='curated') return r.code;
+  const w=r.role.split(/[\s/\-]+/).filter(Boolean);
+  if(mode==='now') return w.length<2 ? r.role : w.map(x=>x.length<=3&&x===x.toUpperCase()?x:x[0].toUpperCase()).join('');
+  if(w.length<2) return r.role.length<=4 ? r.role.toUpperCase() : r.role.slice(0,4).toUpperCase();
+  return w.map(x=>x.length<=3&&x===x.toUpperCase()?x:x[0].toUpperCase()).join('');
+}
+const deptHTML = (code,p,green) => p.dept==='pill' ? `<span class="dp-pill${green?' green':''}">${code}</span>` : p.dept==='osw' ? `<span class="dp-osw">${code}</span>` : `<span class="dp-text">${code}</span>`;
+const roleHTML = (r,p,col) => { const txt = col ? shortRole(r,p.code) : r.role; const cls = p.role==='chip'?'rl-chip':p.role==='sheet'?'rl-sheet':'rl-talent'; return `<span class="${cls}" title="${esc(r.role)} — change or add a role">${esc(txt)}</span>`; };
+const nameHTML = (r,p,col) => `<span class="nm" title="Open ${esc(r.name)}'s record">${esc(col?shortName(r.name,p.name):r.name)}${r.star?'<span class="star">*</span>':''}</span>`;
+const stageHTML = (st,p) => !st?'' : `<span class="stg${p.stage==='dots'?' dots':''}">${st.map(s=>`<i class="${s}" title="${s}">${s}</i>`).join('')}</span>`;
+const fld = (v,cls) => `<span class="fld ${cls||''}">${v==null||v===''?'<span class="mu">—</span>':esc(v)}</span>`;
+const cb = on => `<span class="cb${on?' on':''}"></span>`;
+const tcode = (g,p) => p.tcodes==='short' ? (g==='Client'?'CLI':'TAL') : g.toUpperCase();
+
+/* lead columns — the shared part */
+function lead(p, col, isNow){
+  if(isNow) return null;
+  const w = col ? {d:p.dept==='pill'?58:44, r:p.role==='chip'?64:50, n:p.name==='T.C.'?62:p.name==='first'?96:54} : {d:p.dept==='pill'?58:44, r:p.role==='chip'?140:118, n:150};
+  if(p.tcodes==='long') w.d=Math.max(w.d,60);
+  return w;
+}
+function crewSheet(p, view, rows, compact){
+  const isNow = view==='now', col = view!=='exp';
+  const list = rows ? rows.map(i=>CREW[i]) : CREW;
+  let cols, head, body;
+  const tail = compact ? '44px 50px' : 'repeat(4,50px) 62px 84px minmax(90px,150px)';
+  if(isNow){
+    cols = `58px 158px 84px ${tail}`;
+    head = `<div></div><div><span class="caret">▸</span>Name</div><div><span class="caret">▸</span>Role</div>`;
+    body = r => `<div><span class="dp-pill">${r.dept}</span></div><div>${nameHTML(r,NOW,true)}${stageHTML(r.st,NOW)}</div><div>${roleHTML(r,NOW,true)}</div>`;
+  } else {
+    const w = lead(p,col), extra = (p.stage==='dots'?26:r=>0);
+    const nameW = w.n + (p.stage==='dots'?30:74);
+    cols = `${w.d}px ${w.r}px ${nameW}px ${tail}`;
+    head = `<div>Dept</div><div><span class="caret">${col?'▸':'▾'}</span>Role</div><div><span class="caret">${col?'▸':'▾'}</span>Name</div>`;
+    body = r => `<div>${deptHTML(r.dept,p)}</div><div>${roleHTML(r,p,col)}</div><div>${nameHTML(r,p,col)}${stageHTML(r.st,p)}</div>`;
+  }
+  const pp = isNow?NOW:p;
+  const numHead = compact ? `<div class="c">Prep</div><div class="c">Shoot</div>` : `<div class="c">Prep</div><div class="c"><span class="caret">▸</span>Shoot</div><div class="c">OT</div><div class="c">Post</div><div class="c">Buyout</div><div class="c">Dates</div><div>Show as</div>`;
+  const nums = r => {
+    const shoot = isNow ? `<span class="${r.shoot&&r.shoot!=='—'?'big16':'big16 mu'}">${r.shoot||'—'}</span>` : `<span style="font-size:13px" class="${r.shoot==='—'?'mu':''}">${r.shoot||'—'}</span>`;
+    if(compact) return `<div class="c">${fld(r.prep)}</div><div class="c">${shoot}</div>`;
+    const sa = `<span class="fld w ${(!isNow&&p.center==='all')?'':'l'} ${r.showAs?'':'ph'}">${r.showAs||'Show as…'}</span>`;
+    return `<div class="c">${fld(r.prep)}</div><div class="c">${shoot}</div><div class="c">${fld('')}</div><div class="c">${fld(r.post)}</div><div class="c">${cb(0)}</div><div class="c"><span class="dates">${IC.cal}${r.dates}</span></div><div>${sa}</div>`;
+  };
+  return `<div class="hd-${pp.head}"><div class="g hd" style="grid-template-columns:${cols}">${head}${numHead}</div>${list.map(r=>`<div class="g" style="grid-template-columns:${cols}">${body(r)}${nums(r)}</div>`).join('')}</div>`;
+}
+function talentSheet(p, view, rows, compact){
+  const isNow = view==='now', col = view!=='exp' && (isNow?false:(p.collapse==='all'));
+  const list = rows ? rows.map(i=>TALENT[i]) : TALENT;
+  const pp = isNow?NOW:p;
+  const days = compact ? '' : 'repeat(3,34px) 50px';
+  let cols, head, body;
+  if(isNow){
+    cols = `22px 150px 130px 50px ${days} 1fr 22px`;
+    head = `<div></div><div>Name</div><div>Role</div>`;
+    body = r => `<div>${IC.pencil}</div><div>${nameHTML(r,NOW,false)}${stageHTML(['prod'],NOW)}</div><div><span class="rl-talent">${esc(r.role)}</span></div>`;
+  } else {
+    const w = lead(p,col); const nameW = Math.max(w.n,col?64:150) + (p.stage==='dots'?18:44);
+    cols = `${w.d}px ${w.r}px ${nameW}px 50px ${days} 1fr ${p.trash==='keep'?'22px':'0px'}`;
+    head = `<div>Dept</div><div>${p.collapse==='all'?`<span class="caret">${col?'▸':'▾'}</span>`:''}Role</div><div>${p.collapse==='all'?`<span class="caret">${col?'▸':'▾'}</span>`:''}Name</div>`;
+    body = r => `<div>${deptHTML(tcode(r.grp,p),p)}</div><div>${roleHTML(r,p,col)}</div><div>${nameHTML(r,p,col)}${stageHTML(['prod'],p)}</div>`;
+  }
+  const dayHead = compact ? '' : `<div class="c">D1</div><div class="c">D2</div><div class="c">D3</div><div class="c">Post</div>`;
+  const rowHTML = r => `<div class="g" style="grid-template-columns:${cols}">${body(r)}<div class="c">${fld('', isNow?'s12':'')}</div>${compact?'':r.days.map(cb).map(x=>`<div class="c">${x}</div>`).join('')+`<div class="c">${fld('', isNow?'s12':'')}</div>`}<div></div><div>${(isNow||p.trash==='keep')?IC.trash:''}</div></div>`;
+  const grouped = isNow || p.group==='grouped';
+  let out = `<div class="g hd" style="grid-template-columns:${cols}">${head}<div class="c">Prep</div>${dayHead}<div></div><div></div></div>`;
+  if(grouped){ ['Client','Talent'].forEach(g=>{ const rs=list.filter(r=>r.grp===g); if(rs.length) out += `<div class="grp">▾ ${g} <span class="n">(${rs.length})</span></div>`+rs.map(rowHTML).join(''); }); }
+  else out += list.map(rowHTML).join('');
+  return `<div class="hd-${pp.head} sh-${isNow?'ink':p.subhead}">${out}</div>`;
+}
+function hotelSheet(p, view){
+  const isNow = view==='now', col = view!=='exp' && !isNow && p.collapse==='all';
+  const pp = isNow?NOW:p; const list = CREW.filter((r,i)=>[1,2,3,5,4].includes(i));
+  let cols, head, body;
+  if(isNow){ cols='22px 150px 140px repeat(4,34px) 1fr 30px';
+    head='<div></div><div>Name</div><div>Role</div>';
+    body = r=>`<div>${IC.pencil}</div><div>${nameHTML({name:r.name},NOW,false)}</div><div><span class="rl-chip">${esc(r.role)}</span></div>`;
+  } else { const w=lead(p,col); cols=`${w.d}px ${w.r}px ${Math.max(w.n,col?64:150)}px repeat(4,34px) 1fr 30px`;
+    const car = p.collapse==='all' ? `<span class="caret">${col?'▸':'▾'}</span>` : '';
+    head=`<div>Dept</div><div>${car}Role</div><div>${car}Name</div>`;
+    body = r=>`<div>${deptHTML(r.dept,p)}</div><div>${roleHTML(r,p,col)}</div><div>${nameHTML({name:r.name},p,col)}</div>`;
+  }
+  return `<div class="hd-${pp.head}"><div class="g hd" style="grid-template-columns:${cols}">${head}<div class="c">Pre</div><div class="c">D1</div><div class="c">D2</div><div class="c">D3</div><div></div><div></div></div>`+
+    list.map(r=>`<div class="g" style="grid-template-columns:${cols}">${body(r)}${r.hotel.map(cb).map(x=>`<div class="c">${x}</div>`).join('')}<div></div><div class="alllink">All</div></div>`).join('')+`</div>`;
+}
+function venuesSheet(p, mode){
+  const dayCells = v => v.days.map(cb).map(x=>`<div class="c">${x}</div>`).join('');
+  if(mode==='now') return `
+    <div class="bh" style="font-size:15px;color:var(--tape)">Venues on this project</div>
+    <p class="mu" style="font-size:12px;max-width:170px;margin:8px 0">Location costs hidden. Turn on <b>Budget</b> to see what each venue costs — the day ticks work either way.</p>
+    <div style="text-align:right;margin-bottom:8px"><span class="bnr-tool">Budget</span></div>
+    <div class="hd-green"><div class="vn g hd"><div class="c" style="justify-self:center">Location</div><div class="c">D1</div><div class="c">D2</div><div class="c">D3</div><div></div></div></div>
+    ${VENUES.map(v=>`<div class="vn"><div><div class="vn-name-now"><span class="caret">▸</span>${esc(v.name)}</div><div class="vn-addr" style="max-width:340px">${esc(v.addr)}</div></div>${dayCells(v)}<div>${IC.trash}</div></div>`).join('')}
+    <p class="mu" style="font-size:12px">Click a location to set what it costs. A buyout is split across the days it is ticked on, so each day carries its share…</p>
+    <div class="bh" style="font-size:15px;color:var(--tape);margin-top:14px">Add venue</div><div style="margin-top:8px"><span class="btn-mint">+ Add venue</span></div>`;
+  const full = mode==='full';
+  const addBtn = p.addbtn==='mint' ? '<span class="btn-mint">+ Add venue</span>' : '<span class="bnr-tool ink">+ Add venue</span>';
+  return `
+    ${full ? `<div class="row" style="margin-bottom:10px"><span class="seg">${p.addbtn==='mint'?addBtn:'<span class="bnr-tool ink">+ Add venue</span><span class="bnr-tool">Select</span>'}</span><span style="flex:1"></span><span class="bnr-tool">Budget</span></div>`
+           : `<div class="bh" style="font-size:15px;color:${p.blockhead==='green'?'var(--tape)':'var(--text)'}">Venues on this project</div><div style="text-align:right;margin:8px 0"><span class="bnr-tool">Budget</span></div>`}
+    <div class="hd-${p.head}"><div class="vn g hd"><div>Venue</div><div class="c">D1</div><div class="c">D2</div><div class="c">D3</div><div></div></div></div>
+    ${VENUES.map(v=>`<div class="vn"><div><div class="nm"><span class="caret mu">▸</span>${esc(v.name)}</div><div class="vn-addr ${full?'one':''}" style="${full?'':'max-width:340px'}" title="${esc(v.addr)}">${esc(v.addr)}</div></div>${dayCells(v)}<div>${full&&p.trash==='select'?'':IC.trash}</div></div>`).join('')}
+    ${full ? `<p class="mu" style="font-size:12px;margin-top:10px">Click a venue to set what it costs. <span style="text-decoration:underline;text-underline-offset:3px">Tips</span></p>`
+           : `<p class="mu" style="font-size:12px">Click a location to set what it costs. A buyout is split across the days it is ticked on…</p><div class="bh" style="font-size:15px;color:${p.blockhead==='green'?'var(--tape)':'var(--text)'};margin-top:14px">Add venue</div><div style="margin-top:8px">${addBtn}</div>`}`;
+}
+
+/* option samples */
+function sample(d, o){
+  const p = eff({[d.id]:o.v});
+  switch(d.id){
+    case 'role': case 'dept': case 'head': return crewSheet(p,'col'===S.view||S.view==='now'?'col':'exp',[0,2,5],true);
+    case 'name': return crewSheet(p,'col',[1,4,5],true);
+    case 'code': return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;font-size:12px">`+[...CREW.filter((r,i)=>[0,1,2,5,6].includes(i)),...TALENT.slice(2,6)].map(r=>`<div class="mu" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.role)}</div><div><b style="font-weight:600">${esc(shortRole(r,o.v))}</b></div>`).join('')+`</div>`;
+    case 'collapse': return `<div style="font-size:12px" class="mu">Roles</div>${crewSheet(p,'col',[2],true)}<div style="font-size:12px;margin-top:6px" class="mu">Hotel</div>${o.v==='all'?crewSheet(p,'col',[2],true):crewSheet(p,'exp',[2],true)}`;
+    case 'group': case 'tcodes': case 'trash': case 'subhead': return talentSheet(eff({[d.id]:o.v, group: d.id==='subhead'?'grouped':(d.id==='group'?o.v:p.group)}),'col',[0,1,3],true);
+    case 'stage': return crewSheet(p,'col',[0,1],true);
+    case 'center': { const c = o.v==='all'; return `<div class="hd-${p.head}"><div class="g hd" style="grid-template-columns:54px 50px 1fr 50px"><div class="c">Time</div><div class="c">Dur.</div><div>Description</div><div class="c">Call</div></div>${[['1130','1hrs','Brunch and prep','0800'],['1200','2hrs','Interview with Natasha & Leah','0830']].map(x=>`<div class="g" style="grid-template-columns:54px 50px 1fr 50px"><div>${fld(x[0],'w')}</div><div>${fld(x[1],'w')}</div><div><span class="fld w ${c?'':'l'}">${x[2]}</span></div><div>${fld(x[3],'w')}</div></div>`).join('')}</div>`; }
+    case 'venues': return `<div style="zoom:.72">${venuesSheet(p,o.v)}</div>`;
+    case 'addbtn': { const b = t => o.v==='mint' ? `<span class="btn-mint">${t}</span>` : `<span class="bnr-tool ink">${t}</span>`; return `<div class="row">${b('+ Add person')}${b('+ Add venue')}${b('+ Add camera')}${b('+ Note')}</div>`; }
+    case 'blockhead': { const c = o.v==='green'?'var(--tape)':'var(--text)'; return `<div class="bh" style="font-size:15px;color:${c}">▸ Hotel summary</div><div class="bh" style="font-size:15px;color:${c};margin-top:6px">Project details</div><div style="border:1px solid rgba(17,10,8,.2);border-radius:8px;padding:8px 10px;margin-top:8px"><div class="bh" style="font-size:${o.v==='green'?15:17}px;color:${c}">▾ Tech specs</div></div>`; }
+    case 'tidy': return o.v==='yes' ? `<div class="row"><span class="lad keep">9</span><span class="lad keep">11</span><span class="lad keep">12</span><span class="lad keep">13</span><span class="lad keep">14</span><span class="lad keep">15</span><span class="lad keep">17</span><span class="lad keep">22</span><span class="lad keep">26</span></div>` : `<div class="row">${[9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,14,15,16,17,18,19,20,21,22,26].map(x=>`<span class="lad">${x}</span>`).join('')}</div>`;
+    case 'db': return o.v==='leave'||o.v==='later'
+      ? `<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px"><span class="caret mu">▸</span> ${deptHTML('PROD',p,true)} <span class="nm">Matt Wells</span> <span class="rl-chip" style="border-color:var(--tape);color:var(--tape)">● Field Producer ✕</span><div class="mu" style="font-size:12px;margin-top:3px">07840 140940</div></div>`
+      : `<div class="hd-${p.head}"><div class="g hd" style="grid-template-columns:44px 110px 1fr"><div>Dept</div><div>Role</div><div>Name</div></div><div class="g" style="grid-template-columns:44px 110px 1fr"><div>${deptHTML('PROD',p)}</div><div>${roleHTML({role:'Field Producer'},p,false)}</div><div><span class="nm">Matt Wells</span> <span class="mu" style="font-size:12px;margin-left:8px">07840 140940</span></div></div></div>`;
+  }
+  return '';
+}
+
+/* ───────── page ───────── */
+function renderPreviews(){
+  const p = eff();
+  document.getElementById('pvCrew').innerHTML = crewSheet(p,S.view);
+  document.getElementById('pvTalent').innerHTML = talentSheet(p,S.view);
+  document.getElementById('pvHotel').innerHTML = hotelSheet(p,S.view);
+  document.getElementById('pvVenues').innerHTML = venuesSheet(p, S.view==='now' ? 'now' : p.venues);
+  document.querySelectorAll('#segState .bnr-tool').forEach(b=>b.classList.toggle('on', b.dataset.v===S.view));
+}
+function renderDecisions(){
+  [1,2,3,4].forEach(part=>{
+    document.getElementById('decs'+part).innerHTML = D.filter(d=>d.part===part).map(d=>{
+      const n = D.indexOf(d)+1, cur = S.pick[d.id], shown = cur||recOf(d);
+      return `<section class="dec${cur?' picked':''}" id="dec-${d.id}">
+        <div class="dec-h"><span class="dec-n">${String(n).padStart(2,'0')}</span><h3>${d.t}</h3><span class="done">Decided</span></div>
+        <p class="found">${d.found}</p>
+        <div class="opts" role="radiogroup" aria-label="${esc(d.t)}">${d.opts.map(o=>`
+          <button type="button" class="opt${shown===o.v?' sel':''}" role="radio" aria-checked="${shown===o.v}" onclick="pick('${d.id}','${o.v}')">
+            <div class="opt-t"><span class="cb${shown===o.v?' on':''} box"></span><span>${o.t}</span>${o.rec?'<span class="rec">Recommended</span>':''}${o.now?'<span class="isnow">Today</span>':''}</div>
+            <div class="opt-s"><div class="scroll">${sample(d,o)}</div></div>
+            <div class="opt-d">${o.d}</div>
+          </button>`).join('')}</div>
+        <div class="note"><textarea placeholder="Notes on this one (optional)" oninput="setNote('${d.id}',this.value)">${esc(S.note[d.id]||'')}</textarea></div>
+      </section>`;
+    }).join('');
+  });
+  const picked = D.filter(d=>S.pick[d.id]).length;
+  document.getElementById('nPicked').textContent = picked;
+  document.getElementById('nTotal').textContent = D.length;
+  document.getElementById('nDec').textContent = D.length;
+  document.getElementById('venN').textContent = String(D.findIndex(d=>d.id==='venues')+1).padStart(2,'0');
+}
+function renderAll(){ const y=scrollY; renderPreviews(); renderDecisions(); scrollTo(0,y); }
+function pick(id,v){ S.pick[id]=v; save(); renderAll(); if(document.getElementById('out').style.display==='block') exportDecisions(true); }
+function setNote(id,v){ S.note[id]=v; save(); }
+function setView(v){ S.view=v; save(); renderAll(); }
+function acceptAll(){ D.forEach(d=>{ if(!S.pick[d.id]) S.pick[d.id]=recOf(d); }); save(); renderAll(); }
+function resetAll(){ if(!confirm('Clear every pick and note on this page?')) return; S={pick:{},note:{},view:'col'}; save(); renderAll(); document.getElementById('out').style.display='none'; }
+function exportDecisions(quiet){
+  const lines = ['STYLE CHECK — decisions · '+new Date().toISOString().slice(0,10), '',
+    'AGREED (from the brief, no decision needed)',
+    ...[...document.querySelectorAll('.agreed li')].map(li=>'  - '+li.textContent.replace(/\s+/g,' ').trim()), '', 'DECISIONS'];
+  D.forEach((d,i)=>{
+    const v = S.pick[d.id], o = d.opts.find(x=>x.v===(v||recOf(d)));
+    lines.push(`${String(i+1).padStart(2,'0')}. ${d.t} [${d.id}] → ${o.t} (${o.v})${v ? (o.rec?'':' — NOT the recommendation') : ' — not picked; recommendation accepted'}`);
+    if((S.note[d.id]||'').trim()) lines.push('    note: '+S.note[d.id].trim().replace(/\n/g,'\n          '));
+  });
+  const out = document.getElementById('out'); out.value = lines.join('\n'); out.style.display='block';
+  if(!quiet){ out.scrollIntoView({block:'center'}); out.select(); }
+}
+function copyOut(){
+  const out=document.getElementById('out'); if(out.style.display!=='block') exportDecisions(true);
+  const done = ()=>{ const f=document.getElementById('flash'); f.textContent='Copied'; setTimeout(()=>f.textContent='',1800); };
+  (navigator.clipboard ? navigator.clipboard.writeText(out.value).then(done, ()=>{out.select(); document.execCommand('copy'); done();}) : (out.select(), document.execCommand('copy'), done()));
+}
+renderAll();
+</script>
+</body>
+</html>
