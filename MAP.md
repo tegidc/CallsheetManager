@@ -499,6 +499,16 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   `budgetPersonViewHTML`, `budgetDayViewHTML`, `budgetCostsViewHTML`, `additionalCostsSectionHTML`,
   `addAdditionalCost`, `setAdditionalCostField`, `toggleAdditionalCostConfirmed`, `renderBudgetSummaryBar`,
   `budgetDayBlocks*`, `budgetCostBlocks*`. Notes further down this section that mention them are history.
+- **Budget settings popup** (`toggleBudgetSettings()`, `budgetSettingsDialogHTML()`, the Settings button on every
+  sheet's strip) — how THIS project's budget is worked out, stored as `p.budgetSheet.settings`, only what
+  differs from `BUDGET_SETTING_DEFAULTS`: `vatCatering` / `vatHotel` (% — ⚠️ a TRUE cost, so added inside
+  `buildBudgetData()` to `vatTotal` and Production's `phaseRaw.vat`, not just on the sheet; travel has no
+  setting because a VAT-registered person's travel already carries VAT), `kitRows` split | folded,
+  `floatBase` ex | inc, `floatInMargin`, `feeBase` all | exFloat, `otCharged` charged | cost. The popup also
+  holds the default float %, the fee % and the With VAT / Ex-VAT view switch. `setBudgetSetting()` /
+  `resetBudgetSettings()` go through `xlsCommit`. ⚠️ Charged rates are ALWAYS stored as labour `e:` + kit `k:`
+  parts, so flipping Kit rows never changes what anyone is charged (verified: identical charged total both ways);
+  a folded row carries `foldedKit` / `kitCharged` and writes through `setBudgetChargedPerson()`.
 - Export: money cells are `{v}` — formatted text for Copy, real numbers with a £ format in the .xlsx.
 
 Cost visibility only (Phase Budget) — not a working budget. Rolls up cost data already
