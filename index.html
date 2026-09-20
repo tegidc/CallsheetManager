@@ -1092,13 +1092,44 @@
      Phase BU gave it a zone of its own rather than letting it ride at the end of the
      headline's flex row, which is what made it move when the headline changed shape. */
   .budget-scope-stack{display:flex; flex-direction:column; gap:1px; min-width:0;}
-  .budget-scope-row{display:grid; grid-template-columns:minmax(0,1fr) 84px;
-    align-items:baseline; gap:0 10px;
+  /* dot | name | ONLY | slack | figures. The name column is a FIXED width so the three ONLY
+     buttons stand in one vertical line straight after the titles. */
+  .budget-scope-row{display:grid; grid-template-columns:8px 100px 40px minmax(0,1fr) 84px;
+    align-items:center; gap:0 8px;
     padding:3px 0; cursor:pointer; border-bottom:1px solid var(--line);
     font-family:var(--body); font-size:var(--fs-meta);}
-  .budget-scope-row.itemized{grid-template-columns:minmax(0,1fr) 84px 68px 84px;}
+  .budget-scope-row.itemized{grid-template-columns:8px 100px 40px minmax(0,1fr) 84px 68px 84px;}
+  .budget-scope-lead{grid-column:1 / 5;}
+  .budget-scope-all{font-weight:600;}
+  .stage-dot{width:8px; height:8px; border-radius:50%; display:inline-block; flex:0 0 auto;}
+  .stage-dot.stage-dot-all{background:var(--text);}
+  .stage-dot.stage-pre{background:var(--phase-prep);} .stage-dot.stage-prod{background:var(--phase-shoot);} .stage-dot.stage-post{background:var(--phase-post);}
+  /* ONLY takes its OWN stage's colour, whatever the page is wearing */
+  .stage-only{--c:var(--text); font-family:var(--label); font-size:9.5px; font-weight:500; letter-spacing:1px; text-transform:uppercase; line-height:1.3;
+    width:40px; padding:1px 0; text-align:center; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--muted);}
+  .stage-only.stage-pre{--c:var(--phase-prep);} .stage-only.stage-prod{--c:var(--phase-shoot);} .stage-only.stage-post{--c:var(--phase-post);}
+  .stage-only:hover{border-color:var(--c); color:var(--c);}
+  .stage-only.on{background:var(--c); border-color:var(--c); color:#fff; font-weight:600;}
+  /* the stage colour — see applyStageColour() */
+  .stage-all{--tape:var(--text); --tint-1:rgba(17,10,8,.025); --tint-2:rgba(17,10,8,.04); --tint-3:rgba(17,10,8,.07);
+    --tint-4:rgba(17,10,8,.11); --tint-5:rgba(17,10,8,.30); --tint-6:rgba(17,10,8,.22);}
+  .stage-pre{--tape:var(--phase-prep); --tint-1:rgba(138,90,11,.035); --tint-2:rgba(138,90,11,.06); --tint-3:rgba(138,90,11,.11);
+    --tint-4:rgba(138,90,11,.15); --tint-5:rgba(138,90,11,.35); --tint-6:rgba(138,90,11,.28);}
+  .stage-prod{--tape:var(--phase-shoot); --tint-1:rgba(1,119,86,.03); --tint-2:rgba(1,119,86,.05); --tint-3:rgba(1,119,86,.10);
+    --tint-4:rgba(1,119,86,.14); --tint-5:rgba(1,119,86,.35); --tint-6:rgba(1,119,86,.28);}
+  .stage-post{--tape:var(--phase-post); --tint-1:rgba(74,60,140,.035); --tint-2:rgba(74,60,140,.06); --tint-3:rgba(74,60,140,.11);
+    --tint-4:rgba(74,60,140,.15); --tint-5:rgba(74,60,140,.35); --tint-6:rgba(74,60,140,.28);}
+  /* the little stage tags beside a name on Roles: text where the list has room (money off,
+     desktop — the name column widens to take them), dots everywhere else */
+  .stage-tags{display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;}
+  .stage-tag{width:7px; height:7px; border-radius:50%; font-size:0; line-height:0; display:inline-block;}
+  .stage-tag.stage-pre{background:var(--phase-prep);} .stage-tag.stage-prod{background:var(--phase-shoot);} .stage-tag.stage-post{background:var(--phase-post);}
+  @media(min-width:901px){
+    .roles-tags-text .stage-tag{width:auto; height:auto; border-radius:3px; padding:0 5px; font-family:var(--label); font-size:9px; font-weight:500;
+      letter-spacing:.8px; line-height:15px; text-transform:uppercase; color:#fff;}
+  }
   /* the counts row (money off) has one cell where the figures go, so it spans them */
-  .budget-scope-row .budget-scope-count{grid-column:2 / -1; text-align:right;}
+  .budget-scope-row .budget-scope-count{grid-column:4 / -1; text-align:right;}
   .budget-scope-ex, .budget-scope-vat{text-align:right; white-space:nowrap; color:var(--muted);
     font-variant-numeric:tabular-nums;}
   /* ex-VAT is the figure you work from, so it carries the brand colour the headline's own
@@ -4872,6 +4903,8 @@ function renderProjectCrew(body){
   body.classList.add('crew-rowselect');
   body.classList.toggle('crew-select-mode', crewSelectMode);
   body.classList.toggle('crew-rowselect-tight', crewGridView==='roles');
+  if(crewGridView==='roles') applyStageColour(body); else ['stage-all','stage-pre','stage-prod','stage-post'].forEach(c=>body.classList.remove(c));
+  body.classList.toggle('roles-tags-text', crewGridView==='roles' && rolesTagsAsText());
   if(!body._crewSelHooked){
     body._crewSelHooked = true;
     /* capture, and stopped here: in select mode a click on a line is ONLY a selection — it must
@@ -4983,7 +5016,8 @@ function renderProjectCrew(body){
           + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${
               g.items.map(e=>crewRolesRowHTML(e, spec, budgetData)).join('')}</div>`;
       }).join('');
-      const collapseVars = `--pb-name-w:${(rolesNameCollapsed ? 104 : 170) + 62}px;`
+      // + room for the stage tags beside the name: words where the list has the slack, dots where it hasn't
+      const collapseVars = `--pb-name-w:${(rolesNameCollapsed ? 104 : 170) + 62 + (rolesTagsAsText() ? 96 : 32)}px;`
                          + (rolesRoleCollapsed ? '--pb-role-w:72px;' : '');
       /* .roles-tablewrap adds the frozen panes — Roles only; see the CSS for why the other
          six sub-tabs deliberately don't get a scroll box of their own. */
@@ -5364,7 +5398,7 @@ function crewRolesRowHTML(e, spec, data){
   };
   const row = `<div class="roles-grid pb-head" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${deptLabelHTML(e)}<span class="roles-name-text roles-name-link" onclick="event.stopPropagation();editCrew('${e.id}')" title="Open ${esc(e.name)}'s record">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</span></div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${deptLabelHTML(e)}<span class="roles-name-text roles-name-link" onclick="event.stopPropagation();editCrew('${e.id}')" title="Open ${esc(e.name)}'s record">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</span>${stageTagsHTML(e.id, currentProject())}</div>
     <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e, {abbreviate:rolesRoleCollapsed})}</span></div>
     ${spec.cols.map(cellHTML).join('')}
   </div>`;
@@ -7768,6 +7802,39 @@ const BUDGET_SCOPES = [
 ];
 let budgetScope = { preproduction:true, production:true, post:true };
 function toggleBudgetScope(key, on){ budgetScope[key] = on; renderProjectBody(); }
+/* ---- ONLY (20 Sep 2026) — the stage selector can isolate as well as mute ----
+   A row click still leaves that stage out / brings it back. Its ONLY button shows that stage
+   alone (press it again for everything); the All stages row brings everything back in one.
+   `isolatedStage()` is the one definition of "a single stage is showing" — the ONLY button's
+   lit state, the page's stage colour (stageColourClass) and the name tags all read it. */
+const isolatedStage = () => { const on = BUDGET_SCOPES.filter(([k])=>budgetScope[k]); return on.length===1 ? on[0][0] : null; };
+const allStagesOn = () => BUDGET_SCOPES.every(([k])=>budgetScope[k]);
+function onlyBudgetScope(key){
+  const back = isolatedStage()===key;                       // pressing a lit ONLY = back to everything
+  BUDGET_SCOPES.forEach(([k])=>{ budgetScope[k] = back || k===key; });
+  renderProjectBody();
+}
+/* stage tags beside a name are WORDS only where the Roles list has room for them — money off
+   (few columns) on a desktop-width page; otherwise they are dots. One rule, read by the column
+   width and by the class that styles the tags. */
+const rolesTagsAsText = () => !crewShowMoney && window.matchMedia('(min-width:901px)').matches;
+/* only the stages currently SHOWING get a tag — isolate one and the others drop away */
+function stageTagsHTML(entryId, p){
+  const LABEL = { preproduction:['Pre','Pre-production'], production:['Prod','Production'], post:['Post','Post'] };
+  const tags = entryPhases(entryId, p).filter(k=>budgetScope[k]);
+  return tags.length ? `<span class="stage-tags">${tags.map(k=>`<span class="stage-tag ${STAGE_CLASS[k]}" title="${LABEL[k][1]}">${LABEL[k][0]}</span>`).join('')}</span>` : '';
+}
+function allBudgetScopes(){ BUDGET_SCOPES.forEach(([k])=>{ budgetScope[k] = true; }); renderProjectBody(); }
+/* ⚠️ THE STAGE COLOUR. Crew and Budget re-point the brand tokens (--tape + the six tints) at the
+   stage being shown: ink black for All stages or a mix, the stage's own colour when one is
+   isolated. Everything on those tabs that was brand-green — column headings, department pills,
+   role chips, lit toggles, focus rings — follows without knowing about stages. Set as a class on
+   #projectBody by the two render functions; the element is rebuilt per tab, so it can't leak. */
+const STAGE_CLASS = { preproduction:'stage-pre', production:'stage-prod', post:'stage-post' };
+function applyStageColour(body){
+  ['stage-all','stage-pre','stage-prod','stage-post'].forEach(c=>body.classList.remove(c));
+  body.classList.add(STAGE_CLASS[isolatedStage()] || 'stage-all');
+}
 /* One phrase for what's being costed, used by the summary-bar note and the export
    header so the two can't describe the same state differently. */
 function budgetScopeLabel(){
@@ -8186,12 +8253,33 @@ function budgetSummaryBarHTML(data, o){
     const n = r.peopleCount||0, d = r.daysTotal||0;
     return `${n} ${n===1?'person':'people'} · ${d} ${d===1?'day':'days'}`;
   };
+  const iso = isolatedStage();
+  const figuresHTML = f => budgetVatToggle ? `
+        <span class="budget-scope-ex">${fmt(f.ex)}</span>
+        <span class="budget-scope-vat">${f.vat ? fmt(f.vat) : '—'}</span>
+        <span class="budget-scope-amt">${fmt(f.inc)}</span>`
+        : `<span class="budget-scope-amt">${fmt(f.ex)}</span>`;
+  /* All stages — every stage's figures, whatever is muted: it is the way back, and says what is there */
+  const allRow = () => {
+    const sum = BUDGET_SCOPES.map(([k])=>phaseFigures(k)).reduce((a,f)=>({ex:a.ex+f.ex, vat:a.vat+f.vat, inc:a.inc+f.inc}), {ex:0,vat:0,inc:0});
+    const days = BUDGET_SCOPES.reduce((n,[k])=>n+(((data.phaseRaw||{})[k]||{}).daysTotal||0), 0);
+    return `<div class="budget-scope-row budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${allStagesOn()?'':' off'}"
+      role="button" tabindex="0" aria-pressed="${allStagesOn()?'true':'false'}" onclick="allBudgetScopes()"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allBudgetScopes();}" title="Show every stage">
+      <span class="stage-dot stage-dot-all"></span><span class="budget-scope-name">All stages</span><span></span>${o.showTotals?'<span></span>':''}
+      ${o.showTotals ? figuresHTML(sum) : `<span class="budget-scope-count">${days} ${days===1?'day':'days'}</span>`}
+    </div>`;
+  };
   const scopeRow = ([key, label]) => `<div class="budget-scope-row${budgetVatToggle&&o.showTotals?' itemized':''}${budgetScope[key]?'':' off'}"
       role="button" tabindex="0" aria-pressed="${budgetScope[key]?'true':'false'}"
       onclick="toggleBudgetScope('${key}', !budgetScope['${key}'])"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
-      title="${budgetScope[key]?'Costed — click to leave it out':'Not costed — click to include it'}">
+      title="${budgetScope[key]?'Showing — click to leave it out':'Left out — click to include it'}">
+      <span class="stage-dot ${STAGE_CLASS[key]}"></span>
       <span class="budget-scope-name">${esc(label)}</span>
+      <button type="button" class="stage-only ${STAGE_CLASS[key]}${iso===key?' on':''}" aria-pressed="${iso===key?'true':'false'}"
+        onclick="event.stopPropagation();onlyBudgetScope('${key}')" onkeydown="event.stopPropagation()"
+        title="${iso===key?'Back to all stages':'Show only '+esc(label)}">Only</button>${o.showTotals?'<span></span>':''}
       ${o.showTotals ? (()=>{ const f = phaseFigures(key); return budgetVatToggle ? `
         <span class="budget-scope-ex">${fmt(f.ex)}</span>
         <span class="budget-scope-vat">${f.vat ? fmt(f.vat) : '—'}</span>
@@ -8202,7 +8290,7 @@ function budgetSummaryBarHTML(data, o){
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
   const totalsHTML = o.showTotals
     ? stats.map(([lbl,v,note,sub])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div>${sub?`<div class="budget-stat-sub">${esc(sub)}</div>`:''}</div>`).join('')
-    : `<div class="bnr-totals-off">Rates and totals hidden. Turn on <strong>Budget</strong> to cost this list — the phase buttons still filter who is on it.</div>`;
+    : `<div class="bnr-totals-off">Rates and totals hidden. Turn on <strong>Budget</strong> to cost this list — the stage selector still filters who is on it.</div>`;
   const toolBtn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}"
       aria-pressed="${on?'true':'false'}" onclick="${call}" title="${esc(title)}">${label}</button>`;
   /* ⚠️ REMOVED in Phase CF: `modeHTML` and the `.bnr-modes` STAGE | DAYS picker. Roles has
@@ -8225,13 +8313,13 @@ function budgetSummaryBarHTML(data, o){
   return `<div class="phase-banner">
     <div class="bnr-totals">${o.showTotals||o.showStage ? totalsHTML : ''}</div>
     <div class="budget-scope-stack">${o.showStage ? `${o.showTotals ? `<div class="budget-scope-row${budgetVatToggle?' itemized':''} budget-scope-head" aria-hidden="true">
-        <span class="budget-scope-name"></span>${budgetVatToggle ? `<span class="budget-scope-ex">xVAT</span>
+        <span class="budget-scope-name budget-scope-lead"></span>${budgetVatToggle ? `<span class="budget-scope-ex">xVAT</span>
         <span class="budget-scope-vat">VAT</span>` : ''}<span class="budget-scope-amt">Total</span>
-      </div>` : ''}${BUDGET_SCOPES.map(scopeRow).join('')}` : ''}</div>
+      </div>` : ''}${allRow()}${BUDGET_SCOPES.map(scopeRow).join('')}` : ''}</div>
     <div class="bnr-tools">
       <div class="bnr-toolrow">${moneyToolsHTML}${moneyHTML}</div>
     </div>
-    ${o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every phase is off, so nothing is being costed and only crew in no phase at all are listed. Click Pre-production, Production or Post — or all three.</div>` : ''}
+    ${o.showStage && nothingOn ? `<div class="bnr-scope-note hint">Every stage is off, so nothing is being costed and only crew in no stage at all are listed. Click All stages — or Pre-production, Production or Post.</div>` : ''}
   </div>`;
 }
 
@@ -8710,6 +8798,7 @@ function budgetOutputPanelHTML(){
 }
 
 function renderProjectBudget(body){
+  applyStageColour(body);
   const data = buildBudgetData();
   const viewLabels = BUDGET_VIEW_LABELS;
   const viewSwitcher = `<div class="tabs">
