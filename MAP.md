@@ -540,6 +540,14 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   in the page's own type (`budgetViewMenuOpen`, `toggleBudgetViewMenu()`, `pickBudgetView()`), not a native
   select. The Settings popup is 90% opaque (70% was unreadable over the sheet) with NO dimming and docked top-right (`.bset-overlay`,
   `.bset-box`), so the totals and the sheet can be watched changing while a setting is flipped.
+- **The total block is ONE format on every tab** (Crew, Talent etc, Venues, Budget): the big figure, then plain
+  body-text sub-lines beneath it (`.budget-stat.bhead-final` + `.bhead-sub`) — "Crew total inc. £x VAT", "xVAT £y".
+  The caps label + note + `.budget-stat-sub` arrangement is gone from the page heads. `.bnr-head .bnr-totals` reserves
+  70px so turning Budget on still fills a gap rather than growing the head.
+- ⚠️ REMOVED: the **Split kit & labour** and **Costs PP** head toggles, `budgetSplitKit`, `budgetCostsPP`, their
+  togglers, the `sheetTools` option, Roles' **Est. Costs** column (`case 'est'`, `.budget-est-costs`). Roles' Kit /
+  Labour columns now follow the PROJECT's Budget setting (`settings.kitRows==='split'`) and still only appear when
+  someone has a split rate. `pp.estCosts` is still computed in `buildBudgetData()` but nothing reads it.
 - **EDIT** (`budgetEdit`, `toggleBudgetEdit()`) — off, the cost side is read-only (Charged and Float are the
   budget's own and always typeable). On, shaded `.xls-ed` cells write THROUGH THE OWNING TAB'S SETTER, so every
   other page agrees: person Pre / Post → `setPhaseDays()`, Shoot → a button opening `budgetShootDialogHTML()`

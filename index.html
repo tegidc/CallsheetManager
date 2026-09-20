@@ -1100,7 +1100,9 @@
   .bset-chips{display:flex; flex-wrap:wrap; gap:4px 14px;} .bset-chips label{display:inline-flex; align-items:center; gap:5px; margin:0; font-size:var(--fs-field);}
   .bset-box .tabs{border-bottom:none; gap:4px;} .bset-box .tab{padding:5px 10px;}
   /* the Budget page head's own pieces, inside the shared .bnr-head */
-  .bnr-head .budget-stat.bhead-final{display:block;}
+  .bnr-head .budget-stat.bhead-final, .loc-banner .budget-stat.bhead-final{display:block;}
+  .loc-banner .budget-stat.bhead-final .num{font-size:26px; line-height:1.15;}
+  .bnr-head .bnr-totals{min-height:70px; align-items:flex-start;}
   .bnr-head .budget-stat.bhead-final .num{font-size:26px; line-height:1.15;}
   .bhead-sub{font-family:var(--body); font-size:var(--fs-meta); font-weight:400; color:var(--text); margin-top:2px; font-variant-numeric:tabular-nums;}
   .bhead-sub .mu{color:var(--muted);}
@@ -1312,9 +1314,6 @@
   .budget-scope-count{font-family:var(--body); font-size:var(--fs-meta); font-weight:400;
     letter-spacing:0; color:var(--muted); white-space:nowrap;}
   .budget-scope-row.off{opacity:.38;}
-  /* Est. Costs is a look, not a sum — italic, and never bold, so it can't be mistaken
-     for one of the figures that adds into the total beside it */
-  .budget-est-costs{font-style:italic; color:var(--muted);}
   .budget-same-person td{border-top:none;}
   tr:has(+ .budget-same-person) td{border-bottom:none;}
   /* ---- catering summary ----
@@ -5571,10 +5570,10 @@ const repeatStarHTML = crewId => repeatedInView.has(crewId)
 function rolesColumns(data){
   const money = crewShowMoney;
   const people = (data && data.people) || [];
-  /* Kit and Labour appear only when the toggle is on AND somebody here actually has a
-     split rate — the same rule Per Person uses, so two empty columns don't turn up on a
-     job where nobody brings kit. */
-  const showSplit = money && budgetSplitKit && people.some(pp=>pp.kit!=null);
+  /* Kit and Labour appear only when the project's Budget setting shows kit on its own
+     (Settings ▸ Kit rows) AND somebody here actually has a split rate — so two empty
+     columns don't turn up on a job where nobody brings kit. */
+  const showSplit = money && budgetSheetOf(currentProject()).settings.kitRows==='split' && people.some(pp=>pp.kit!=null);
   const cols = [];
   const push = (head, width, o) => cols.push(Object.assign({head, width}, o||{}));
   if(money) push('Total', '92px', {key:'total', title:'Fee for this role across every phase being costed — inc-VAT, the same figure the Budget shows'});
@@ -5616,7 +5615,6 @@ function rolesColumns(data){
       push('Kit', '78px', {key:'kit', title:'Equipment portion of the day rate, across every day being costed'});
       push('Labour', '78px', {key:'labour', title:'What is left of the day rate once kit comes out'});
     }
-    if(budgetCostsPP) push('Est. Costs', '84px', {key:'est', title:'What this person costs besides their fee — hotel, travel and meals. NOT part of the Total'});
     push('VAT reg.', '62px', {key:'vatreg', title:'Charges VAT'});
     if(budgetVatToggle) push('VAT', '84px', {key:'vat'});
   }
@@ -5793,8 +5791,6 @@ function crewRolesRowHTML(e, spec, data){
         return `<div class="roles-grid-cell roles-total" data-label="Kit">${pp&&pp.kitSubtotal!=null?budgetFmt(pp.kitSubtotal):dash}</div>`;
       case 'labour':
         return `<div class="roles-grid-cell roles-total" data-label="Labour">${pp&&pp.labourSubtotal!=null?budgetFmt(pp.labourSubtotal):dash}</div>`;
-      case 'est':
-        return `<div class="roles-grid-cell roles-total budget-est-costs" data-label="Est. Costs">${pp&&pp.estCosts?budgetFmt(pp.estCosts):dash}</div>`;
       /* the same checkbox Per Person has, writing the same c.vatRegistered — and with the
          same caveat: it reaches the crew database only when that row's rate Save icon is
          clicked. The footnote on Per Person says so; here the title does. */
@@ -7880,9 +7876,9 @@ function locBannerHTML(assigned, days){
   }, 0);
   return `<div class="phase-banner loc-banner">
     <div class="bnr-totals">${locShowMoney
-      ? `<div class="budget-stat"><div class="num">${budgetFmt(total + vat)}</div>
-           <div class="lbl">Locations${vat?`<span class="budget-stat-note">inc. ${budgetFmt(vat)} VAT</span>`:''}</div>
-           ${vat?`<div class="budget-stat-sub">xVAT ${budgetFmt(total)}</div>`:''}</div>`
+      ? `<div class="budget-stat bhead-final"><div class="num">${budgetFmt(total + vat)}</div>
+           <div class="bhead-sub">Locations total${vat?` inc. ${budgetFmt(vat)} VAT`:''}</div>
+           ${vat?`<div class="bhead-sub">xVAT ${budgetFmt(total)}</div>`:''}</div>`
       : `<div class="bnr-totals-off">Location costs hidden. Turn on <strong>Budget</strong> to see what each venue costs — the day ticks work either way.</div>`}</div>
     <div class="bnr-toolrow" style="grid-area:tools;">
       <button type="button" class="bnr-tool${locShowMoney?' on':''}" aria-pressed="${locShowMoney?'true':'false'}"
@@ -8366,10 +8362,6 @@ let budgetOutputOpen = false;
 function toggleBudgetOutputPanel(){ budgetOutputOpen = !budgetOutputOpen; renderProjectBody(); }
 let budgetVatToggle = true;
 function toggleBudgetVat(checked){ budgetVatToggle = checked; renderProjectBody(); }
-let budgetSplitKit = true;
-function toggleBudgetSplitKit(checked){ budgetSplitKit = checked; renderProjectBody(); }
-let budgetCostsPP = false;
-function toggleBudgetCostsPP(checked){ budgetCostsPP = checked; renderProjectBody(); }
 const BUDGET_SCOPES = [
   ['preproduction', 'Pre-production'],
   ['production',    'Production'],
@@ -8879,7 +8871,7 @@ function stageFiguresFor(data, kind){
            totalVat: sumOf(mine,'vat') };
 }
 function budgetSummaryBarHTML(data, o){
-  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false, listToolsHTML:null, peopleKind:null, sheetTools:false,
+  o = Object.assign({showTotals:true, showStage:true, showMoneyToggle:false, crewOnly:false, listToolsHTML:null, peopleKind:null,
     topToolsHTML:null, totalsOverrideHTML:null, stageFigs:null}, o||{});   // the last three: the Budget page head — see budgetPageHeadHTML()
   /* `peopleKind` ('crew' | 'talent') — the page head's scope; see stageFiguresFor() */
   const kindFigs = o.peopleKind ? stageFiguresFor(data, o.peopleKind) : null;
@@ -8888,7 +8880,7 @@ function budgetSummaryBarHTML(data, o){
   const totalVat = kindFigs ? kindFigs.totalVat : o.crewOnly ? data.people.reduce((s,pp)=>s+pp.vat, 0) : data.vatTotal;
   const totalInc = totalEx + totalVat;
   const fmt = budgetFmt;
-  const stats = [[o.peopleKind==='talent' ? 'Talent total' : o.crewOnly ? 'Crew total' : 'Total',
+  const stats = [[o.peopleKind==='talent' ? 'Talent total' : o.crewOnly ? 'Crew total' : 'Total',   // body text under the figure now, not a caps label
     budgetVatToggle ? totalInc : totalEx,
     budgetVatToggle ? (totalVat>0 ? `inc. ${fmt(totalVat)} VAT` : '') : 'ex-VAT',
     budgetVatToggle ? `xVAT ${fmt(totalEx)}` : '']];
@@ -8940,8 +8932,10 @@ function budgetSummaryBarHTML(data, o){
         : `<span class="budget-scope-count">${esc(scopeMeta(key))}</span>`}
     </div>`;
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);
+  /* the Budget head's format on every tab: ONE big figure, then plain sub-lines beneath it */
   const totalsHTML = o.showTotals
-    ? stats.map(([lbl,v,note,sub])=>`<div class="budget-stat"><div class="num">${fmt(v)}</div><div class="lbl">${esc(lbl)}${note?`<span class="budget-stat-note">${esc(note)}</span>`:''}</div>${sub?`<div class="budget-stat-sub">${esc(sub)}</div>`:''}</div>`).join('')
+    ? stats.map(([lbl,v,note,sub])=>`<div class="budget-stat bhead-final"><div class="num">${fmt(v)}</div>
+        <div class="bhead-sub">${esc(lbl)}${note?' '+esc(note):''}</div>${sub?`<div class="bhead-sub">${esc(sub)}</div>`:''}</div>`).join('')
     : '';
   const toolBtn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}"
       aria-pressed="${on?'true':'false'}" onclick="${call}" title="${esc(title)}">${label}</button>`;
@@ -8957,11 +8951,9 @@ function budgetSummaryBarHTML(data, o){
   const moneyToolsHTML = showMoneyTools ? [
       toolBtn(budgetVatToggle, budgetVatToggle ? 'VAT' : 'xVAT', `toggleBudgetVat(${!budgetVatToggle})`,
         budgetVatToggle ? 'Hide the VAT breakdown' : 'Break out xVAT and VAT on the totals, the phases and every row'),
-      /* the Budget sheets always show kit as its own figure, and have no per-person costs column */
-      o.sheetTools ? '' : toolBtn(budgetSplitKit, 'Split kit &amp; labour', `toggleBudgetSplitKit(${!budgetSplitKit})`,
-        'Break each rate into its equipment and labour halves'),
-      o.sheetTools ? '' : toolBtn(budgetCostsPP, 'Costs PP', `toggleBudgetCostsPP(${!budgetCostsPP})`,
-        "Show what each person costs besides their fee — their hotel, travel and meals")
+      /* ⚠️ REMOVED 20 Sep 2026: Split kit & labour and Costs PP. Kit is a Budget setting now (Settings ▸
+         Kit rows — Roles' Kit / Labour columns follow it), and what a person costs besides their fee is
+         the Budget's catering, travel and hotel rows. */
     ].join('') : '';
   const headRowHTML = foldHTML => (o.showTotals || foldHTML) ? `<div class="budget-scope-row${budgetVatToggle&&o.showTotals?' itemized':''} budget-scope-head">
         <span class="budget-scope-name budget-scope-lead">${foldHTML||''}</span>${o.showTotals ? `${budgetVatToggle ? `<span class="budget-scope-ex">xVAT</span>
