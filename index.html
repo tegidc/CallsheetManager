@@ -9043,7 +9043,7 @@ function budgetExportRows(data, view){
     ['Showing', mode==='cost' ? 'Cost — true costs, no float or production fee' : 'Charged — charged rates, float and production fee'],
     ['VAT', budgetVatToggle ? 'included in every total' : 'left out — every figure is ex-VAT'], [],
     ['Cost', money(T.cost)], ['Charged', money(T.charged)], [`Production fee ${B.sheet.feePct}%`, money(T.fee)],
-    ['Final total', money(T.final)], ['Margin', money(T.margin)], []);
+    ['Final total', money(T.final)], ...(T.vatBack ? [['VAT reclaimed', money(T.vatBack)]] : []), ['Margin', money(T.margin)], []);
   if(view==='lines'){
     rows.push(['Code','Item','Name','Total','Pre','Shoot','Post','Qty','OT','Rate','Charged', ...(budgetVatToggle?['VAT %','VAT']:[]), 'Float %','Float']);
     B.sections.forEach(sec=>{
@@ -9160,8 +9160,11 @@ function budgetSheetOf(p){
      floatBase    'ex' | 'inc' — float is a % of the line before or after VAT
      floatInMargin  true = unspent float is kept (margin) · false = held for the client
      feeBase      'all' | 'exFloat' — production fee on the whole charged total, or not on float
-     otCharged    'charged' | 'cost' — overtime follows the charged rate, or stays at the cost rate */
-const BUDGET_SETTING_DEFAULTS = { vatCatering:0, vatHotel:0, kitRows:'split', floatBase:'ex', floatInMargin:true, feeBase:'all', otCharged:'charged' };
+     otCharged    'charged' | 'cost' — overtime follows the charged rate, or stays at the cost rate
+     vatBack      true = OVERSEAS CLIENT (e.g. USA): the budget is charged with VAT in it as a final figure,
+                  and the VAT paid to suppliers is reclaimed afterwards — so it comes back as margin.
+                  What comes back is the COST-side VAT (what was actually paid), not the charged VAT. */
+const BUDGET_SETTING_DEFAULTS = { vatBack:false, vatCatering:0, vatHotel:0, kitRows:'split', floatBase:'ex', floatInMargin:true, feeBase:'all', otCharged:'charged' };
 function budgetSheetRec(p){
   const s = p.budgetSheet = p.budgetSheet || {};
   s.charged = s.charged || {}; s.floatLines = s.floatLines || {}; s.lines = s.lines || [];
@@ -9339,6 +9342,7 @@ function buildBudgetLines(data){
     return { ex, vat, fl, tot: ex+vat+fl }; };
   const sumTot = mode => all().reduce((n,l)=>n+fig(l,mode).tot, 0);
   const floatTotal = all().reduce((n,l)=>n+l.float, 0);
+  const vatBack = (set.vatBack && budgetVatToggle) ? all().reduce((n,l)=>n+l.costVat, 0) : 0;
   const cost = sumTot('cost'), charged = sumTot('charged'), fee = (charged - (set.feeBase==='exFloat' ? floatTotal : 0))*sheet.feePct/100;
   /* a row's figure in each Per Day column: { pre, post, proj, days:{id}, } summing to fig(l,mode)[k] */
   const split = (l, mode, k) => {
@@ -9349,9 +9353,9 @@ function buildBudgetLines(data){
              days:Object.fromEntries(Object.entries(d.days||{}).map(([id,w])=>[id, v*w/W])) };
   };
   return { sections, lines: all(), fig, split, sheet, rateCard, days,
-           totals: { cost, charged, fee, float: floatTotal, final: charged+fee,
-                     margin: charged+fee-cost - (set.floatInMargin ? 0 : floatTotal),
-                     marginLabel: set.floatInMargin ? 'Margin — markup, float and fee' : 'Margin — markup and fee (float held for the client)' } };
+           totals: { cost, charged, fee, float: floatTotal, final: charged+fee, vatBack,
+                     margin: charged+fee-cost + vatBack - (set.floatInMargin ? 0 : floatTotal),
+                     marginLabel: `Margin — markup${set.floatInMargin?', float':''} and fee${vatBack?', plus the VAT reclaimed':''}${set.floatInMargin?'':' (float held for the client)'}` } };
 }
 /* ---- THE OTHER FIVE VIEWS, as sheets (20 Sep 2026) ----
    All five are re-cuts of buildBudgetLines() — the same rows as Line Items, grouped another way —
@@ -9384,7 +9388,8 @@ function budgetSheetTopHTML(B, o){
         ${stat(fmt(T.cost), 'Cost', budgetVatToggle?'':'ex-VAT')}
         ${stat(fmt(T.charged), 'Charged', 'inc. float')}
         ${stat(fmt(T.fee), `Production fee ${B.sheet.feePct}%`)}
-        ${stat(fmt(T.final), 'Final total')}
+        ${stat(fmt(T.final), 'Final total', B.sheet.settings.vatBack && budgetVatToggle ? 'VAT in, final' : '')}
+        ${T.vatBack ? stat(fmt(T.vatBack), 'VAT reclaimed') : ''}
         ${stat((T.margin<0?'−':'+')+fmt(Math.abs(T.margin)), 'Margin', pct + (B.sheet.settings.floatInMargin ? '' : ' · ex float'), T.margin<0?'xls-neg':'xls-pos')}
       </div>
       <div class="bnr-toolrow">
@@ -9410,6 +9415,7 @@ function budgetSheetModel(view, data, B){
     return [ { cls:'xls-tot xls-rule', cells:[{h:`Total${vatOn?' (inc. VAT':' (ex-VAT'}${' and float)'}`, span:lead+1}, M(T.cost), M(T.charged), ''] },
              { cells:[{h:`Production fee ${B.sheet.feePct}%`, span:lead+1}, {h:dash, c:'n'}, M(T.fee), ''] },
              { cls:'xls-tot xls-rule', cells:[{h:'Final total', span:lead+1}, M(T.cost), M(T.final), ''] },
+             ...(T.vatBack ? [{ cells:[{h:'VAT reclaimed — paid to suppliers, comes back to you', span:lead+1}, '', M(T.vatBack), ''] }] : []),
              { cls:'xls-tot', cells:[{h:esc(T.marginLabel), span:lead+1}, '', M(m, m<0?'xls-neg':'xls-pos'),
                {h: T.final ? (m/T.final*100).toFixed(1)+'%' : '', c:'n mu'}] } ];
   };
@@ -9578,6 +9584,7 @@ function setBudgetSetting(key, value){
       if(v==null || v>100){ budgetXlsError = 'Enter a VAT percentage between 0 and 100.'; return false; }
       value = v;
     }
+    if(key==='vatBack' && value) budgetVatToggle = true;        // an overseas budget is a With-VAT budget by definition
     if(value===BUDGET_SETTING_DEFAULTS[key]) delete s.settings[key]; else s.settings[key] = value;   // store only what differs
   });
 }
@@ -9596,7 +9603,10 @@ function budgetSettingsDialogHTML(){
       <h3>Budget settings</h3>
       <div class="hint" style="margin:-6px 0 12px;">How <strong>this project's</strong> budget is worked out. Changes apply straight away, on every Budget view and in the export.</div>
       ${err ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(err)}</div>` : ''}
-      <div class="subhead">VAT</div>
+      <div class="subhead">Client</div>
+      ${row('Client is', pick('vatBack', [[false,'UK — normal VAT'], [true,'Overseas (e.g. USA) — VAT reclaimed']]),
+        `Overseas: everything is charged with VAT in it, as a final figure, and you reclaim the VAT you paid suppliers afterwards. That VAT shows as <strong>VAT reclaimed</strong> and counts towards Margin.${set.vatBack && !budgetVatToggle ? ' <strong>Switch Show VAT to With VAT for this to apply.</strong>' : ''}`)}
+      <div class="subhead" style="margin-top:16px;">VAT</div>
       ${row('Show VAT', `<div class="tabs" style="margin-bottom:0;"><div class="tab ${budgetVatToggle?'active':''}" onclick="toggleBudgetVat(true)">With VAT</div><div class="tab ${budgetVatToggle?'':'active'}" onclick="toggleBudgetVat(false)">Ex-VAT only</div></div>`,
         'With VAT, every total includes it and the sheets show VAT columns. Ex-VAT only leaves it out of everything. The same switch as VAT in the header — a view, not saved with the project.')}
       ${row('Catering VAT', pct('vatCatering', set.vatCatering, `setBudgetSetting('vatCatering', this.value)`), 'What the caterer adds — usually 20%. A true cost: it joins the VAT in the header total too.')}
