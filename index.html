@@ -1097,13 +1097,18 @@
   .bset-chips{display:flex; flex-wrap:wrap; gap:4px 14px;} .bset-chips label{display:inline-flex; align-items:center; gap:5px; margin:0; font-size:var(--fs-field);}
   .bset-box .tabs{border-bottom:none; gap:4px;} .bset-box .tab{padding:5px 10px;}
   /* the Budget page head's own pieces, inside the shared .bnr-head */
-  .bhead-totals{display:flex; flex-direction:column; gap:4px; min-width:0;}
-  .bhead-minis{display:flex; flex-wrap:wrap; gap:2px 16px;}
-  .bhead-mini{display:inline-flex; align-items:baseline; gap:6px; white-space:nowrap;}
-  .bhead-mini .lbl{font-family:var(--label); font-size:10px; letter-spacing:1.1px; text-transform:uppercase; color:var(--tape);}
-  .bhead-mini .val{font-family:var(--label); font-weight:600; font-size:14px; letter-spacing:.3px; font-variant-numeric:tabular-nums;}
-  .bhead-note{font-family:var(--body); font-weight:400; font-size:var(--fs-meta); color:var(--muted);}
-  .bhead-tools{display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
+  .bnr-head .budget-stat.bhead-final{display:block;}
+  .bnr-head .budget-stat.bhead-final .num{font-size:26px; line-height:1.15;}
+  .bhead-sub{font-family:var(--body); font-size:var(--fs-meta); color:var(--text); margin-top:2px; font-variant-numeric:tabular-nums;}
+  .bhead-sub .lbl{display:inline; margin-right:4px;}
+  .bhead-strip{display:flex; flex-wrap:wrap; gap:10px 34px; margin:2px 0 14px; padding-bottom:14px; border-bottom:1px solid var(--line);}
+  .bhead-strip .budget-stat .num{font-size:21px; line-height:1.2;}
+  .bhead-row{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
+  .bhead-row .bnr-grow{flex:1 1 auto;}
+  .bhead-view{display:inline-flex; align-items:center; gap:6px; padding-right:4px; color:var(--text);}
+  .bhead-view select{width:auto; border:none; padding:0 2px; font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px;
+    text-transform:uppercase; font-weight:600; color:var(--text); background:transparent; cursor:pointer;}
+  .bhead-view select:focus{box-shadow:none;}
   /* Edit on: the cells that write back to another tab are shaded, so it is plain what just unlocked */
   .section table.xls td.xls-ed{background:var(--tint-3);}
   .section table.xls td.xls-btn{padding:0;}
@@ -9146,8 +9151,10 @@ function budgetOutputPanelHTML(){
    charged separately, keys `e:<entryId>` and `k:<entryId>`.
    ============================================================================ */
 const escA = s => esc(s).replace(/"/g,'&quot;');
-let budgetMode = 'charged';   // 'cost' | 'charged' — which budget the figures show
-function setBudgetMode(m){ budgetMode = m; renderProjectBody(); }
+/* ⚠️ The views show the CHARGED budget only (third pass, 20 Sep 2026) — the Cost | Charged switch is
+   gone. `budgetMode` stays as the one word the sheet code reads, and fig(l,'cost') still exists
+   because Cost is a column and a total; nothing sets this to 'cost' any more. */
+const budgetMode = 'charged';
 function budgetSheetOf(p){
   const s = (p && p.budgetSheet) || {};
   return { charged: s.charged||{}, floatLines: s.floatLines||{}, lines: s.lines||[],
@@ -9385,15 +9392,16 @@ function xlsSheetHTML(cols, rows){
     <tr><th class="xls-hd"></th>${cols.map((c,i)=>`<th class="xls-hd">${String.fromCharCode(65+i)}</th>`).join('')}</tr>
     ${tr({cls:'xls-cols', cells: cols.map(c=>({h:c[1], c:c[2]||''}))})}${rows.map(tr).join('')}</table></div>`;
 }
-/* THE BUDGET PAGE HEAD (20 Sep 2026, second pass) — the same pageHeadHTML() Crew wears:
-     top     Cost | Charged · Lines (where a view has them) · Export
-     middle  ONE total that follows the switch — Final total when Charged, Total cost when Cost —
-             then the smaller figures chosen in Settings ▸ View (BUDGET_VIEW_STATS)
-     bottom  Settings, then Edit | Filter | VAT joined like + Add | Filter | Select on Crew
-     right   the stage selector, showing the same budget (cost or charged) as the total.
-   Filter, Export, Settings and the shoot-day ticks are all popups; nothing pushes the sheet down. */
-const BUDGET_VIEW_STATS = [['fee','Fee total',true], ['feePct','Fee %',false], ['charged','Charged',true], ['cost','Cost',true],
-  ['margin','Margin',true], ['floatTotal','Float total',false], ['floatPct','Float %',false]];
+/* THE BUDGET PAGE HEAD (20 Sep 2026, third pass) — the working budget is the CHARGED one, so there
+   is no Cost | Charged switch any more: every view shows charged, and Cost is a figure and a column.
+     left    FINAL TOTAL, big; under it in the small style — Prod fee · Total inc. VAT · xVAT
+     right   the stage selector (charged figures; the fee is on the whole budget, so not in a stage)
+     foot    the totaliser — Cost | Charged | Float | Margin (what shows is Settings ▸ View)
+     ─────   the divider, then ONE tool row on the sheet:
+             View ▾ (replaces the tab strip) | VAT | Settings | Days   ·····   Lines · Edit · Export
+   Days, Export, Settings and the shoot-day ticks are popups; nothing pushes the sheet down. */
+const BUDGET_VIEW_STATS = [['cost','Cost',true], ['charged','Charged',true], ['floatTotal','Float',true], ['margin','Margin',true],
+  ['floatPct','Float %',false], ['feePct','Fee %',false]];
 const budgetViewShows = (set, key) => { const v = (set.view||{})[key]; return v!=null ? !!v : (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2]; };
 let budgetEdit = false;
 function toggleBudgetEdit(){ budgetEdit = !budgetEdit; renderProjectBody(); }
@@ -9413,28 +9421,37 @@ function budgetStageFigs(mode){
   return out;
 }
 function budgetPageHeadHTML(data, B){
-  const fmt = budgetFmt, T = B.totals, set = B.sheet.settings, isCost = budgetMode==='cost';
-  const btn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}" aria-pressed="${on?'true':'false'}" onclick="${call}" title="${escA(title)}">${label}</button>`;
-  const filters = budgetActiveFilterCount();
-  const top = toolGroupHTML([btn(isCost, 'Cost', `setBudgetMode('cost')`, 'True costs — no float, no production fee'),
-                             btn(!isCost, 'Charged', `setBudgetMode('charged')`, 'What the client is charged — charged rates, float and production fee')])
-    + (['department','day','bbc'].includes(budgetView) ? btn(budgetShowLines, 'Lines', 'toggleBudgetShowLines()', 'List the rows behind each heading') : '')
-    + btn(false, 'Export', 'toggleBudgetOutputPanel()', 'Copy as text, or download an Excel file');
+  const fmt = budgetFmt, T = B.totals, set = B.sheet.settings;
+  const chVat = budgetVatToggle ? B.lines.reduce((n,l)=>n+l.chVat, 0) : 0;
   const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
-  const mini = { fee:['Fee '+B.sheet.feePct+'%', fmt(T.fee)], feePct:['Fee %', B.sheet.feePct+'%'], charged:['Charged', fmt(T.charged)], cost:['Cost', fmt(T.cost)],
-    margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span> <span class="bhead-note">${pct}</span>`],
-    floatTotal:['Float total', fmt(T.float)], floatPct:['Float %', B.sheet.floatPct+'%'] };
-  const minis = isCost ? [] : BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>mini[k])
-    .concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack)]] : []);
-  const vatNote = !budgetVatToggle ? 'ex-VAT' : set.vatBack ? 'VAT in, final' : data.vatTotal>0 ? 'inc. VAT' : '';
-  const totals = `<div class="bhead-totals"><div class="budget-stat"><div class="num">${fmt(isCost ? T.cost : T.final)}</div>
-      <div class="lbl">${isCost ? 'Total cost' : 'Final total'}${vatNote?`<span class="budget-stat-note">${vatNote}</span>`:''}</div></div>
-    ${minis.length ? `<div class="bhead-minis">${minis.map(([l,v])=>`<span class="bhead-mini"><span class="lbl">${l}</span><span class="val">${v}</span></span>`).join('')}</div>` : ''}</div>`;
-  const tools = `<div class="bhead-tools">${btn(false, 'Settings', 'toggleBudgetSettings()', "How this project's budget is worked out, and what this head shows")}
-    ${toolGroupHTML([btn(budgetEdit, 'Edit', 'toggleBudgetEdit()', budgetEdit ? 'Lock the costs again' : 'Change costs, days and rates here — they write back to Crew, the cost tabs and Venues — and add lines of your own'),
-                     btn(false, 'Filter'+(filters?` (${filters})`:''), 'toggleBudgetFilterPanel()', 'Shoot days, departments, sort order'),
-                     btn(budgetVatToggle, budgetVatToggle?'VAT':'xVAT', `toggleBudgetVat(${!budgetVatToggle})`, budgetVatToggle ? 'Showing with VAT — click for ex-VAT only' : 'Showing ex-VAT only — click to include VAT')])}</div>`;
-  return budgetSummaryBarHTML(data, { listToolsHTML: tools, topToolsHTML: top, totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode), showTotals:true });
+  const totals = `<div class="budget-stat bhead-final"><div class="num">${fmt(T.final)}</div>
+      <div class="lbl">Final total</div>
+      <div class="bhead-sub"><span class="lbl">Prod fee</span> ${fmt(T.fee)} <span class="budget-stat-note">${B.sheet.feePct}%</span></div>
+      <div class="bhead-sub"><span class="lbl">Total</span> <span class="budget-stat-note">${!budgetVatToggle ? 'ex-VAT' : chVat>0 ? `inc. ${fmt(chVat)} VAT${set.vatBack?' — final':''}` : 'no VAT in it'}</span></div>
+      ${budgetVatToggle ? `<div class="bhead-sub"><span class="lbl">xVAT</span> ${fmt(T.final - chVat)}</div>` : ''}</div>`;
+  const stat = { cost:['Cost', fmt(T.cost), ''], charged:['Charged', fmt(T.charged), 'inc. float'], floatTotal:['Float', fmt(T.float), B.sheet.floatPct+'%'],
+    margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span>`, pct],
+    floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee %', B.sheet.feePct+'%', ''] };
+  const strip = BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>stat[k]).concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack), '']] : []);
+  return budgetSummaryBarHTML(data, { listToolsHTML:'', topToolsHTML:'', totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode), showTotals:true })
+    + `<div class="bhead-strip">${strip.map(([l,v,note])=>`<div class="budget-stat"><div class="num">${v}</div><div class="lbl">${l}${note?`<span class="budget-stat-note">${note}</span>`:''}</div></div>`).join('')}</div>`;
+}
+/* the one tool row, under the divider and on the sheet */
+function budgetToolRowHTML(){
+  const btn = (on, label, call, title) => `<button type="button" class="bnr-tool${on?' on':''}" aria-pressed="${on?'true':'false'}" onclick="${call}" title="${escA(title)}">${label}</button>`;
+  const filters = budgetActiveFilterCount(), dayN = budgetDayFilterCount();
+  return `<div class="bhead-row">
+    <label class="bnr-tool bhead-view" title="Which way to cut the budget">View
+      <select onchange="setBudgetView(this.value)" aria-label="Budget view">${Object.keys(BUDGET_VIEW_LABELS).map(v=>`<option value="${v}"${budgetView===v?' selected':''}>${BUDGET_VIEW_LABELS[v]}</option>`).join('')}</select></label>
+    ${btn(budgetVatToggle, budgetVatToggle?'VAT':'xVAT', `toggleBudgetVat(${!budgetVatToggle})`, budgetVatToggle ? 'Showing with VAT — click for ex-VAT only' : 'Showing ex-VAT only — click to include VAT')}
+    ${btn(false, 'Settings', 'toggleBudgetSettings()', "How this project's budget is worked out, and what the totals show")}
+    ${btn(dayN>0, 'Days'+(dayN ? ` (${dayN} of ${projectDays().length})` : '')+(filters>dayN ? ' · filtered' : ''), 'toggleBudgetFilterPanel()',
+        filters>dayN ? 'A department or company filter is on too — it is shared with the Crew tab. Click to see it.' : 'Which shoot days are costed — and departments, and the Per Person sort')}
+    <span class="bnr-grow"></span>
+    ${['department','day','bbc'].includes(budgetView) ? btn(budgetShowLines, 'Lines', 'toggleBudgetShowLines()', 'List the rows behind each heading') : ''}
+    ${btn(budgetEdit, 'Edit', 'toggleBudgetEdit()', budgetEdit ? 'Lock the costs again' : 'Change costs, days and rates here — they write back to Crew, the cost tabs and Venues — and add lines of your own')}
+    ${btn(false, 'Export', 'toggleBudgetOutputPanel()', 'Copy as text, or download an Excel file')}
+  </div>`;
 }
 function budgetOutputDialogHTML(){
   return `<div class="modal-overlay" onclick="if(event.target===this) toggleBudgetOutputPanel()">
@@ -9598,7 +9615,7 @@ function budgetSheetViewHTML(view, data, B){
   const m = budgetSheetModel(view, data, B);
   const err = budgetXlsError; budgetXlsError = '';
   return `<div class="${view==='day'||view==='person' ? 'roles-widezone' : ''}">${xlsSheetHTML(m.cols, m.rows)}
-      <div class="xls-bar"><span class="${err?'err':''}">${err ? esc(err) : `Showing ${budgetMode==='cost'?'cost — true costs, no float or fee':'charged — charged rates and float'}`}</span><span>${esc(budgetScopeLabel())}</span></div></div>
+      <div class="xls-bar"><span class="${err?'err':''}">${err ? esc(err) : 'The charged budget — charged rates and float. Cost is the true cost.'}</span><span>${esc(budgetScopeLabel())}</span></div></div>
     ${(m.notes||[]).map(t=>`<div class="hint" style="margin-top:8px;">${t}</div>`).join('')}
     ${view==='bbc' ? feedbackButtonHTML('bbc-view', 'the BBC view') : ''}`;
 }
@@ -9665,10 +9682,10 @@ function budgetSettingsDialogHTML(){
       <div class="subhead">Float and fee</div>
       ${row('Float', pct('floatPct', sheet.floatPct, `setBudgetSheetPct('floatPct', this.value)`), 'Contingency, as a % of each line. Any line can still carry its own % in the Float column.')}
       ${row('Production fee', pct('feePct', sheet.feePct, `setBudgetSheetPct('feePct', this.value)`), 'A % of the charged total.')}
-      <div class="subhead" style="margin-top:16px;">View — what the total shows</div>
-      ${row('Beside the total', `<div class="filter-chips bset-chips"><label title="Always shown"><input type="checkbox" checked disabled> Final total</label>${BUDGET_VIEW_STATS.map(([k,label])=>
+      <div class="subhead" style="margin-top:16px;">View — the totals row</div>
+      ${row('Show', `<div class="filter-chips bset-chips">${BUDGET_VIEW_STATS.map(([k,label])=>
         `<label><input type="checkbox" ${budgetViewShows(set,k)?'checked':''} onchange="setBudgetViewStat('${k}', this.checked)"> ${label}</label>`).join('')}</div>`,
-        'The big figure follows Cost | Charged: Final total when Charged, Total cost when Cost. These sit beside it when Charged is showing. VAT reclaimed joins them by itself for an overseas client.')}
+        'The row along the foot of the header. Final total, the production fee and the VAT lines always sit above it. VAT reclaimed joins the row by itself for an overseas client.')}
       <div class="subhead" style="margin-top:16px;">Client</div>
       ${row('Client is', pick('vatBack', [[false,'UK — normal VAT'], [true,'Overseas (e.g. USA) — VAT reclaimed']]),
         `Overseas: everything is charged with VAT in it, as a final figure, and you reclaim the VAT you paid suppliers afterwards. That VAT shows as <strong>VAT reclaimed</strong> and counts towards Margin.${set.vatBack && !budgetVatToggle ? ' <strong>Switch Show VAT to With VAT for this to apply.</strong>' : ''}`)}
@@ -9783,7 +9800,7 @@ function budgetLinesViewHTML(data, B){
       </div>
       <div class="xls-bar"><span class="${err?'err':''}">${err ? esc(err) : budgetEdit ? 'Edit is on — the shaded cells write back to where that cost lives: Crew ▸ Roles, the cost tabs, Venues. + in the left margin adds a line of your own.'
           : 'Charged overrides the rate — type a figure, or +20% / −10%; clear it to charge at cost. Turn on Edit to change costs, days and rates, or to add a line.'}</span>
-        <span>Showing ${isCost?'cost':'charged'} · ${overridden} of ${B.lines.length} rates overridden</span></div>
+        <span>${overridden} of ${B.lines.length} rates overridden</span></div>
     </div>`;
 }
 function xlsFocus(e){
@@ -9874,14 +9891,11 @@ async function deleteBudgetLine(id){
 function renderProjectBudget(body){
   applyStageColour(body);
   const data = buildBudgetData(), B = buildBudgetLines(data);
-  const viewSwitcher = `<div class="tabs">
-    ${Object.keys(BUDGET_VIEW_LABELS).map(v=>`<div class="tab ${budgetView===v?'active':''}" onclick="setBudgetView('${v}')">${BUDGET_VIEW_LABELS[v]}</div>`).join('')}
-  </div>`;
   const viewHTML = budgetView==='lines' ? budgetLinesViewHTML(data, B) : budgetSheetViewHTML(budgetView, data, B);
   body.innerHTML = `
     <div class="section">
       <div id="budgetSummaryBarWrap">${budgetPageHeadHTML(data, B)}</div>
-      ${viewSwitcher}
+      ${budgetToolRowHTML()}
       ${viewHTML}
     </div>${budgetSettingsOpen ? budgetSettingsDialogHTML() : ''}${budgetFilterOpen ? filterDialogHTML(budgetFilterPanelHTML(), 'toggleBudgetFilterPanel()') : ''}${
       budgetOutputOpen ? budgetOutputDialogHTML() : ''}${budgetShootFor ? budgetShootDialogHTML() : ''}`;

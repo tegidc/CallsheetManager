@@ -526,6 +526,14 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   now), Export (`budgetOutputDialogHTML()`), Settings and the shoot-day ticks are popups. `renderProjectBudget`
   builds `B` once and hands it to the head and the view. REMOVED: `budgetSheetTopHTML`, `outputMenuRowHTML`,
   `budgetDayChipsHTML`, `toggleBudgetDayChip`, `onlyBudgetDay`.
+- **Fourth pass, same day — CHARGED ONLY.** The Cost | Charged switch is gone: `budgetMode` is a `const 'charged'`
+  (`setBudgetMode` removed; `fig(l,'cost')` stays because Cost is a column and a total). The head is now: big
+  **Final total** with Prod fee / Total inc. VAT / xVAT under it in the small style; the stage selector (charged
+  figures) on the right; the totaliser `.bhead-strip` along the foot — Cost | Charged | Float | Margin, chosen in
+  Settings ▸ View (`BUDGET_VIEW_STATS` is now cost, charged, floatTotal, margin, floatPct, feePct); then the divider;
+  then ONE tool row, `budgetToolRowHTML()`: **View ▾** (a select — the tab strip is gone) | VAT | Settings | Days,
+  with Lines · Edit · Export pushed right. "Days" opens the filter popup and reads `Days (n of N)` when days are
+  filtered, `· filtered` when a shared Crew filter is on. Where this note and the one above disagree, this wins.
 - **EDIT** (`budgetEdit`, `toggleBudgetEdit()`) — off, the cost side is read-only (Charged and Float are the
   budget's own and always typeable). On, shaded `.xls-ed` cells write THROUGH THE OWNING TAB'S SETTER, so every
   other page agrees: person Pre / Post → `setPhaseDays()`, Shoot → a button opening `budgetShootDialogHTML()`
