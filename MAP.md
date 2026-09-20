@@ -1066,7 +1066,7 @@ coarse information first, finest detail last.
 | T-1.7 | · Danger zone | Delete project + its shoot days | `deleteProject()` |
 | **T-2** | **Crew** | Who's on the project, and on which days | `renderProjectCrew()` |
 | T-2.1 | · Roles | **The footnote under the grid has "Hide tips" / "Tips"** (`rolesFootnoteHTML()` → `setRolesTipsHidden()`, `appSettings.hideRolesTips` in `db:settings`, 14 Sep 2026): the how-it-works sentences hide; the status sentences (your own column order, a phase switched off) always show. **Clicking a person's name opens their record in the edit pop-up** (`editCrew(entryId)` → `crewEditModalHTML()`, the same modal bulk-edit uses for one selection; 14 Sep 2026). **The Crew tab's default sub-tab since Phase BU, and Budget Per Person's whole column set with editing.** One row per role (Phase BK/BL). Carries the T-6.1 banner, the Stage/Days mode picker (⚠️ keys `stage`/`totals` — the mode labelled "Days" is key `'totals'`, see Phase BU ▸ The three modes), and TOTAL · Prep · Shoot · Post · Buyout · Day rate · Subtotal · [Kit · Labour] · [Est. Costs] · VAT reg. · [VAT] · Show as, behind the Budget's own toggles. Money read from `buildBudgetData()`, never recomputed | `crewRolesRowHTML()` / `rolesColumns()` / `phaseCellHTML()` |
-| **T-2.0.2** | · · Role chip | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
+| **T-2.0.2** | · · Role text (was the role chip — plain muted text since the Style check, 20 Sep 2026) | Phase AZ/BE, folded to ONE renderer in Phase BM. `roleBannerHTML()` draws the role chip on every one of the six sub-tabs, and the chip IS the roles-menu trigger — AZ's separate "+" marker is gone and its has-other-saved-roles weighting is not replaced (T-2.0's chevron/"+N" already carries it) | `roleBannerHTML()` → `openRolesMenu()` |
 | **T-2.0** | · Person block | Phase BK/BL — the shared card every one of the six sub-tabs renders: person-level facts and — since **Phase BN** — the FRONTED entry's own cells all render onto ONE shared row (`.pb-head`), columns aligned across every block; a stacked-away entry still gets a genuine separate row (`.pb-role-row.pb-role-extra`) below. Collapses to the fronted entry + a muted "+N"; no chevron when one entry is visible. Nothing persists — no open/closed state anywhere, no per-person total ever | `buildPersonBlocks()` / `personBlockWrapHTML()` |
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
 | T-2.2 | · Days on site | Person block; day checkboxes + row All + remove belong to whichever entry they're on — the fronted entry's render on the shared head row since Phase BN, a stacked-away entry's on its own row (a position is keyed to an entry) | `crewAssignRowHTML()` |
@@ -2105,6 +2105,74 @@ Multi-day case re-verified unchanged: ROW 2026's real 6-day project, filtered to
 
 **Phase AT complete. Phases AU / AV / AW remain — seedSampleData() (G20) and the
 shoot-day location structures (G21) were not touched, as instructed.**
+
+## The design system, as decided (Style check, 20 Sep 2026)
+
+Applied from the `style-check.html` decisions (standalone click-to-pick page at the repo root, same
+idea as the `style-audit*.html` pages in `archive/`). **Where this disagrees with the Phase
+Refinement / Detail / Fonts / Style Review sections below, this wins.** The reference for the whole
+pass was the call sheet card: if in doubt, a new thing should look like that.
+
+**Every person row is DEPT | ROLE | NAME.** All four Crew sub-tabs, all four Talent etc sub-tabs,
+and the Crew database. One set of lead cells: `pbHeadLeadCellsHTML()` (header, with the ▸ ROLE /
+▸ NAME toggles), `pbDeptCellHTML()`, `roleBannerHTML()` / `talentRoleTextHTML()`, `pbNameHTML()`.
+The grid tracks are `--pb-controls-w | --pb-dept-w | --pb-role-w | --pb-name-w` on `.roles-grid`,
+`.crewgrid`, `.tegrid` and the (retired) `.prep-grid` — role is still grid column 3, name is 4, and
+every explicit `grid-column` after them moved up by one. Venues spans `1/5` for its name cell.
+
+- **DEPT is plain text** (`.pb-dept-cell`, Jost 13px) — no pill on project tabs or in the Crew
+  database. Talent / Client codes are **TAL / CLI** (`DEPARTMENT_CODES`); `CODE_DEPARTMENTS` keeps
+  `TALENT` / `CLIENT` as aliases for typed budget lines saved before the change.
+- **ROLE is muted text** (`.role-text`, Jost 12px — Talent's old `.te-role` look), not the boxed
+  `.role-chip`. On Crew it is still the roles-menu trigger; hover turns it green and underlines it.
+  `.role-chip` survives only in the role EDITOR (`rolesTagListHTML()`, in the open crew record).
+- **NAME opens the record** (`editCrew`) everywhere — so **there is no pencil on any row**, and
+  `--pb-controls-w` is 0 on every sub-tab (the hidden select checkbox still lives in that cell).
+  Talent has no row bin either: Select ▸ Remove from project, as on Crew.
+- **One collapse state for all eight sub-tabs** (`rolesNameCollapsed` / `rolesRoleCollapsed`;
+  widths from `pbLeadVars()`, set inline on each `.tablewrap`). Folded, names are **initials**
+  (`rolesShortName()` — single-word names stay whole; two different people sharing initials gain
+  two letters of surname) and roles are **3–4 letter codes** (`rolesShortRole()`: a saved code in
+  `appSettings.roleCodes` → `ROLE_CODE_DEFAULTS` → `roleCodeByRule()`). Codes are edited in Crew
+  database ▸ Settings ▸ Departments & roles (the small box on each role; `setRoleCode()`).
+- **Flat lists.** Talent lost its Client / Talent sub-heads; both pages group only when
+  Filter ▸ Group by says so, through the same `buildProjectCrewGroups()`.
+- **Stage marks are always dots** (`rolesTagsAsText()` returns false) — "PROD" the department and
+  "PROD" the stage were the same four letters on one row.
+
+**Column headers are the call sheet's**: Oswald 11px, **muted**, over one **1.5px 35% rule**
+(`.crewgrid-header`, `.roles-grid-header`, `.section th`, `.meal-fill-table th`, the database heads).
+Not green, not ink. **Group sub-heads** (`.subhead.dept-toggle`, `.dept-code`) are muted 500 too.
+
+**Block headings are ink** — `.section h2` and `.sd-block-head` 15px on the page, 17px as a card
+title; hover goes green. Green is for what is live: the active tab, a lit toggle, a link, a hover.
+
+**Short values are centred, sentences stay left.** `.sc-time`, `.sc-dur`, `.posn-call`,
+`.fld-short`, `.fld-xs`, `.fld-sm`, number and money fields — and their column headings on
+`table.sd-sched` / `table.sd-posn`, in both call sheet states. Description, notes, Show as,
+addresses stay left.
+
+**One "+ Add" button: `.bnr-tool.add`** (Oswald outline, ink). Mint Jost `button.small` is for
+neutral actions (Edit, Send to sheet); solid green `.primary` is the one primary action in a dialog.
+
+**Venues has the Crew page's shape.** No "Venues on this project" / "Add venue" headings: the
+banner's tool row holds `+ Add venue` (left) and `Budget` (right), the search opens under it, the
+table follows, and the how-it-works line is a footnote with Hide tips / Tips
+(`venueTipsHTML()`, `appSettings.hideVenueTips`). Venue names are Jost 600 14px. **The address
+shows only when a venue is opened** (`.loc-open-address`, top of the cost panel).
+
+**The databases are frameless rows.** Crew database: `crewCardHTML()` draws DEPT | ROLE | NAME |
+CONTACT (`.crewdb-row` under `.crewdb-head`); other saved roles are a "+N" with the list in the
+title; an OPEN record keeps its frame. Locations database: `.locdb-row` — the name opens the
+record (was an Edit button), the bin is the only icon.
+
+**The ladders.** Text: 9 micro tag · 11 label · 12 meta · 13 field · 14 name · 15 heading ·
+17 card title · 22 page · 26 figure (21 stays as the Budget head's secondary figure; ≤900px keeps
+its own 16px inputs — that is iOS zoom prevention, not drift). Oswald: 500 labels and headers,
+600 things you click, 700 only for the call sheet card's own section heads; tracking 1.2px at
+11px, 0.8px at 9px. Radius: 3 ticks and tags · 5 controls · 8 boxes. `.roles-grid-cell` sets 13px
+— the Shoot count and the empty dash had been inheriting the browser's 16px. ⚠️ The Budget
+spreadsheet (`table.xls`) keeps its own 10 / 12px grid idiom on purpose.
 
 ## The design system, as decided (Phase Refinement)
 

@@ -51,6 +51,8 @@
                                  pencil out (selecting and pressing Edit is the one way in
                                  now), so all six tabs are checkbox-only and the column is
                                  the width of a checkbox again. 22px of the table back. */
+    --pb-dept-w:56px;        /* Style check, 20 Sep 2026 — DEPT has its own column on every person
+                                 row (DEPT | ROLE | NAME); 56px fits the widest code, CAT/TRA */
     --pb-name-w:170px;       /* fixed, not flexible — a flexible Name column is what
                                  let Role drift depending on how long a name was.
                                  170px (was 220px, Phase BO follow-up — narrowed to
@@ -88,12 +90,12 @@
   .scrim{display:none;}
 
   .brand{display:flex; align-items:center; gap:8px; margin-bottom:18px;}
-  .brand .dot{width:10px; height:10px; border-radius:2px; background:var(--tape); transform:rotate(45deg);}
+  .brand .dot{width:10px; height:10px; border-radius:3px; background:var(--tape); transform:rotate(45deg);}
   .brand strong{font-family:var(--disp); font-size:16px; letter-spacing:.3px; color:var(--side-text);}
 
   .side-label{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:rgba(255,255,245,.55);
     text-transform:uppercase; margin:16px 6px 6px;}
-  .side-item{padding:8px 10px; border-radius:7px; font-size:var(--fs-field); cursor:pointer; color:var(--side-text);
+  .side-item{padding:8px 10px; border-radius:5px; font-size:var(--fs-field); cursor:pointer; color:var(--side-text);
     display:flex; align-items:center; gap:8px; margin-bottom:2px;}
   .side-item:hover{background:var(--side-hover);}
   /* Sidebar accents use --tape-light, the brand hue lifted for dark backgrounds
@@ -101,7 +103,7 @@
      brand green, so active items clear AA without introducing a second identity. */
   .side-item.active{background:var(--side-hover); color:var(--tape-light); font-weight:600;}
   .side-item .ico{opacity:.85; font-size:var(--fs-meta);}
-  .side-proj{padding:7px 10px; border-radius:7px; font-size:var(--fs-field); cursor:pointer; margin-bottom:2px; color:var(--side-text);}
+  .side-proj{padding:7px 10px; border-radius:5px; font-size:var(--fs-field); cursor:pointer; margin-bottom:2px; color:var(--side-text);}
   .side-proj:hover{background:var(--side-hover);}
   .side-proj.active{background:linear-gradient(90deg, var(--tint-5), transparent); color:var(--tape-light); font-weight:600; border-left:2px solid var(--tape-light); padding-left:8px;}
   .side-proj .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:rgba(255,255,245,.5); display:block;}
@@ -111,8 +113,11 @@
   .side-empty{font-size:var(--fs-meta); color:rgba(255,255,245,.45); padding:4px 10px; font-style:italic;}
 
   .section{background:none; border:none; border-radius:0; padding:0; margin-bottom:26px;}
+  /* Style check, 20 Sep 2026 — block headings are INK everywhere (15px on the page, 17px as a
+     card title), following the call sheet. Green is for what is live: the active tab, a lit
+     toggle, a link, a hover. */
   .section h2{font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px; text-transform:none;
-    color:var(--tape); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+    color:var(--text); margin:0 0 12px; display:flex; align-items:center; gap:8px;}
   .section h2::after{content:''; flex:1; height:1px; background:var(--line);}
   .sd-block{margin-bottom:4px;}
   /* flex-start + margin-left:auto on any trailing action, NOT space-between: with
@@ -120,12 +125,12 @@
      own title to the far right, away from its caret. */
   .sd-block-head{display:flex; align-items:center; justify-content:flex-start; gap:8px; cursor:pointer; user-select:none;
     font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.2px;
-    color:var(--tape); margin:26px 0 12px; padding-bottom:0; border-bottom:none;}
+    color:var(--text); margin:26px 0 12px; padding-bottom:0; border-bottom:none;}
   .sd-block:first-child .sd-block-head{margin-top:0;}
   .sd-block-head.flush{margin:0 0 12px;}
   .sd-block-head .dept-caret{font-size:11px; color:inherit;}
   .sd-block-head > button{margin-left:12px; flex:0 0 auto;}
-  .sd-block-head:hover{color:var(--text);}
+  .sd-block-head:hover{color:var(--tape);}
   /* The rule fills the gap between title and any trailing action. When a
      .sd-block-head-toggle is present the rule belongs to it, so it sits between
      the title and the button rather than after the button. */
@@ -135,7 +140,7 @@
      and stays clickable/visible on its own, including while the body is collapsed. */
   .sd-block-head-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; flex:1; min-width:0;}
   .sd-block-head-toggle::after{content:''; flex:1; height:1px; background:var(--line);}
-  .sd-block-head-toggle:hover{color:var(--text);}
+  .sd-block-head-toggle:hover{color:var(--tape);}
   .sd-block-head-toggle .dept-caret{color:inherit;}
   .grid{display:grid; gap:10px;} .grid.g2{grid-template-columns:1fr 1fr;} .grid.g3{grid-template-columns:1fr 1fr 1fr;}
 
@@ -163,7 +168,7 @@
   .ts-field input[type=date]{width:150px; padding:6px 8px; font-size:var(--fs-field);}
   .ts-field > .hint, .field-inline > .hint{margin:0; flex:1 1 220px; min-width:0;}
   .ts-banner{font-size:var(--fs-meta); color:var(--muted); background:var(--panel-2); border:1px solid var(--line);
-    border-radius:6px; padding:7px 10px; margin-bottom:12px;}
+    border-radius:5px; padding:7px 10px; margin-bottom:12px;}
   .ts-banner.differs{background:var(--tint-3); border-color:var(--tape); color:var(--text);}
   .ts-banner span{color:var(--tape); cursor:pointer; text-decoration:underline; margin-left:6px;}
   .cam-row{display:grid; grid-template-columns:minmax(150px,1fr) minmax(0,2fr) 60px; gap:10px; align-items:start;
@@ -208,7 +213,7 @@
   input[type=checkbox]:hover{border-color:var(--text);}
   input[type=checkbox]:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
 
-  button{font-family:var(--body); font-weight:600; font-size:var(--fs-field); cursor:pointer; border-radius:7px;
+  button{font-family:var(--body); font-weight:600; font-size:var(--fs-field); cursor:pointer; border-radius:5px;
     border:1px solid var(--line); background:var(--panel-2); color:var(--text); padding:8px 13px;}
   button:hover{border-color:var(--tape);} button:active{transform:translateY(1px);}
   button.primary{background:var(--tape); color:var(--tape-ink); border-color:var(--tape);}
@@ -235,7 +240,7 @@
     text-transform:uppercase; margin:0; color:var(--text);}
   .page-head .eyebrow{font-family:var(--body); font-size:13px; letter-spacing:0; color:var(--muted);
     text-transform:none; margin-top:2px;}
-  .page-head .code{font-family:var(--label); letter-spacing:1.2px; font-size:var(--fs-ctl); color:var(--tape); margin-top:4px;}
+  .page-head .code{font-family:var(--label); font-weight:500; letter-spacing:1.2px; font-size:var(--fs-ctl); color:var(--tape); margin-top:4px;}
 
   .tabs{display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
   .crewdb-tab-count{font-family:var(--body); font-weight:400; letter-spacing:0; opacity:.55;}
@@ -250,19 +255,17 @@
   /* Project Notes (T-9) — ruled rows, borderless bodies: a scratchpad, not a form */
   /* Talent etc — the SAME row as the Crew sub-tabs (.crewgrid's lead columns, header type,
      name weight, tick size); only the middle columns differ per view, set inline as --te-cols */
-  .tegrid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) var(--te-cols);
+  .tegrid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) var(--te-cols);
     align-items:center; column-gap:10px;}
-  .talent-tab{--pb-name-w:160px; --pb-role-w:126px;}
-  .talent-tab.roles-tags-text{--pb-name-w:236px;}
   .tegrid .crewgrid-header.te-l{text-align:left;}
-  .tegrid input[type=text]{padding:0; margin:0; height:auto; min-height:0; width:100%; font-size:var(--fs-meta); line-height:1.6; border-bottom:none; box-shadow:0 1px 0 var(--field-line);}
+  .tegrid input[type=text]{padding:0; margin:0; height:auto; min-height:0; width:100%; font-size:var(--fs-field); line-height:1.6; border-bottom:none; box-shadow:0 1px 0 var(--field-line);}
   .tegrid input[type=text]:hover{box-shadow:0 1px 0 var(--text);}
   .tegrid input[type=text]:focus{box-shadow:0 1.5px 0 var(--tape);}
   .tegrid input.te-num{text-align:center;}
   .te-role{font-size:var(--fs-meta); color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .te-total{font-size:var(--fs-meta); text-align:right; font-variant-numeric:tabular-nums;}
   .te-by{display:inline-flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; justify-self:center;}
-  .te-by span{font-family:var(--label); font-size:9.5px; letter-spacing:1px; text-transform:uppercase; padding:1px 7px; cursor:pointer; color:var(--muted); user-select:none;}
+  .te-by span{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; padding:1px 7px; cursor:pointer; color:var(--muted); user-select:none;}
   .te-by span.on{background:var(--tape); color:var(--tape-ink);}
   .te-by span.on.them{background:var(--muted);}
   @media (pointer:coarse){ .tegrid input[type=text]{font-size:16px;} }
@@ -353,6 +356,27 @@
      say so before it's clicked. Hover tint and pointer only; no border change, because
      .list-card-editing already owns the border and the two would fight. */
   .crew-card{cursor:pointer;}
+  /* frameless rows, like the project tabs (Style check, 20 Sep 2026) — the department heading
+     divides, the hover tint says it opens. An OPEN record keeps its frame: that is an editing state. */
+  .crew-entry{margin-bottom:0;}
+  .crew-entry .list-card.crew-card{border-color:transparent; padding:6px 6px; border-radius:5px;}
+  .crew-entry .list-card.crew-card.crew-card-open{border-color:var(--line); border-radius:8px 8px 0 0; background:var(--tint-1); margin-top:6px;}
+  .crew-entry .list-card.crew-card.list-card-editing{border-color:var(--tape);}
+  .crew-entry .inline-form-card{margin-bottom:10px;}
+  .crewdb-row{display:grid !important; grid-template-columns:12px var(--pb-dept-w) 160px 200px minmax(0,1fr) 22px; column-gap:10px; align-items:center;}
+  .crewdb-row .crew-card-contact{margin-top:0 !important; justify-content:flex-start; min-width:0; overflow:hidden; white-space:nowrap;}
+  .crewdb-row .pb-dept-cell{color:var(--text); margin-top:0 !important;}
+  .crewdb-more{opacity:.7;}
+  .locdb-row{display:grid; grid-template-columns:minmax(160px,300px) minmax(0,1.4fr) minmax(0,1fr) 22px; column-gap:14px; align-items:center; padding:7px 6px; border-radius:5px;}
+  .locdb-row:not(.locdb-head):hover{background:var(--tint-1);}
+  .locdb-head{padding-bottom:6px; margin-bottom:4px; border-bottom:1.5px solid rgba(17,10,8,.35); border-radius:0;}
+  .locdb-head .crewgrid-header{text-align:left;}
+  .locdb-name{font-weight:600; font-size:var(--fs-name);}
+  .locdb-sub{font-size:var(--fs-meta); color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  @media(max-width:700px){ .locdb-row{grid-template-columns:minmax(0,1fr) 22px;} .locdb-row .locdb-sub, .locdb-head > :nth-child(2), .locdb-head > :nth-child(3){display:none;} }
+  .crewdb-head{display:grid; grid-template-columns:12px var(--pb-dept-w) 160px 200px minmax(0,1fr) 22px; column-gap:10px;
+    padding:0 7px 6px; margin:0 0 4px; border-bottom:1.5px solid rgba(17,10,8,.35);}
+  @media(max-width:700px){ .crewdb-row, .crewdb-head{grid-template-columns:12px 44px minmax(70px,110px) minmax(0,1fr);} .crewdb-row .crew-card-contact, .crewdb-head > :nth-child(5){display:none;} }
   .crew-card:hover{background:var(--tint-1);}
   .crew-card:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   /* the caret sits where the eye/pencil pair used to, so the DEPT | Name | Roles line
@@ -378,7 +402,7 @@
   .empty-note{color:var(--muted); font-size:var(--fs-meta); font-style:italic;}
 
   .searchresults{position:relative;}
-  .srlist{border:1px solid var(--line); border-radius:6px; background:var(--panel-2); margin-top:4px; max-height:200px; overflow:auto;}
+  .srlist{border:1px solid var(--line); border-radius:5px; background:var(--panel-2); margin-top:4px; max-height:200px; overflow:auto;}
   .sritem{padding:7px 9px; font-size:var(--fs-meta); cursor:pointer; border-bottom:1px solid var(--line);}
   .sritem:last-child{border-bottom:none;} .sritem:hover{background:var(--panel-2);}
   .mapembed{width:100%; height:220px; border:1px solid var(--line); border-radius:8px; margin-top:8px;}
@@ -405,7 +429,7 @@
      below it (tech, hotels, catering, travel) wear the same card. */
   .card.editing{border-color:var(--tape); box-shadow:0 0 0 3px var(--tint-2);}
   .card.viewing [data-edit]{cursor:text;}
-  .card.viewing [data-edit]:hover{background:var(--tint-2); border-radius:4px;}
+  .card.viewing [data-edit]:hover{background:var(--tint-2); border-radius:5px;}
   .card h3.sd-sec-toggle{cursor:pointer; user-select:none;}
   .card h3.sd-sec-toggle:hover{color:var(--text);}
   .card h3.sd-sec-toggle .dept-caret{font-size:11px; color:inherit;}
@@ -431,7 +455,7 @@
   .sd-wx-line{display:flex; flex-wrap:wrap; align-items:baseline; gap:0 5px;}
   .ki-item h4{position:relative;}
   .ki-tool{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; margin-left:4px;
-    border:none; background:transparent; color:var(--muted); vertical-align:-3px; border-radius:4px; position:relative;}
+    border:none; background:transparent; color:var(--muted); vertical-align:-3px; border-radius:5px; position:relative;}
   .ki-tool:hover{color:var(--tape); background:var(--tint-3);}
   .ki-tool .ic{width:12px; height:12px;}
   [data-tip]:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 4px); left:0; z-index:20;
@@ -509,9 +533,22 @@
     border-bottom:1.5px solid rgba(17,10,8,.35);}
   .card th{color:var(--muted); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
   .card ul{margin:4px 0; padding-left:18px;}
+  /* SHORT VALUES ARE CENTRED, SENTENCES STAY LEFT (Style check, 20 Sep 2026). Numbers, times,
+     durations, call times, rates and day counts sit centred under a centred heading — on the
+     call sheet in both its states, as they already did on Crew. Anything you would write a
+     sentence in (description, notes, Show as, an address) stays left: centred prose is ragged
+     down a column. */
+  input.sc-time, input.sc-dur, input.posn-call, input.fld-short, .ts-field input.fld-xs, .ts-field input.fld-sm,
+  input[type=number], .money-field input{text-align:center;}
+  input.fld-short{max-width:78px;}
+  table.sd-sched th:nth-child(-n+2), table.sd-sched td:nth-child(-n+2),
+  table.sd-posn th:nth-child(4), table.sd-posn td:nth-child(4){text-align:center;}
+  /* the Roles row is 13px throughout — the Shoot count and the empty dash were inheriting the
+     browser's 16px and read as a different table */
+  .roles-grid-cell{font-size:var(--fs-field);}
   .section table{width:100%; border-collapse:collapse; font-size:var(--fs-field);}
   .section td, .section th{padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
-  .section th{color:var(--tape); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
+  .section th{color:var(--muted); border-bottom:1.5px solid rgba(17,10,8,.35); font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;}
   .hint{font-size:var(--fs-meta); color:var(--muted); margin-top:6px;}
   .pill{display:inline-block; font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; padding:2px 8px; border-radius:20px;
     background:var(--panel-2); color:var(--muted); letter-spacing:1.2px; vertical-align:middle;}
@@ -539,12 +576,12 @@
     color:var(--muted);
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236f6a63' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
   }
-  .subhead{font-family:var(--label); font-size:11px; letter-spacing:1.2px; text-transform:uppercase;
+  .subhead{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase;
     color:var(--tape); margin:14px 0 8px; padding-bottom:0; border-bottom:none;
     display:flex; align-items:center; gap:8px;}
   .subhead::after{content:''; flex:1; height:1px; background:var(--line);}
   .subhead:first-child{margin-top:0;}
-  .subhead.dept-toggle{cursor:pointer; user-select:none; display:flex; align-items:center; gap:4px;}
+  .subhead.dept-toggle{cursor:pointer; user-select:none; display:flex; align-items:center; gap:4px; color:var(--muted); font-weight:500;}
   .posn-company-header{
     display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
     font-family:var(--label); font-weight:700; font-size:13px; letter-spacing:.6px;
@@ -561,7 +598,7 @@
   .posn-name{font-size:var(--fs-field); display:flex; flex-direction:column; gap:1px;}
   .subhead.dept-toggle:hover{color:var(--tape);}
   .dept-caret{font-size:9px; width:10px; display:inline-block;}
-  .dept-code{color:var(--tape); font-weight:600; letter-spacing:1.2px;}
+  .dept-code{color:inherit; font-weight:600; letter-spacing:1.2px;}
   .dept-count{color:var(--muted); font-weight:400;}
   /* Same label type as the Crew tab's Select all / Filter row, so every header
      control across the app reads at one weight and size (Style Review). */
@@ -609,9 +646,10 @@
   /* desktop only: ≤900px pins that column at a hard 60px (see the sticky block), so the variable
      must keep its mobile value there. Roles has nothing left in the column; the other views
      still keep their Edit pencil in it. */
+  /* Style check, 20 Sep 2026 — the pencil left the other views too, so the column is empty on
+     every sub-tab and closes up on all of them. */
   @media(min-width:901px){
-    .crew-rowselect{--pb-controls-w:24px;}
-    .crew-rowselect.crew-rowselect-tight{--pb-controls-w:0px;}
+    .crew-rowselect{--pb-controls-w:0px;}
   }
   .crew-rowselect .bulk-select-cb{display:none;}
   .crew-rowselect .pb-head:has(.bulk-select-cb:checked),
@@ -623,7 +661,7 @@
   .crew-select-mode .pb-head:has(.bulk-select-cb:checked):hover,
   .crew-select-mode .pb-head:has(.bulk-select-cb:checked):hover > *{background-color:color-mix(in srgb, var(--tape) 15%, var(--bg));}
   .roles-grid{display:grid; align-items:center; column-gap:10px;
-    grid-template-columns:var(--roles-cols, var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w)
+    grid-template-columns:var(--roles-cols, var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w)
       56px 56px 56px 60px minmax(110px,1fr));}
   .roles-total{font-variant-numeric:tabular-nums; white-space:nowrap; text-align:center;}
   .roles-num{min-width:0; text-align:center; font-variant-numeric:tabular-nums;}
@@ -654,10 +692,10 @@
   .also-listed-head{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500;
     letter-spacing:1.2px; text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
   .also-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer;
-    padding:7px 8px; margin:0 -8px; border-radius:6px; font-size:var(--fs-meta);}
+    padding:7px 8px; margin:0 -8px; border-radius:5px; font-size:var(--fs-meta);}
   .also-row:hover{background:var(--tint-2);}
   .also-row:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
-  .also-dept{font-family:var(--label); font-size:10.5px; font-weight:600; letter-spacing:1.1px;
+  .also-dept{font-family:var(--label); font-size:var(--fs-ctl); font-weight:600; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape);}
   .also-stages{color:var(--muted);}
   /* the row you were sent to, so arriving reads as arriving */
@@ -667,11 +705,11 @@
   /* a buyout is a different KIND of number from a day rate, so the row says so rather
      than leaving the reader to infer it from a tick box three columns away */
   .roles-buyout{display:flex; align-items:center; justify-content:center;}
-  .buyout-flag{font-family:var(--label); font-size:10px; font-weight:600; letter-spacing:.1em;
+  .buyout-flag{font-family:var(--label); font-size:9px; font-weight:600; letter-spacing:.8px;
     text-transform:uppercase; color:var(--tape); border:1px solid var(--tape);
     border-radius:20px; padding:0 6px; margin-left:6px; white-space:nowrap;}
   .roles-grid-rate{white-space:nowrap;}
-  .roles-grid-header-row, .prep-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
+  .roles-grid-header-row, .prep-grid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1.5px solid rgba(17,10,8,.35);}
   /* the Name/Role headings, when they are disclosure controls (Phase BX). Same treatment as
      .roles-shoot-head — a heading that happens to be clickable, so it grows a caret and a
      pointer and nothing else. */
@@ -711,20 +749,26 @@
     position:sticky; left:0; z-index:2; background:var(--bg); align-self:stretch;
     width:calc(var(--pb-controls-w) + 10px);
   }
-  .roles-tablewrap .roles-grid-name,
-  .roles-tablewrap .pb-head-name{
+  .roles-tablewrap .pb-dept-cell,
+  .roles-tablewrap .pb-head-dept{
     position:sticky; left:calc(var(--pb-controls-w) + 10px); z-index:2; background:var(--bg);
     align-self:stretch; display:flex; align-items:center;
   }
   .roles-tablewrap .pb-role-cell,
   .roles-tablewrap .pb-head-role{
-    position:sticky; left:calc(var(--pb-controls-w) + var(--pb-name-w) + 20px); z-index:2;
+    position:sticky; left:calc(var(--pb-controls-w) + var(--pb-dept-w) + 20px); z-index:2;
+    background:var(--bg); align-self:stretch; display:flex; align-items:center;
+  }
+  .roles-tablewrap .roles-grid-name,
+  .roles-tablewrap .pb-head-name{
+    position:sticky; left:calc(var(--pb-controls-w) + var(--pb-dept-w) + var(--pb-role-w) + 30px); z-index:2;
     background:var(--bg); align-self:stretch; display:flex; align-items:center;
     box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
   }
   /* the header row's own three lead cells sit at BOTH edges, so they outrank the row cells
      (z-index 2) and the header row (3) alike */
   .roles-tablewrap .roles-grid-header-row .pb-head-blank,
+  .roles-tablewrap .roles-grid-header-row .pb-head-dept,
   .roles-tablewrap .roles-grid-header-row .pb-head-name,
   .roles-tablewrap .roles-grid-header-row .pb-head-role{z-index:4;}
   /* the department heading is narrower than the rows it labels, so it pins left too rather
@@ -744,7 +788,7 @@
       margin-right:calc(-1 * var(--roles-bleed));
     }
   }
-  .roles-grid-header, .prep-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); letter-spacing:1.2px; text-transform:uppercase;}
+  .roles-grid-header, .prep-grid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase;}
   /* ---- drag a heading to move the column (Phase CA) ----
      The grab cursor is the whole affordance at rest; anything louder would put a permanent
      handle in every heading of the app's densest row for something you do once a month. */
@@ -761,14 +805,25 @@
      width as .prep-fields-row below it so each label lands over its own input. */
   .prep-header-fields{display:flex; align-items:center; gap:10px;}
   .prep-header-fields span{width:60px; flex:0 0 auto;}
+  :is(.roles-grid-header, .prep-grid-header, .crewgrid-header).pb-head-dept,
   :is(.roles-grid-header, .prep-grid-header, .crewgrid-header).pb-head-name,
   :is(.roles-grid-header, .prep-grid-header, .crewgrid-header).pb-head-role{text-align:left;}
+  /* DEPT | ROLE | NAME — the three lead cells of every person row (Style check, 20 Sep 2026).
+     DEPT is the plain code, as on the call sheet card; ROLE is Talent's muted text and is still
+     the way into the roles menu; NAME opens the record. */
+  .pb-dept-cell{min-width:0; font-size:var(--fs-field); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .role-text{font-family:var(--body); font-size:var(--fs-meta); font-weight:400; color:var(--muted);
+    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .role-text[onclick]{cursor:pointer;}
+  .role-text[onclick]:hover, .role-text[onclick]:focus-visible{color:var(--tape); text-decoration:underline; text-underline-offset:2px; outline:none;}
+  .pb-name{min-width:0; display:inline-flex; align-items:center; gap:6px; font-family:var(--body); font-weight:600; font-size:var(--fs-name);}
+  .pb-name-sub{font-weight:400;}
   .roles-grid-controls{display:flex; align-items:center; gap:0;}
   .roles-grid-name{min-width:0; font-family:var(--body); font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .roles-grid-cell{min-width:0;}
   .roles-grid-showas{display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .prep-grid{display:grid; align-items:center; column-gap:10px;
-    grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) var(--pb-phase-fields-w) 32px minmax(0,1fr);}
+    grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) var(--pb-phase-fields-w) 32px minmax(0,1fr);}
   .prep-controls{display:flex; align-items:center;}
   .prep-cell{min-width:0;}
   /* names match every other list in the app: Jost 600 14px (Phase Style Review) */
@@ -816,7 +871,7 @@
   .dates-phase:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .dates-dot{width:16px; height:16px; border-radius:50%; flex:0 0 auto;
     border:2px solid currentColor; background:transparent;}
-  .dates-phase-lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px;
+  .dates-phase-lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
     text-transform:uppercase; line-height:1;}
   .dates-phase-n{font-family:var(--body); font-size:var(--fs-meta); color:var(--muted);
     line-height:1; letter-spacing:0; text-transform:none;}
@@ -851,7 +906,7 @@
   /* the shortfall flag — fewer dates marked than days booked. Amber, not red: nothing is
      broken and nothing is blocked, there is just a booking not yet placed on the calendar. */
   .dates-short{display:flex; align-items:flex-start; gap:7px; margin-top:10px;
-    padding:8px 10px; border-radius:6px; background:rgba(138,90,11,.09);
+    padding:8px 10px; border-radius:5px; background:rgba(138,90,11,.09);
     border:1px solid rgba(138,90,11,.28);
     font-family:var(--body); font-size:var(--fs-meta); color:#7A4F09; line-height:1.45;}
   .dates-short strong{color:#7A4F09;}
@@ -887,7 +942,11 @@
   .loc-name-cell:hover{color:var(--tape);}
   .loc-name-cell:focus-visible{outline:2px solid var(--tape); outline-offset:-2px;}
   .loc-name-cell .dept-caret{flex:0 0 auto;}
-  .loc-name-text{min-width:0;}
+  .loc-name-text{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  /* a venue's name is a record title like any other — Jost 600 14px (was the browser's bold 16px) */
+  .loc-name-text strong{font-family:var(--body); font-weight:600; font-size:var(--fs-name);}
+  .loc-open-address{font-size:var(--fs-field); color:var(--text); margin-bottom:10px;}
+  .venue-tools{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
   .loc-row-total{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;
     font-weight:600; align-self:center;}
   .loc-row-open{background:var(--tint-1);}
@@ -912,7 +971,7 @@
   .loc-days{margin-top:10px; border-top:1px solid var(--line); padding-top:8px;}
   .loc-day-head, .loc-day-row{display:grid; grid-template-columns:44px repeat(var(--locday-cols,2), 96px) minmax(0,1fr);
     align-items:center; gap:8px;}
-  .loc-day-head{font-family:var(--label); font-size:10px; letter-spacing:1.1px; text-transform:uppercase;
+  .loc-day-head{font-family:var(--label); font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
     color:var(--muted); margin-bottom:4px;}
   .loc-day-head span:last-child, .loc-day-cost{text-align:right;}
   .loc-day-row{margin-bottom:4px;}
@@ -947,7 +1006,7 @@
   details[open] > summary.fg-title::before{transform:rotate(90deg);}
   summary.fg-title:hover{opacity:.75;}
   .private-note{font-size:var(--fs-meta); color:var(--muted); background:rgba(164,50,31,.08); border:1px solid rgba(164,50,31,.28);
-    border-radius:6px; padding:6px 9px; margin-bottom:8px;}
+    border-radius:5px; padding:6px 9px; margin-bottom:8px;}
   .private-note b{color:var(--danger);}
   .taglist{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
   .crewrow-select{display:grid; grid-template-columns:46px 1fr 100px 34px; gap:8px; align-items:start; margin-bottom:8px; padding-top:6px;}
@@ -966,10 +1025,10 @@
   .day-override-form{border:1px solid var(--line); border-radius:var(--box-radius); padding:var(--box-pad); background:var(--tint-1);}
   .day-override-form .fg-title{font-family:var(--label); font-size:11px; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape); margin-bottom:8px;}
-  .crewgrid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-name-w) var(--pb-role-w) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px minmax(0,1fr);
+  .crewgrid{display:grid; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px minmax(0,1fr);
     align-items:center; column-gap:10px;}
-  .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid var(--line);}
-  .crewgrid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--tape); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
+  .crewgrid-header-row{padding-bottom:6px; margin-bottom:4px; border-bottom:1.5px solid rgba(17,10,8,.35);}
+  .crewgrid-header{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--muted); text-align:center; letter-spacing:1.2px; text-transform:uppercase;}
   /* No rule between people — the department heading does the dividing (Fonts Review) */
   .crewgrid-row{padding:8px 0;}
   .crewgrid-controls{display:flex; align-items:center;}
@@ -989,16 +1048,16 @@
   .meal-trio, .meal-trio-head{display:flex; justify-content:center; gap:5px;}
   .crewgrid-check.meal-trio input{width:14px; height:14px;}
   .crewgrid-check.meal-trio input::after{font-size:12px;}
-  .meal-trio-head span{width:14px; text-align:center; font-family:var(--body); font-size:9.5px; font-weight:400; letter-spacing:0; color:var(--muted); cursor:pointer; user-select:none; border-radius:3px;}
+  .meal-trio-head span{width:14px; text-align:center; font-family:var(--body); font-size:9px; font-weight:400; letter-spacing:0; color:var(--muted); cursor:pointer; user-select:none; border-radius:3px;}
   .meal-trio-head span:hover{color:var(--tape); background:var(--tint-3);}
   .meal-trio-head span:focus-visible{outline:2px solid var(--tape); outline-offset:1px;}
   .meal-fill-table{width:100%; border-collapse:collapse;}
   .meal-fill-table th, .meal-fill-table td{text-align:left; padding:6px 16px 6px 0; font-size:var(--fs-field); border-bottom:1px solid var(--line); white-space:nowrap;}
-  .meal-fill-table th{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--tape);}
+  .meal-fill-table th{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); border-bottom:1.5px solid rgba(17,10,8,.35);}
   .crewview-tabs .crew-header-row .bnr-tool{font-family:var(--label);}
   .meal-tail{gap:12px; min-width:0; padding-left:12px;}
   .meal-diet{flex:1 1 auto; min-width:0; text-align:left; font-size:var(--fs-meta); color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .meal-all.open .meal-all-key{font-family:var(--label); font-size:10px; letter-spacing:.8px; border:1px solid var(--line); border-radius:4px; padding:0 5px; line-height:16px;}
+  .meal-all.open .meal-all-key{font-family:var(--label); font-size:9px; letter-spacing:.8px; border:1px solid var(--line); border-radius:5px; padding:0 5px; line-height:16px;}
   .meal-all.open .meal-all-key:hover{border-color:var(--tape);}
   .meal-all.open > .meal-row-all:last-child{color:var(--tape);}
   .meal-all{display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-meta); color:var(--muted);}
@@ -1060,7 +1119,7 @@
     font-family:var(--body); font-size:var(--fs-meta); font-weight:400; letter-spacing:0; text-transform:none; color:var(--text);}
   .section table.xls .xls-hd{background:var(--tint-1); color:var(--muted); text-align:center; padding:0;
     font-family:var(--label); font-size:10px; letter-spacing:.6px;}
-  .section table.xls tr.xls-cols td{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.1px;
+  .section table.xls tr.xls-cols td{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape);}
   .section table.xls .n{text-align:right;} .section table.xls .c{text-align:center;}
   .section table.xls .mu{color:var(--muted);}
@@ -1086,7 +1145,7 @@
   .xls-bar .err{color:var(--danger);}
   .xls-pos{color:var(--tape);} .xls-neg{color:var(--danger);}
   .xls-pct{display:inline-flex; align-items:center; gap:4px; font-family:var(--label); font-size:var(--fs-ctl);
-    letter-spacing:1.1px; text-transform:uppercase; color:var(--muted);}
+    letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
   .xls-pct input[type=text]{width:44px; padding:3px 4px; text-align:right; font-size:var(--fs-meta);}
   /* a lit button that happens to be first in a joined group keeps its lit ink (Cost | Charged) */
   .bnr-group .bnr-tool.on:first-child, .bnr-group .bnr-tool.on:first-child:hover{color:var(--tape-ink);}
@@ -1117,7 +1176,7 @@
   .bhead-view-shade{position:fixed; inset:0; z-index:40;}
   .bhead-view-menu{position:absolute; top:calc(100% + 4px); left:0; z-index:41; display:flex; flex-direction:column; min-width:170px;
     background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:4px; box-shadow:0 8px 24px rgba(17,10,8,.14);}
-  .bhead-view-menu button{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px; text-transform:uppercase; text-align:left;
+  .bhead-view-menu button{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; text-align:left;
     color:var(--muted); background:transparent; border:none; border-radius:3px; padding:7px 9px; cursor:pointer; white-space:nowrap;}
   .bhead-view-menu button:hover{background:var(--tint-2); color:var(--tape);}
   .bhead-view-menu button.on{color:var(--text); font-weight:600; background:var(--tint-3);}
@@ -1145,7 +1204,7 @@
   .phase-banner .budget-scope-stack{grid-area:stage; width:var(--bnr-stage-w); max-width:100%;}
   .budget-stat .num{font-family:var(--label); font-weight:700; font-size:26px; letter-spacing:.4px;
     color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap;}
-  .budget-stat .lbl{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
+  .budget-stat .lbl{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px;
     text-transform:uppercase; color:var(--tape); margin-top:2px;}
   /* the note that makes the whole banner's state readable when TOTALS is blank — otherwise
      an empty left third reads as a screen that failed to load rather than one with the
@@ -1155,11 +1214,19 @@
   .bnr-tools{grid-area:tools; display:flex; flex-direction:column; align-items:flex-end;
     gap:7px; min-width:0;}
   .bnr-toolrow{display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
-  .bnr-tool{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px;
+  .bnr-tool{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px;
     text-transform:uppercase; color:var(--muted); background:transparent;
     border:1px solid var(--line); border-radius:5px; padding:4px 9px; cursor:pointer;
     user-select:none; white-space:nowrap; line-height:1.35;}
   .bnr-tool:hover{border-color:var(--tape); color:var(--tape);}
+  /* ONE "+ ADD" BUTTON (Style check, 20 Sep 2026) — every button that adds a thing is this:
+     the toolbar's Oswald outline, in ink so it leads its row. Mint Jost (button.small) is for
+     neutral actions — Edit, Send to sheet; solid green is the one primary action in a dialog. */
+  .bnr-tool.add{color:var(--text);}
+  .bnr-tool.add:hover{color:var(--tape);}
+  .bnr-tool.add.on, .bnr-tool.add.on:hover{color:var(--tape-ink);}
+  input.role-code-input{width:48px; text-align:center; padding:0 2px; min-height:0; height:20px; font-size:var(--fs-meta);
+    text-transform:uppercase; letter-spacing:.4px; margin-right:6px;}
   .bnr-tool.on{background:var(--tape); border-color:var(--tape); color:var(--tape-ink); font-weight:600;}
   .bnr-tool:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .bnr-scope-note{grid-column:1/-1; margin:0;}
@@ -1192,7 +1259,7 @@
   .bnr-folded .bnr-grow{flex:1 1 auto;}
   .stage-chip{display:inline-flex; align-items:center; gap:7px; border-radius:5px; padding:4px 10px; cursor:pointer; user-select:none;
     background:var(--tape); border:1px solid var(--tape); color:#fff; white-space:nowrap; line-height:1.35;
-    font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.1px; text-transform:uppercase; font-weight:500;}
+    font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; font-weight:500;}
   .stage-chip .stage-chip-meta{font-family:var(--body); font-size:var(--fs-meta); letter-spacing:0; text-transform:none; font-weight:400; opacity:.85;}
   .stage-chip .stage-dot{box-shadow:0 0 0 1.5px rgba(255,255,255,.85);}
   .stage-chip.none{background:transparent; color:var(--muted); border-color:var(--line);}
@@ -1279,8 +1346,8 @@
   .stage-dot.stage-dot-all{background:var(--text);}
   .stage-dot.stage-pre{background:var(--phase-prep);} .stage-dot.stage-prod{background:var(--phase-shoot);} .stage-dot.stage-post{background:var(--phase-post);}
   /* ONLY takes its OWN stage's colour, whatever the page is wearing */
-  .stage-only{--c:var(--text); font-family:var(--label); font-size:9.5px; font-weight:500; letter-spacing:1px; text-transform:uppercase; line-height:1.3;
-    width:40px; padding:1px 0; text-align:center; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--muted);}
+  .stage-only{--c:var(--text); font-family:var(--label); font-size:9px; font-weight:500; letter-spacing:.8px; text-transform:uppercase; line-height:1.3;
+    width:40px; padding:1px 0; text-align:center; border:1px solid var(--line); border-radius:5px; background:var(--bg); color:var(--muted);}
   .stage-only.stage-pre{--c:var(--phase-prep);} .stage-only.stage-prod{--c:var(--phase-shoot);} .stage-only.stage-post{--c:var(--phase-post);}
   .stage-only:hover{border-color:var(--c); color:var(--c);}
   .stage-only.on{background:var(--c); border-color:var(--c); color:#fff; font-weight:600;}
@@ -1312,7 +1379,7 @@
   /* the column headings: the same uppercase label type the rest of the banner uses, and not
      a control — clicking a scope row is a toggle, and this row must not look like one */
   .budget-scope-head{cursor:default; font-family:var(--label); font-size:10px;
-    letter-spacing:1.1px; text-transform:uppercase; color:var(--muted); padding-bottom:2px;}
+    letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); padding-bottom:2px;}
   .budget-scope-head:hover{color:var(--muted);}
   .budget-scope-row:last-child{border-bottom:none;}
   .budget-scope-row:hover{color:var(--tape);}
@@ -1332,7 +1399,7 @@
      The total leads the block: it's the number you came for, and it used to sit under a
      six-column grid, below the fold. */
   .csm-total{font-size:var(--fs-meta); color:var(--muted); margin-bottom:10px;}
-  .csm-total strong{font-family:var(--body); font-size:18px; color:var(--text); margin-left:6px;}
+  .csm-total strong{font-family:var(--body); font-size:17px; color:var(--text); margin-left:6px;}
   /* the cost column is inputs, so it needs a real width where the day columns can stay
      as narrow as their numbers */
   .csm-cost-head{width:96px;}
@@ -1375,12 +1442,12 @@
     color:#7a5200; border-radius:var(--box-radius); padding:10px 12px;
     font-size:var(--fs-meta); line-height:1.5; margin-bottom:10px;
     display:flex; align-items:flex-start; gap:8px;}
-  .ai-notconfigured code{font-family:var(--mono); font-size:11.5px;
+  .ai-notconfigured code{font-family:var(--mono); font-size:var(--fs-meta);
     background:rgba(180,120,10,.14); padding:1px 5px; border-radius:3px;}
   .ai-notconfigured .ic, .ai-notconfigured svg{flex:0 0 auto;}
   /* R13 — an active Inverse flips what the whole list means, so the toggle says so
      rather than leaving it to a tick buried in the open panel. */
-  .filter-inverted{font-family:var(--label); font-size:10px; letter-spacing:1px;
+  .filter-inverted{font-family:var(--label); font-size:9px; letter-spacing:.8px;
     text-transform:uppercase; color:var(--danger); border:1px solid var(--danger);
     border-radius:3px; padding:0 4px; margin-left:4px; vertical-align:1px;}
   /* R17 — the undo toast. Sits above everything, bottom-left so it never covers the
@@ -1429,13 +1496,13 @@
     }
     .topbar .burger{
       background:transparent; border:1px solid var(--side-line); color:var(--side-text);
-      width:44px; height:44px; min-width:44px; border-radius:9px; font-size:17px; line-height:1;
+      width:44px; height:44px; min-width:44px; border-radius:8px; font-size:17px; line-height:1;
       display:flex; align-items:center; justify-content:center; padding:0;
     }
     .topbar .burger:hover{border-color:var(--tape-light);}
     .topbar .tb-title{font-family:var(--disp); font-weight:700; font-size:16px; white-space:nowrap;
       overflow:hidden; text-overflow:ellipsis;}
-    .topbar .tb-dot{width:9px; height:9px; border-radius:2px; background:var(--tape); transform:rotate(45deg); flex:0 0 auto;}
+    .topbar .tb-dot{width:9px; height:9px; border-radius:3px; background:var(--tape); transform:rotate(45deg); flex:0 0 auto;}
 
     .app{display:block;}
     .side{
@@ -1512,7 +1579,7 @@
     .tabs{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
       scroll-snap-type:x proximity;}
     .tabs::-webkit-scrollbar{display:none;}
-    .tab{padding:12px 15px; font-size:13.5px; white-space:nowrap; flex:0 0 auto; scroll-snap-align:start;}
+    .tab{padding:12px 15px; font-size:var(--fs-field); white-space:nowrap; flex:0 0 auto; scroll-snap-align:start;}
     .tabscroll{position:relative;}
     .tabscroll::after{
       content:''; position:absolute; top:0; right:0; bottom:1px; width:34px; pointer-events:none;
@@ -1530,7 +1597,7 @@
     .page-head h1{font-size:22px; line-height:1.2;}
     .page-head{margin-bottom:14px;}
 
-    :root{--pb-controls-w:50px; --pb-name-w:126px; --pb-role-w:104px;}
+    :root{--pb-controls-w:0px; --pb-dept-w:50px; --pb-name-w:126px; --pb-role-w:104px;}
     .tablewrap .crewgrid, .tablewrap .roles-grid, .tablewrap .prep-grid,
     .tablewrap .person-block, .tablewrap .dept-group{width:max-content; min-width:100%;}
     .tablewrap{container-type:inline-size;}
@@ -1542,10 +1609,10 @@
     :root{--pb-pin-w:186px;}   /* 50 + 10 + 126 */
     .crewgrid-controls, .roles-grid-controls, .prep-controls, .pb-head-blank{
       position:sticky; left:0; z-index:2; background:var(--bg);
-      align-self:stretch; width:60px;
+      align-self:stretch; width:calc(var(--pb-controls-w) + 10px);
     }
     .crewgrid-row-name, .roles-grid-name, .prep-name, .pb-head-name{
-      position:sticky; left:60px; z-index:2; background:var(--bg);
+      position:sticky; left:calc(var(--pb-controls-w) + 10px); z-index:2; background:var(--bg);
       align-self:stretch; display:flex; align-items:center;
       padding-right:6px; box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
     }
@@ -1554,7 +1621,7 @@
       align-self:stretch; width:var(--pb-pin-w);
       box-shadow:6px 0 6px -6px rgba(17,10,8,.16);
     }
-    .pb-role-row::before{content:''; grid-column:1/3;}
+    .pb-role-row::before{content:''; grid-column:1/3; width:auto; box-shadow:none;}
     .crewgrid-name-span{left:0; width:var(--pb-pin-w); display:block; overflow:hidden;
       padding:2px 6px 2px 0;}
     .crewgrid-name-span .hint{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -1563,7 +1630,7 @@
     .person-block-editing .pb-role-row::before{
       background-image:linear-gradient(var(--tint-2), var(--tint-2));
     }
-    .crewgrid-check input{width:100%; height:34px; border-radius:4px;}
+    .crewgrid-check input{width:100%; height:34px; border-radius:5px;}
     .crewgrid-check input::after{font-size:22px;}
     .meal-subrow .meal-cell input{width:100%; height:26px;}
     .meal-subrow .meal-cell input::after{font-size:17px;}
@@ -1599,7 +1666,7 @@
     .formgroup{padding:13px 11px;}
     .hint{font-size:13px;}
     .empty-note{font-size:14px;}
-    .private-note{font-size:12.5px; padding:9px 11px;}
+    .private-note{font-size:var(--fs-meta); padding:9px 11px;}
     .srlist{max-height:250px;}
     .sritem{padding:12px 11px; font-size:14px;}
     .subhead{font-size:12px;}
@@ -1720,14 +1787,14 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, roleCodes: appSettings.roleCodes });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
 }
 const DEPARTMENTS = ['Production','Client','Talent','Cinematography','Audio','Grip','Equipment','Set','Vanities','Catering & Travel','Post Production','Other'];
 const DEPARTMENT_CODES = {
-  'Production':'PROD', 'Client':'CLIENT', 'Talent':'TALENT', 'Cinematography':'CIN', 'Audio':'AUD',
+  'Production':'PROD', 'Client':'CLI', 'Talent':'TAL', 'Cinematography':'CIN', 'Audio':'AUD',
   'Grip':'GRIP', 'Equipment':'EQUIP', 'Set':'SET', 'Vanities':'HMUC', 'Catering & Travel':'CAT/TRA',
   'Post Production':'POST', 'Other':'—'
 };
@@ -1778,10 +1845,35 @@ function deptBucketKey(dept){ return DEPARTMENTS.includes(dept) ? dept : 'Other'
    anything with a `department` (a crew record, an entry, an entry view). */
 const TALENT_ETC_DEPTS = ['Talent','Client'];
 const isTalentEtc = v => !!v && TALENT_ETC_DEPTS.includes(deptBucketKey(v.department));
+/* THE LEAD COLUMNS — DEPT | ROLE | NAME, on every Crew and Talent etc sub-tab (Style check,
+   20 Sep 2026). One header, one set of cells, one collapse state: ▸ ROLE folds roles to their
+   codes and ▸ NAME folds names to initials, and both hold as you move between sub-tabs and
+   between Crew and Talent, so the three columns never jump. */
 function pbHeadLeadCellsHTML(cellClass){
+  const toggle = (label, collapsed, fn) => `<span class="roles-col-toggle" role="button" tabindex="0" onclick="${fn}"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${fn}}"
+      aria-expanded="${collapsed?'false':'true'}"
+      title="${collapsed?`Show full ${label.toLowerCase()}s`:`Abbreviate ${label.toLowerCase()}s`}"
+      ><span class="dept-caret">${collapsed?'▸':'▾'}</span>${label}</span>`;
   return `<div class="${cellClass} pb-head-blank"></div>
-    <div class="${cellClass} pb-head-name">Name</div>
-    <div class="${cellClass} pb-head-role">Role</div>`;
+    <div class="${cellClass} pb-head-dept">Dept</div>
+    <div class="${cellClass} pb-head-role">${toggle('Role', rolesRoleCollapsed, 'toggleRolesRoleColumn()')}</div>
+    <div class="${cellClass} pb-head-name">${toggle('Name', rolesNameCollapsed, 'toggleRolesNameColumn()')}</div>`;
+}
+/* the widths that go with the collapse state — set inline on the table wrapper, so they beat the
+   :root values (desktop and the ≤900px override alike). +40px on the name is room for the dots. */
+function pbLeadVars(){
+  return `--pb-name-w:${(rolesNameCollapsed ? 64 : 170) + 40}px; --pb-role-w:${rolesRoleCollapsed ? 52 : 136}px;`;
+}
+function pbDeptCellHTML(c){
+  const dept = c && c.department ? deptBucketKey(c.department) : '';
+  return `<div class="pb-dept-cell" title="${esc((c&&c.department)||'')}">${esc(dept ? (DEPARTMENT_CODES[dept]||c.department) : '')}</div>`;
+}
+/* the name: opens the record (editCrew), full or as initials. `id` is whatever editCrew takes on
+   this view — an entry id on Roles and Talent, the person block's id on the day-tick tabs. */
+function pbNameHTML(name, id, afterHTML){
+  return `<span class="roles-name-text roles-name-link" role="button" tabindex="0" onclick="event.stopPropagation();editCrew('${id}')"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();editCrew('${id}');}" title="Open ${esc(name)}'s record">${esc(rolesNameCollapsed ? rolesShortName(name) : name)}${afterHTML||''}</span>`;
 }
 function deptHeaderHTML(label, count, collapsed, onclickJS, code){
   const c = code===undefined ? (DEPARTMENT_CODES[label]||'') : code;
@@ -1817,10 +1909,13 @@ function rolesTagListHTML(c, entryId){
     return `<span class="role-chip${active?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();${pick(rp)}" title="${active?'Currently their active role':'Click to make this their active role'}">${active?'● ':''}${esc(name)}<span onclick="event.stopPropagation();removeRoleFromCrew('${c.id}','${esc(rp)}')" style="margin-left:5px;opacity:.6;" title="Remove this saved role">✕</span></span>`;
   }).join('')}</span>`;
 }
+/* ⚠️ Style check, 20 Sep 2026 — plain muted text (Talent's look), not the boxed chip. Still the
+   roles-menu trigger. Abbreviates with the shared ▸ ROLE state unless told otherwise. */
 function roleBannerHTML(c, o){
   const has = !!c.role;
-  const shown = has ? ((o&&o.abbreviate) ? rolesShortRole(c.role) : c.role) : '—';
-  return `<span class="role-chip${has?' active':''}" style="cursor:pointer;" onclick="event.stopPropagation();openRolesMenu('${c.id}')" title="${has?esc(c.role)+' — change or add a role':'Change or add a role'}">${esc(shown)}</span>`;
+  const abbreviate = (o && o.abbreviate!==undefined) ? o.abbreviate : rolesRoleCollapsed;
+  const shown = has ? (abbreviate ? rolesShortRole(c.role) : c.role) : '—';
+  return `<span class="role-text" role="button" tabindex="0" onclick="event.stopPropagation();openRolesMenu('${c.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();openRolesMenu('${c.id}');}" title="${has?esc(c.role)+' — change or add a role':'Change or add a role'}">${esc(shown)}</span>`;
 }
 function newRolePickerOptionsHTML(c){
   const has = new Set(c.roles||[]);
@@ -3118,7 +3213,7 @@ function renderWelcome(m){
     <div class="page-head"><h1>Call Sheet App</h1><div class="eyebrow">${esc(COMPANY)}</div></div>
     <div class="toolbar" style="margin-bottom:16px;">
       <button class="primary" onclick="goRecentProject()" ${recent?'':'disabled'}>Recent${recent?(': '+esc(recent.title||recent.client||'')):''}</button>
-      <button onclick="goNewProject()">+ New</button>
+      <button type="button" class="bnr-tool add" onclick="goNewProject()">+ New</button>
     </div>
     <div class="section">
       <h2>Get started</h2>
@@ -3250,7 +3345,7 @@ function renderProjectOverview(body){
         <div><label>Production company</label><input type="text" value="${esc(p.company||COMPANY)}" readonly></div>
       </div>
       <div class="grid g2" style="margin-bottom:10px;">
-        <div><label>Shoot days</label><input type="text" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
+        <div><label>Shoot days</label><input type="text" class="fld-short" inputmode="numeric" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
         <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Call Sheets tab — both stay in sync.</div></div>
       </div>
       ${shootDayReductionPanelHTML(days)}
@@ -3509,8 +3604,6 @@ function refreshTalentSummary(){
    head, sub-tab row, department headings and row grid as Crew. Same data, same savers. */
 let talentView = 'roles';
 function setTalentView(v){ talentView = v; renderProjectBody(); }
-let collapsedTalentGroups = new Set();
-function toggleTalentGroup(kind){ collapsedTalentGroups.has(kind) ? collapsedTalentGroups.delete(kind) : collapsedTalentGroups.add(kind); renderProjectBody(); }
 function talentColumns(days){
   const money = crewShowMoney;
   const dayCols = days.length ? `repeat(${days.length}, 38px) ` : '';
@@ -3525,15 +3618,22 @@ function talentColumns(days){
     heads:[{head:'Prep', title:'Booked pre-production days'}].concat(dayHeads, [{head:'Post', title:'Booked edit days'}],
       money?[{head:'Fee', title:'Optional. Costed in Budget only if you enter one — never flagged as missing'}]:[])};
 }
+/* Talent's role line is what the call sheet will print (Show as, else the role) — the same muted
+   text as Crew's, folding to a code with the shared ▸ ROLE state. Not a roles-menu trigger. */
+function talentRoleTextHTML(v){
+  const full = (v && (v.showAs||v.role)) || '';
+  return `<span class="role-text" title="${esc(full)}">${esc(rolesRoleCollapsed ? rolesShortRole(full) : full)}</span>`;
+}
 function talentRowHTML(v, days, cols){
   const p = currentProject();
   const money = crewShowMoney;
   const e = entryById(v.id, p), s = stayOf(e), t = tripOf(e);
   const bySwitch = (group, by) => `<span class="te-by" title="Who arranges and pays for it">
       <span class="${by==='us'?'on':''}" onclick="setTalentField('${v.id}','${group}','by','us')">Us</span><span class="${by==='them'?'on them':''}" onclick="setTalentField('${v.id}','${group}','by','them')">Them</span></span>`;
-  const lead = `<div class="crewgrid-controls">${entrySelectCbHTML(v)}<button class="icon-btn" onclick="editCrew('${v.id}')" title="Edit" aria-label="Edit">${icon('edit')}</button></div>
-      <div class="crewgrid-row-name"><div class="crew-ident one-line"><strong class="roles-name-link" role="button" tabindex="0" onclick="editCrew('${v.id}')" title="Open ${esc(v.name)}'s record">${esc(v.name)}</strong></div>${talentView==='roles'?stageTagsHTML(v.id, p):''}</div>
-      <div class="te-role" title="${esc(v.showAs||v.role||'')}">${esc(v.showAs||v.role||'')}</div>`;
+  const lead = `<div class="crewgrid-controls">${entrySelectCbHTML(v)}</div>
+      ${pbDeptCellHTML(v)}
+      <div class="crewgrid-role-cell pb-role-cell">${talentRoleTextHTML(v)}</div>
+      <div class="crewgrid-row-name pb-name">${pbNameHTML(v.name, v.id)}${talentView==='roles'?stageTagsHTML(v.id, p):''}</div>`;
   const row = (cells, right) => `<div class="tegrid crewgrid-row pb-head" style="--te-cols:${cols.template};">${lead}${cells}${cols.tail ? `<div class="crewgrid-remove">${right||''}</div>` : ''}</div>`;
   if(talentView==='hotel'){
     const total = numOf(s.nights) * numOf(s.perNight);
@@ -3557,15 +3657,19 @@ function talentRowHTML(v, days, cols){
       + days.map(d=>`<div class="crewgrid-check"><input type="checkbox" ${entryOnDay(v.id,d)?'checked':''} onclick="event.stopPropagation()" onchange="toggleCrewOnDay('${v.id}','${d.id}',this.checked)" title="On the call sheet for Day ${esc(d.dayNum||'?')}${d.date?' — '+esc(fmtDate(d.date)):''}"></div>`).join('')
       + phaseField(phaseByView('post'))
       + (money ? `<span class="money-field"><input type="text" inputmode="decimal" value="${esc(fee)}" placeholder="—" onchange="setTalentFee('${v.id}', this.value)" title="Optional. Costed in Budget only if you enter one — never flagged as missing"></span>` : ''),
-    `<button class="icon-btn danger-ic" onclick="removeTalentFromProject('${v.id}','${esc(v.name).replace(/'/g,'&#39;')}')" title="Take ${esc(v.name)} off the project" aria-label="Remove from project">${icon('trash')}</button>`);
+    '');   // Style check, 20 Sep 2026: no row bin — Select ▸ Remove from project, as on Crew
 }
-function talentGroupHTML(kind, views, days, cols){
-  if(!views.length) return '';
-  const collapsed = collapsedTalentGroups.has(kind);
+/* ⚠️ Style check, 20 Sep 2026 — FLAT, like Crew: the DEPT column says Client / Talent on the row,
+   so the two sub-heads went. A group head appears only when Filter ▸ Group by asks for one, and
+   then from the same grouper Crew uses (buildProjectCrewGroups), folding with the same set. */
+function talentGroupHTML(g, days, cols){
+  if(!g.items.length) return '';
   const rows = talentView==='catering'
-    ? buildPersonBlocks(views).map(b=>crewCateringBlockHTML(b, days)).join('')
-    : views.map(v=>talentRowHTML(v, days, cols)).join('');
-  return deptHeaderHTML(kind, views.length, collapsed, `toggleTalentGroup('${kind}')`, '')
+    ? buildPersonBlocks(g.items).map(b=>crewCateringBlockHTML(b, days)).join('')
+    : g.items.map(v=>talentRowHTML(v, days, cols)).join('');
+  if(g.key==='all') return `<div class="dept-group">${rows}</div>`;
+  const collapsed = collapsedProjectDepts.has(g.key);
+  return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectDeptCollapse('${g.key}')`, g.code||'')
     + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${rows}</div>`;
 }
 function renderProjectTalent(body){
@@ -3584,12 +3688,11 @@ function renderProjectTalent(body){
     .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   // Catering lists who is on set, as on Crew. Hotel and Travel do NOT: a client can be flown in for a viewing.
   if(talentView==='catering') views = views.filter(v=>entryOnShoot(v.id, p));
-  const of = kind => views.filter(v=>deptBucketKey(v.department)===kind);
   const cols = talentColumns(days);
-  const kinds = ['Client','Talent'].filter(k=>of(k).length);
-  const allCollapsed = kinds.length>0 && kinds.every(k=>collapsedTalentGroups.has(k));
+  const groups = views.length ? buildProjectCrewGroups(views, p, days) : [];
+  const allCollapsed = groups.length>0 && groups.every(g=>collapsedProjectDepts.has(g.key));
   const rightHTML = (talentView==='catering' ? `${days.length && all.length ? mealFillButtonHTML() : ''}<span onclick="jumpToSummary('catering')">Summary</span>` : '')
-    + (kinds.length>1 ? `<span class="crew-header-expandall" onclick="${allCollapsed?'collapsedTalentGroups.clear()':`collapsedTalentGroups=new Set(['Client','Talent'])`};renderProjectBody();">${allCollapsed?'Expand all':'Collapse all'}</span>` : '');
+    + (groups.length>1 ? `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groups.map(g=>g.key).join(',')}')">${allCollapsed?'Expand all':'Collapse all'}</span>` : '');
   const isCatering = talentView==='catering';
   const headerRow = isCatering
     ? (days.length ? `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length}; --daycolwidth:${CATERING_DAYCOL};">
@@ -3602,13 +3705,13 @@ function renderProjectTalent(body){
   const filterCount = projectCrewActiveFilterCount();
   const ids = views.map(v=>v.id);
   const listToolsHTML = toolGroupHTML([
-    `<button type="button" class="bnr-tool" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button>`,
+    `<button type="button" class="bnr-tool add" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button>`,
     filterButtonHTML({count: filterCount, onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse}),
     crewToolbarSelectAll(ids.join(','), ids.length>0 && ids.every(id=>projectCrewSelected.has(id)), filterCount)]);
   const tableHTML = !all.length ? '<div class="empty-note">No talent or clients on this project yet.</div>'
     : (isCatering && !days.length) ? '<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>'
-    : `<div class="tablewrap">${headerRow}${views.length
-        ? talentGroupHTML('Client', of('Client'), days, cols) + talentGroupHTML('Talent', of('Talent'), days, cols)
+    : `<div class="tablewrap" style="${pbLeadVars()}">${headerRow}${views.length
+        ? groups.map(g=>talentGroupHTML(g, days, cols)).join('')
         : `<div class="empty-note">${isCatering && !filterCount ? 'Nobody here is on the shoot in the selected stages.' : 'Nobody matches the selected stages or filter.'}</div>`}${
         isCatering ? cateringOtherSideHTML(false, days) : ''}</div>`;
   body.innerHTML = `
@@ -3667,7 +3770,7 @@ function quickAddSectionHTML(p){
     aiScanPendingFiles = []; aiScanError = null; aiScanPendingUserMsg = null; aiScanBusy = false;
   }
   const mode = quickAddMode;
-  const btn = (key, label) => `<button class="small ${mode===key?'primary':''}" onclick="setQuickAddMode('${key}')">+ ${label}</button>`;
+  const btn = (key, label) => `<button type="button" class="bnr-tool add${mode===key?' on':''}" onclick="setQuickAddMode('${key}')">+ ${label}</button>`;
   let bodyHTML = '';
   if(mode === 'day'){
     bodyHTML = `
@@ -3894,10 +3997,10 @@ function taskFieldHTML(t){
   }
   else if(kind==='daycrew'){
     const crew = projectEntryViews(p);
-    if(!crew.length) return `<div class="task-field"><span class="hint" style="margin:0;">No crew on the project yet.</span><button class="small" onclick="goProjectTab('crew');openAddPerson()">+ Add person</button></div>`;
+    if(!crew.length) return `<div class="task-field"><span class="hint" style="margin:0;">No crew on the project yet.</span><button type="button" class="bnr-tool add" onclick="goProjectTab('crew');openAddPerson()">+ Add person</button></div>`;
     field = `<select id="${fid}" style="width:auto; max-width:260px;"><option value="">— Select crew —</option>${groupedCrewOptionsHTML(crew)}</select>`;
   }
-  else if(kind==='crew') return `<div class="task-field"><button class="small primary" onclick="goProjectTab('crew');openAddPerson()">+ Add person</button><span class="hint" style="margin:0;">Ticks itself off once someone is on the project.</span></div>`;
+  else if(kind==='crew') return `<div class="task-field"><button type="button" class="bnr-tool add" onclick="goProjectTab('crew');openAddPerson()">+ Add person</button><span class="hint" style="margin:0;">Ticks itself off once someone is on the project.</span></div>`;
   else return '';
   return `<div class="task-field">${field}${done}</div>`;
 }
@@ -4100,7 +4203,7 @@ function notesSectionHTML(p){
           <label for="notesSearch">Search notes</label>
           <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="notesQuery=this.value;renderNotesList()">
         </div>
-        <button class="primary" onclick="addProjectNote()">+ Note</button>
+        <button type="button" class="bnr-tool add" onclick="addProjectNote()">+ Note</button>
         <span class="status" id="notesStatus"></span>
       </div>
       <div id="notesList"></div>`;
@@ -4270,7 +4373,7 @@ function renderTasksSection(p, days){
         <div><label>Title</label><input type="text" id="taskTitleInput" value="${esc(taskDraftTitle)}" placeholder="e.g. Confirm parking permit" oninput="taskDraftTitle=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
         <div><label>Note (optional)</label><input type="text" id="taskNoteInput" value="${esc(taskDraftNote)}" placeholder="Optional detail" oninput="taskDraftNote=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();addProjectTask();}"></div>
       </div>
-      <div class="toolbar" style="margin-bottom:14px;"><button class="small primary" onclick="addProjectTask()">+ Add task</button></div>
+      <div class="toolbar" style="margin-bottom:14px;"><button type="button" class="bnr-tool add" onclick="addProjectTask()">+ Add task</button></div>
       ${tasksListHTML(p)}
     `;
   return collapsibleSectionHTML({
@@ -5317,23 +5420,61 @@ let rolesNameCollapsed = true;
 let rolesRoleCollapsed = true;
 function toggleRolesNameColumn(){ rolesNameCollapsed = !rolesNameCollapsed; renderProjectBody(); }
 function toggleRolesRoleColumn(){ rolesRoleCollapsed = !rolesRoleCollapsed; renderProjectBody(); }
-const NAME_ABBREV_MAX = 10;
+/* NAMES → INITIALS (Style check, 20 Sep 2026; was "Tegid C."). A single-word name — most talent —
+   cannot sensibly be one letter, so it stays whole. If two DIFFERENT people on the project share
+   initials, each gains the next two letters of the surname (AWau / AWil); the same person listed
+   twice is not a clash. The full name is always in the title. */
+/* nameInitials() is the camera-tag one, further down — same initials everywhere */
 function rolesShortName(name){
   const parts = String(name||'').trim().split(/\s+/).filter(Boolean);
   if(!parts.length) return '';
-  const first = parts[0].length>NAME_ABBREV_MAX ? parts[0].slice(0,NAME_ABBREV_MAX)+'…' : parts[0];
-  if(parts.length===1) return first;
-  return first + ' ' + parts.slice(1).map(w=>w[0].toUpperCase()+'.').join('');
+  if(parts.length===1) return parts[0];
+  const ini = nameInitials(name);
+  const p = currentProject();
+  const clash = p && projectEntryViews(p).some(v => v.name && v.name!==name && v.name.trim().split(/\s+/).length>1 && nameInitials(v.name)===ini);
+  return clash ? ini + parts[parts.length-1].slice(1,3).toLowerCase() : ini;
 }
+/* ROLES → 3–4 LETTER CODES. A code saved with the role wins (Settings ▸ Departments & roles writes
+   appSettings.roleCodes, keyed by role name); then the house defaults below; then a rule —
+   initials for several words, the first four letters for one. ⚠️ Keyed by NAME, not by
+   "Department/Role": the code is for reading a row at a glance, and a Producer is PROD wherever
+   they sit. */
+const ROLE_CODE_DEFAULTS = {
+  'Director':'DIR', 'Executive Producer':'EP', 'Line Producer':'LP', 'Field Producer':'FP', 'Producer':'PROD',
+  'Production Manager':'PM', 'Production Coordinator':'PC', 'PA':'PA', 'Runner':'RUN',
+  'Presenter':'PRES', 'Host':'HOST', 'Guest':'GST', 'Contributor':'CONT', 'Cast':'CAST', 'Talent':'TAL', 'Model':'MOD',
+  'DOP':'DOP', '1st AC':'1AC', '2nd AC':'2AC', 'Camera Operator':'CAM', 'Loader':'LOAD', 'Focus Puller':'FOC',
+  'Sound Mixer':'MIX', 'Sound Recordist':'SND', 'Boom Operator':'BOOM',
+  'Gaffer':'GAF', 'Best Boy':'BB', 'Grip':'GRIP', 'Rigger':'RIG', 'Equipment Manager':'EQM', 'Kit Tech':'KIT',
+  'Set Designer':'SETD', 'Art Director':'ART', 'Props':'PROP', 'HMUA':'HMUA', 'Hair Stylist':'HAIR', 'Costume/Wardrobe':'WARD',
+  'Chef':'CHEF', 'Caterer':'CAT', 'Driver':'DRV', 'Travel Coordinator':'TRAV',
+  'Editor':'EDIT', 'Colourist':'COL', 'DIT':'DIT', 'Assistant Editor':'AE', 'Designer':'DES', 'Stylist':'STY'
+};
 const ROLE_JOINERS = new Set(['of','and','the','for','to','a']);
+function roleCodeByRule(role){
+  const words = String(role||'').trim().split(/[\s/\-]+/).filter(Boolean).filter(w=>!ROLE_JOINERS.has(w.toLowerCase()));
+  if(!words.length) return '';
+  if(words.length<2) return words[0].slice(0,4).toUpperCase();
+  /* a word that is already an abbreviation ("AD", "PA", "DOP", "OFTV") contributes itself, not
+     just its first letter — "1st AD" must not collapse to "1A" */
+  return words.map(w=>(w.length<=4 && w===w.toUpperCase()) ? w : w[0].toUpperCase()).join('').slice(0,4);
+}
 function rolesShortRole(role){
   const raw = String(role||'').trim();
   if(!raw) return '';
-  const words = raw.split(/[\s/]+/).filter(Boolean).filter(w=>!ROLE_JOINERS.has(w.toLowerCase()));
-  if(words.length<2) return raw.length>NAME_ABBREV_MAX+2 ? raw.slice(0,NAME_ABBREV_MAX+2)+'…' : raw;
-  /* a word that is already an abbreviation ("AD", "PA", "DOP") contributes itself, not just
-     its first letter — "1st AD" must not collapse to "1A" */
-  return words.map(w=>(w.length<=3 && w===w.toUpperCase()) ? w : w[0].toUpperCase()).join('');
+  const saved = (appSettings.roleCodes||{})[raw];
+  if(saved || ROLE_CODE_DEFAULTS[raw]) return saved || ROLE_CODE_DEFAULTS[raw];
+  // "Talent / Model" — two roles on one line: the more specific one (the last) names the row
+  const parts = raw.split('/').map(x=>x.trim()).filter(Boolean);
+  const last = parts.length>1 ? parts[parts.length-1] : '';
+  return (last && ((appSettings.roleCodes||{})[last] || ROLE_CODE_DEFAULTS[last])) || roleCodeByRule(raw);
+}
+async function setRoleCode(role, value){
+  const code = String(value||'').trim().toUpperCase().slice(0,4);
+  appSettings.roleCodes = Object.assign({}, appSettings.roleCodes);
+  if(code && code!==(ROLE_CODE_DEFAULTS[role]||roleCodeByRule(role))) appSettings.roleCodes[role] = code;
+  else delete appSettings.roleCodes[role];
+  await saveAppSettings();
 }
 /* whether the column can be open at all: the modes that show a count, and a project that
    actually has days to show. Guarded in one place so the header, the template and the cells
@@ -5342,7 +5483,7 @@ const rolesShootOpen = () => rolesShootExpanded && projectDays().length>0;
 function crewToolbarHTML(selectAllHTML, filterHTML, rightHTML){
   return `<div class="crew-header-row">
       <div class="crew-header-left">
-        <button type="button" class="bnr-tool crew-add-person" onclick="openAddPerson()"
+        <button type="button" class="bnr-tool add crew-add-person" onclick="openAddPerson()"
           title="Search the crew database and add someone to this project">+ Add person</button>
         ${selectAllHTML||''}${filterHTML||''}</div>
       <div class="crew-header-right">${rightHTML||''}</div>
@@ -5449,17 +5590,8 @@ function renderProjectCrew(body){
 
     if(crewGridView==='roles'){
       const spec = rolesColumns(budgetData);
-      const leadHead = (cls, label, collapsed, onToggle) => `<div class="roles-grid-header ${cls}">
-          <span class="roles-col-toggle" role="button" tabindex="0" onclick="${onToggle}"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${onToggle}}"
-            aria-expanded="${collapsed?'false':'true'}"
-            title="${collapsed?`Show full ${label.toLowerCase()}s`:`Abbreviate ${label.toLowerCase()}s`}"
-            ><span class="dept-caret">${collapsed?'▸':'▾'}</span>${label}</span>
-        </div>`;
       const rolesHeaderRow = `<div class="roles-grid roles-grid-header-row">
-          <div class="roles-grid-header pb-head-blank"></div>
-          ${leadHead('pb-head-name', 'Name', rolesNameCollapsed, 'toggleRolesNameColumn()')}
-          ${leadHead('pb-head-role', 'Role', rolesRoleCollapsed, 'toggleRolesRoleColumn()')}
+          ${pbHeadLeadCellsHTML('roles-grid-header')}
           ${spec.cols.map(c=>rolesHeadCellHTML(c)).join('')}
         </div>`;
       const groupsHTML = groups.map(g=>{
@@ -5468,9 +5600,7 @@ function renderProjectCrew(body){
           + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${
               g.items.map(e=>crewRolesRowHTML(e, spec, budgetData)).join('')}</div>`;
       }).join('');
-      // + room for the stage tags beside the name: words where the list has the slack, dots where it hasn't
-      const collapseVars = `--pb-name-w:${(rolesNameCollapsed ? 104 : 170) + 62 + (rolesTagsAsText() ? 96 : 32)}px;`
-                         + (rolesRoleCollapsed ? '--pb-role-w:72px;' : '');
+      const collapseVars = pbLeadVars();
       /* .roles-tablewrap adds the frozen panes — Roles only; see the CSS for why the other
          six sub-tabs deliberately don't get a scroll box of their own. */
       assignedHTML = `<div class="tablewrap roles-tablewrap" style="--roles-cols:${spec.template};${collapseVars}">${rolesHeaderRow}${groupsHTML}</div>
@@ -5484,7 +5614,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>phaseRowHTML(c, crewGridView)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${phaseHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${phaseHeaderRow}${groupsHTML}</div>`;
     } else if(crewGridView==='travel'){
       // travel is a once-per-project choice per person, not day-by-day — same
       // crewgrid row/column pattern as the other tabs, just one "column" wide
@@ -5497,7 +5627,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewTravelRowHTML(c, p)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${travelHeaderRow}${groupsHTML}</div>`;
+      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${travelHeaderRow}${groupsHTML}</div>`;
     } else {
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const isCatering = crewGridView==='catering';
@@ -5512,7 +5642,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap">${dayHeaderRow}${groupsHTML}${isCatering && days.length ? cateringOtherSideHTML(true, days) : ''}</div>`;
+      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${dayHeaderRow}${groupsHTML}${isCatering && days.length ? cateringOtherSideHTML(true, days) : ''}</div>`;
     }
   }
 
@@ -5520,7 +5650,7 @@ function renderProjectCrew(body){
      the bottom line, the stage selector on the right on every sub-tab. The sub-tabs come AFTER
      it, directly on the table they switch; the old toolbar row is gone — its right-hand links
      (Summary, Collapse all) ride the sub-tab row. */
-  const listToolsHTML = toolGroupHTML([`<button type="button" class="bnr-tool crew-add-person" onclick="openAddPerson()"
+  const listToolsHTML = toolGroupHTML([`<button type="button" class="bnr-tool add crew-add-person" onclick="openAddPerson()"
       title="Search the crew database and add someone to this project">+ Add person</button>`, filterBtnHTML, selectAllHTML || crewToolbarSelectAll('', true, filterCount)]);
   const headHTML = `<div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(budgetData, {
       showTotals: crewShowMoney,
@@ -5639,7 +5769,7 @@ function rolesColumns(data){
          : c.key;
   });
   const ordered = applyRolesColumnOrder(cols);
-  const template = ['var(--pb-controls-w)','var(--pb-name-w)','var(--pb-role-w)']
+  const template = ['var(--pb-controls-w)','var(--pb-dept-w)','var(--pb-role-w)','var(--pb-name-w)']
     .concat(ordered.map(c=>c.width)).concat('minmax(0,1fr)').join(' ');
   return {cols:ordered, template, showSplit};
 }
@@ -5818,8 +5948,9 @@ function crewRolesRowHTML(e, spec, data){
   };
   const row = `<div class="roles-grid pb-head" id="role-row-${e.id}">
     <div class="roles-grid-controls">${entrySelectCbHTML(e)}</div>
-    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${deptLabelHTML(e)}<span class="roles-name-text roles-name-link" onclick="event.stopPropagation();editCrew('${e.id}')" title="Open ${esc(e.name)}'s record">${esc(rolesNameCollapsed?rolesShortName(e.name):e.name)}${repeatStarHTML(e.crewId)}</span>${stageTagsHTML(e.id, currentProject())}</div>
-    <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e, {abbreviate:rolesRoleCollapsed})}</span></div>
+    ${pbDeptCellHTML(e)}
+    <div class="roles-grid-cell pb-role-cell" data-label="Role"><span class="roles-inline">${roleBannerHTML(e)}</span></div>
+    <div class="roles-grid-cell roles-grid-name" data-label="Name" title="${esc(e.name)}">${pbNameHTML(e.name, e.id, repeatStarHTML(e.crewId))}${stageTagsHTML(e.id, currentProject())}</div>
     ${spec.cols.map(cellHTML).join('')}
   </div>`;
   return `<div class="person-block">${row}</div>`;
@@ -6007,21 +6138,22 @@ function crewAssignRowHTML(block, days){
     `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
      <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
   const roleChipHTML = (e, toggleHTML) => `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
-  const identOpts = {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true};
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:${colCount};">
-    <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-    <div class="crewgrid-row-name">${crewIdentityHTML(block, identOpts)}${repeatStarHTML(block.crewId)}</div>
+    <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
+    ${pbDeptCellHTML(isHotel?topSeniorityEntry(block.entries):fronted)}
     <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(isHotel?topSeniorityEntry(block.entries):fronted, isHotel?'':personBlockToggleHTML(block, rest.length, false))}</div>
+    <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
     ${isHotel ? headCells : entryCellsHTML(fronted)}
-    <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
+    <div class="crewgrid-remove" style="grid-column:${colCount+5};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
   </div>`;
   // ⚠️ Hotel has no stack: nothing about a room is per role, so a second row would be a
   // duplicate of the first. Days on site keeps its own — but a days block holds exactly
   // one entry now, so `rest` is empty there and this renders nothing either way.
   const stack = isHotel ? '' : rest.map(e=>`<div class="crewgrid pb-role-row pb-role-extra" style="--daycols:${colCount};display:none;">
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(e, '')}</div>
+      <div style="grid-column:4;"></div>
       ${isHotel ? '' : entryCellsHTML(e)}
-      <div class="crewgrid-remove" style="grid-column:${colCount+4};">${isHotel ? '' : entryRightHTML(e)}</div>
+      <div class="crewgrid-remove" style="grid-column:${colCount+5};">${isHotel ? '' : entryRightHTML(e)}</div>
     </div>`).join('');
   return personBlockWrapHTML(block, head + stack,
     { editing:isEditing, open:false, expansionHTML:crewExpansionHTML(block, 'pb-editform') });
@@ -6080,14 +6212,15 @@ function crewCateringBlockHTML(block, days){
   const dietHTML = `<span class="meal-diet" title="${esc(diet)}">${esc(diet)}</span>`;
   const ownHTML = talent ? `<span class="te-by" title="Own — their own arrangement (a rider, eating elsewhere). Their ticks are kept but not counted in the caterer's covers or cost.">
       <span class="${own?'':'on'}" onclick="setCrewOwnCatering('${crewId}', false)">Shared</span><span class="${own?'on them':''}" onclick="setCrewOwnCatering('${crewId}', true)">Own</span></span>` : '';
-  const roleHTML = talent ? `<span class="te-role" title="${esc(block.role||'')}">${esc(topSeniorityEntry(block.entries).showAs||block.role||'')}</span>`
+  const roleHTML = talent ? talentRoleTextHTML(topSeniorityEntry(block.entries))
                           : `<span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span>`;
   const head = `<div class="crewgrid crewgrid-row pb-head${own?' meal-own':''}" style="--daycols:${days.length}; --daycolwidth:${CATERING_DAYCOL};">
-      <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-      <div class="crewgrid-row-name">${crewIdentityHTML(block, {oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}${repeatStarHTML(block.crewId)}</div>
+      <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
+      ${pbDeptCellHTML(topSeniorityEntry(block.entries))}
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleHTML}</div>
+      <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
       ${cells}
-      <div class="crewgrid-remove meal-tail" style="grid-column:${days.length+4} / -1;">${dietHTML}${ownHTML}${allHTML}</div>
+      <div class="crewgrid-remove meal-tail" style="grid-column:${days.length+5} / -1;">${dietHTML}${ownHTML}${allHTML}</div>
     </div>`;
   /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch. */
   return personBlockWrapHTML(block, head,
@@ -6609,10 +6742,12 @@ function crewTravelRowHTML(block, p){
   const carInfo = (block.drives==='Yes' && (block.carMakeModel||block.carReg)) ? `<div class="hint">${icon('car')} ${esc([block.carMakeModel,block.carReg].filter(Boolean).join(' — '))}</div>` : '';
   const isEditing = editingCrewId===block.id;
   const head = `<div class="crewgrid crewgrid-row pb-head" style="--daycols:1; --daycolwidth:210px;">
-    <div class="crewgrid-controls">${crewControlsHTML(block, {selectCbHTML:personBlockSelectCbHTML(block)})}</div>
-    <div class="crewgrid-row-name">${crewIdentityHTML(block, {extraLine:carInfo, oneLine:true, showPhone:false, showRole:false, hideDept:true, hideLeadPill:true, hideButtons:true})}${repeatStarHTML(block.crewId)}</div>
+    <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
+    ${pbDeptCellHTML(topSeniorityEntry(block.entries))}
     <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span></div>
-    <div style="display:flex; align-items:center;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
+    <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
+    <div style="display:flex; align-items:center; gap:10px;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
+    <div class="pb-name-sub" style="grid-column:6 / -1;">${carInfo}</div>
   </div>`;
   /* ⚠️ NO STACK. Travel method is one choice per person per project, so a per-role
      row could only ever repeat it. */
@@ -6934,7 +7069,7 @@ function renderCameraDesignations(scope){
         </div>
         <div class="cam-cams">
           ${camLines}
-          <button class="small" onclick="addOperatorCamera('${scope}','${cid}')">+ Add camera</button>
+          <button type="button" class="bnr-tool add" onclick="addOperatorCamera('${scope}','${cid}')">+ Add camera</button>
         </div>
         <div class="cam-reorder">
           <button class="icon-btn" ${canMoveUp?'':'disabled'} onclick="moveOperator('${scope}','${cid}',-1)" title="Move up">${icon('up')}</button>
@@ -6970,7 +7105,7 @@ function renderCameraDesignations(scope){
       </div>`;
     }).join('');
   }
-  html += `<div class="toolbar" style="margin-top:8px;"><button class="small" onclick="addUnnamedCamera('${scope}')">+ Add unmanned camera</button></div>`;
+  html += `<div class="toolbar" style="margin-top:8px;"><button type="button" class="bnr-tool add" onclick="addUnnamedCamera('${scope}')">+ Add unmanned camera</button></div>`;
   el.innerHTML = html;
 }
 /* returns the cameras object to mutate, creating a day override on first day-scoped edit */
@@ -7470,7 +7605,7 @@ function phaseRowHTML(block, phase){
     const marks = phaseDatesOf(phase, e.id, p);
     const calOpen = phaseCalOpen(phase, e.id);
     return { calOpen, html: `<div class="prep-cell pb-role-cell" data-label="Role" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span></div>
-      <div class="prep-cell prep-fields" style="grid-column:4;">
+      <div class="prep-cell prep-fields" style="grid-column:5;">
         <div class="prep-fields-row">
           ${crewShowMoney?`<span class="money-field"><input type="text" inputmode="decimal" class="budget-rate-input" value="${rate.hasRate?rate.rate:''}" placeholder="—"
             title="Day rate — the same rate as the Roles view and Budget"
@@ -7480,7 +7615,7 @@ function phaseRowHTML(block, phase){
             onclick="event.stopPropagation()" onchange="setPhaseDays('${phase}','${e.id}', this.value)">
         </div>
       </div>
-      <div class="prep-cell prep-calcell" style="grid-column:5;">
+      <div class="prep-cell prep-calcell" style="grid-column:6;">
         <button type="button" class="icon-btn prep-cal-btn${marks.length?' has-marks':''}"
           onclick="togglePhaseCalendar('${phase}','${e.id}')"
           title="${marks.length ? `${marks.length} date${marks.length===1?'':'s'} marked` : 'No dates marked'}"
@@ -7510,21 +7645,20 @@ function renderProjectLocations(body){
   const days = projectDays();
   body.innerHTML = `
     <div class="section">
-      <h2>Venues on this project</h2>
-      ${assigned.length ? locBannerHTML(assigned, days) + locDayGridHTML(assigned, days) + `
-        <div class="hint" style="margin-top:8px;">Click a location to set what it costs. A buyout is split across the days it is ticked on, so each day carries its share; per-day and hourly follow the ticks directly. Additional charges are counted once for the project, and all of it feeds the <strong>Locations</strong> line in the Budget.</div>`
-        : '<div class="empty-note">No venues assigned to this project yet.</div>'}
-    </div>
-    <div class="section">
-      <h2>Add venue</h2>
-      <button class="small" onclick="toggleLocAdd()">${locAddOpen?'Cancel':'+ Add venue'}</button>
+      ${/* Style check, 20 Sep 2026 — the Crew page's shape: tools on the banner (+ Add venue on the
+            left, Budget on the right), the table straight under it, the how-it-works line as a
+            footnote you can fold. The "Venues on this project" and "Add venue" headings are gone —
+            the tab already says where you are. The address shows when a venue is opened. */''}
+      ${locBannerHTML(assigned, days)}
       ${locAddOpen ? `
-        <div class="searchresults" style="margin-top:10px;">
+        <div class="searchresults" style="margin:0 0 14px;">
           <input type="text" id="locAddSearch" placeholder="Search saved locations…" value="${esc(locAddQuery)}" oninput="onLocAddInput(this.value)" autocomplete="off">
           <div class="srlist" id="locAddResults">${locAddResultsHTML()}</div>
         </div>
-        <div id="locFormWrap" style="display:none; margin-top:12px;"></div>
+        <div id="locFormWrap" style="display:none; margin-bottom:14px;"></div>
       ` : '<div id="locFormWrap" style="display:none;"></div>'}
+      ${assigned.length ? locDayGridHTML(assigned, days) + venueTipsHTML()
+        : '<div class="empty-note">No venues assigned to this project yet.</div>'}
     </div>
     ${vendorsSectionHTML(p)}`;
   if(locAddOpen) document.getElementById('locAddSearch')?.focus();
@@ -7568,7 +7702,7 @@ function vendorsSectionHTML(p){
         <option value="">+ Add saved vendor…</option>
         ${unbooked.map(v=>`<option value="${v.id}">${esc(v.name)} (${esc(v.type)})</option>`).join('')}
       </select>` : ''}
-      <button class="small" onclick="vendorNewOpen=!vendorNewOpen; renderProjectBody();">${vendorNewOpen?'Cancel':'+ New vendor'}</button>
+      <button type="button" class="bnr-tool add" onclick="vendorNewOpen=!vendorNewOpen; renderProjectBody();">${vendorNewOpen?'Cancel':'+ New vendor'}</button>
       ${vendorNewOpen ? `<input type="text" id="vnName" placeholder="Vendor name — e.g. Keira’s Kitchen" style="width:220px;">
       <select id="vnType" style="width:auto;">${VENDOR_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
       <button class="small primary" onclick="createVendorAndBook()">Add</button>` : ''}
@@ -7868,10 +8002,15 @@ function locCostPanelHTML(l, days){
     ${dayRows}
     ${extras ? `<div class="loc-extras">${extras}</div>` : ''}
     <div class="toolbar" style="margin:8px 0 0;">
-      <button class="small" onclick="addLocationExtra('${l.id}')">+ Additional charge</button>
+      <button type="button" class="bnr-tool add" onclick="addLocationExtra('${l.id}')">+ Additional charge</button>
       ${c.extrasTotal?`<span class="hint">${budgetFmt(c.extrasTotal)} of extras, charged once</span>`:''}
     </div>
   </div>`;
+}
+function venueTipsHTML(){
+  const hidden = !!appSettings.hideVenueTips;
+  const flip = `appSettings.hideVenueTips=${hidden?'false':'true'}; saveAppSettings(); renderProjectBody();`;
+  return `<div class="hint" style="margin-top:8px;">${hidden ? '' : 'Click a venue to see its address and set what it costs. A buyout is split across the days it is ticked on, so each day carries its share; per-day and hourly follow the ticks directly. Additional charges are counted once for the project, and all of it feeds the <strong>Locations</strong> line in the Budget. '}<span class="filter-clear" role="button" tabindex="0" onclick="${flip}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${flip}}">${hidden?'Tips':'Hide tips'}</span></div>`;
 }
 function locBannerHTML(assigned, days){
   const p = currentProject();
@@ -7891,8 +8030,10 @@ function locBannerHTML(assigned, days){
       ? `<div class="budget-stat bhead-final"><div class="num">${budgetFmt(total + vat)}</div>
            <div class="bhead-sub">Locations total${vat?` inc. ${budgetFmt(vat)} VAT`:''}</div>
            ${vat?`<div class="bhead-sub">xVAT ${budgetFmt(total)}</div>`:''}</div>`
-      : `<div class="bnr-totals-off">Location costs hidden. Turn on <strong>Budget</strong> to see what each venue costs — the day ticks work either way.</div>`}</div>
-    <div class="bnr-toolrow" style="grid-area:tools;">
+      : ''}</div>
+    <div class="bnr-toolrow" style="grid-area:tools; justify-content:space-between;">
+      <span class="venue-tools"><button type="button" class="bnr-tool add${locAddOpen?' on':''}" onclick="toggleLocAdd()"
+        title="Search the Locations database, or create a new venue">${locAddOpen?'Cancel':'+ Add venue'}</button></span>
       <button type="button" class="bnr-tool${locShowMoney?' on':''}" aria-pressed="${locShowMoney?'true':'false'}"
         onclick="toggleLocMoney()" title="${locShowMoney?'Hide location costs':'Show location costs'}">Budget</button>
     </div>
@@ -7907,7 +8048,7 @@ function locDayGridHTML(assigned, days){
       </div>`).join('') + `<div class="hint" style="margin-top:8px;">Add shoot days first, then tick which days each location is used.</div>`;
   }
   const dayHeaderRow = `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length};">
-      <div class="crewgrid-header crewgrid-corner" style="grid-column:1/4;">Location</div>
+      <div class="crewgrid-header crewgrid-corner" style="grid-column:1/5; text-align:left;">Venue</div>
       ${days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
       <div class="crewgrid-header" style="text-align:right;">${locShowMoney?'Total':''}</div>
       <div class="crewgrid-header"></div>
@@ -7930,18 +8071,18 @@ function locRowHTML(l, days){
   const fee = locationFeeFor(l.id, projectDays(p.id), p, locDaysUsed(l.id, p).length);
   const total = (fee===null ? c.rate : fee) + c.extrasTotal;
   return `<div class="crewgrid crewgrid-row loc-row${open?' loc-row-open':''}" style="--daycols:${days.length};">
-    <div class="crewgrid-row-name crewgrid-name-span loc-name-cell" style="grid-column:1/4;"
+    <div class="crewgrid-row-name crewgrid-name-span loc-name-cell" style="grid-column:1/5;"
       role="button" tabindex="0" aria-expanded="${open?'true':'false'}"
       onclick="toggleLocExpanded('${l.id}')"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleLocExpanded('${l.id}');}"
-      title="${open?'Hide this location’s costs':'Show this location’s costs'}">
+      title="${open?'Hide this venue’s address and costs':'Show this venue’s address and costs'}">
       <span class="dept-caret">${open?'▾':'▸'}</span>
-      <span class="loc-name-text"><strong>${esc(l.name)}</strong><div class="hint">${esc(l.address||'')}</div></span>
+      <span class="loc-name-text"><strong>${esc(l.name)}</strong></span>
     </div>
     ${dayCells}
     <div class="crewgrid-cell loc-row-total">${locShowMoney ? (total ? budgetFmt(total) : '<span class="budget-noRate">—</span>') : ''}</div>
     <div class="crewgrid-remove"><button class="icon-btn danger-ic" onclick="event.stopPropagation();removeLocFromProject('${l.id}')" title="Remove ${esc(l.name)} from this project" aria-label="Remove from project">${icon('trash')}</button></div>
-    ${open ? `<div class="crewgrid-editform loc-cost-panel">${locCostPanelHTML(l, days)}</div>` : ''}
+    ${open ? `<div class="crewgrid-editform loc-cost-panel">${l.address?`<div class="loc-open-address">${esc(l.address)}</div>`:''}${locCostPanelHTML(l, days)}</div>` : ''}
   </div>`;
 }
 async function toggleLocOnDay(locId, dayId, checked){
@@ -8101,14 +8242,14 @@ function shootDayEditCardHTML(d){
     </div>
     <h4 class="sd-subh">Additional locations</h4>
     <div class="rows-add" id="rows-sdaddloc"></div>
-    <button type="button" class="bnr-tool" onclick="addSdLocRow()">+ Add location</button>
+    <button type="button" class="bnr-tool add" onclick="addSdLocRow()">+ Add location</button>
     </div>
     ${sdSectionOpenHTML('schedule','Schedule')}
     <div class="sd-tablescroll"><table class="sd-sched"><colgroup>${SD_SCHED_COLS}<col style="width:74px"></colgroup>
       <thead><tr><th>Time</th><th>Duration</th><th>Description</th><th></th></tr></thead>
       <tbody id="rows-sched"></tbody></table></div>
     <div class="sd-sched-tools">
-      <button type="button" class="bnr-tool" onclick="addSchedRow()" data-tip="A time range fills in Duration; a start time plus a Duration fills in the range" style="position:relative;">+ Add schedule item</button>
+      <button type="button" class="bnr-tool add" onclick="addSchedRow()" data-tip="A time range fills in Duration; a start time plus a Duration fills in the range" style="position:relative;">+ Add schedule item</button>
       <span class="sched-shift">
         <span class="hint">Shift ticked</span>
         <button class="small" onclick="shiftSelected(-1)" title="Earlier">&minus;</button>
@@ -8122,7 +8263,7 @@ function shootDayEditCardHTML(d){
     <div id="rows-posn"></div>
     <div class="sd-add-row">
       <select id="addPosnPick"></select>
-      <button type="button" class="bnr-tool" onclick="addPosnToDay()" data-tip="Only crew assigned to the project appear here" style="position:relative;">+ Add to this day</button>
+      <button type="button" class="bnr-tool add" onclick="addPosnToDay()" data-tip="Only crew assigned to the project appear here" style="position:relative;">+ Add to this day</button>
     </div>
     </div>
     <div class="toolbar" style="margin:18px 0 0; justify-content:space-between;">
@@ -8138,7 +8279,7 @@ function renderProjectDays(body){
       <div class="section">
         <h2>Shoot days</h2>
         <div class="empty-note">No shoot days yet.</div>
-        <button class="small" style="margin-top:8px;" onclick="addShootDay()">+ New shoot day</button>
+        <button type="button" class="bnr-tool add" style="margin-top:8px;" onclick="addShootDay()">+ New shoot day</button>
       </div>`;
     return;
   }
@@ -8396,7 +8537,10 @@ function onlyBudgetScope(key){
 /* stage tags beside a name are WORDS only where the Roles list has room for them — money off
    (few columns) on a desktop-width page; otherwise they are dots. One rule, read by the column
    width and by the class that styles the tags. */
-const rolesTagsAsText = () => !crewShowMoney && window.matchMedia('(min-width:901px)').matches;
+/* Style check, 20 Sep 2026 — always dots. With DEPT in its own column a producer's row read
+   "PROD … PROD": the department and the Production stage are the same four letters. The stage
+   selector above the table is the key; the title names the stage on hover. */
+const rolesTagsAsText = () => false;
 /* only the stages currently SHOWING get a tag — isolate one and the others drop away */
 function stageTagsHTML(entryId, p){
   const LABEL = { preproduction:['Pre','Pre-production'], production:['Prod','Production'], post:['Post','Post'] };
@@ -9484,6 +9628,9 @@ function buildBudgetLines(data){
 let budgetShowLines = false;
 function toggleBudgetShowLines(){ budgetShowLines = !budgetShowLines; renderProjectBody(); }
 const CODE_DEPARTMENTS = Object.fromEntries(Object.entries(DEPARTMENT_CODES).map(([d,c])=>[c,d]));
+/* Style check, 20 Sep 2026: Client / Talent went from CLIENT / TALENT to CLI / TAL — typed budget
+   lines saved before that still carry the long codes. */
+CODE_DEPARTMENTS.CLIENT = 'Client'; CODE_DEPARTMENTS.TALENT = 'Talent';
 function xlsSheetHTML(cols, rows){
   let n = 1;
   const tr = r => `<tr class="${r.cls||''}"><td class="xls-hd">${n++}</td>${r.cells.map(cell=>{
@@ -10215,8 +10362,8 @@ function renderCrewDatabase(m){
         <input type="text" id="crewSearch" value="${esc(crewSearchQuery)}" style="margin-bottom:10px;" placeholder="Search name, role, skills, camera gear…" oninput="crewSearchQuery=this.value;renderCrewList()">
         ${filterToggleHTML({open: crewDbFilterOpen, count: crewDbActiveFilterCount(), onToggle: 'toggleCrewDbFilterPanel()'})}
         ${crewDbFilterOpen ? crewDbFilterPanelHTML() : ''}
-        <div id="crewList"></div>
-        <button class="small" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
+        <div id="crewList" style="margin-bottom:12px;"></div>
+        <button type="button" class="bnr-tool add" onclick="toggleCrewForm()">${addingCrewNew?'− Cancel':'+ Add crew member'}</button>
         ${addingCrewNew ? `<div class="inline-form-card" id="crewFormWrap" style="margin-top:12px;">${crewFormHTML()}</div>` : ''}
       </div>`;
   m.innerHTML = `
@@ -10235,11 +10382,13 @@ function renderDeptAdminPanel(){
         <span class="hint">(${roster.length})</span>
       </div>
       <div style="margin-bottom:8px;">
-        <div class="hint" style="margin-bottom:4px;">Role seniority order (top = most senior)</div>
+        <div class="hint" style="margin-bottom:4px;">Role seniority order (top = most senior) · the box is the role's <strong>code</strong> — what Crew and Talent show when ▸ ROLE is folded. Clear it to get the suggestion back.</div>
         ${roles.length ? `<div style="display:flex;flex-direction:column;gap:2px;max-width:320px;">
           ${roles.map((r,idx)=>`<span class="pill" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span>${esc(r)}</span>
-              <span style="display:flex;gap:2px;">
+              <span style="display:flex;gap:2px;align-items:center;">
+                <input type="text" class="role-code-input" maxlength="4" value="${esc(rolesShortRole(r))}" placeholder="${esc(ROLE_CODE_DEFAULTS[r]||roleCodeByRule(r))}"
+                  onchange="setRoleCode('${esc(r).replace(/'/g,"\\'")}', this.value).then(()=>{ this.value = rolesShortRole('${esc(r).replace(/'/g,"\\'")}'); })" title="3–4 letter code for ${esc(r)}" aria-label="Code for ${esc(r)}">
                 <button class="icon-btn" ${idx===0?'disabled':''} onclick="moveRoleSeniority('${esc(d)}','${esc(r)}',-1)" title="More senior">${icon('up')}</button>
                 <button class="icon-btn" ${idx===roles.length-1?'disabled':''} onclick="moveRoleSeniority('${esc(d)}','${esc(r)}',1)" title="Less senior">${icon('down')}</button>
               </span>
@@ -10296,14 +10445,18 @@ function crewCardHTML(c){
       onclick="toggleCrewCard('${c.id}')"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCrewCard('${c.id}');}">
       <div class="meta">
-        <div class="crew-card-head">
+        ${/* Style check, 20 Sep 2026 — the project tabs' row: DEPT | ROLE | NAME, plain text, no
+              frame. The active role is the muted text; other saved roles are a count (named in
+              the title). The role EDITOR — make active, remove, add — is in the open record,
+              where crewFormHTML() already had it. */''}
+        <div class="crew-card-head crewdb-row">
           <span class="dept-caret crew-card-caret">${open?'▾':'▸'}</span>
-          ${deptLabelHTML(c)}
+          ${pbDeptCellHTML(c)}
+          <span class="role-text" title="${esc((c.roles||[]).map(rp=>rp.includes('/')?rp.split('/').slice(1).join('/'):rp).join(' · ') || c.role || '')}">${esc(c.role||'—')}${(c.roles||[]).length>1?` <span class="crewdb-more">+${(c.roles||[]).length-1}</span>`:''}</span>
           <strong class="crew-card-name" title="${esc(c.name)}">${esc(c.name)}</strong>
-          <span class="roles-inline crew-card-roles">${rolesTagListHTML(c, null)}${roleAddPickerHTML(c)}</span>
+          <span class="crew-card-contact">${contact}</span>
           ${bannerAction}
         </div>
-        ${contact?`<div class="crew-card-contact">${contact}</div>`:''}
       </div>
     </div>
     ${crewExpansionHTML(c, 'inline-form-card')}
@@ -10364,7 +10517,8 @@ function renderCrewList(){
     return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`)
       + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(crewCardHTML).join('')}</div>`;
   }).join('');
-  list.innerHTML = toggleRow + (html || filtered.map(crewCardHTML).join(''));
+  const headRow = `<div class="crewdb-head"><span></span><span class="crewgrid-header" style="text-align:left;">Dept</span><span class="crewgrid-header" style="text-align:left;">Role</span><span class="crewgrid-header" style="text-align:left;">Name</span><span class="crewgrid-header" style="text-align:left;">Contact</span></div>`;
+  list.innerHTML = toggleRow + headRow + (html || filtered.map(crewCardHTML).join(''));
 }
 /* single-role picker for a brand-new, not-yet-saved crew member (no id to attach
    roles/addRoleToCrew to yet) — stashes the pick here until saveCrew() creates the
@@ -11092,10 +11246,9 @@ function renderLocationsDatabase(m){
   m.innerHTML = `
     <div class="page-head"><h1>Locations</h1><div class="eyebrow">Database</div></div>
     <div class="section">
-      <h2>All locations</h2>
       <input type="text" id="locSearch" placeholder="Search saved locations…" oninput="renderLocationsList()" style="margin-bottom:10px;">
-      <div id="locationsList"></div>
-      <button class="small" onclick="toggleLocForm()">+ Add location</button>
+      <div id="locationsList" style="margin-bottom:12px;"></div>
+      <button type="button" class="bnr-tool add" onclick="toggleLocForm()">+ Add location</button>
       <div id="locFormWrap" style="display:none; margin-top:12px;"></div>
     </div>`;
   renderLocationsList();
@@ -11105,16 +11258,16 @@ function renderLocationsList(){
   const list = document.getElementById('locationsList'); if(!list) return;
   const filtered = locationsDB.filter(l => !q || (l.name+' '+(l.address||'')).toLowerCase().includes(q));
   if(!filtered.length){ list.innerHTML = '<div class="empty-note">No locations found.</div>'; return; }
-  list.innerHTML = filtered.map(l=>`
-    <div class="list-card">
-      <div class="meta"><strong>${esc(l.name)}</strong>
-        <div>${esc(l.address||'')}</div>
-        ${l.hospital ? `<div>${icon('hospital')} ${esc(l.hospital.name)} (~${esc(l.hospital.distanceKm)}km)</div>`:''}
-      </div>
-      <div class="actions">
-        <button class="small" onclick="editLocation('${l.id}')">Edit</button>
-        <button class="small danger" onclick="deleteLocation('${l.id}')">Delete</button>
-      </div>
+  /* Style check, 20 Sep 2026 — frameless rows under one ruled header, as on Venues and the Crew
+     database. The NAME opens the record (it was an Edit button); the bin is the row's one icon. */
+  list.innerHTML = `<div class="locdb-row locdb-head"><span class="crewgrid-header">Venue</span><span class="crewgrid-header">Address</span><span class="crewgrid-header">Nearest hospital</span><span></span></div>`
+    + filtered.map(l=>`
+    <div class="locdb-row">
+      <span class="roles-name-text roles-name-link locdb-name" role="button" tabindex="0" onclick="editLocation('${l.id}')"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();editLocation('${l.id}');}" title="Open ${esc(l.name)}">${esc(l.name)}</span>
+      <span class="locdb-sub" title="${esc(l.address||'')}">${esc(l.address||'')}</span>
+      <span class="locdb-sub">${l.hospital ? `${esc(l.hospital.name)} (~${esc(l.hospital.distanceKm)}km)` : ''}</span>
+      <button class="icon-btn danger-ic" onclick="deleteLocation('${l.id}')" title="Delete ${esc(l.name)}" aria-label="Delete">${icon('trash')}</button>
     </div>`).join('');
 }
 let locFormState = { lat:null, lon:null, hospital:null, parking:null };
