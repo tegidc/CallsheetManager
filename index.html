@@ -1753,7 +1753,8 @@ const SETTINGS_DEFAULTS = { headerFont:'fraunces', labelFont:'oswald', bodyFont:
                             brand:'#017756', brandLight:'#0FA47A', rolesColumnOrder:null,
                             sheetSync:null, /* {url, sheetUrl, sheetName, lastPush, lastPull} — see GOOGLE SHEET SYNC */
                             hideRolesTips:false /* retired 20 Sep 2026 — no longer read */,
-                            headFolded:false /* Crew / Talent etc page head folded to one line (pageHeadHTML) */ };
+                            headFolded:false /* Crew / Talent etc page head folded to one line (pageHeadHTML) */,
+                            crewPeopleKind:'all' /* Crew's All | Crew | Talent etc switch — the last one picked (setCrewPeopleKind) */ };
 let appSettings = Object.assign({}, SETTINGS_DEFAULTS);
 
 function hexToRgbTriple(hex){
@@ -1787,7 +1788,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, roleCodes: appSettings.roleCodes });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -2910,6 +2911,7 @@ async function initApp(){
   if(savedRoleSeniority && !Array.isArray(savedRoleSeniority) && Object.keys(savedRoleSeniority).length) ROLE_SENIORITY = savedRoleSeniority;
   if(savedSettings && !Array.isArray(savedSettings)) appSettings = Object.assign({}, SETTINGS_DEFAULTS, savedSettings);
   applyAppSettings();
+  if(['all','crew','talent'].includes(appSettings.crewPeopleKind)) crewPeopleKind = appSettings.crewPeopleKind;
   renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
@@ -3120,7 +3122,7 @@ function mostRecentProject(){
 function goRecentProject(){ const p=mostRecentProject(); if(p) openProject(p.id); }
 /* ⚠️ Phase BW — closes the Dates popup. It lives on #globalOverlay, outside #main, so a tab
    change alone would leave it floating over a screen that has nothing to do with it. */
-function goProjectTab(tab){ flushShootDayEdits(); flushNotesEdits(); if(tab!==currentProjectTab){ projectCrewSelected.clear(); crewSelectMode = false; bulkEditOpen = false; projectCrewFilterOpen = false; mealFillOpen = false; } currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
+function goProjectTab(tab){ if(tab==='talent'){ tab = 'crew'; crewPeopleKind = 'talent'; } flushShootDayEdits(); flushNotesEdits(); if(tab!==currentProjectTab){ projectCrewSelected.clear(); crewSelectMode = false; bulkEditOpen = false; projectCrewFilterOpen = false; mealFillOpen = false; } currentProjectTab=tab; closeDatesDialog(); renderMain(); window.scrollTo(0,0); }
 
 function renderMain(){
   const m = document.getElementById('main');
@@ -3286,7 +3288,6 @@ function renderProject(m){
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
-      <div class="tab ${currentProjectTab==='talent'?'active':''}" onclick="goProjectTab('talent')">TALENT ETC</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">CALL SHEETS</div>
       <div class="tab ${currentProjectTab==='budget'?'active':''}" onclick="goProjectTab('budget')">BUDGET</div>
@@ -3305,12 +3306,12 @@ let _lastBodyScreen = '';
 function renderProjectBody(){
   const body = document.getElementById('projectBody');
   if(!body) return;
-  const screen = [currentProjectId, currentProjectTab, crewGridView, talentView, budgetView].join('|');
+  const screen = [currentProjectId, currentProjectTab, crewGridView, crewPeopleKind, budgetView].join('|');
   const same = screen===_lastBodyScreen;
   const pageY = window.scrollY, pageX = window.scrollX;
   const inner = same ? [...body.querySelectorAll(SCROLL_KEEPERS)].map(el=>[el.scrollTop, el.scrollLeft]) : [];
   renderProjectBodyNow(body);
-  _lastBodyScreen = [currentProjectId, currentProjectTab, crewGridView, talentView, budgetView].join('|');
+  _lastBodyScreen = [currentProjectId, currentProjectTab, crewGridView, crewPeopleKind, budgetView].join('|');
   if(!same) return;
   [...body.querySelectorAll(SCROLL_KEEPERS)].forEach((el,i)=>{ if(inner[i]){ el.scrollTop = inner[i][0]; el.scrollLeft = inner[i][1]; } });
   if(window.scrollY!==pageY || window.scrollX!==pageX) window.scrollTo(pageX, pageY);
@@ -3319,7 +3320,8 @@ function renderProjectBodyNow(body){
   setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
-  if(currentProjectTab==='talent') return renderProjectTalent(body);
+  // 'talent' was the Talent etc tab until 24 Sep 2026 — it is Crew's Talent etc switch now
+  if(currentProjectTab==='talent'){ currentProjectTab='crew'; crewPeopleKind='talent'; return renderProjectCrew(body); }
   if(currentProjectTab==='locations') return renderProjectLocations(body);
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
@@ -3446,13 +3448,15 @@ function crewSearchResultsHTML(query, onCreateJS, limit){
   /* name, role AND department all match, so "cam" finds the Camera Operators and "grip"
      finds the department — the thing you remember is not always the name */
   const blob = c => (c.name+' '+(c.role||'')+' '+(c.department||'')).toLowerCase();
-  // scoped to the kind being added (see addPersonKind); the Talent etc tab is the only 'talent' caller
-  const wantTalent = currentProjectTab==='talent' && addPersonKind==='talent';
+  // scoped to the kind being added (see addPersonKind); Crew's Talent etc switch is the only 'talent' caller,
+  // and its All switch ('all') searches everyone and offers both kinds of new person
+  const wantTalent = currentProjectTab==='crew' && addPersonKind==='talent';
+  const bothKinds = currentProjectTab==='crew' && addPersonKind==='all';
   const inScope = c => addPersonEveryone || isTalentEtc(c)===wantTalent;
   const pool = crewDB.filter(c=>!assignedIds.includes(c.id)).filter(c=>!ql || blob(c).includes(ql));
   const matches = pool.filter(inScope).slice(0, limit||8);
   const hiddenN = pool.length - pool.filter(inScope).length;
-  const everyoneLink = addPersonEveryone
+  const everyoneLink = bothKinds ? '' : addPersonEveryone
     ? `<div class="sritem" style="cursor:pointer; color:var(--tape);" onclick="setAddPersonEveryone(false)">Showing everyone — back to ${wantTalent?'talent &amp; clients':'crew'} only</div>`
     : ((ql && hiddenN) ? `<div class="sritem" style="cursor:pointer; color:var(--muted);" onclick="setAddPersonEveryone(true)">${hiddenN} more outside ${wantTalent?'talent &amp; clients':'crew'} — search everyone</div>` : '');
   const rows = matches.map(c=>`<div class="sritem" onclick="addCrewToProject('${c.id}')">
@@ -3467,8 +3471,10 @@ function crewSearchResultsHTML(query, onCreateJS, limit){
       : `Every ${wantTalent?'talent and client':'crew member'} in the database is already on this project.`}</div>`;
   }
   const noun = wantTalent ? 'talent / client' : 'crew member';
-  return rows + note + everyoneLink + `<div class="sritem" style="color:var(--tape);" onclick="${onCreateJS}">${
-    q ? `+ Create new ${noun} “${esc(q)}”` : `+ Create a new ${noun}`}</div>`;
+  const createRow = (js, n) => `<div class="sritem" style="color:var(--tape);" onclick="${js}">${
+    q ? `+ Create new ${n} “${esc(q)}”` : `+ Create a new ${n}`}</div>`;
+  return rows + note + everyoneLink + createRow(onCreateJS, noun)
+    + (bothKinds ? createRow('startNewTalentFromAddPerson()', 'talent / client') : '');
 }
 function quickCrewResultsHTML(){ return crewSearchResultsHTML(quickCrewQuery, 'startNewCrewFromSearch()'); }
 
@@ -3477,7 +3483,7 @@ let addPersonQuery = '';
 /* ⚠️ THE SEARCH IS SCOPED (20 Sep 2026): Crew's Add person finds crew, Talent etc's finds talent
    and clients — so neither list is padded with the other's people. "Search everyone" lifts it
    for the rare time you need to. Overview's Quick add is a crew search. */
-let addPersonKind = 'crew';            // 'crew' | 'talent'
+let addPersonKind = 'crew';            // 'crew' | 'talent' | 'all' (Crew's All switch — everyone, both creates)
 let addPersonEveryone = false;
 let addTalentNewOpen = false;
 function setAddPersonEveryone(on){
@@ -3488,7 +3494,7 @@ function setAddPersonEveryone(on){
 }
 const addPersonCreateJS = () => addPersonKind==='talent' ? 'startNewTalentFromAddPerson()' : 'startNewCrewFromAddPerson()';
 function openAddPerson(kind){
-  addPersonKind = kind==='talent' ? 'talent' : 'crew'; addPersonEveryone = false; addTalentNewOpen = false;
+  addPersonKind = ['talent','all'].includes(kind) ? kind : 'crew'; addPersonEveryone = kind==='all'; addTalentNewOpen = false;
   addPersonOpen = true; addPersonQuery = '';
   renderProjectBody();
   document.getElementById('addPersonSearch')?.focus();
@@ -3584,8 +3590,8 @@ function talentSummaryHTML(p){
   const fees = list.reduce((s,e)=> s + (Object.prototype.hasOwnProperty.call(e,'rate') ? numOf(e.rate) : 0), 0);
   const c = talentEtcCosts(p);
   // each sub-tab totals its own column — all three are what Budget counts
-  if(talentView==='hotel')  return `Hotels we book ${c.stay?budgetFmt(c.stay):'—'}`;
-  if(talentView==='travel') return `Travel we book ${c.trip?budgetFmt(c.trip):'—'}`;
+  if(crewGridView==='hotel')  return `Hotels we book ${c.stay?budgetFmt(c.stay):'—'}`;
+  if(crewGridView==='travel') return `Travel we book ${c.trip?budgetFmt(c.trip):'—'}`;
   return `Fees ${fees?budgetFmt(fees):'—'}`;
 }
 function refreshTalentSummary(){
@@ -3602,17 +3608,17 @@ function refreshTalentSummary(){
    stacked under their name; it is now Roles (day ticks + fee) / Hotel (e.stay) / Travel (e.trip)
    / Catering (the SAME meal ticks Crew's Catering writes — toggleMeal), under the same page
    head, sub-tab row, department headings and row grid as Crew. Same data, same savers. */
-let talentView = 'roles';
-function setTalentView(v){ talentView = v; renderProjectBody(); }
+/* ⚠️ 24 Sep 2026 — Talent etc is Crew's switch now, not a tab, so its sub-tab IS Crew's:
+   crewGridView (Roles / Travel / Catering / Hotel) drives both lists; crewGridView is gone. */
 function talentColumns(days){
   const money = crewShowMoney;
   const dayCols = days.length ? `repeat(${days.length}, 38px) ` : '';
   const dayHeads = days.map(d=>({head:`D${esc(d.dayNum||'?')}`, title:`Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`}));
   const byHead = {head:'Booked by', title:'Who arranges and pays for it — only Us is costed'};
   /* money columns (fee, per night, cost, totals) follow the Budget toggle, exactly as on Crew */
-  if(talentView==='hotel') return {tail:false, template:`minmax(110px,1fr) 56px ${money?'76px ':''}84px${money?' 72px':''}`,
+  if(crewGridView==='hotel') return {tail:false, template:`minmax(110px,1fr) 56px ${money?'76px ':''}84px${money?' 72px':''}`,
     heads:[{head:'Hotel', left:true}, {head:'Nights'}].concat(money?[{head:'Per night'}]:[], [byHead], money?[{head:'Total'}]:[])};
-  if(talentView==='travel') return {tail:false, template:`minmax(140px,1fr) ${money?'76px ':''}84px`,
+  if(crewGridView==='travel') return {tail:false, template:`minmax(140px,1fr) ${money?'76px ':''}84px`,
     heads:[{head:'Travel', left:true}].concat(money?[{head:'Cost'}]:[], [byHead])};
   return {tail:true, template:`46px ${dayCols}46px ${money?'84px ':''}minmax(0,1fr)`,
     heads:[{head:'Prep', title:'Booked pre-production days'}].concat(dayHeads, [{head:'Post', title:'Booked edit days'}],
@@ -3633,9 +3639,9 @@ function talentRowHTML(v, days, cols){
   const lead = `<div class="crewgrid-controls">${entrySelectCbHTML(v)}</div>
       ${pbDeptCellHTML(v)}
       <div class="crewgrid-role-cell pb-role-cell">${talentRoleTextHTML(v)}</div>
-      <div class="crewgrid-row-name pb-name">${pbNameHTML(v.name, v.id)}${talentView==='roles'?stageTagsHTML(v.id, p):''}</div>`;
+      <div class="crewgrid-row-name pb-name">${pbNameHTML(v.name, v.id)}${crewGridView==='roles'?stageTagsHTML(v.id, p):''}</div>`;
   const row = (cells, right) => `<div class="tegrid crewgrid-row pb-head" style="--te-cols:${cols.template};">${lead}${cells}${cols.tail ? `<div class="crewgrid-remove">${right||''}</div>` : ''}</div>`;
-  if(talentView==='hotel'){
+  if(crewGridView==='hotel'){
     const total = numOf(s.nights) * numOf(s.perNight);
     return row(`<input type="text" value="${esc(s.hotel)}" placeholder="Hotel name" oninput="setTalentField('${v.id}','stay','hotel',this.value)">
       <input type="text" class="te-num" inputmode="numeric" value="${esc(s.nights)}" placeholder="0" oninput="setTalentField('${v.id}','stay','nights',this.value)">
@@ -3643,7 +3649,7 @@ function talentRowHTML(v, days, cols){
       ${bySwitch('stay', s.by)}
       ${money?`<span class="te-total" data-te-staytotal="${v.id}">${total?budgetFmt(total):'—'}</span>`:''}`);
   }
-  if(talentView==='travel'){
+  if(crewGridView==='travel'){
     return row(`<input type="text" value="${esc(t.note)}" placeholder="Car, train, flight, who is booking…" oninput="setTalentField('${v.id}','trip','note',this.value)">
       ${money?`<span class="money-field"><input type="text" inputmode="decimal" value="${esc(t.cost)}" placeholder="0" oninput="setTalentField('${v.id}','trip','cost',this.value)"></span>`:''}
       ${bySwitch('trip', t.by)}`);
@@ -3664,7 +3670,7 @@ function talentRowHTML(v, days, cols){
    then from the same grouper Crew uses (buildProjectCrewGroups), folding with the same set. */
 function talentGroupHTML(g, days, cols){
   if(!g.items.length) return '';
-  const rows = talentView==='catering'
+  const rows = crewGridView==='catering'
     ? buildPersonBlocks(g.items).map(b=>crewCateringBlockHTML(b, days)).join('')
     : g.items.map(v=>talentRowHTML(v, days, cols)).join('');
   if(g.key==='all') return `<div class="dept-group">${rows}</div>`;
@@ -3672,6 +3678,42 @@ function talentGroupHTML(g, days, cols){
   return deptHeaderHTML(g.label, g.items.length, collapsed, `toggleProjectDeptCollapse('${g.key}')`, g.code||'')
     + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${rows}</div>`;
 }
+/* The talent list — the whole of Crew's Talent etc switch, and the second section under the
+   crew list on its All switch (talentSectionHTML). One build, so the two cannot drift. */
+function talentListParts(p, days){
+  const all = projectEntryViews(p).filter(isTalentEtc);
+  let views = all.filter(personMatchesProjectFilter).filter(v=>entryInSelectedStage(v.id, p))
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  // Catering lists who is on set, as on Crew. Hotel and Travel do NOT: a client can be flown in for a viewing.
+  if(crewGridView==='catering') views = views.filter(v=>entryOnShoot(v.id, p));
+  const cols = talentColumns(days);
+  const groups = views.length ? buildProjectCrewGroups(views, p, days) : [];
+  const headerRow = `<div class="tegrid crewgrid-header-row" style="--te-cols:${cols.template};">
+      ${pbHeadLeadCellsHTML('crewgrid-header')}
+      ${cols.heads.map(h=>`<div class="crewgrid-header${h.left?' te-l':''}"${h.title?` title="${h.title}"`:''}>${h.head}</div>`).join('')}
+      ${cols.tail ? '<div class="crewgrid-header"></div>' : ''}
+    </div>`;
+  return {all, views, cols, groups, headerRow};
+}
+/* ALL: talent and clients under the crew list, folding as one section. Catering never calls
+   this — on All its list already has everyone (a lunch is a lunch). */
+let talentSectionCollapsed = false;
+function toggleTalentSection(){ talentSectionCollapsed = !talentSectionCollapsed; renderProjectBody(); }
+function talentSectionHTML(p, days){
+  const t = talentListParts(p, days);
+  if(!t.all.length) return '';
+  return `<div class="talent-section" style="margin-top:22px;">
+    ${deptHeaderHTML('Talent etc', t.views.length, talentSectionCollapsed, 'toggleTalentSection()', '')}
+    <div style="display:${talentSectionCollapsed?'none':'block'}">
+      <div class="tablewrap" style="${pbLeadVars()}">${t.headerRow}${t.views.length
+        ? t.groups.map(g=>talentGroupHTML(g, days, t.cols)).join('')
+        : '<div class="empty-note">No talent or clients match the selected stages or filter.</div>'}</div>
+      ${t.views.length && crewShowMoney ? `<div class="hint" id="talentSummary" style="margin-top:14px;">${talentSummaryHTML(p)}</div>` : ''}
+      <span class="status" id="talentStatus"></span>
+    </div>
+  </div>`;
+}
+/* Crew's Talent etc switch (was the TALENT ETC tab until 24 Sep 2026) — called by renderProjectCrew() */
 function renderProjectTalent(body){
   const p = currentProject(); if(!p) return;
   const days = projectDays(p.id);
@@ -3679,32 +3721,22 @@ function renderProjectTalent(body){
   body.classList.add('crew-rowselect', 'talent-tab');
   body.classList.toggle('crew-select-mode', crewSelectMode);
   body.classList.remove('crew-rowselect-tight');
-  body.classList.toggle('roles-tags-text', talentView==='roles' && rolesTagsAsText());
+  body.classList.toggle('roles-tags-text', crewGridView==='roles' && rolesTagsAsText());
   applyStageColour(body);
   hookCrewSelectClicks(body);
   repeatedInView = new Set();   // Crew's "listed twice" stars mean nothing here — and the set outlives the tab
-  const all = projectEntryViews(p).filter(isTalentEtc);
-  let views = all.filter(personMatchesProjectFilter).filter(v=>entryInSelectedStage(v.id, p))
-    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  // Catering lists who is on set, as on Crew. Hotel and Travel do NOT: a client can be flown in for a viewing.
-  if(talentView==='catering') views = views.filter(v=>entryOnShoot(v.id, p));
-  const cols = talentColumns(days);
-  const groups = views.length ? buildProjectCrewGroups(views, p, days) : [];
+  const {all, views, cols, groups, headerRow: teHeaderRow} = talentListParts(p, days);
   const allCollapsed = groups.length>0 && groups.every(g=>collapsedProjectDepts.has(g.key));
-  const rightHTML = (talentView==='catering' ? `${days.length && all.length ? mealFillButtonHTML() : ''}<span onclick="jumpToSummary('catering')">Summary</span>` : '')
+  const rightHTML = (crewGridView==='catering' ? `${days.length && all.length ? mealFillButtonHTML() : ''}<span onclick="jumpToSummary('catering')">Summary</span>` : '')
     + (groups.length>1 ? `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groups.map(g=>g.key).join(',')}')">${allCollapsed?'Expand all':'Collapse all'}</span>` : '');
-  const isCatering = talentView==='catering';
+  const isCatering = crewGridView==='catering';
   const headerRow = isCatering
     ? (days.length ? `<div class="crewgrid crewgrid-header-row" style="--daycols:${days.length}; --daycolwidth:${CATERING_DAYCOL};">
         ${pbHeadLeadCellsHTML('crewgrid-header')}${cateringDayHeadsHTML(days)}${CATERING_DIET_HEAD}</div>` : '')
-    : `<div class="tegrid crewgrid-header-row" style="--te-cols:${cols.template};">
-      ${pbHeadLeadCellsHTML('crewgrid-header')}
-      ${cols.heads.map(h=>`<div class="crewgrid-header${h.left?' te-l':''}"${h.title?` title="${h.title}"`:''}>${h.head}</div>`).join('')}
-      ${cols.tail ? '<div class="crewgrid-header"></div>' : ''}
-    </div>`;
+    : teHeaderRow;
   const filterCount = projectCrewActiveFilterCount();
   const ids = views.map(v=>v.id);
-  const listToolsHTML = toolGroupHTML([
+  const listToolsHTML = peopleKindSwitchHTML() + toolGroupHTML([
     `<button type="button" class="bnr-tool add" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button>`,
     filterButtonHTML({count: filterCount, onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse}),
     crewToolbarSelectAll(ids.join(','), ids.length>0 && ids.every(id=>projectCrewSelected.has(id)), filterCount)]);
@@ -3718,7 +3750,7 @@ function renderProjectTalent(body){
     <div class="section">
       <div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(buildBudgetData(), {
         showTotals: crewShowMoney, showMoneyToggle: true, peopleKind: 'talent', listToolsHTML })}</div>
-      ${crewSubTabsHTML(talentView, 'setTalentView', rightHTML)}
+      ${crewSubTabsHTML(crewGridView, 'setCrewGridView', rightHTML)}
       ${bulkActionBarHTML()}
       ${tableHTML}
       ${views.length && !isCatering && crewShowMoney ? `<div class="hint" id="talentSummary" style="margin-top:14px;">${talentSummaryHTML(p)}</div>` : ''}
@@ -3739,7 +3771,7 @@ function addPersonDialogHTML(){
   if(!addPersonOpen) return '';
   return `<div class="modal-overlay" onclick="if(event.target===this) closeAddPerson()">
     <div class="modal-box add-person-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
-      <h3>${addPersonKind==='talent' ? 'Add talent or client' : 'Add person'}</h3>
+      <h3>${addPersonKind==='talent' ? 'Add talent or client' : addPersonKind==='all' ? 'Add crew, talent or client' : 'Add person'}</h3>
       ${addTalentNewOpen ? addTalentNewFormHTML() : ''}
       <input type="text" id="addPersonSearch" class="add-person-search" placeholder="Search by name, role or department…"
         value="${esc(addPersonQuery)}" oninput="onAddPersonInput(this.value)"
@@ -5505,8 +5537,29 @@ function hookCrewSelectClicks(body){
     cb.dispatchEvent(new Event('change'));
   }, true);
 }
+/* ⚠️ ALL | CREW | TALENT ETC (24 Sep 2026) — the Talent etc tab folded into Crew as a switch at
+   the head of the tools row. CREW is the crew list as it was; TALENT ETC is the old tab's list,
+   unchanged (renderProjectTalent); ALL is the crew list with the talent list as its own folding
+   section beneath (talentSectionHTML) — the two keep their own columns, because a talent row
+   (fee, their own hotel and travel) is not a crew row. Catering on All is ONE list: same rows. */
+let crewPeopleKind = 'all';              // 'all' | 'crew' | 'talent' — remembered in appSettings.crewPeopleKind (db:settings)
+async function setCrewPeopleKind(k){
+  if(k===crewPeopleKind) return;
+  crewPeopleKind = k;
+  projectCrewSelected.clear(); bulkEditOpen = false;   // a selection must not reach rows you can no longer see
+  renderProjectBody();
+  appSettings.crewPeopleKind = k;
+  await saveAppSettings();
+}
+function peopleKindSwitchHTML(){
+  const btn = (k, label, title) => `<button type="button" class="bnr-tool${crewPeopleKind===k?' on':''}" onclick="setCrewPeopleKind('${k}')" title="${title}">${label}</button>`;
+  return toolGroupHTML([btn('all', 'All', 'Crew, talent and clients'), btn('crew', 'Crew', 'Crew only'),
+    btn('talent', 'Talent etc', 'Talent and clients only')]);
+}
 function renderProjectCrew(body){
   if(['preprod','days','post'].includes(crewGridView)) crewGridView = 'roles';   // retired tabs — a stale value lands on Roles
+  if(crewPeopleKind==='talent') return renderProjectTalent(body);
+  const showAll = crewPeopleKind==='all';
   body.classList.add('crew-rowselect');
   body.classList.toggle('crew-select-mode', crewSelectMode);
   body.classList.toggle('crew-rowselect-tight', crewGridView==='roles');
@@ -5517,9 +5570,11 @@ function renderProjectCrew(body){
   const p = currentProject();
   const days = projectDays();
   const budgetData = buildBudgetData();
-  /* Talent etc have their own tab — including their own Catering sub-tab since 20 Sep 2026, so
-     every Crew view is crew only. The catering SUMMARY still counts everyone: a lunch is a lunch. */
-  const assigned = projectEntryViews(p).filter(v => !isTalentEtc(v));
+  /* Talent etc are their own list (the switch; on All, their own section below) — so this list is
+     crew only, except Catering on All, which is everyone. The catering SUMMARY always counts
+     everyone: a lunch is a lunch. */
+  const cateringAll = showAll && crewGridView==='catering';
+  const assigned = projectEntryViews(p).filter(v => cateringAll || !isTalentEtc(v));
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   /* ⚠️ REMOVED in Phase CM: `unassigned` — it existed only to fill the retired "Add from crew
      database" <select>. The Add person popup filters crewDB against the roster itself, in
@@ -5557,7 +5612,7 @@ function renderProjectCrew(body){
     count: filterCount, onToggle: 'toggleProjectCrewFilterPanel()', inverted: projectCrewFilter.inverse
   });
   const filterDialog = projectCrewFilterOpen
-    ? filterDialogHTML(projectCrewFilterPanelHTML(assigned, days), 'toggleProjectCrewFilterPanel()') : '';
+    ? filterDialogHTML(projectCrewFilterPanelHTML(showAll ? projectEntryViews(p) : assigned, days), 'toggleProjectCrewFilterPanel()') : '';
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
   let selectAllHTML = '', rightHeaderHTML = '';
@@ -5566,7 +5621,8 @@ function renderProjectCrew(body){
   } else if(filtered.length){
     const groups = buildProjectCrewGroups(filtered, p, days);
     const groupsCSV = groups.map(g=>g.key).join(',');
-    const filteredEntryIds = filtered.flatMap(b=>b.entries.map(e=>e.id));
+    const filteredEntryIds = filtered.flatMap(b=>b.entries.map(e=>e.id))
+      .concat(showAll && crewGridView!=='catering' ? talentListParts(p, days).views.map(v=>v.id) : []);   // All: the talent section's rows too
     const filteredIdsCSV = filteredEntryIds.join(',');
     const allFilteredSelected = filteredEntryIds.length>0 && filteredEntryIds.every(id=>projectCrewSelected.has(id));
     selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
@@ -5642,7 +5698,7 @@ function renderProjectCrew(body){
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${dayHeaderRow}${groupsHTML}${isCatering && days.length ? cateringOtherSideHTML(true, days) : ''}</div>`;
+      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${dayHeaderRow}${groupsHTML}${isCatering && days.length && !cateringAll ? cateringOtherSideHTML(true, days) : ''}</div>`;
     }
   }
 
@@ -5650,14 +5706,15 @@ function renderProjectCrew(body){
      the bottom line, the stage selector on the right on every sub-tab. The sub-tabs come AFTER
      it, directly on the table they switch; the old toolbar row is gone — its right-hand links
      (Summary, Collapse all) ride the sub-tab row. */
-  const listToolsHTML = toolGroupHTML([`<button type="button" class="bnr-tool add crew-add-person" onclick="openAddPerson()"
-      title="Search the crew database and add someone to this project">+ Add person</button>`, filterBtnHTML, selectAllHTML || crewToolbarSelectAll('', true, filterCount)]);
+  const listToolsHTML = peopleKindSwitchHTML() + toolGroupHTML([`<button type="button" class="bnr-tool add crew-add-person" onclick="openAddPerson(${showAll?"'all'":''})"
+      title="${showAll?'Search the whole database and add someone to this project':'Search the crew database and add someone to this project'}">+ Add person</button>`, filterBtnHTML, selectAllHTML || crewToolbarSelectAll('', true, filterCount)]);
   const headHTML = `<div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(budgetData, {
       showTotals: crewShowMoney,
       showMoneyToggle: true,
-      crewOnly: true, peopleKind: 'crew',
+      crewOnly: !showAll, peopleKind: showAll ? 'all' : 'crew',
       listToolsHTML
     })}</div>`;
+  const talentHTML = showAll && crewGridView!=='catering' ? talentSectionHTML(p, days) : '';
   const viewSwitcher = crewSubTabsHTML(crewGridView, 'setCrewGridView', (crewGridView==='catering' && days.length ? mealFillButtonHTML() : '') + rightHeaderHTML);
 
   body.innerHTML = `
@@ -5678,8 +5735,9 @@ function renderProjectCrew(body){
         ${bulkActionBarHTML()}
         ${assignedHTML}
       </div>
+      ${talentHTML}
     </div>
-    ${crewGridView==='roles' ? crewEditModalHTML() : ''}
+    ${crewGridView==='roles' || talentHTML ? crewEditModalHTML() : ''}
     ${crewGridView==='hotel' ? hotelSummaryHTML() : ''}
     ${crewGridView==='catering' ? cateringSummaryHTML() : ''}
     ${crewGridView==='travel' ? transportSummaryHTML() : ''}
@@ -5698,13 +5756,15 @@ function renderProjectCrew(body){
   // Phase BX — after this render's innerHTML lands, so the box can measure where it started.
   // Same idiom as renderMain()'s refreshTabScrollCues().
   setTimeout(() => { sizeRolesTablewrap(); restoreRolesFocus(); }, 0);
-  body.oninput = crewGridView==='catering'
+  const onInput = crewGridView==='catering'
     ? () => scheduleAutosave('cateringCosts', () => { saveCateringCosts(); refreshCateringSummaryFigures(); })
     : crewGridView==='travel'
     ? () => scheduleAutosave('transportCosts', () => { saveTransportCosts(); renderTransportSummaryGridSection(); })
     : crewGridView==='hotel'
     ? () => scheduleAutosave('hotelCosts', () => saveHotelCosts())
     : null;
+  // on All the talent section's fields save themselves (setTalentField) — the crew summaries' saver is not theirs
+  body.oninput = onInput && (ev => { if(!(ev && ev.target && ev.target.closest && ev.target.closest('.talent-section'))) onInput(); });
 }
 let repeatedInView = new Set();
 const repeatStarHTML = crewId => repeatedInView.has(crewId)
@@ -9007,11 +9067,11 @@ function crewSubTabsHTML(current, setterName, rightHTML){
    Talent's Production figure includes the hotels and travel WE book for them (talentEtcCosts). */
 function stageFiguresFor(data, kind){
   const p = currentProject();
-  const wantTalent = kind==='talent';
-  const mine = data.people.filter(pp=>!!pp.talentEtc===wantTalent);
-  const entries = projectEntryViews(p).filter(v=>isTalentEtc(v)===wantTalent).filter(personMatchesProjectFilter);
+  const wantTalent = kind==='talent', everyone = kind==='all';   // 'all' — Crew's All switch
+  const mine = data.people.filter(pp=>everyone || !!pp.talentEtc===wantTalent);
+  const entries = projectEntryViews(p).filter(v=>everyone || isTalentEtc(v)===wantTalent).filter(personMatchesProjectFilter);
   const days = budgetFilteredDays();
-  const extras = wantTalent ? (c=>c.stay+c.trip)(talentEtcCosts(p)) : 0;
+  const extras = (wantTalent || everyone) ? (c=>c.stay+c.trip)(talentEtcCosts(p)) : 0;
   const sumOf = (list, k) => list.reduce((n,x)=>n+(x[k]||0), 0);
   const daysOf = { preproduction:e=>prepDaysOf(e.id,p)||0, production:e=>entryDayCount(e.id,days), post:e=>postDaysOf(e.id,p)||0 };
   const keys = { preproduction:['prepRaw','prepVatRaw'], production:['prodRaw','prodVatRaw'], post:['postRaw','postVatRaw'] };
@@ -9079,7 +9139,7 @@ function budgetSummaryBarHTML(data, o){
   const totalVat = kindFigs ? kindFigs.totalVat : o.crewOnly ? data.people.reduce((s,pp)=>s+pp.vat, 0) : data.vatTotal;
   const totalInc = totalEx + totalVat;
   const fmt = budgetFmt;
-  const stats = [[o.peopleKind==='talent' ? 'Talent total' : o.crewOnly ? 'Crew total' : 'Total',   // body text under the figure now, not a caps label
+  const stats = [[o.peopleKind==='talent' ? 'Talent total' : o.peopleKind==='all' ? 'Crew & talent total' : o.crewOnly ? 'Crew total' : 'Total',   // body text under the figure now, not a caps label
     budgetVatToggle ? totalInc : totalEx,
     budgetVatToggle ? (totalVat>0 ? `inc. ${fmt(totalVat)} VAT` : '') : 'ex-VAT',
     budgetVatToggle ? `xVAT ${fmt(totalEx)}` : '']];
@@ -9134,7 +9194,7 @@ function budgetSummaryBarHTML(data, o){
   const deptMode = headBreakdown==='depts' && o.listToolsHTML!=null;
   /* ⚠️ a department with PEOPLE in it is always listed, even at £0.00 — muting one department writes the
      others into the filter, so a department missing from this list would silently vanish with it */
-  const deptFigs = deptMode ? (o.deptFigs || headDeptFigs(o.peopleKind)).filter(f=>f.inc || f.people) : [];
+  const deptFigs = deptMode ? (o.deptFigs || headDeptFigs(o.peopleKind==='all' ? null : o.peopleKind)).filter(f=>f.inc || f.people) : [];
   if(deptMode) headDeptPresent = deptFigs.map(f=>f.dept);
   const deptTotal = deptFigs.reduce((n,f)=>n+(budgetVatToggle?f.inc:f.ex), 0);
   const pctOf = v => deptTotal ? Math.round(v/deptTotal*100)+'%' : '—';
