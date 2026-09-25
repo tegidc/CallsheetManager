@@ -38,6 +38,9 @@
     --tint-3:rgba(1,119,86,.10);   /* badges, hover fills, bulk action bar */
     --tint-4:rgba(1,119,86,.14);   /* active controls — must stay distinct from tint-3 */
     --phase-prep:#8A5A0B; --phase-shoot:#017756; --phase-post:#4A3C8C;
+    /* the three costs — Hotels / Catering / Travel (the head's COSTS rows, and the day shading when one is the filter) */
+    --cost-hotel:#2E6BA8; --cost-catering:#C0622B; --cost-travel:#1B8A8A;
+    --cost-hotel-soft:rgba(46,107,168,.16); --cost-catering-soft:rgba(192,98,43,.16); --cost-travel-soft:rgba(27,138,138,.16);
     --phase-prep-soft:rgba(138,90,11,.13); --phase-shoot-soft:rgba(1,119,86,.13);
     --phase-post-soft:rgba(74,60,140,.13);
     --tint-5:rgba(1,119,86,.35);   /* sidebar active-project gradient */
@@ -1445,6 +1448,19 @@
   .stage-only{--c:var(--text); font-family:var(--label); font-size:9px; font-weight:500; letter-spacing:.8px; text-transform:uppercase; line-height:1.3;
     width:40px; padding:1px 0; text-align:center; border:1px solid var(--line); border-radius:5px; background:var(--bg); color:var(--muted);}
   .stage-only.stage-pre{--c:var(--phase-prep);} .stage-only.stage-prod{--c:var(--phase-shoot);} .stage-only.stage-post{--c:var(--phase-post);}
+  .stage-dot.cost-dot-hotel, .stage-only.cost-hotel{--c:var(--cost-hotel); background:var(--cost-hotel);} .stage-only.cost-hotel{background:none;}
+  .stage-dot.cost-dot-catering, .stage-only.cost-catering{--c:var(--cost-catering); background:var(--cost-catering);} .stage-only.cost-catering{background:none;}
+  .stage-dot.cost-dot-travel, .stage-only.cost-travel{--c:var(--cost-travel); background:var(--cost-travel);} .stage-only.cost-travel{background:none;}
+  /* DAY SHADING — with a cost filter on, every view's day cells show which days that cost falls on:
+     hotel = a night in that day's hotel (filled), catering = a meal (bar below), travel = on site with a method (bar above) */
+  .cost-day-hotel{background:var(--cost-hotel-soft); border-radius:4px;}
+  .cost-day-catering{box-shadow:inset 0 -3px 0 var(--cost-catering); border-radius:4px;}
+  .cost-day-travel{box-shadow:inset 0 3px 0 var(--cost-travel); border-radius:4px;}
+  .cost-day-catering.cost-day-travel{box-shadow:inset 0 -3px 0 var(--cost-catering), inset 0 3px 0 var(--cost-travel);}
+  .crewgrid-check.cost-day-hotel, .crewgrid-check.cost-day-catering, .crewgrid-check.cost-day-travel, .roles-shootday.cost-day-hotel, .roles-shootday.cost-day-catering, .roles-shootday.cost-day-travel{align-self:stretch; min-height:26px; align-items:center;}
+  .cost-key{display:inline-flex; gap:12px; align-items:center; font-size:var(--fs-meta); color:var(--muted); margin-right:14px;}
+  .cost-key i{display:inline-block; width:14px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px;}
+  .cost-key i.hotel{background:var(--cost-hotel-soft);} .cost-key i.catering{box-shadow:inset 0 -3px 0 var(--cost-catering); background:var(--tint-1);} .cost-key i.travel{box-shadow:inset 0 3px 0 var(--cost-travel); background:var(--tint-1);}
   .stage-only:hover{border-color:var(--c); color:var(--c);}
   .stage-only.on{background:var(--c); border-color:var(--c); color:#fff; font-weight:600;}
   /* the stage colour — see applyStageColour() */
@@ -4861,6 +4877,21 @@ function personMatchesCostFilter(c){
   const id = personIdOf(c);
   return [...f].some(k=>personHasCost(id, k));
 }
+/* the classes a day cell wears while a cost filter is on — which of the filtered costs this person has on
+   that day (a hotel night is the night OF the day; the pre night has no day column outside Hotel) */
+function costDayClass(crewId, d, opts){
+  const f = projectCrewFilter.costs; if(!f.size || !d) return '';
+  const p = currentProject(), out = [];
+  if(f.has('hotel') && ((opts&&opts.pre) ? (p.hotelNightBefore||[]).includes(crewId) : (d.hotelNights||[]).includes(crewId))) out.push('cost-day-hotel');
+  if(f.has('catering') && !(opts&&opts.pre) && dayCateredAny(d, crewId)) out.push('cost-day-catering');
+  if(f.has('travel') && !(opts&&opts.pre) && (p.travelMethods||{})[crewId] && crewOnDay(crewId, d, p)) out.push('cost-day-travel');
+  return out.length ? ' '+out.join(' ') : '';
+}
+function costKeyHTML(){
+  const f = projectCrewFilter.costs; if(!f.size) return '';
+  const L = { hotel:'hotel night', catering:'meal', travel:'travelling' };
+  return `<span class="cost-key" title="The costs filter is on — the shading shows which days it falls on">${[...f].map(k=>`<span><i class="${k}"></i>${L[k]}</span>`).join('')}</span>`;
+}
 function toggleCostFilter(kind){
   const f = projectCrewFilter.costs;
   if(f.has(kind)) f.delete(kind); else f.add(kind);
@@ -5602,7 +5633,7 @@ function renderProjectCrew(body){
       const allCollapsed = groups.every(g=>collapsedProjectDepts.has(g.key));
       expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
     }
-    rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
+    rightHeaderHTML = `${costKeyHTML()}${summaryLinkHTML}${expandAllHTML}`;
     /* ⚠️ THE FLAT LIST HAS NO HEAD, and that is the whole of what "None (flat list)" buys —
        one group called "All crew" wearing a subhead that says "All crew (41)" would be a row
        of chrome above every screen for no information. Every other grouper still gets one. */
@@ -5983,7 +6014,7 @@ function crewRolesRowHTML(e, spec, data){
 function shootDayCellHTML(e, d){
   const on = entryOnDay(e.id, d);
   const label = `Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}`;
-  return `<div class="crewgrid-check roles-shootday" data-day="D${esc(d.dayNum||'?')}">
+  return `<div class="crewgrid-check roles-shootday${costDayClass(e.crewId, d)}" data-day="D${esc(d.dayNum||'?')}">
     <input type="checkbox" ${on?'checked':''} onclick="event.stopPropagation()"
       onchange="toggleRolesShootDay('${e.id}','${d.id}', this.checked)" title="${label}"></div>`;
 }
@@ -6311,10 +6342,10 @@ function crewAssignRowHTML(block, days){
   let headCells = '', headRight = '';
   if(isHotel && days.length){
     const inPre = (p.hotelNightBefore||[]).includes(block.crewId);
-    headCells = `<div class="crewgrid-check" data-day="Pre"><input type="checkbox" ${inPre?'checked':''} onchange="toggleHotelPre('${block.crewId}',this.checked)" title="Night before Day 1"></div>`
+    headCells = `<div class="crewgrid-check${costDayClass(block.crewId, days[0], {pre:true})}" data-day="Pre"><input type="checkbox" ${inPre?'checked':''} onchange="toggleHotelPre('${block.crewId}',this.checked)" title="Night before Day 1"></div>`
       + days.map(d=>{
           const inHotel = (d.hotelNights||[]).includes(block.crewId);
-          return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${block.crewId}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
+          return `<div class="crewgrid-check${costDayClass(block.crewId, d)}" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${block.crewId}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
         }).join('');
     headRight = `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${block.crewId}','hotel')" title="Toggle all on/off for this person">All</button>`;
     /* ▸ opens the nights beneath, in both modes: the hotel each night, and with Budget on its rate too */
@@ -6323,7 +6354,7 @@ function crewAssignRowHTML(block, days){
     if(isTalentEtc(block)) headRight = bookedByHTML(block.crewId, 'stay') + headRight;   // Talent etc: Us is costed, Them is listed
   }
   const entryCellsHTML = e => isHotel ? '' : days.map(d=>
-    `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${entryOnDay(e.id, d)?'checked':''} onchange="toggleCrewOnDay('${e.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`
+    `<div class="crewgrid-check${costDayClass(e.crewId, d)}" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${entryOnDay(e.id, d)?'checked':''} onchange="toggleCrewOnDay('${e.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`
   ).join('');
   const entryRightHTML = e => isHotel ? '' :
     `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
@@ -6401,7 +6432,7 @@ function crewCateringBlockHTML(block, days){
   const isOpen = cateringOpen.has(crewId);
   /* THREE MARKS A DAY — B L D, each cycling — / ✓ catered / £ per diem (cycleMealState). The marks are the
      whole detail; the header's letters and the row's All cycle everyone the same way, absolutely. */
-  const cells = days.map(d=>`<div class="crewgrid-check meal-marks" data-day="D${esc(d.dayNum||'?')}" data-crew="${crewId}" data-day-id="${d.id}">${MEAL_KEYS.map(([k,label])=>mealMarkHTML(crewId, d, k, label)).join('')}</div>`).join('');
+  const cells = days.map(d=>`<div class="crewgrid-check meal-marks${costDayClass(crewId, d)}" data-day="D${esc(d.dayNum||'?')}" data-crew="${crewId}" data-day-id="${d.id}">${MEAL_KEYS.map(([k,label])=>mealMarkHTML(crewId, d, k, label)).join('')}</div>`).join('');
   const openBtn = own ? `<button type="button" class="cost-open" onclick="toggleCateringOpen('${cid}')" title="${isOpen?'Close':'The arrangement — what, and what it costs us'}" aria-expanded="${isOpen}">${isOpen?'▾':'▸'}</button>` : '';
   const allHTML = `<button class="small all-toggle-btn" onclick="cycleAllCateringForPerson('${cid}')" title="Every meal, every day: all catered → all per diem → none">All</button>`;
   /* what makes this person's plate different — the standard diet says nothing, so it shows nothing */
@@ -9694,8 +9725,8 @@ function budgetSummaryBarHTML(data, o){
       return `<div class="budget-scope-row dept-mode cost-mode${budgetVatToggle&&o.showTotals?' itemized':''}${on?'':' off'}" role="button" tabindex="0" aria-pressed="${on}"
         onclick="toggleCostFilter('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCostFilter('${k}');}"
         title="${label} — ${cf.has(k) ? 'in the filter, click to take it out' : cf.size ? 'left out, click to add it' : 'click to list only the people with '+label.toLowerCase()}">
-        <span class="stage-dot stage-dot-dept"></span><span class="budget-scope-name">${label}</span>
-        <button type="button" class="stage-only${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
+        <span class="stage-dot cost-dot-${k}"></span><span class="budget-scope-name">${label}</span>
+        <button type="button" class="stage-only cost-${k}${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
           onclick="event.stopPropagation();onlyCostFilter('${k}')" onkeydown="event.stopPropagation()"
           title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button>${cells(f, fmtN(counts[k]))}</div>`;
     };

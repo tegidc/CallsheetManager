@@ -78,6 +78,11 @@ the people with that cost, ONLY isolates one, All costs is the way back; several
 of them. It writes `projectCrewFilter.costs` (`personMatchesCostFilter` / `personHasCost`: hotel = a night
 ticked, catering = a meal mark or an Own arrangement, travel = a method), so the head's figures and the
 Filter count narrow with the list. The use: Only Hotels, then Catering, and set those dinners to £.
+**Colour and day shading (same pass):** Hotels / Catering / Travel have their own colours (`--cost-hotel`
+blue, `--cost-catering` orange, `--cost-travel` teal — the rows' dots and their Only pill). While a cost is
+the filter, every view's day cells wear `costDayClass()`: a hotel night fills the cell, a meal puts a bar
+below it, a travel day a bar above; a key on the sub-tab row (`costKeyHTML`) says which. So Only Hotels
+on Roles or Catering shows which days each person is in a hotel.
 Figures: `data.hotelTotal/hotelVat`,
 `cateringCounted/cateringVat`, `travelTotal/travelVat`.
 
