@@ -137,9 +137,12 @@ Removed with the old summaries: `cateringSummaryGridBodyHTML`, `cateringDietTabl
   → all ✓. The row's All (`cycleAllCateringForPerson`) covers every meal on every day; a header letter
   (`toggleMealColumn`) covers that meal for everyone on screen. `setCateredDay` / `dayMealPlan` /
   `toggleAllCateringForPerson` are gone.
-- **Hotel's ▸ opens the nights in both modes** (`hotelNightRowsHTML(…, costOn)`): the hotel each night is
-  detail, so the row's Hotel column and the night lines' hotel field show with Budget off too
-  (`.crewgrid.hotel-detail` template); Rate / night and xVAT, and the night lines' rate, only with Budget on.
+- **Hotel's ▸ opens the nights in both modes** (`hotelNightRowsHTML(…, costOn)`). Sixth pass, same day: the
+  row itself carries only the ticks, ▸ / All and (Budget on) the total; the hotel and the rates are the open
+  lines beneath, laid out in the space under the day columns — **All nights** first (the person's hotel and
+  rate, `cost-night-all`), then one line per night with its own (label over Dept · Role, hotel over the name
+  and the first half of the days, rate over the rest, the night's cost in the total column). Budget off shows
+  the hotels alone. `COST_COLS.hotel` is `74px 92px` (All · xVAT).
 
 ### Third pass, 26 Sep 2026 — per-meal per diems, Standard costs, one list
 

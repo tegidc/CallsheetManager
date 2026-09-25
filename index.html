@@ -1036,8 +1036,6 @@
      own --costcols (COST_COLS). They are tinted, a costing sheet beside the roster. A name on its
      own rate is amber — the pre-production stage's ink, the one warm colour the app already has. */
   .crewgrid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) var(--costcols) minmax(0,1fr);}
-  /* Hotel, Budget off — the ▸ / All column, then the hotel name (detail, not cost) */
-  .crewgrid.hotel-detail{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px 170px minmax(0,1fr);}
   /* Catering: the ticks, [the cost columns], Dietary, how they eat, the row's All */
   .crewgrid.catering-grid{column-gap:8px; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 56px) 52px minmax(80px,1fr) 150px;}
   .crewgrid.catering-grid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 56px) 52px var(--costcols) minmax(80px,1fr) 150px;}
@@ -1083,7 +1081,11 @@
   .person-block.cost-changed .cost-cell{background:transparent;}
   .cost-night{min-height:30px; font-size:var(--fs-meta);}
   .cost-night.cost-changed .cost-cell{background:var(--phase-prep-soft);}
-  .cost-night-lab{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); text-align:right; padding-right:10px;}
+  .cost-night-lab{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cost-night .cost-cell.l{justify-content:flex-start; padding-right:14px;}
+  .cost-night .cost-cell.l .cost-in{width:100%;}
+  .cost-night-all{background:var(--tint-2);}
+  .cost-night-all .cost-night-lab{color:var(--text);}
   .cost-tail{display:flex; align-items:center; gap:10px; min-width:0; padding-left:12px;}
   .cost-note{max-width:220px; font-size:var(--fs-meta);}
   .meal-diet-head, .meal-mode-head{text-align:left; padding-left:6px;}
@@ -1435,7 +1437,7 @@
   .budget-scope-row.dept-mode .budget-scope-count{grid-column:4 / -1;}
   .budget-scope-row.cost-mode{cursor:pointer;}
   .budget-scope-row.cost-mode .budget-scope-name{display:flex; align-items:center; gap:6px; overflow:visible;}
-  .cost-cog{padding:0 5px; font-size:11px; line-height:1.2; margin-left:-4px;}
+  .cost-cog{padding:0 5px; font-size:11px; line-height:1.2; margin-left:2px; flex:0 0 auto;}
   .cost-cog.on{background:var(--c); border-color:var(--c); color:#fff;}
   .cost-sub-group{margin:0 0 10px;}
   .cost-sub-h{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:4px;}
@@ -5745,12 +5747,12 @@ function renderProjectCrew(body){
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const isCatering = crewGridView==='catering';
       const dayHeaderRow = days.length ? `
-        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}${crewGridView==='hotel'&&!costGridOn()?' hotel-detail':''}" style="--daycols:${colCount};${costGridVars()}">
+        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}" style="--daycols:${colCount};${costGridVars()}">
           ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
           ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
           ${isCatering ? '<div class="crewgrid-header"></div>' : ''}
-          ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : crewGridView==='hotel' ? `<div class="crewgrid-header"></div><div class="crewgrid-header cost-cell l" style="grid-column:${colCount+6};">Hotel</div>` : ''}
+          ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : ''}
           ${isCatering ? CATERING_TAIL_HEAD : (costGridOn() ? '' : '<div class="crewgrid-header"></div>')}
         </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
       const groupsHTML = groups.map(g=>{
@@ -6238,7 +6240,7 @@ function groupedCrewOptionsHTML(list){
    with ↺ to go back to the standard. The rates themselves live in p.costAmends — see costAmendsOf().
    ⚠️ Talent etc keep their own hotel / travel (e.stay / e.trip) on the Talent etc switch; these columns
    are Crew's (the Catering sub-tab's Talent & client fold shares the kitchen, so it gets them too). */
-const COST_COLS = { hotel:'74px 170px 112px 92px', catering:'80px', travel:'44px 112px 92px 92px' };
+const COST_COLS = { hotel:'74px 92px', catering:'80px', travel:'44px 112px 92px 92px' };
 /* Talent etc's Booked by — Us is costed, Them is listed and not (bookedByThem) */
 function bookedByHTML(crewId, group){
   const them = bookedByThem(currentProject(), crewId, group), cid = costJs(crewId);
@@ -6279,52 +6281,54 @@ const costResetHTML = (kind, crewId, title) =>
 function costHeadCellsHTML(firstCol){
   if(!costGridOn()) return '';
   const h = (t, i, cls='', title='') => `<div class="crewgrid-header cost-cell${cls}"${firstCol?` style="grid-column:${firstCol+i};"`:''}${title?` title="${esc(title)}"`:''}>${t}</div>`;
-  if(crewGridView==='hotel') return h('', 0, ' blank') + h('Hotel', 1, ' l') + h('Rate / night', 2, '', 'Per room per night — the standard unless this person has their own') + h('xVAT', 3);
+  if(crewGridView==='hotel') return h('', 0, ' blank') + h('xVAT', 1, '', 'Every night at its rate — ▸ opens the nights, the hotel and the rates');
   if(crewGridView==='catering') return h('xVAT', 0, '', 'Meals at the standard rates, per diems at the standard allowances, or the own cost');
   return h('Days', 0) + h('Rate', 1) + h('Per', 2) + h('xVAT', 3);
 }
 /* ---- HOTEL: the person's hotel, rate and cost; ▸ opens the nights ---- */
+/* the row's own cost cell — the total only; the hotel and the rates live in the open lines beneath */
 function hotelCostCellsHTML(crewId, firstCol, costOn){
+  if(!costOn) return '';
   const p = currentProject(), fmt = budgetFmt;
-  const c = i => `grid-column:${firstCol+i};`;
   const keys = hotelNightKeysFor(p, crewId);
-  const cid = costJs(crewId);
-  const nights = keys.map(k=>hotelNightTerms(p, crewId, k)), person = hotelPersonTerms(p, crewId);
-  const open = hotelNightsOpen.has(crewId);
-  const hotels = [...new Set(nights.map(n=>n.hotel).filter(Boolean))];
-  /* the hotel — detail, not cost: in both modes */
-  const hotelCell = !keys.length ? '' : hotels.length>1 && !open ? `<span class="cost-mixed">${hotels.length} hotels</span>`
-    : `<input type="text" class="cost-in l" value="${esc(person.hotel)}" placeholder="Hotel…" aria-label="Hotel" onchange="setHotelAmend('${cid}', '', 'hotel', this.value)">`;
-  const hotelHTML = `<div class="cost-cell l" style="${c(1)}">${hotelCell}</div>`;
-  if(!costOn) return hotelHTML;
-  if(keys.length && bookedByThem(p, crewId, 'stay')) return hotelHTML + `<div class="cost-cell muted" style="${c(2)}">by them</div><div class="cost-cell muted" style="${c(3)}">—</div>`;
-  if(!keys.length) return hotelHTML + `<div class="cost-cell" style="${c(2)}"></div><div class="cost-cell muted" style="${c(3)}">—</div>`;
-  const mixedRate = new Set(nights.map(n=>n.rate)).size>1;
-  const rateCell = mixedRate && !open ? `<span class="cost-mixed">Mixed</span>`
-    : `${person.changed ? '' : '<span class="cost-std">std</span>'}${costRateInputHTML(person.rate, person.std, person.changed, `setHotelAmend('${cid}', '', 'rate', this.value)`, 'Rate per night')}`;
-  const changed = nights.some(n=>n.changed);
-  return hotelHTML + `<div class="cost-cell" style="${c(2)}">${rateCell}${changed ? costResetHTML('hotel', crewId, 'Every night back to the standard rate') : ''}</div>
-    <div class="cost-cell" style="${c(3)}">${fmt(nights.reduce((s,n)=>s+n.rate, 0))}</div>`;
+  const c = `grid-column:${firstCol+1};`;
+  if(!keys.length) return `<div class="cost-cell muted" style="${c}">—</div>`;
+  if(bookedByThem(p, crewId, 'stay')) return `<div class="cost-cell muted" style="${c}" title="Booked by them — not costed">by them</div>`;
+  return `<div class="cost-cell" style="${c}">${fmt(keys.reduce((s,k)=>s+hotelNightTerms(p, crewId, k).rate, 0))}</div>`;
 }
-/* the open person's nights beneath — the hotel each night; with Budget on, its rate and cost too */
+/* the open person, beneath the ticks: ALL NIGHTS first (the hotel and, with Budget on, the rate that every
+   night follows), then one line per night with its own — laid out in the space under the day columns:
+   the label over Dept · Role, the hotel over the name and the first day columns, the rate over the rest,
+   the night's cost in the total column. Budget off shows the hotels alone. */
 function hotelNightRowsHTML(crewId, colCount, firstCol, costOn){
   if(!hotelNightsOpen.has(crewId)) return '';
   const p = currentProject(), fmt = budgetFmt, person = hotelPersonTerms(p, crewId);
   const own = (costAmendsOf(p).hotel[crewId]||{}).nights || {};
   const days = projectDays(), cid = costJs(crewId);
   const them = bookedByThem(p, crewId, 'stay');
-  return hotelNightKeysFor(p, crewId).map(k=>{
+  /* columns: 1 controls · 2 dept · 3 role · 4 name · 5… days (colCount of them) · firstCol = All · firstCol+1 = total */
+  const hotelSpan = costOn ? Math.max(2, Math.ceil((colCount+1)/2)) : colCount+1;     // name + the first half of the days
+  const rateStart = 4 + hotelSpan, rateSpan = firstCol - rateStart + 1;                // the rest of the days, and the All column
+  const line = (cls, labelHTML, hotelHTML, rateHTML, costHTML) => `<div class="crewgrid pb-role-row cost-night${cls}${costOn?' cost-on':''}" style="--daycols:${colCount};${costOn?costGridVars():''}">
+      <div class="cost-night-lab" style="grid-column:2 / 4;">${labelHTML}</div>
+      <div class="cost-cell l" style="grid-column:4 / span ${hotelSpan};">${hotelHTML}</div>
+      ${costOn ? `<div class="cost-cell" style="grid-column:${rateStart} / span ${rateSpan};">${rateHTML}</div><div class="cost-cell muted" style="grid-column:${firstCol+1};">${costHTML}</div>` : ''}
+    </div>`;
+  const allRate = them ? '<span class="muted">by them</span>'
+    : `${person.changed ? '' : '<span class="cost-std">std</span>'}${costRateInputHTML(person.rate, person.std, person.changed, `setHotelAmend('${cid}', '', 'rate', this.value)`, 'Rate per night, every night')}<span class="cost-unit">/ night</span>${person.changed || Object.keys(own).length ? costResetHTML('hotel', crewId, 'Every night back to the standard rate') : ''}`;
+  let html = line(' cost-night-all', 'All nights',
+    `<input type="text" class="cost-in l" value="${esc(person.hotel)}" placeholder="Hotel…" aria-label="Hotel, every night" onchange="setHotelAmend('${cid}', '', 'hotel', this.value)">`,
+    allRate, '');
+  html += hotelNightKeysFor(p, crewId).map(k=>{
     const t = hotelNightTerms(p, crewId, k), o = own[k] || {};
     const d = k==='pre' ? null : days.find(x=>x.id===k);
     const label = k==='pre' ? 'Night before Day 1' : `Day ${esc(d.dayNum||'?')}${d.date ? ' · '+esc(fmtDate(d.date)) : ''}`;
-    return `<div class="crewgrid pb-role-row cost-night${costOn?' cost-on':' hotel-detail'}${costOn&&t.changed?' cost-changed':''}" style="--daycols:${colCount};${costOn?costGridVars():''}">
-      <div class="cost-night-lab" style="grid-column:3 / ${firstCol+1};">${label}</div>
-      <div class="cost-cell l" style="grid-column:${firstCol+1};"><input type="text" class="cost-in l" value="${esc(o.hotel||'')}" placeholder="${esc(person.hotel||'Same hotel')}" aria-label="Hotel this night" onchange="setHotelAmend('${cid}', '${k}', 'hotel', this.value)"></div>
-      ${costOn ? (them ? `<div class="cost-cell muted" style="grid-column:${firstCol+2};">by them</div><div class="cost-cell muted" style="grid-column:${firstCol+3};">—</div>`
-        : `<div class="cost-cell" style="grid-column:${firstCol+2};">${costRateInputHTML(t.rate, person.rate, hasVal(o.rate), `setHotelAmend('${cid}', '${k}', 'rate', this.value)`, 'Rate this night')}</div>
-      <div class="cost-cell muted" style="grid-column:${firstCol+3};">${fmt(t.rate)}</div>`) : ''}
-    </div>`;
+    return line(costOn && t.changed ? ' cost-changed' : '', label,
+      `<input type="text" class="cost-in l" value="${esc(o.hotel||'')}" placeholder="${esc(person.hotel||'Same hotel')}" aria-label="Hotel this night" onchange="setHotelAmend('${cid}', '${k}', 'hotel', this.value)">`,
+      them ? '<span class="muted">by them</span>' : costRateInputHTML(t.rate, person.rate, hasVal(o.rate), `setHotelAmend('${cid}', '${k}', 'rate', this.value)`, 'Rate this night'),
+      them ? '—' : fmt(t.rate));
   }).join('');
+  return html;
 }
 /* ---- CATERING: one rate per meal for this person, and what their meals cost ---- */
 function cateringCostCellsHTML(crewId, days, mode){
@@ -6422,7 +6426,7 @@ function crewAssignRowHTML(block, days){
      <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
   const roleChipHTML = (e, toggleHTML) => isTalentEtc(block) ? talentRoleTextHTML(e) : `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
   const costOn = isHotel && costGridOn();
-  const gridCls = isHotel ? (costOn ? ' cost-on' : ' hotel-detail') : '';   // Hotel always carries the hotel-name column; Budget adds the rate and the cost
+  const gridCls = costOn ? ' cost-on' : '';
   const head = `<div class="crewgrid crewgrid-row pb-head${gridCls}" style="--daycols:${colCount};${costOn?costGridVars():''}">
     <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
     ${pbDeptCellHTML(isHotel?topSeniorityEntry(block.entries):fronted)}
@@ -9786,11 +9790,11 @@ function budgetSummaryBarHTML(data, o){
       return `<div class="budget-scope-row dept-mode cost-mode${budgetVatToggle&&o.showTotals?' itemized':''}${on?'':' off'}" role="button" tabindex="0" aria-pressed="${on}"
         onclick="toggleCostFilter('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCostFilter('${k}');}"
         title="${label} — ${cf.has(k) ? 'in the filter, click to take it out' : cf.size ? 'left out, click to add it' : 'click to list only the people with '+label.toLowerCase()}">
-        <span class="stage-dot cost-dot-${k}"></span><span class="budget-scope-name">${label}</span>
+        <span class="stage-dot cost-dot-${k}"></span><span class="budget-scope-name">${label}<button type="button" class="stage-only cost-cog cost-${k}${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
+          onclick="event.stopPropagation();openCostSub('${k}')" onkeydown="event.stopPropagation()" title="Narrow ${label.toLowerCase()} — ${k==='hotel'?'by night':k==='catering'?'by day, meal, catered or per diem':'by method and day'}" aria-label="Narrow ${label}">⚙</button></span>
         <button type="button" class="stage-only cost-${k}${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
           onclick="event.stopPropagation();onlyCostFilter('${k}')" onkeydown="event.stopPropagation()"
-          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button><button type="button" class="stage-only cost-cog${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
-          onclick="event.stopPropagation();openCostSub('${k}')" onkeydown="event.stopPropagation()" title="Narrow ${label.toLowerCase()} — ${k==='hotel'?'by night':k==='catering'?'by day, meal, catered or per diem':'by method and day'}" aria-label="Narrow ${label}">⚙</button>${cells(f, fmtN(counts[k]))}</div>`;
+          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button>${cells(f, fmtN(counts[k]))}</div>`;
     };
     return `<div class="budget-scope-row dept-mode cost-mode budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${cf.size?' off':''}" role="button" tabindex="0" aria-pressed="${!cf.size}"
         onclick="allCostFilter()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allCostFilter();}" title="Everyone — clear the costs filter">
