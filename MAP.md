@@ -35,6 +35,64 @@ The five current users, each a thin wrapper with its own precedence order:
 | Tech specs | `resolveTechSpecs()` | defaults → project → day |
 | Cameras | `resolveCameras()` | project → day (whole object) |
 | Day crew fields | `resolveCrewForDay()` / `saveDayOverride()` | entry → day override (`OVERRIDABLE_FIELDS`) |
+| Per-person costs (25 Sep 2026) | `hotelNightTerms()` / `mealRateFor()` / `travelTermsFor()` | project standard rate → person (`p.costAmends`) → night (hotel only) |
+
+## Per-person costs — Crew ▸ Hotel / Catering / Travel with Budget on (25 Sep 2026, branch `crew-costs`)
+
+Decided on `demo-crew-costs.html` and `summaries-check.html` (both in the repo root, untracked demos).
+There is **no Costs tab**: Crew's **Budget** button is the switch. Budget off, Hotel / Catering / Travel
+are for filling in who needs what, unchanged. Budget on (`costGridOn()` — Crew or All, not the Talent etc
+switch), each gets:
+
+- **Standard £ strip** above the table (`costStripHTML()`) — the project rates, same stores as before
+  (`p.hotelCosts` / `p.cateringCosts` / `p.transportCosts`), same field ids (`hcRoomNight`, `ccCost*`,
+  `tsCost*`), saved on change by `saveStandardRates()`. They used to sit inside the summaries.
+- **Cost columns** after the ticks (`.crewgrid.cost-on`, widths in `COST_COLS`, the zone widens with
+  `.roles-widezone` as Roles does): Hotel — hotel · rate/night · xVAT, ▸ opens the person's nights
+  (`hotelNightRowsHTML()`, one hotel + rate per night); Catering — B £ · L £ · D £ · ↺ · xVAT; Travel — days ·
+  rate (a fare for Train / Flying) · Day | Trip · xVAT, and a note. A name on its own rate is amber
+  (`--phase-prep`), ↺ puts the standard back (`resetCostAmend()`). Editing one selected person applies to
+  all selected (`selectedCrewTargets`), as the ticks do.
+- **Select** with Budget on adds one-cost-for-everyone fields to the bulk bar (`bulkCostFieldsHTML()` →
+  `applyBulkCosts()`); a hotel rate applied to a group clears their night-by-night figures.
+
+**Storage** — `p.costAmends = { hotel:{crewId:{rate, hotel, nights:{'pre'|dayId:{rate, hotel}}}},
+catering:{crewId:{b,l,d}}, travel:{crewId:{rate, unit:'day'|'trip', note}} }`, keyed by crewId (a bed, a meal,
+a journey belong to a person, not a role). `setCostAmend()` stores only what differs — typing the standard
+back clears it. A Trip fare lands on the person's first day on site (`travelCostOnDay()`).
+
+⚠️ **One set of helpers costs everything** — `buildBudgetData()` (person hotel / meal / travel cost, hotel
+totals and per day, travel VAT), `buildCateringSummaryGrid()` (`cols[].cost`), `buildTransportSummary()`
+(`cols[].costBy`), `buildBudgetLines()` and the Crew rows. Never multiply a standard rate by a count
+anywhere else, or Crew and Budget will disagree.
+
+**Budget ▸ Line Items** — the standard line (Hotel rooms / Breakfast / Lunch / Dinner / Own car / Public
+transport) carries everyone at the standard; each changed name gets its own line (`Lunch — Name`,
+`Hotel — Name · Hotel`, one per hotel-and-rate, `Train — Name`). Keys `cat:k:crewId`, `htl:crewId|rate|hotel`,
+`trv:p:crewId`; `amendedFor` on the line. The reconciliation row ("Unitemised difference") stays silent.
+
+**Head** — the block's cuts are STAGES / DEPT / **COSTS** (`headBreakdown==='costs'`): All costs, Hotels,
+Catering, Travel with xVAT | VAT | Total | % (Budget on) or room nights / meals / people travelling (off).
+Not a filter — a row opens that Crew sub-tab. Figures: `data.hotelTotal/hotelVat`,
+`cateringCounted/cateringVat`, `travelTotal/travelVat`.
+
+**Summaries** (`hotelSummaryHTML` / `cateringSummaryHTML` / `transportSummaryHTML`, one fold per sub-tab):
+Budget off — a grid (Rooms per night / B L D per day / method per day), a rule, then the list: Bookings
+(name, hotel, from, to, nights), special dietaries grouped by diet (notes still edit in place —
+`editDietaryNote`), Who per method + an **Own car** table (name, car, registration from the crew record).
+Budget on — the same grid with £ each, Cost and a daily row; a changed name is FOLDED into its item (the
+average with a *, a footnote says who and what; "No fare yet" in red). Copy copies what's showing
+(`copySummaryShowing()`). The Call Sheets page shows the Budget-off form (`wrapClass 'card'`).
+Removed with the old summaries: `cateringSummaryGridBodyHTML`, `cateringDietTableHTML`,
+`cateringSpecialsHTML`, `refreshCateringSummaryFigures`, `transportSummaryGridBodyHTML`,
+`renderTransportSummaryGridSection`, `costFieldHTML`, `copyHotelSummary`, `copyTransportSummary`,
+`copyCateringSummaryGrid`. `hotelSummaryLines()` / `transportSummaryLines()` still feed the WhatsApp export.
+
+⚠️ **No body-wide rate saver.** Crew and the Talent etc switch set `body.oninput = null`; the rate savers
+(`saveHotelCosts` etc.) keep a rate whose field isn't on the page (`fieldNum()`), so they can never zero one.
+
+**Not changed:** Talent etc's own hotel / travel (`e.stay` / `e.trip`) stay on the Talent etc switch; the
+Catering sub-tab's Talent & client fold shares the kitchen, so it gets the catering columns.
 
 ⚠️ **Vendors (planned): a supplier's QUOTE overriding the running ESTIMATE, flowing
 into Budget, is this exact pattern — build it on these four primitives and give it a
