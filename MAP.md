@@ -113,6 +113,27 @@ Removed with the old summaries: `cateringSummaryGridBodyHTML`, `cateringDietTabl
   and `perDiem / own / fed` lists; Budget ▸ Line Items gets `Per diem` (standard), `Per diem — Name` and
   `Own catering — Name` lines; the Summary gets Per diem / Own arrangements rows (Budget on) and a
   **Not catered** list (both modes).
+### Third pass, 26 Sep 2026 — per-meal per diems, Standard costs, one list
+
+- **Per diem is per MEAL, per DAY** (`d.cateringPerDiem[crewId] = {b,l,d}` beside `d.cateringMeals`): a meal
+  on a day is Catered, a Per diem (they buy it at the standard allowance for that meal — lunch laid on, a
+  dinner allowance in a hotel) or neither — `mealStateOf()` / `setMealState()`, set under ▸ on the Catering
+  row (`cateringDayRowsHTML`, a Catered | Per diem | — switch per meal per day). Standard allowances
+  `cateringCosts.pdB / pdL / pdD` (a legacy per-day `perDiem` seeds all three). Costed in `buildBudgetData`
+  (the person's meals), `buildCateringSummaryGrid` (`cols[].pd = {b,l,d}`, `pdCost`), Line Items (`Per diem —
+  lunch`, one line per meal, `cat:pd:k`) and the Summary (Per diem rows in both modes). The row's single tick
+  is "anything that day" (`dayCateredAny`); `dayMealPlan` carries both the catered meals and the per diems.
+- **The mode switch is Catered | Own.** Own's detail and one cost live under ▸ (the open row). No per-person
+  meal or per diem rates on screen at all; with Budget on the Catering row carries **xVAT only**.
+- **Standard costs is a sub-tab of Crew** (`standardCostsHTML()`, `crewGridView==='standards'`): the meal
+  rates, delivery, the three per diem allowances, room per night, public transport and own car per day —
+  the old Standard £ strip is gone from every sub-tab. Same field ids, same savers, same stores as
+  Budget ▸ Costs.
+- **One list, one set of columns:** Talent etc go through Crew's Roles too (`crewRolesRowHTML`, the role as
+  plain text — `talentRoleTextHTML`); `renderProjectTalent`, `talentSectionHTML`, `talentListParts`,
+  `talentColumns`, `talentRowHTML`, `talentGroupHTML`, `talentSummaryHTML`, `cateringOtherSideHTML` are gone.
+- The header's B L D letters act on everyone on screen (checked or not), so a meal taken off can go back on.
+
 - **Catering row = Hotel's shape** (second pass, same day): **one tick a day** — catered that day, any meal
   (`setCateredDay`: on gives them the day's meals, `dayMealPlan(d)` = whatever meals anyone catered that day
   has, else lunch; off clears the day) · **▸** opens the person's days (`cateringOpen`, `cateringDayRowsHTML`),
