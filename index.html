@@ -1034,8 +1034,12 @@
      own rate is amber — the pre-production stage's ink, the one warm colour the app already has. */
   .crewgrid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) var(--costcols) minmax(0,1fr);}
   /* Catering: the ticks, [the cost columns], Dietary, how they eat, the row's All */
-  .crewgrid.catering-grid{column-gap:8px; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 62px)) minmax(80px,1fr) 168px 30px;}
-  .crewgrid.catering-grid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 62px)) var(--costcols) minmax(80px,1fr) 168px 30px;}
+  .crewgrid.catering-grid{column-gap:8px; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 44px) 52px minmax(80px,1fr) 168px;}
+  .crewgrid.catering-grid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 44px) 52px var(--costcols) minmax(80px,1fr) 168px;}
+  .catering-grid .crewgrid-remove{justify-content:flex-start; gap:6px;}
+  .meal-day-detail{display:flex; gap:16px; align-items:center; font-size:var(--fs-meta);}
+  .meal-day-detail label{display:inline-flex; gap:5px; align-items:center; cursor:pointer;}
+  .meal-day-detail input{width:14px; height:14px;}
   /* the cost cells wear Roles' clothes — muted header, centred tabular figures, the same rate input — no tint */
   .cost-cell{display:flex; align-items:center; justify-content:center; gap:3px; min-width:0;
     font-size:var(--fs-field); font-variant-numeric:tabular-nums; white-space:nowrap;}
@@ -1075,12 +1079,7 @@
   .diet-sp{font-size:var(--fs-meta); padding:2px 0 2px 10px; display:flex; gap:6px; align-items:baseline;}
   .diet-sp .muted{flex:1; min-width:0;}
   .diet-unset{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--danger); white-space:nowrap;}
-  /* ▸ B L D — one three-part mark a day; each part is that meal's tick */
-  .meal-mini{display:inline-flex; gap:2px;}
-  .meal-mini i{width:8px; height:14px; border:1px solid var(--field-line); border-radius:2px; cursor:pointer; display:inline-block;}
-  .meal-mini i.on{background:var(--text); border-color:var(--text);}
-  .meal-mini i:hover{border-color:var(--tape);}
-  .meal-own .meal-mini{opacity:.35;}
+  .meal-own .crewgrid-check input{opacity:.35;}
   .cost-per span{padding:0 6px;}
   .cost-strip{display:flex; gap:8px 22px; flex-wrap:wrap; align-items:center; padding:10px 0; margin-bottom:6px; border-bottom:1px solid var(--line); font-size:var(--fs-meta); color:var(--muted);}
   .cost-strip label{display:inline-flex; align-items:center; gap:6px;}
@@ -5725,10 +5724,7 @@ function renderProjectCrew(body){
     selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
     const summaryLinkHTML = ['hotel','catering'].includes(crewGridView) ? `<span onclick="jumpToSummary('${crewGridView}')">Summary</span>`
       : crewGridView==='travel' ? `<span onclick="jumpToSummary('transport')">Summary</span>` : '';
-    /* ▸ B L D folds each day's three ticks to one small mark, as ▸ ROLE and ▸ NAME fold their columns */
-    const mealsFoldHTML = crewGridView==='catering' && days.length ? `<span class="roles-col-toggle" role="button" tabindex="0" onclick="toggleMealsCollapsed()"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealsCollapsed();}" aria-expanded="${mealsCollapsed?'false':'true'}"
-        title="${mealsCollapsed?'Show the three tick boxes for each day':'Fold each day to one mark'}"><span class="dept-caret">${mealsCollapsed?'▸':'▾'}</span>B L D</span>` : '';
+
     // Expand/Collapse all: one toggle, not two separate links. The Style Review
     // dropped the rotating chevron in favour of plain text that swaps between
     // "Expand all" and "Collapse all" so only the available action is shown.
@@ -5737,7 +5733,7 @@ function renderProjectCrew(body){
       const allCollapsed = groups.every(g=>collapsedProjectDepts.has(g.key));
       expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
     }
-    rightHeaderHTML = `${mealsFoldHTML}${summaryLinkHTML}${expandAllHTML}`;
+    rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
     /* ⚠️ THE FLAT LIST HAS NO HEAD, and that is the whole of what "None (flat list)" buys —
        one group called "All crew" wearing a subhead that says "All crew (41)" would be a row
        of chrome above every screen for no information. Every other grouper still gets one. */
@@ -5789,10 +5785,11 @@ function renderProjectCrew(body){
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const isCatering = crewGridView==='catering';
       const dayHeaderRow = days.length ? `
-        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}" style="--daycols:${colCount};${isCatering?` --daycolwidth:${cateringDayColW()};`:''}${costGridVars()}">
+        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}" style="--daycols:${colCount};${costGridVars()}">
           ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
           ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
+          ${isCatering ? '<div class="crewgrid-header"></div>' : ''}
           ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : ''}
           ${isCatering ? CATERING_TAIL_HEAD : (costGridOn() ? '' : '<div class="crewgrid-header"></div>')}
         </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
@@ -6281,11 +6278,7 @@ function groupedCrewOptionsHTML(list){
    with ↺ to go back to the standard. The rates themselves live in p.costAmends — see costAmendsOf().
    ⚠️ Talent etc keep their own hotel / travel (e.stay / e.trip) on the Talent etc switch; these columns
    are Crew's (the Catering sub-tab's Talent & client fold shares the kitchen, so it gets them too). */
-const COST_COLS = { hotel:'74px 170px 112px 92px', catering:'52px 52px 52px 20px 80px', travel:'44px 112px 92px 92px' };
-/* ▸ B L D — each day's three ticks fold to one small three-part mark (Style check: fold, don't hide) */
-let mealsCollapsed = true;   // folded by default — the compact form; ▾ B L D opens the three ticks
-function toggleMealsCollapsed(){ mealsCollapsed = !mealsCollapsed; renderProjectBody(); }
-const cateringDayColW = () => mealsCollapsed ? '34px' : CATERING_DAYCOL;
+const COST_COLS = { hotel:'74px 170px 112px 92px', catering:'120px 20px 80px', travel:'44px 112px 92px 92px' };
 /* Talent etc's Booked by — Us is costed, Them is listed and not (bookedByThem) */
 function bookedByHTML(crewId, group){
   const them = bookedByThem(currentProject(), crewId, group), cid = costJs(crewId);
@@ -6328,7 +6321,7 @@ function costHeadCellsHTML(firstCol){
   if(!costGridOn()) return '';
   const h = (t, i, cls='', title='') => `<div class="crewgrid-header cost-cell${cls}"${firstCol?` style="grid-column:${firstCol+i};"`:''}${title?` title="${esc(title)}"`:''}>${t}</div>`;
   if(crewGridView==='hotel') return h('', 0, ' blank') + h('Hotel', 1, ' l') + h('Rate / night', 2, '', 'Per room per night — the standard unless this person has their own') + h('xVAT', 3);
-  if(crewGridView==='catering') return h('B £', 0, '', 'Breakfast, per head') + h('L £', 1, '', 'Lunch, per head') + h('D £', 2, '', 'Dinner, per head') + h('', 3) + h('xVAT', 4);
+  if(crewGridView==='catering') return h('Rate', 0, '', 'A per diem or an own cost — a catered person is at the Standard £ meal rates') + h('', 1) + h('xVAT', 2);
   return h('Days', 0) + h('Rate', 1) + h('Per', 2) + h('xVAT', 3);
 }
 /* ---- HOTEL: the person's hotel, rate and cost; ▸ opens the nights ---- */
@@ -6374,23 +6367,21 @@ function cateringCostCellsHTML(crewId, days, mode){
   const p = currentProject(), fmt = budgetFmt, std = getCateringCosts(p), cid = costJs(crewId);
   if(mode==='perdiem'){
     const q = crewDayCount(crewId, days, p), r = perDiemRateFor(p, crewId), ch = perDiemChanged(p, crewId);
-    return `<div class="cost-cell cost-span" title="The daily allowance — the standard per diem unless this person has their own">
-        ${ch?'':'<span class="cost-std">std</span>'}${costRateInputHTML(r, std.perDiem, ch, `setCateringExtra('${cid}','pd',this.value)`, 'Per diem, per day')}<span class="cost-unit">× ${q} day${q===1?'':'s'}</span></div>
+    return `<div class="cost-cell" title="The daily allowance — the standard per diem unless this person has their own">
+        ${ch?'':'<span class="cost-std">std</span>'}${costRateInputHTML(r, std.perDiem, ch, `setCateringExtra('${cid}','pd',this.value)`, 'Per diem, per day')}<span class="cost-unit">× ${q}</span></div>
       <div class="cost-cell">${ch ? costResetHTML('catering', crewId, 'Back to the standard per diem') : ''}</div>
       <div class="cost-cell">${fmt(r*q)}</div>`;
   }
   if(mode==='own'){
     const amt = ownCateringCostOf(p, crewId);
-    return `<div class="cost-cell cost-span" title="What their own arrangement costs us, if anything — once for the job">
-        <span class="cost-unit">£</span>${costRateInputHTML(amt||'', '0', !!amt, `setCateringExtra('${cid}','own',this.value)`, 'Own catering cost')}<span class="cost-unit">for the job</span></div>
+    return `<div class="cost-cell" title="What their own arrangement costs us, if anything — once for the job">
+        <span class="cost-unit">£</span>${costRateInputHTML(amt||'', '0', !!amt, `setCateringExtra('${cid}','own',this.value)`, 'Own catering cost')}<span class="cost-unit">job</span></div>
       <div class="cost-cell">${amt ? costResetHTML('catering', crewId, 'No cost to us') : ''}</div>
       <div class="cost-cell">${amt ? fmt(amt) : '<span class="muted">—</span>'}</div>`;
   }
-  const changed = ['b','l','d'].some(k=>mealChanged(p, crewId, k));
+  /* catered — at the Standard £ meal rates (a legacy per-person meal rate still counts; the Summary's footnote says so) */
   const total = days.reduce((s,d)=>{ const m = (d.cateringMeals||{})[crewId]; return s + (m ? ['b','l','d'].reduce((n,k)=>n + (m[k] ? mealRateFor(p, crewId, k) : 0), 0) : 0); }, 0);
-  return ['b','l','d'].map(k=>`<div class="cost-cell">${costRateInputHTML(mealRateFor(p, crewId, k), std[k], mealChanged(p, crewId, k), `setMealRate('${cid}','${k}',this.value)`, {b:'Breakfast',l:'Lunch',d:'Dinner'}[k]+' rate')}</div>`).join('')
-    + `<div class="cost-cell">${changed ? costResetHTML('catering', crewId, 'Back to the standard rates') : ''}</div>`
-    + `<div class="cost-cell">${fmt(total)}</div>`;
+  return `<div class="cost-cell muted" title="At the standard meal rates">std</div><div class="cost-cell"></div><div class="cost-cell">${fmt(total)}</div>`;
 }
 /* ---- TRAVEL: days on site, the rate (a fare, for Train / Flying), per day or per trip, the cost ---- */
 function travelCostCellsHTML(crewId, firstCol){
@@ -6413,7 +6404,7 @@ function bulkCostFieldsHTML(){
   if(!costGridOn()) return '';
   const f = (id, label, w) => `<label class="bulk-cost-f">${label} <input type="text" id="${id}" inputmode="decimal" placeholder="—" style="width:${w||56}px"></label>`;
   const fields = crewGridView==='hotel' ? `<label class="bulk-cost-f">Hotel <input type="text" id="bulkCostHotel" placeholder="leave as is" style="width:150px"></label>${f('bulkCostRate', 'Rate / night')}`
-    : crewGridView==='catering' ? `${f('bulkCostB','B')}${f('bulkCostL','L')}${f('bulkCostD','D')}<span class="hint">per head · blank = leave as is</span>`
+    : crewGridView==='catering' ? `${f('bulkCostPD','Per diem')}<span class="hint">per day — for those on a per diem</span>`
     : `${f('bulkCostTRate','Rate')}<label class="bulk-cost-f">Per <select id="bulkCostUnit"><option value="">leave as is</option><option value="day">Day</option><option value="trip">Trip</option></select></label>`;
   return `<span class="bulk-cost">${fields}<button class="small primary" onclick="applyBulkCosts()">Apply to ${selectedPeopleIds().length}</button>
     <button class="small" onclick="resetBulkCosts()">Back to standard</button></span>`;
@@ -6436,10 +6427,9 @@ function applyBulkCosts(){
     return setCostAmend('hotel', ids, patch);
   }
   if(crewGridView==='catering'){
-    const patch = {};
-    for(const k of ['b','l','d']){ const v = num('bulkCost'+k.toUpperCase()); if(v===null){ alert('Enter each rate as a number, like 14.'); return; } if(v!=='') patch[k] = v; }
-    if(!Object.keys(patch).length) return;
-    return setCostAmend('catering', ids, patch);
+    const v = num('bulkCostPD'); if(v===null){ alert('Enter the per diem as a number, like 30.'); return; }
+    if(v==='') return;
+    return setCostAmend('catering', ids, { pd: v });
   }
   const r = num('bulkCostTRate'), unit = val('bulkCostUnit');
   if(r===null){ alert('Enter the rate as a number, like 45.'); return; }
@@ -6512,15 +6502,13 @@ function crewAssignRowHTML(block, days){
    the header — cateringDayHeadsHTML). Used by BOTH tabs: crew and talent eat from one kitchen,
    so each tab lists its own people and folds the other side underneath (cateringOtherSideHTML).
    Talent / client rows carry Shared | Own — see entryOwnCatering(). */
-const CATERING_DAYCOL = '62px';
+const CATERING_DAYCOL = '44px';   // one tick a day since 26 Sep 2026; the B L D letters above set the day's meals
 const MEAL_KEYS = [['b','Breakfast'],['l','Lunch'],['d','Dinner']];
 const CATERING_DIET_HEAD = `<div class="crewgrid-header" style="grid-column:span 2; text-align:left; padding-left:12px;" title="From each person's record — anything other than the standard diet, plus their specific notes">Dietary</div>`;
 /* Dietary in its own column, then how they eat (Catered | Per diem | Own), then the row's All */
 const CATERING_TAIL_HEAD = `<div class="crewgrid-header meal-diet-head" title="From each person's record — anything other than the standard diet, plus their specific notes">Dietary</div>
-  <div class="crewgrid-header meal-mode-head" title="Catered — the ticks are covers, costed at the meal rates · Per diem — a daily allowance instead · Own — their own arrangement">Catering</div>
-  <div class="crewgrid-header"></div>`;
+  <div class="crewgrid-header meal-mode-head" title="Catered — the ticks are covers, costed at the meal rates · Per diem — a daily allowance instead · Own — their own arrangement">Catering</div>`;
 function cateringDayHeadsHTML(days){
-  if(mealsCollapsed) return days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')} · B L D folded — ▾ B L D to open">D${esc(d.dayNum||'?')}</div>`).join('');
   return days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}<div class="meal-trio-head">${MEAL_KEYS.map(([k,label])=>
       `<span role="button" tabindex="0" onclick="toggleMealColumn('${d.id}','${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealColumn('${d.id}','${k}');}" title="${label}, Day ${esc(d.dayNum||'?')} — tick or untick everyone listed below">${k.toUpperCase()}</span>`).join('')}</div></div>`).join('');
 }
@@ -6529,12 +6517,14 @@ function cateringDayHeadsHTML(days){
    are left alone) all mean what they look like they mean. All on → all off; otherwise all on. */
 function toggleMealColumn(dayId, mealKey){
   const d = dayById(dayId); if(!d) return;
-  const boxes = [...document.querySelectorAll(`.meal-trio input[data-day-id="${dayId}"][data-meal="${mealKey}"]`)]
-    .filter(el=>el.offsetParent!==null);
+  /* the people catered that day among the rows on screen — the day's single tick per row */
+  const boxes = [...document.querySelectorAll(`.catering-grid.pb-head input[data-day-id="${dayId}"][data-crew]`)]
+    .filter(el=>el.offsetParent!==null && el.checked);
   if(!boxes.length) return;
-  const on = !boxes.every(el=>el.checked);
   d.cateringMeals = d.cateringMeals || {};
-  [...new Set(boxes.map(el=>el.dataset.crew))].forEach(id=>{
+  const ids = [...new Set(boxes.map(el=>el.dataset.crew))];
+  const on = !ids.every(id=>(d.cateringMeals[id]||{})[mealKey]);
+  ids.forEach(id=>{
     const m = d.cateringMeals[id] = d.cateringMeals[id] || {b:false, l:false, d:false};
     m[mealKey] = on;
     if(!m.b && !m.l && !m.d) delete d.cateringMeals[id];
@@ -6549,45 +6539,75 @@ function crewCateringBlockHTML(block, days){
   const talent = isTalentEtc(block);
   const mode = cateringModeOf(p, crewId), own = mode!=='catered';
   const costOn = costGridOn();
-  /* ▾ B L D — three ticks a day; ▸ B L D — one three-part mark a day, each part still a tick */
+  const isOpen = cateringOpen.has(crewId);
+  /* ONE TICK A DAY — catered that day (any meal). Ticking it on gives them the day's meals (dayMealPlan);
+     ▸ opens the person's days, each with its own B / L / D, as Hotel's ▸ opens the nights. */
   const cells = days.map(d=>{
-    const meals = getCateringMeals(d.id, crewId);
-    if(mealsCollapsed) return `<div class="crewgrid-check meal-mini-cell" data-day="D${esc(d.dayNum||'?')}"><span class="meal-mini" title="Day ${esc(d.dayNum||'?')} — ${MEAL_KEYS.map(([k,label])=>label+(meals[k]?' ✓':' –')).join(', ')}">${MEAL_KEYS.map(([k,label])=>
-      `<i class="${meals[k]?'on':''}" role="checkbox" aria-checked="${meals[k]?'true':'false'}" aria-label="${label} — Day ${esc(d.dayNum||'?')}" onclick="toggleMeal('${crewId}','${d.id}','${k}',${meals[k]?'false':'true'})"></i>`).join('')}</span></div>`;
-    return `<div class="crewgrid-check meal-trio" data-day="D${esc(d.dayNum||'?')}">${MEAL_KEYS.map(([k,label])=>
-      `<input type="checkbox" data-crew="${crewId}" data-day-id="${d.id}" data-meal="${k}" ${meals[k]?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${k}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}">`).join('')}</div>`;
+    const meals = getCateringMeals(d.id, crewId), on = !!(meals.b||meals.l||meals.d);
+    return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" data-crew="${crewId}" data-day-id="${d.id}" ${on?'checked':''}
+      onchange="setCateredDay('${crewId}','${d.id}',this.checked)" title="Catered — Day ${esc(d.dayNum||'?')}${on ? ' · '+MEAL_KEYS.filter(([k])=>meals[k]).map(([,l])=>l).join(', ') : ''}"></div>`;
   }).join('');
-  /* "All" is a disclosure: closed it is one word; open it offers B / L / D, each toggling that meal
-     across every day for this person. One row open at a time (mealAllOpenFor). */
-  const allOpen = mealAllOpenFor===crewId;
-  const allHTML = `<span class="meal-all${allOpen?' open':''}">${allOpen ? MEAL_KEYS.map(([k,label])=>
-      `<span class="meal-row-all meal-all-key" onclick="toggleAllMealForPerson('${crewId}','${k}')" title="${label} — every day, on or off">${k.toUpperCase()}</span>`).join('') : ''}<span class="meal-row-all" role="button" tabindex="0" aria-expanded="${allOpen?'true':'false'}"
-        onclick="toggleMealAllOpen('${crewId}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealAllOpen('${crewId}');}"
-        title="${allOpen?'Close':'Tick a whole meal across every day'}">All</span></span>`;
+  const nDays = days.filter(d=>{ const m = getCateringMeals(d.id, crewId); return m.b||m.l||m.d; }).length;
+  const openBtn = nDays ? `<button type="button" class="cost-open" onclick="toggleCateringOpen('${cid}')" title="${isOpen?'Close the days':'Day by day — which meals'}" aria-expanded="${isOpen}">${isOpen?'▾':'▸'}</button>` : '';
+  const allHTML = `<button class="small all-toggle-btn" onclick="toggleAllCateringForPerson('${cid}')" title="Every day on or off for this person">All</button>`;
   /* what makes this person's plate different — the standard diet says nothing, so it shows nothing */
   const rec = crewById(crewId) || {};
   const diet = [rec.dietaryGeneral && rec.dietaryGeneral!==DIETARY_OPTIONS[0] ? rec.dietaryGeneral : '', rec.dietarySpecific || rec.dietary || ''].filter(Boolean).join(' · ');
   const dietHTML = `<div class="meal-diet" title="${esc(diet)}">${esc(diet)}</div>`;
-  /* Catered | Per diem | Own — on every row, crew and talent alike; Own and Per diem take a detail */
+  /* Catered | Per diem | Own — on every row, crew and talent alike; Own takes a detail */
   const modeBtn = (m, label, title) => `<span class="${mode===m?'on':''}${m==='own'&&mode===m?' them':''}" onclick="setCateringMode('${cid}','${m}')" title="${title}">${label}</span>`;
   const modeHTML = `<div class="meal-mode"><span class="te-by">${modeBtn('catered','Catered','In the caterer\'s covers, at the meal rates')}${modeBtn('perdiem','Per diem','Feeds themselves on a daily allowance — the ticks are kept, not counted')}${modeBtn('own','Own','Their own arrangement — a rider, eating elsewhere')}</span>
-      ${own ? `<input type="text" class="meal-detail" value="${esc(cateringDetailOf(p, crewId))}" placeholder="${mode==='perdiem'?'Detail…':'What, and who pays…'}" aria-label="Catering detail" onchange="setCateringExtra('${cid}','detail',this.value)">` : ''}</div>`;
+      ${mode==='own' ? `<input type="text" class="meal-detail" value="${esc(cateringDetailOf(p, crewId))}" placeholder="What, and who pays…" aria-label="Catering detail" onchange="setCateringExtra('${cid}','detail',this.value)">` : ''}</div>`;
   const roleHTML = talent ? talentRoleTextHTML(topSeniorityEntry(block.entries))
                           : `<span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span>`;
-  const head = `<div class="crewgrid crewgrid-row pb-head catering-grid${own?' meal-own':''}${costOn?' cost-on':''}" style="--daycols:${days.length}; --daycolwidth:${cateringDayColW()};${costOn?costGridVars():''}">
+  const head = `<div class="crewgrid crewgrid-row pb-head catering-grid${own?' meal-own':''}${costOn?' cost-on':''}" style="--daycols:${days.length};${costOn?costGridVars():''}">
       <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
       ${pbDeptCellHTML(topSeniorityEntry(block.entries))}
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleHTML}</div>
       <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
       ${cells}
+      <div class="crewgrid-remove">${openBtn}${allHTML}</div>
       ${costOn ? cateringCostCellsHTML(crewId, days, mode) : ''}
       ${dietHTML}${modeHTML}
-      <div class="crewgrid-remove">${allHTML}</div>
-    </div>`;
+    </div>${isOpen ? cateringDayRowsHTML(crewId, days, costOn) : ''}`;
   /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch. */
-  const changed = costOn && (mode==='catered' ? ['b','l','d'].some(k=>mealChanged(p, crewId, k)) : mode==='perdiem' ? perDiemChanged(p, crewId) : !!ownCateringCostOf(p, crewId));
+  const changed = costOn && (mode==='perdiem' ? perDiemChanged(p, crewId) : mode==='own' ? !!ownCateringCostOf(p, crewId) : false);
   return personBlockWrapHTML(block, head,
     { editing:isEditing, open:false, extraClass: changed ? 'cost-changed' : '', expansionHTML:crewExpansionHTML(block, 'pb-editform') });
+}
+/* the open person's days — one line per catered day, its B / L / D there to change */
+function cateringDayRowsHTML(crewId, days, costOn){
+  return days.filter(d=>{ const m = getCateringMeals(d.id, crewId); return m.b||m.l||m.d; }).map(d=>{
+    const meals = getCateringMeals(d.id, crewId);
+    return `<div class="crewgrid pb-role-row catering-grid cost-night${costOn?' cost-on':''}" style="--daycols:${days.length};${costOn?costGridVars():''}">
+      <div class="cost-night-lab" style="grid-column:3 / span 2;">Day ${esc(d.dayNum||'?')}${d.date ? ' · '+esc(fmtDate(d.date)) : ''}</div>
+      <div class="meal-day-detail" style="grid-column:5 / -1;">${MEAL_KEYS.map(([k,label])=>`<label><input type="checkbox" ${meals[k]?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${k}',this.checked)"> ${label}</label>`).join('')}</div>
+    </div>`; }).join('');
+}
+let cateringOpen = new Set();   // crewIds whose catering row is open day by day
+function toggleCateringOpen(crewId){ cateringOpen.has(crewId) ? cateringOpen.delete(crewId) : cateringOpen.add(crewId); renderProjectBody(); }
+/* the day's meals — what a newly ticked person gets: whatever meals anyone catered that day has, or lunch */
+function dayMealPlan(d){
+  const plan = {b:false, l:false, d:false};
+  Object.values(d.cateringMeals||{}).forEach(m=>{ if(m.b) plan.b = true; if(m.l) plan.l = true; if(m.d) plan.d = true; });
+  if(!plan.b && !plan.l && !plan.d) plan.l = true;
+  return plan;
+}
+async function setCateredDay(crewId, dayId, on){
+  const d = dayById(dayId); if(!d) return;
+  d.cateringMeals = d.cateringMeals || {};
+  const plan = dayMealPlan(d);
+  selectedCrewTargets(crewId).forEach(id=>{ if(on) d.cateringMeals[id] = Object.assign({}, plan); else delete d.cateringMeals[id]; });
+  renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
+}
+async function toggleAllCateringForPerson(crewId){
+  const p = currentProject(), days = projectDays();
+  const allOn = days.every(d=>{ const m = getCateringMeals(d.id, crewId); return m.b||m.l||m.d; });
+  days.forEach(d=>{ d.cateringMeals = d.cateringMeals || {}; const plan = dayMealPlan(d);
+    selectedCrewTargets(crewId).forEach(id=>{ if(allOn) delete d.cateringMeals[id]; else if(!d.cateringMeals[id]) d.cateringMeals[id] = Object.assign({}, plan); }); });
+  renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
 }
 /* OWN CATERING — a talent / client override, on the project ENTRY (e.ownCatering). Person-level in
    effect (a lunch belongs to a human): any of their entries carrying it takes them out of the

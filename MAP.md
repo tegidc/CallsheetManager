@@ -113,10 +113,16 @@ Removed with the old summaries: `cateringSummaryGridBodyHTML`, `cateringDietTabl
   and `perDiem / own / fed` lists; Budget ▸ Line Items gets `Per diem` (standard), `Per diem — Name` and
   `Own catering — Name` lines; the Summary gets Per diem / Own arrangements rows (Budget on) and a
   **Not catered** list (both modes).
-- **Catering row columns:** ticks · [B £ · L £ · D £ · ↺ · xVAT] · **Dietary** (its own column) · **Catering**
-  (the mode switch, with a detail field for per diem / own) · All. `.crewgrid.catering-grid` sets the template.
-  **▸ B L D** (`mealsCollapsed`, folded by default, the toggle on the sub-tab row beside Auto-fill meals)
-  folds each day's three ticks to one three-part mark (`.meal-mini`) — each part is still that meal's tick.
+- **Catering row = Hotel's shape** (second pass, same day): **one tick a day** — catered that day, any meal
+  (`setCateredDay`: on gives them the day's meals, `dayMealPlan(d)` = whatever meals anyone catered that day
+  has, else lunch; off clears the day) · **▸** opens the person's days (`cateringOpen`, `cateringDayRowsHTML`),
+  one line per catered day with its Breakfast / Lunch / Dinner ticks (`toggleMeal`) · **All** ticks every day
+  (`toggleAllCateringForPerson`). The header's **B L D** letters set that meal for everyone catered that day
+  (`toggleMealColumn`, reading the rows' single ticks). Budget on adds only **Rate · ↺ · xVAT** — "std" for a
+  catered person (the meal rates are the Standard £ strip's; no per-person meal rates on screen any more —
+  `mealRateFor` still honours a stored one), the per diem rate or the own cost otherwise. Then **Dietary**
+  (its own column) and **Catering** (Catered | Per diem | Own; a detail field for Own only).
+  `.crewgrid.catering-grid` sets the template. The ▸ B L D fold and `.meal-mini` are gone.
 - **Cost cells wear Roles' clothes** — no tint, muted headers, centred tabular figures, the same rate input.
 - **Catering summary, Budget off:** the grid, then **Dietaries as columns** (`.diet-cols`, one per diet among
   the people fed: Standard · n, Specials · n, each special listed with the note). A record with neither a diet
