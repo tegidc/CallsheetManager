@@ -91,8 +91,41 @@ Removed with the old summaries: `cateringSummaryGridBodyHTML`, `cateringDietTabl
 ⚠️ **No body-wide rate saver.** Crew and the Talent etc switch set `body.oninput = null`; the rate savers
 (`saveHotelCosts` etc.) keep a rate whose field isn't on the page (`fieldNum()`), so they can never zero one.
 
-**Not changed:** Talent etc's own hotel / travel (`e.stay` / `e.trip`) stay on the Talent etc switch; the
-Catering sub-tab's Talent & client fold shares the kitchen, so it gets the catering columns.
+### Review round, 26 Sep 2026
+
+- **All | Crew | Talent etc is a FILTER.** Crew lists crew, Talent etc lists talent and clients, All lists
+  both (Roles / Hotel / Travel: the talent section folds under the crew list; Catering: one list). No sub-tab
+  folds "the other side" underneath any more — `cateringOtherSideHTML()` is unused.
+- **Talent etc's Hotel, Travel and Catering are Crew's renderers** (`renderProjectCrew` with
+  `crewPeopleKind==='talent'`; `renderProjectTalent` is Roles only): night ticks, a travel method, the meal
+  ticks, the cost columns with Budget on — plus a **Booked by Us | Them** switch (`bookedByHTML()` →
+  `setBookedBy()`, stored as `e.stay.by` / `e.trip.by` on every entry of the person, a client defaulting to
+  Them). Them is listed, never costed: `bookedByThem()` gates the engine (hotel guests, `travelCostOnDay`),
+  the summaries and the Budget lines. Talent's Hotel / Travel do not need shoot days. ⚠️ The legacy
+  `e.stay.nights × perNight` / `e.trip.cost` still count (`talentEtcCosts`) ONLY for a person with no nights
+  ticked / no method set, so nothing already costed vanishes until it is re-entered the new way.
+- **Catering modes** — `cateringModeOf()`: `catered` (ticks are covers, meal rates) · `perdiem` (a daily
+  allowance × days on site — the standard `cateringCosts.perDiem` in the Standard £ strip, a person's own
+  in `costAmends.catering[id].pd`) · `own` (their own arrangement; optional `detail` and one `own` cost
+  for the job). The Catered | Per diem | Own switch is on every Catering row (`setCateringMode`); the legacy
+  `e.ownCatering` reads as own and is cleared by the switch. `crewOwnCatering()` now means "not in the
+  covers" (per diem and own alike). `buildCateringSummaryGrid()` carries `pd / pdCost / ownCost` per day
+  and `perDiem / own / fed` lists; Budget ▸ Line Items gets `Per diem` (standard), `Per diem — Name` and
+  `Own catering — Name` lines; the Summary gets Per diem / Own arrangements rows (Budget on) and a
+  **Not catered** list (both modes).
+- **Catering row columns:** ticks · [B £ · L £ · D £ · ↺ · xVAT] · **Dietary** (its own column) · **Catering**
+  (the mode switch, with a detail field for per diem / own) · All. `.crewgrid.catering-grid` sets the template.
+  **▸ B L D** (`mealsCollapsed`, folded by default, the toggle on the sub-tab row beside Auto-fill meals)
+  folds each day's three ticks to one three-part mark (`.meal-mini`) — each part is still that meal's tick.
+- **Cost cells wear Roles' clothes** — no tint, muted headers, centred tabular figures, the same rate input.
+- **Catering summary, Budget off:** the grid, then **Dietaries as columns** (`.diet-cols`, one per diet among
+  the people fed: Standard · n, Specials · n, each special listed with the note). A record with neither a diet
+  nor a note is left out. A note with NO diet chosen files under the standard diet (`DIETARY_OPTIONS[0]`)
+  marked *diet not set* — and is a **task flag** on Overview (`buildTaskFlagGroups` → `diet`).
+- **Budget ▸ Costs** lists each group's typed lines (Catering / Travel / Hotel sections of
+  `p.budgetSheet.lines`) with Item / Detail / Qty / Rate editable with Edit on, and **+ Add line** under each
+  group — for a per-person, per-day cost the rate card has no row for. Same store as Line Items.
+- `buildTransportSummary()` counts a method someone has even if `travelMethodsList` no longer carries it.
 
 ⚠️ **Vendors (planned): a supplier's QUOTE overriding the running ESTIMATE, flowing
 into Budget, is this exact pattern — build it on these four primitives and give it a

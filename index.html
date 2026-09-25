@@ -1033,15 +1033,18 @@
      own --costcols (COST_COLS). They are tinted, a costing sheet beside the roster. A name on its
      own rate is amber — the pre-production stage's ink, the one warm colour the app already has. */
   .crewgrid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) var(--costcols) minmax(0,1fr);}
-  .cost-cell{align-self:stretch; display:flex; align-items:center; justify-content:center; gap:3px; min-width:0; padding:0 6px;
-    background:var(--tint-1); font-size:var(--fs-field); font-variant-numeric:tabular-nums; white-space:nowrap;}
-  .cost-cell.l{justify-content:flex-start;} .cost-cell.r{justify-content:flex-end;}
-  .cost-cell.blank{background:none;}
-  .crewgrid-header.cost-cell{color:var(--tape); font-size:var(--fs-ctl);}
-  .crewgrid-header-row .cost-cell{margin-bottom:-6px; padding-bottom:6px;}
+  /* Catering: the ticks, [the cost columns], Dietary, how they eat, the row's All */
+  .crewgrid.catering-grid{column-gap:8px; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 62px)) minmax(80px,1fr) 168px 30px;}
+  .crewgrid.catering-grid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 62px)) var(--costcols) minmax(80px,1fr) 168px 30px;}
+  /* the cost cells wear Roles' clothes — muted header, centred tabular figures, the same rate input — no tint */
+  .cost-cell{display:flex; align-items:center; justify-content:center; gap:3px; min-width:0;
+    font-size:var(--fs-field); font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .cost-cell.l{justify-content:flex-start;}
+  .cost-cell.cost-span{grid-column:span 3;}
+  .cost-unit{font-size:var(--fs-meta); color:var(--muted);}
   .cost-in{width:100%; min-width:0; text-align:center; font-variant-numeric:tabular-nums;}
   .cost-in.l{text-align:left;}
-  .cost-cell.r .cost-in{width:58px; text-align:center;}
+  .cost-cell .cost-in:not(.l){width:56px;}
   .cost-in::placeholder{color:var(--muted); opacity:1;}
   .cost-in.amd{color:var(--phase-prep); font-weight:600; box-shadow:0 1px 0 var(--phase-prep);}
   .cost-std{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted);}
@@ -1058,6 +1061,26 @@
   .cost-night-lab{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); text-align:right; padding-right:10px;}
   .cost-tail{display:flex; align-items:center; gap:10px; min-width:0; padding-left:12px;}
   .cost-note{max-width:220px; font-size:var(--fs-meta);}
+  .meal-diet-head, .meal-mode-head{text-align:left; padding-left:6px;}
+  .meal-diet{min-width:0; text-align:left; font-size:var(--fs-meta); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-left:6px;}
+  .meal-mode{display:flex; flex-wrap:wrap; align-items:center; gap:3px 6px; padding:0 6px; min-width:0;}
+  .meal-mode .te-by{justify-self:start; flex:0 0 auto;}
+  .meal-mode .te-by span{padding:1px 4px; letter-spacing:.6px;}
+  .meal-detail{width:100%; font-size:var(--fs-meta);}
+  /* the dietary columns of the Catering summary — one per diet, Standard and Specials in each */
+  .diet-cols{display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px 20px; margin-top:6px;}
+  .diet-col-h{font-family:var(--label); font-size:var(--fs-ctl); font-weight:600; letter-spacing:1.2px; text-transform:uppercase; border-bottom:1.5px solid rgba(17,10,8,.35); padding-bottom:4px; margin-bottom:6px;}
+  .diet-col-n{font-size:var(--fs-field); display:flex; justify-content:space-between; padding:2px 0;}
+  .diet-col-n b{font-weight:500;}
+  .diet-sp{font-size:var(--fs-meta); padding:2px 0 2px 10px; display:flex; gap:6px; align-items:baseline;}
+  .diet-sp .muted{flex:1; min-width:0;}
+  .diet-unset{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--danger); white-space:nowrap;}
+  /* ▸ B L D — one three-part mark a day; each part is that meal's tick */
+  .meal-mini{display:inline-flex; gap:2px;}
+  .meal-mini i{width:8px; height:14px; border:1px solid var(--field-line); border-radius:2px; cursor:pointer; display:inline-block;}
+  .meal-mini i.on{background:var(--text); border-color:var(--text);}
+  .meal-mini i:hover{border-color:var(--tape);}
+  .meal-own .meal-mini{opacity:.35;}
   .cost-per span{padding:0 6px;}
   .cost-strip{display:flex; gap:8px 22px; flex-wrap:wrap; align-items:center; padding:10px 0; margin-bottom:6px; border-bottom:1px solid var(--line); font-size:var(--fs-meta); color:var(--muted);}
   .cost-strip label{display:inline-flex; align-items:center; gap:6px;}
@@ -3621,10 +3644,13 @@ const tripOf = e => Object.assign({note:'', cost:'', by: deptBucketKey(e.departm
 const numOf = v => { const n = Number(String(v==null?'':v).replace(/[£,\s]/g,'')); return isNaN(n) ? 0 : n; };
 function talentEtcCosts(p){
   let stay = 0, trip = 0;
+  /* ⚠️ 26 Sep 2026 — Talent etc's hotel and travel are Crew's now (night ticks, a travel method, the
+     per-person rates). These legacy per-entry figures still count ONLY for someone with no nights
+     ticked / no method set, so nothing already costed disappears until it is re-entered the new way. */
   projectEntries(p).filter(isTalentEtc).forEach(e=>{
     const s = stayOf(e), t = tripOf(e);
-    if(s.by==='us') stay += numOf(s.nights) * numOf(s.perNight);
-    if(t.by==='us') trip += numOf(t.cost);
+    if(s.by==='us' && !hotelNightKeysFor(p, e.crewId).length) stay += numOf(s.nights) * numOf(s.perNight);
+    if(t.by==='us' && !(p.travelMethods||{})[e.crewId]) trip += numOf(t.cost);
   });
   return {stay, trip};
 }
@@ -3776,7 +3802,7 @@ function talentSectionHTML(p, days){
   </div>`;
 }
 /* Crew's Talent etc switch (was the TALENT ETC tab until 24 Sep 2026) — called by renderProjectCrew() */
-function renderProjectTalent(body){
+function renderProjectTalent(body){   // Roles only since 26 Sep 2026 — see renderProjectCrew
   const p = currentProject(); if(!p) return;
   const days = projectDays(p.id);
   /* the same body classes Crew sets — select mode, the stage colour, stage tags as words */
@@ -3950,6 +3976,11 @@ function buildTaskFlagGroups(p, days){
       n=>`${plural(n,'shoot day','shoot days')} with no location`, `goProjectTab('days')`);
   add('daycrew', days.filter(d=>!(d.positions||[]).length).map(d=>dayEl('daycrew', d, 'Crew')),
       n=>`${plural(n,'shoot day','shoot days')} with no crew`, `goProjectTab('days')`);
+  /* a note with no diet chosen — the caterer can't file it under anything (the Catering summary lists
+     them under the standard diet, marked) */
+  add('diet', [...new Set(projectEntries(p).map(e=>e.crewId))].filter(id=>crewOnShoot(id, p)).map(id=>crewById(id)).filter(c=>c && !c.dietaryGeneral && (c.dietarySpecific||c.dietary))
+      .map(c=>({ key:`diet:${c.id}`, label:`${c.name||'(no name)'} — “${c.dietarySpecific||c.dietary}”`, task:`Set a diet for ${c.name||'(no name)'} — they have a dietary note but no diet chosen` })),
+      n=>`${plural(n,'person has','people have')} a dietary note but no diet set`, `crewGridView='catering';goProjectTab('crew')`);
   if(typeof resolveEntryRate==='function'){
     add('rate', projectEntryViews(p).filter(v=>!isTalentEtc(v) && !resolveEntryRate(v.id,p).hasRate).map(v=>({
           key:`rate:${v.id}`, label:`${v.name||'(no name)'}${v.role?' — '+v.role:''}`, task:`Day rate — ${v.name||'(no name)'}${v.role?' ('+v.role+')':''}` })),
@@ -5619,8 +5650,12 @@ function peopleKindSwitchHTML(){
 }
 function renderProjectCrew(body){
   if(['preprod','days','post'].includes(crewGridView)) crewGridView = 'roles';   // retired tabs — a stale value lands on Roles
-  if(crewPeopleKind==='talent') return renderProjectTalent(body);
-  const showAll = crewPeopleKind==='all';
+  /* ⚠️ 26 Sep 2026 — the All | Crew | Talent etc switch is a FILTER: Crew lists crew, Talent etc lists talent
+     and clients, All lists both. No sub-tab folds "the other side" underneath any more. Talent etc's
+     Hotel, Travel and Catering are Crew's own renderers (night ticks, a method, the meal ticks, and the
+     cost columns with Budget on) plus a Booked by Us | Them switch; only Roles keeps talent's own row. */
+  if(crewPeopleKind==='talent' && crewGridView==='roles') return renderProjectTalent(body);
+  const showAll = crewPeopleKind==='all', talentOnly = crewPeopleKind==='talent';
   body.classList.add('crew-rowselect');
   body.classList.toggle('crew-select-mode', crewSelectMode);
   body.classList.toggle('crew-rowselect-tight', crewGridView==='roles');
@@ -5635,13 +5670,14 @@ function renderProjectCrew(body){
      crew only, except Catering on All, which is everyone. The catering SUMMARY always counts
      everyone: a lunch is a lunch. */
   const cateringAll = showAll && crewGridView==='catering';
-  const assigned = projectEntryViews(p).filter(v => cateringAll || !isTalentEtc(v));
+  const assigned = projectEntryViews(p).filter(v => showAll ? (crewGridView==='catering' || !isTalentEtc(v)) : isTalentEtc(v)===talentOnly);
   const onProject = new Set(projectEntries(p).map(e=>e.crewId));
   /* ⚠️ REMOVED in Phase CM: `unassigned` — it existed only to fill the retired "Add from crew
      database" <select>. The Add person popup filters crewDB against the roster itself, in
      crewSearchResultsHTML(), where the matching rule lives. */
   let filtered = buildPersonBlocks(assigned.filter(personMatchesProjectFilter));
-  if(['hotel','travel','catering'].includes(crewGridView)){
+  /* Talent etc's Hotel and Travel do NOT need shoot days — a client can be flown in for a viewing */
+  if(crewGridView==='catering' || (['hotel','travel'].includes(crewGridView) && !talentOnly)){
     filtered = filtered
       .map(b=>Object.assign({}, b, {entries: b.entries.filter(e=>entryOnShoot(e.id, p))}))
       .filter(b=>b.entries.length);
@@ -5689,6 +5725,10 @@ function renderProjectCrew(body){
     selectAllHTML = crewToolbarSelectAll(filteredIdsCSV, allFilteredSelected, filterCount);
     const summaryLinkHTML = ['hotel','catering'].includes(crewGridView) ? `<span onclick="jumpToSummary('${crewGridView}')">Summary</span>`
       : crewGridView==='travel' ? `<span onclick="jumpToSummary('transport')">Summary</span>` : '';
+    /* ▸ B L D folds each day's three ticks to one small mark, as ▸ ROLE and ▸ NAME fold their columns */
+    const mealsFoldHTML = crewGridView==='catering' && days.length ? `<span class="roles-col-toggle" role="button" tabindex="0" onclick="toggleMealsCollapsed()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealsCollapsed();}" aria-expanded="${mealsCollapsed?'false':'true'}"
+        title="${mealsCollapsed?'Show the three tick boxes for each day':'Fold each day to one mark'}"><span class="dept-caret">${mealsCollapsed?'▸':'▾'}</span>B L D</span>` : '';
     // Expand/Collapse all: one toggle, not two separate links. The Style Review
     // dropped the rotating chevron in favour of plain text that swaps between
     // "Expand all" and "Collapse all" so only the available action is shown.
@@ -5697,7 +5737,7 @@ function renderProjectCrew(body){
       const allCollapsed = groups.every(g=>collapsedProjectDepts.has(g.key));
       expandAllHTML = `<span class="crew-header-expandall" onclick="toggleAllProjectDeptsCollapsed('${groupsCSV}')">${allCollapsed?'Expand all':'Collapse all'}</span>`;
     }
-    rightHeaderHTML = `${summaryLinkHTML}${expandAllHTML}`;
+    rightHeaderHTML = `${mealsFoldHTML}${summaryLinkHTML}${expandAllHTML}`;
     /* ⚠️ THE FLAT LIST HAS NO HEAD, and that is the whole of what "None (flat list)" buys —
        one group called "All crew" wearing a subhead that says "All crew (41)" would be a row
        of chrome above every screen for no information. Every other grouper still gets one. */
@@ -5749,18 +5789,18 @@ function renderProjectCrew(body){
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const isCatering = crewGridView==='catering';
       const dayHeaderRow = days.length ? `
-        <div class="crewgrid crewgrid-header-row${costGridCls()}" style="--daycols:${colCount};${isCatering?` --daycolwidth:${CATERING_DAYCOL};`:''}${costGridVars()}">
+        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}" style="--daycols:${colCount};${isCatering?` --daycolwidth:${cateringDayColW()};`:''}${costGridVars()}">
           ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
           ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
-          ${costGridOn() ? costHeadCellsHTML(colCount+5) : ''}
-          ${isCatering ? (costGridOn() ? CATERING_DIET_HEAD.replace('grid-column:span 2', `grid-column:${colCount+10} / -1`) : CATERING_DIET_HEAD) : (costGridOn() ? '' : '<div class="crewgrid-header"></div>')}
+          ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : ''}
+          ${isCatering ? CATERING_TAIL_HEAD : (costGridOn() ? '' : '<div class="crewgrid-header"></div>')}
         </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
       const groupsHTML = groups.map(g=>{
         const collapsed = collapsedProjectDepts.has(g.key);
         return groupHeaderHTML(g) + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${g.items.map(c=>crewGridView==='catering' ? crewCateringBlockHTML(c, days) : crewAssignRowHTML(c, days)).join('')}</div>`;
       }).join('');
-      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${dayHeaderRow}${groupsHTML}${isCatering && days.length && !cateringAll ? cateringOtherSideHTML(true, days) : ''}</div>`;
+      assignedHTML = `<div class="tablewrap" style="${pbLeadVars()}">${dayHeaderRow}${groupsHTML}</div>`;
     }
   }
 
@@ -5768,12 +5808,14 @@ function renderProjectCrew(body){
      the bottom line, the stage selector on the right on every sub-tab. The sub-tabs come AFTER
      it, directly on the table they switch; the old toolbar row is gone — its right-hand links
      (Summary, Collapse all) ride the sub-tab row. */
-  const listToolsHTML = peopleKindSwitchHTML() + toolGroupHTML([`<button type="button" class="bnr-tool add crew-add-person" onclick="openAddPerson(${showAll?"'all'":''})"
+  const listToolsHTML = peopleKindSwitchHTML() + toolGroupHTML([talentOnly
+      ? `<button type="button" class="bnr-tool add" onclick="openAddPerson('talent')" title="Search talent and clients in the database, or create one">+ Add talent / client</button>`
+      : `<button type="button" class="bnr-tool add crew-add-person" onclick="openAddPerson(${showAll?"'all'":''})"
       title="${showAll?'Search the whole database and add someone to this project':'Search the crew database and add someone to this project'}">+ Add person</button>`, filterBtnHTML, selectAllHTML || crewToolbarSelectAll('', true, filterCount)]);
   const headHTML = `<div id="budgetSummaryBarWrap">${budgetSummaryBarHTML(budgetData, {
       showTotals: crewShowMoney,
       showMoneyToggle: true,
-      crewOnly: !showAll, peopleKind: showAll ? 'all' : 'crew',
+      crewOnly: !showAll && !talentOnly, peopleKind: showAll ? 'all' : talentOnly ? 'talent' : 'crew',
       listToolsHTML
     })}</div>`;
   const talentHTML = showAll && crewGridView!=='catering' ? talentSectionHTML(p, days) : '';
@@ -6239,8 +6281,18 @@ function groupedCrewOptionsHTML(list){
    with ↺ to go back to the standard. The rates themselves live in p.costAmends — see costAmendsOf().
    ⚠️ Talent etc keep their own hotel / travel (e.stay / e.trip) on the Talent etc switch; these columns
    are Crew's (the Catering sub-tab's Talent & client fold shares the kitchen, so it gets them too). */
-const COST_COLS = { hotel:'74px 170px 112px 92px', catering:'56px 56px 56px 24px 92px', travel:'44px 112px 92px 92px' };
-const costGridOn = () => crewShowMoney && crewPeopleKind!=='talent' && ['hotel','catering','travel'].includes(crewGridView);
+const COST_COLS = { hotel:'74px 170px 112px 92px', catering:'52px 52px 52px 20px 80px', travel:'44px 112px 92px 92px' };
+/* ▸ B L D — each day's three ticks fold to one small three-part mark (Style check: fold, don't hide) */
+let mealsCollapsed = true;   // folded by default — the compact form; ▾ B L D opens the three ticks
+function toggleMealsCollapsed(){ mealsCollapsed = !mealsCollapsed; renderProjectBody(); }
+const cateringDayColW = () => mealsCollapsed ? '34px' : CATERING_DAYCOL;
+/* Talent etc's Booked by — Us is costed, Them is listed and not (bookedByThem) */
+function bookedByHTML(crewId, group){
+  const them = bookedByThem(currentProject(), crewId, group), cid = costJs(crewId);
+  return `<span class="te-by" title="Who arranges and pays for it — only Us is costed">
+    <span class="${them?'':'on'}" onclick="setBookedBy('${cid}','${group}','us')">Us</span><span class="${them?'on them':''}" onclick="setBookedBy('${cid}','${group}','them')">Them</span></span>`;
+}
+const costGridOn = () => crewShowMoney && ['hotel','catering','travel'].includes(crewGridView);
 const costGridCls = () => costGridOn() ? ' cost-on' : '';
 const costGridVars = () => costGridOn() ? ` --costcols:${COST_COLS[crewGridView]};` : '';
 let hotelNightsOpen = new Set();   // crewIds whose hotel row is open night by night (Budget on)
@@ -6263,7 +6315,8 @@ function costStripHTML(){
       <span class="hint">▸ on a row opens that person's nights — each night can have its own hotel and rate.</span>`; }
   if(crewGridView==='catering'){ const c = getCateringCosts(p);
     inner = `<label>B ${f('ccCostB', c.b, 'Breakfast, per head')}</label><label>L ${f('ccCostL', c.l, 'Lunch, per head')}</label>
-      <label>D ${f('ccCostD', c.d, 'Dinner, per head')} per head</label><label>Delivery ${f('ccCostDelivery', c.delivery, 'Delivery, per drop')} per drop</label>`; }
+      <label>D ${f('ccCostD', c.d, 'Dinner, per head')} per head</label><label>Delivery ${f('ccCostDelivery', c.delivery, 'Delivery, per drop')} per drop</label>
+      <label>Per diem ${f('ccCostPerDiem', c.perDiem, 'Per diem, per person per day')} per day</label>`; }
   if(crewGridView==='travel'){ const c = getTransportCosts(p);
     inner = `<label>Public transport ${f('tsCostPublic', c.publicPerDay, 'Public transport, per day')} per day</label>
       <label>Own car ${f('tsCostMileage', c.mileage, 'Own car, per day')} per day</label>
@@ -6273,16 +6326,17 @@ function costStripHTML(){
 /* ---- the header cells ---- */
 function costHeadCellsHTML(firstCol){
   if(!costGridOn()) return '';
-  const h = (t, i, cls='') => `<div class="crewgrid-header cost-cell${cls}" style="grid-column:${firstCol+i};">${t}</div>`;
-  if(crewGridView==='hotel') return h('', 0, ' blank') + h('Hotel', 1, ' l') + h('Rate / night', 2, ' r') + h('xVAT', 3, ' r');
-  if(crewGridView==='catering') return h('B £', 0) + h('L £', 1) + h('D £', 2) + h('', 3) + h('xVAT', 4, ' r');
-  return h('Days', 0) + h('Rate', 1, ' r') + h('Per', 2) + h('xVAT', 3, ' r');
+  const h = (t, i, cls='', title='') => `<div class="crewgrid-header cost-cell${cls}"${firstCol?` style="grid-column:${firstCol+i};"`:''}${title?` title="${esc(title)}"`:''}>${t}</div>`;
+  if(crewGridView==='hotel') return h('', 0, ' blank') + h('Hotel', 1, ' l') + h('Rate / night', 2, '', 'Per room per night — the standard unless this person has their own') + h('xVAT', 3);
+  if(crewGridView==='catering') return h('B £', 0, '', 'Breakfast, per head') + h('L £', 1, '', 'Lunch, per head') + h('D £', 2, '', 'Dinner, per head') + h('', 3) + h('xVAT', 4);
+  return h('Days', 0) + h('Rate', 1) + h('Per', 2) + h('xVAT', 3);
 }
 /* ---- HOTEL: the person's hotel, rate and cost; ▸ opens the nights ---- */
 function hotelCostCellsHTML(crewId, firstCol){
   const p = currentProject(), fmt = budgetFmt;
   const c = i => `grid-column:${firstCol+i};`;
   const keys = hotelNightKeysFor(p, crewId);
+  if(keys.length && bookedByThem(p, crewId, 'stay')) return `<div class="cost-cell muted" style="${c(1)}">Booked by them — not costed</div><div class="cost-cell" style="${c(2)}"></div><div class="cost-cell muted" style="${c(3)}">—</div>`;
   if(!keys.length) return `<div class="cost-cell" style="${c(1)}"></div><div class="cost-cell" style="${c(2)}"></div><div class="cost-cell r muted" style="${c(3)}">—</div>`;
   const nights = keys.map(k=>hotelNightTerms(p, crewId, k)), person = hotelPersonTerms(p, crewId);
   const open = hotelNightsOpen.has(crewId);
@@ -6316,15 +6370,27 @@ function hotelNightRowsHTML(crewId, colCount, firstCol){
   }).join('');
 }
 /* ---- CATERING: one rate per meal for this person, and what their meals cost ---- */
-function cateringCostCellsHTML(crewId, days, firstCol, own){
+function cateringCostCellsHTML(crewId, days, mode){
   const p = currentProject(), fmt = budgetFmt, std = getCateringCosts(p), cid = costJs(crewId);
-  const c = i => `grid-column:${firstCol+i};`;
-  if(own) return `<div class="cost-cell muted" style="grid-column:${firstCol} / span 4;">Own — not costed</div><div class="cost-cell r muted" style="${c(4)}">—</div>`;
+  if(mode==='perdiem'){
+    const q = crewDayCount(crewId, days, p), r = perDiemRateFor(p, crewId), ch = perDiemChanged(p, crewId);
+    return `<div class="cost-cell cost-span" title="The daily allowance — the standard per diem unless this person has their own">
+        ${ch?'':'<span class="cost-std">std</span>'}${costRateInputHTML(r, std.perDiem, ch, `setCateringExtra('${cid}','pd',this.value)`, 'Per diem, per day')}<span class="cost-unit">× ${q} day${q===1?'':'s'}</span></div>
+      <div class="cost-cell">${ch ? costResetHTML('catering', crewId, 'Back to the standard per diem') : ''}</div>
+      <div class="cost-cell">${fmt(r*q)}</div>`;
+  }
+  if(mode==='own'){
+    const amt = ownCateringCostOf(p, crewId);
+    return `<div class="cost-cell cost-span" title="What their own arrangement costs us, if anything — once for the job">
+        <span class="cost-unit">£</span>${costRateInputHTML(amt||'', '0', !!amt, `setCateringExtra('${cid}','own',this.value)`, 'Own catering cost')}<span class="cost-unit">for the job</span></div>
+      <div class="cost-cell">${amt ? costResetHTML('catering', crewId, 'No cost to us') : ''}</div>
+      <div class="cost-cell">${amt ? fmt(amt) : '<span class="muted">—</span>'}</div>`;
+  }
   const changed = ['b','l','d'].some(k=>mealChanged(p, crewId, k));
   const total = days.reduce((s,d)=>{ const m = (d.cateringMeals||{})[crewId]; return s + (m ? ['b','l','d'].reduce((n,k)=>n + (m[k] ? mealRateFor(p, crewId, k) : 0), 0) : 0); }, 0);
-  return ['b','l','d'].map((k,i)=>`<div class="cost-cell" style="${c(i)}">${costRateInputHTML(mealRateFor(p, crewId, k), std[k], mealChanged(p, crewId, k), `setMealRate('${cid}','${k}',this.value)`, {b:'Breakfast',l:'Lunch',d:'Dinner'}[k]+' rate')}</div>`).join('')
-    + `<div class="cost-cell" style="${c(3)}">${changed ? costResetHTML('catering', crewId, 'Back to the standard rates') : ''}</div>`
-    + `<div class="cost-cell r" style="${c(4)}">${fmt(total)}</div>`;
+  return ['b','l','d'].map(k=>`<div class="cost-cell">${costRateInputHTML(mealRateFor(p, crewId, k), std[k], mealChanged(p, crewId, k), `setMealRate('${cid}','${k}',this.value)`, {b:'Breakfast',l:'Lunch',d:'Dinner'}[k]+' rate')}</div>`).join('')
+    + `<div class="cost-cell">${changed ? costResetHTML('catering', crewId, 'Back to the standard rates') : ''}</div>`
+    + `<div class="cost-cell">${fmt(total)}</div>`;
 }
 /* ---- TRAVEL: days on site, the rate (a fare, for Train / Flying), per day or per trip, the cost ---- */
 function travelCostCellsHTML(crewId, firstCol){
@@ -6332,6 +6398,7 @@ function travelCostCellsHTML(crewId, firstCol){
   const days = projectDays(), c = i => `grid-column:${firstCol+i};`;
   const onDays = crewDayCount(crewId, days, p);
   const cost = days.reduce((s,d)=>s+travelCostOnDay(p, crewId, d), 0);
+  if(t.method && bookedByThem(p, crewId, 'trip')) return `<div class="cost-cell" style="${c(0)}">${onDays||'—'}</div><div class="cost-cell muted cost-span2" style="grid-column:${firstCol+1} / span 2;">Booked by them — not costed</div><div class="cost-cell muted" style="${c(3)}">—</div>`;
   const costable = t.method && t.method!=='Production transport';
   const rateCell = !costable ? '<span class="muted">—</span>'
     : `${t.std.rate!=null && !t.changed ? '<span class="cost-std">std</span>' : ''}${costRateInputHTML(t.rate==null?'':t.rate, t.std.rate!=null ? t.std.rate : 'fare', t.changed || (t.std.rate==null && t.rate!=null), `setTravelAmend('${cid}','rate',this.value)`, t.std.rate==null ? 'Fare' : 'Rate')}${t.changed ? costResetHTML('travel', crewId, 'Back to the standard') : ''}`;
@@ -6405,8 +6472,9 @@ function crewAssignRowHTML(block, days){
           return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${block.crewId}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
         }).join('');
     headRight = `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${block.crewId}','hotel')" title="Toggle all on/off for this person">All</button>`;
-    if(costGridOn() && hotelNightKeysFor(p, block.crewId).length) headRight = `<button type="button" class="cost-open" onclick="toggleHotelNightsOpen('${block.crewId}')"
+    if(costGridOn() && hotelNightKeysFor(p, block.crewId).length && !bookedByThem(p, block.crewId, 'stay')) headRight = `<button type="button" class="cost-open" onclick="toggleHotelNightsOpen('${block.crewId}')"
         title="${hotelNightsOpen.has(block.crewId)?'Close the nights':'Night by night — each night its own hotel and rate'}" aria-expanded="${hotelNightsOpen.has(block.crewId)}">${hotelNightsOpen.has(block.crewId)?'▾':'▸'}</button>` + headRight;
+    if(isTalentEtc(block)) headRight = bookedByHTML(block.crewId, 'stay') + headRight;   // Talent etc: Us is costed, Them is listed
   }
   const entryCellsHTML = e => isHotel ? '' : days.map(d=>
     `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${entryOnDay(e.id, d)?'checked':''} onchange="toggleCrewOnDay('${e.id}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`
@@ -6414,7 +6482,7 @@ function crewAssignRowHTML(block, days){
   const entryRightHTML = e => isHotel ? '' :
     `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${e.id}','days')" title="Toggle all days on/off for this role">All</button>
      <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
-  const roleChipHTML = (e, toggleHTML) => `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
+  const roleChipHTML = (e, toggleHTML) => isTalentEtc(block) ? talentRoleTextHTML(e) : `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
   const costOn = isHotel && costGridOn();
   const head = `<div class="crewgrid crewgrid-row pb-head${costOn?' cost-on':''}" style="--daycols:${colCount};${costOn?costGridVars():''}">
     <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
@@ -6447,7 +6515,12 @@ function crewAssignRowHTML(block, days){
 const CATERING_DAYCOL = '62px';
 const MEAL_KEYS = [['b','Breakfast'],['l','Lunch'],['d','Dinner']];
 const CATERING_DIET_HEAD = `<div class="crewgrid-header" style="grid-column:span 2; text-align:left; padding-left:12px;" title="From each person's record — anything other than the standard diet, plus their specific notes">Dietary</div>`;
+/* Dietary in its own column, then how they eat (Catered | Per diem | Own), then the row's All */
+const CATERING_TAIL_HEAD = `<div class="crewgrid-header meal-diet-head" title="From each person's record — anything other than the standard diet, plus their specific notes">Dietary</div>
+  <div class="crewgrid-header meal-mode-head" title="Catered — the ticks are covers, costed at the meal rates · Per diem — a daily allowance instead · Own — their own arrangement">Catering</div>
+  <div class="crewgrid-header"></div>`;
 function cateringDayHeadsHTML(days){
+  if(mealsCollapsed) return days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')} · B L D folded — ▾ B L D to open">D${esc(d.dayNum||'?')}</div>`).join('');
   return days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}<div class="meal-trio-head">${MEAL_KEYS.map(([k,label])=>
       `<span role="button" tabindex="0" onclick="toggleMealColumn('${d.id}','${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMealColumn('${d.id}','${k}');}" title="${label}, Day ${esc(d.dayNum||'?')} — tick or untick everyone listed below">${k.toUpperCase()}</span>`).join('')}</div></div>`).join('');
 }
@@ -6471,11 +6544,16 @@ function toggleMealColumn(dayId, mealKey){
 }
 function crewCateringBlockHTML(block, days){
   const isEditing = editingCrewId===block.id;
-  const crewId = block.crewId;
+  const p = currentProject();
+  const crewId = block.crewId, cid = costJs(crewId);
   const talent = isTalentEtc(block);
-  const own = talent && crewOwnCatering(crewId);
+  const mode = cateringModeOf(p, crewId), own = mode!=='catered';
+  const costOn = costGridOn();
+  /* ▾ B L D — three ticks a day; ▸ B L D — one three-part mark a day, each part still a tick */
   const cells = days.map(d=>{
     const meals = getCateringMeals(d.id, crewId);
+    if(mealsCollapsed) return `<div class="crewgrid-check meal-mini-cell" data-day="D${esc(d.dayNum||'?')}"><span class="meal-mini" title="Day ${esc(d.dayNum||'?')} — ${MEAL_KEYS.map(([k,label])=>label+(meals[k]?' ✓':' –')).join(', ')}">${MEAL_KEYS.map(([k,label])=>
+      `<i class="${meals[k]?'on':''}" role="checkbox" aria-checked="${meals[k]?'true':'false'}" aria-label="${label} — Day ${esc(d.dayNum||'?')}" onclick="toggleMeal('${crewId}','${d.id}','${k}',${meals[k]?'false':'true'})"></i>`).join('')}</span></div>`;
     return `<div class="crewgrid-check meal-trio" data-day="D${esc(d.dayNum||'?')}">${MEAL_KEYS.map(([k,label])=>
       `<input type="checkbox" data-crew="${crewId}" data-day-id="${d.id}" data-meal="${k}" ${meals[k]?'checked':''} onchange="toggleMeal('${crewId}','${d.id}','${k}',this.checked)" title="${label} — Day ${esc(d.dayNum||'?')}">`).join('')}</div>`;
   }).join('');
@@ -6489,34 +6567,37 @@ function crewCateringBlockHTML(block, days){
   /* what makes this person's plate different — the standard diet says nothing, so it shows nothing */
   const rec = crewById(crewId) || {};
   const diet = [rec.dietaryGeneral && rec.dietaryGeneral!==DIETARY_OPTIONS[0] ? rec.dietaryGeneral : '', rec.dietarySpecific || rec.dietary || ''].filter(Boolean).join(' · ');
-  const dietHTML = `<span class="meal-diet" title="${esc(diet)}">${esc(diet)}</span>`;
-  const ownHTML = talent ? `<span class="te-by" title="Own — their own arrangement (a rider, eating elsewhere). Their ticks are kept but not counted in the caterer's covers or cost.">
-      <span class="${own?'':'on'}" onclick="setCrewOwnCatering('${crewId}', false)">Shared</span><span class="${own?'on them':''}" onclick="setCrewOwnCatering('${crewId}', true)">Own</span></span>` : '';
+  const dietHTML = `<div class="meal-diet" title="${esc(diet)}">${esc(diet)}</div>`;
+  /* Catered | Per diem | Own — on every row, crew and talent alike; Own and Per diem take a detail */
+  const modeBtn = (m, label, title) => `<span class="${mode===m?'on':''}${m==='own'&&mode===m?' them':''}" onclick="setCateringMode('${cid}','${m}')" title="${title}">${label}</span>`;
+  const modeHTML = `<div class="meal-mode"><span class="te-by">${modeBtn('catered','Catered','In the caterer\'s covers, at the meal rates')}${modeBtn('perdiem','Per diem','Feeds themselves on a daily allowance — the ticks are kept, not counted')}${modeBtn('own','Own','Their own arrangement — a rider, eating elsewhere')}</span>
+      ${own ? `<input type="text" class="meal-detail" value="${esc(cateringDetailOf(p, crewId))}" placeholder="${mode==='perdiem'?'Detail…':'What, and who pays…'}" aria-label="Catering detail" onchange="setCateringExtra('${cid}','detail',this.value)">` : ''}</div>`;
   const roleHTML = talent ? talentRoleTextHTML(topSeniorityEntry(block.entries))
                           : `<span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span>`;
-  /* Budget on: the person's B / L / D rates and what their meals cost sit between the ticks and the tail */
-  const costOn = costGridOn();
-  const head = `<div class="crewgrid crewgrid-row pb-head${own?' meal-own':''}${costOn?' cost-on':''}" style="--daycols:${days.length}; --daycolwidth:${CATERING_DAYCOL};${costOn?costGridVars():''}">
+  const head = `<div class="crewgrid crewgrid-row pb-head catering-grid${own?' meal-own':''}${costOn?' cost-on':''}" style="--daycols:${days.length}; --daycolwidth:${cateringDayColW()};${costOn?costGridVars():''}">
       <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
       ${pbDeptCellHTML(topSeniorityEntry(block.entries))}
       <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleHTML}</div>
       <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
       ${cells}
-      ${costOn ? cateringCostCellsHTML(crewId, days, days.length+5, own) : ''}
-      <div class="crewgrid-remove meal-tail" style="grid-column:${days.length+(costOn?10:5)} / -1;">${dietHTML}${ownHTML}${allHTML}</div>
+      ${costOn ? cateringCostCellsHTML(crewId, days, mode) : ''}
+      ${dietHTML}${modeHTML}
+      <div class="crewgrid-remove">${allHTML}</div>
     </div>`;
   /* ⚠️ NO STACK. Nothing about a meal is per role — two roles is still one lunch. */
-  const mealsChanged = costOn && !own && ['b','l','d'].some(k=>mealChanged(currentProject(), crewId, k));
+  const changed = costOn && (mode==='catered' ? ['b','l','d'].some(k=>mealChanged(p, crewId, k)) : mode==='perdiem' ? perDiemChanged(p, crewId) : !!ownCateringCostOf(p, crewId));
   return personBlockWrapHTML(block, head,
-    { editing:isEditing, open:false, extraClass: mealsChanged ? 'cost-changed' : '', expansionHTML:crewExpansionHTML(block, 'pb-editform') });
+    { editing:isEditing, open:false, extraClass: changed ? 'cost-changed' : '', expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
 /* OWN CATERING — a talent / client override, on the project ENTRY (e.ownCatering). Person-level in
    effect (a lunch belongs to a human): any of their entries carrying it takes them out of the
    covers, the dietaries and the cost. The ticks themselves are kept, so switching back restores them. */
 let mealAllOpenFor = null;
 function toggleMealAllOpen(crewId){ mealAllOpenFor = mealAllOpenFor===crewId ? null : crewId; renderProjectBody(); }
-const crewOwnCatering = (crewId, p) => entriesForCrew(crewId, p || currentProject()).some(e=>e.ownCatering);
+/* "not in the caterer's covers" — per diem and own alike (see cateringModeOf) */
+const crewOwnCatering = (crewId, p) => cateringModeOf(p || currentProject(), crewId)!=='catered';
 async function setCrewOwnCatering(crewId, on){
+  return setCateringMode(crewId, on ? 'own' : 'catered');
   const p = currentProject(); if(!p) return;
   entriesForCrew(crewId, p).forEach(v=>{ const e = entryById(v.id, p); if(!e) return; if(on) e.ownCatering = true; else delete e.ownCatering; });
   renderProjectBody();
@@ -6757,7 +6838,7 @@ function summaryCopyHTML(key){
 function copySummaryShowing(key){
   const el = document.querySelector(`#${SUMMARY_BLOCKS[key].sectionId} .sum-body`); if(!el) return;
   const out = [SUMMARY_BLOCKS[key].title.toUpperCase(), ''];
-  el.querySelectorAll(':scope > table, :scope > .sum-sub, :scope > .sum-foot, :scope > .sum-group').forEach(n=>{
+  el.querySelectorAll(':scope > table, :scope > .sum-sub, :scope > .sum-foot, :scope > .sum-group, :scope > .diet-cols').forEach(n=>{
     if(n.tagName==='TABLE') n.querySelectorAll('tr').forEach(tr=>{ const cells = [...tr.children].map(c=>c.innerText.trim()); if(cells.some(Boolean)) out.push(cells.join('\t')); });
     else out.push(n.innerText.trim());
     out.push('');
@@ -6798,6 +6879,14 @@ function hotelSummaryHTML(wrapClass){
   }
   return summaryBlockHTML('hotel', `<div class="sum-body">${inner}</div>${summaryCopyHTML('hotel')}`, wrapClass);
 }
+/* who is NOT in the caterer's covers, and why — per diem and own arrangements, with their detail */
+function cateringNotCateredHTML(data){
+  const p = currentProject();
+  const list = (ids, label) => ids.length ? `<div class="sum-group"><div class="sum-group-h"><b>${label}</b> · ${ids.length}</div>
+      ${ids.map(id=>`<div class="sum-group-row"><span>${esc(crewInfo(id).name)}</span>${cateringDetailOf(p, id) ? `<span class="muted">${esc(cateringDetailOf(p, id))}</span>` : ''}</div>`).join('')}</div>` : '';
+  const html = list(data.perDiem, 'Per diem') + list(data.own, 'Own arrangements');
+  return html ? `<div class="sum-sub">Not catered</div>${html}` : '';
+}
 function cateringSummaryHTML(){
   const p = currentProject();
   const money = summaryMoneyOn();
@@ -6806,17 +6895,26 @@ function cateringSummaryHTML(){
   if(!data) return summaryBlockHTML('catering', '<div class="empty-note">Add shoot days first, then fill in catering on the grid above.</div>');
   let inner = '';
   if(!money){
-    /* the specials, grouped by diet — only people with something recorded, so every line is something to act on */
-    const groups = {};
-    data.specials.forEach(s=>{ (groups[s.general || 'No diet set'] = groups[s.general || 'No diet set'] || []).push(s); });
-    const groupsHTML = Object.keys(groups).sort((a,b)=> a==='No diet set' ? 1 : b==='No diet set' ? -1 : a.localeCompare(b)).map(g=>`<div class="sum-group">
-        <div class="sum-group-h"><b>${esc(g)}</b> · ${groups[g].length}</div>
-        ${groups[g].map(s=>`<div class="sum-group-row"><span>${esc(s.name)}</span>${s.specific ? `<span class="muted">${esc(s.specific)}</span>` : ''}<button class="icon-btn" onclick="editDietaryNote('${s.id}')" title="Edit ${esc(s.name)}'s dietary note" aria-label="Edit note">${icon('edit')}</button></div>`).join('')}
-      </div>`).join('');
+    /* DIETARY COLUMNS — one per diet among the people being fed: Standard (that diet, no note) and Specials
+       (that diet plus a note, each listed). A record with neither a diet nor a note is left out. A note with
+       NO diet chosen files under the standard diet, marked — and is a task flag on Overview (buildTaskFlagGroups). */
+    const std0 = DIETARY_OPTIONS[0], byDiet = {};
+    data.fed.filter(f=>f.general || f.specific).forEach(f=>{
+      const k = f.general || std0, col = byDiet[k] = byDiet[k] || { std:[], sp:[] };
+      (f.specific ? col.sp : col.std).push(f); });
+    const order = Object.keys(byDiet).sort((a,b)=>{ const ia = DIETARY_OPTIONS.indexOf(a), ib = DIETARY_OPTIONS.indexOf(b);
+      return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b); });
+    const colsHTML = order.map(k=>{ const col = byDiet[k];
+      return `<div class="diet-col"><div class="diet-col-h">${esc(k)}</div>
+        <div class="diet-col-n"><b>Standard</b><span>${col.std.length}</span></div>
+        <div class="diet-col-n"><b>Specials</b><span>${col.sp.length}</span></div>
+        ${col.sp.sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<div class="diet-sp"><span>${esc(f.name)}</span><span class="muted">${esc(f.specific)}</span>${f.general?'':'<span class="diet-unset" title="A note but no diet chosen — set one on their record">diet not set</span>'}<button class="icon-btn" onclick="editDietaryNote('${f.id}')" title="Edit ${esc(f.name)}'s dietary note" aria-label="Edit note">${icon('edit')}</button></div>`).join('')}
+      </div>`; }).join('');
     inner = `<table class="sum-grid"><tr><th>Item</th>${data.cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}</tr>
       ${MEALS.map(([k,l])=>`<tr><td>${l}</td>${data.cols.map(c=>sumCell(c[k])).join('')}</tr>`).join('')}</table>
-      <div class="sum-sub">Special dietaries</div>
-      ${groupsHTML || '<div class="hint">Nobody being fed has a diet or a note on their record.</div>'}`;
+      <div class="sum-sub">Dietaries</div>
+      ${colsHTML ? `<div class="diet-cols">${colsHTML}</div>` : '<div class="hint">Nobody being fed has a diet or a note on their record.</div>'}
+      ${cateringNotCateredHTML(data)}`;
   } else {
     const d = buildBudgetData(), src = d.src, fmt = budgetFmt, prodOn = src.prodOn;
     const g = src.cateringGrid, cols = g ? g.cols.filter(c=>src.dayIdsInScope.has(c.dayId)) : [];
@@ -6832,9 +6930,17 @@ function cateringSummaryHTML(){
     }).join('');
     const del = cols.reduce((s,c)=>s+c.deliveryFee, 0)*prodOn;
     const total = cols.reduce((s,c)=>s+c.dailyCost, 0)*prodOn;
+    /* per diems and own arrangements — the people out of the covers, on their own rows */
+    const pdCost = cols.reduce((s,c)=>s+c.pdCost, 0)*prodOn, pdQty = cols.reduce((s,c)=>s+c.pd, 0)*prodOn;
+    g.perDiem.filter(id=>perDiemChanged(p, id)).forEach(id=>notes.push(`Per diem — ${esc(crewInfo(id).name)} at ${fmt(perDiemRateFor(p, id))} per day${cateringDetailOf(p, id)?' ('+esc(cateringDetailOf(p, id))+')':''}`));
+    const ownCost = cols.reduce((s,c)=>s+c.ownCost, 0)*prodOn;
+    g.own.forEach(id=>{ const amt = ownCateringCostOf(p, id); notes.push(`Own — ${esc(crewInfo(id).name)}${amt ? ' at '+fmt(amt)+' for the job' : ', no cost to us'}${cateringDetailOf(p, id)?' ('+esc(cateringDetailOf(p, id))+')':''}`); });
+    const pdRow = g.perDiem.length ? `<tr><td>Per diem</td>${sumRate(pdCost, pdQty, std.perDiem, g.perDiem.some(id=>perDiemChanged(p, id)))}${cols.map(c=>sumCell(c.pd)).join('')}<td class="sum-fig">${fmt(pdCost)}</td></tr>` : '';
+    const ownRow = g.own.length ? `<tr><td>Own arrangements<span class="sum-star">*</span></td><td></td>${cols.map(()=>'<td></td>').join('')}<td class="sum-fig">${ownCost ? fmt(ownCost) : '<span class="muted">—</span>'}</td></tr>` : '';
     inner = `<table class="sum-grid"><tr><th>Item</th><th class="r">£ each</th>${cols.map(c=>`<th>D${esc(c.dayNum||'?')}</th>`).join('')}<th class="r">Cost</th></tr>
       ${rows}
       <tr><td>Delivery</td><td class="sum-fig">${fmt(std.delivery)}</td>${cols.map(c=>sumCell((c.b>0?1:0)+(c.l>0?1:0)+(c.d>0?1:0))).join('')}<td class="sum-fig">${fmt(del)}</td></tr>
+      ${pdRow}${ownRow}
       <tr class="sum-total"><td>Daily cost</td><td></td>${cols.map(c=>`<td>${fmt(c.dailyCost*prodOn)}</td>`).join('')}<td class="sum-fig">${fmt(total)}</td></tr></table>
       ${sumFoot(notes)}
       <div class="hint" style="margin-top:6px;">Delivery is charged once per meal occasion per day, and only on days that meal is actually running.</div>`;
@@ -6990,7 +7096,7 @@ function copyCateringExport(){
 }
 function getCateringCosts(p){
   const c = (p && p.cateringCosts) || {};
-  return { b:Number(c.b)||0, l:Number(c.l)||0, d:Number(c.d)||0, delivery:Number(c.delivery)||0 };
+  return { b:Number(c.b)||0, l:Number(c.l)||0, d:Number(c.d)||0, delivery:Number(c.delivery)||0, perDiem:Number(c.perDiem)||0 };
 }
 /* ⚠️ a field that isn't on the page keeps the rate it has — a saver that read a missing field as 0
    would wipe the standard rate the moment it ran from a screen without that field */
@@ -7002,7 +7108,8 @@ async function saveCateringCosts(){
     b: fieldNum('ccCostB', was.b),
     l: fieldNum('ccCostL', was.l),
     d: fieldNum('ccCostD', was.d),
-    delivery: fieldNum('ccCostDelivery', was.delivery)
+    delivery: fieldNum('ccCostDelivery', was.delivery),
+    perDiem: fieldNum('ccCostPerDiem', was.perDiem)
   };
   await saveDB('db:projects', projectsDB);
 }
@@ -7013,6 +7120,7 @@ function buildCateringSummaryGrid(personOk){
   const days = projectDays();
   if(!days.length) return null;
   const costs = getCateringCosts(p);
+  const notCatered = [...new Set(projectEntries(p).map(e=>e.crewId))].filter(id=>scopeOk(id) && crewOnShoot(id, p) && crewOwnCatering(id, p));
   const cols = days.map(d=>{
     const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
     /* ⚠️ Meals are kept on the day record for everyone, on the shoot or not — taking
@@ -7027,8 +7135,12 @@ function buildCateringSummaryGrid(personOk){
       ['b','l','d'].forEach(k=>{ if(m[k]){ const r = mealRateFor(p, crewId, k); cost[k] += r; mealsCost += r; } });
     });
     const deliveryFee = (b>0?costs.delivery:0) + (l>0?costs.delivery:0) + (dd>0?costs.delivery:0);
-    const dailyCost = mealsCost + deliveryFee;
-    return { dayId:d.id, dayNum:d.dayNum, label, b, l, d:dd, cost, deliveryFee, dailyCost };
+    /* the people feeding themselves — a per diem on each day on site, an own arrangement once */
+    let pd = 0, pdCost = 0, ownCost = 0;
+    notCatered.forEach(id=>{ if(!crewOnDay(id, d, p)) return;
+      if(cateringModeOf(p, id)==='perdiem'){ pd++; pdCost += perDiemRateFor(p, id); } else ownCost += cateringExtraOnDay(p, id, d); });
+    const dailyCost = mealsCost + deliveryFee + pdCost + ownCost;
+    return { dayId:d.id, dayNum:d.dayNum, label, b, l, d:dd, cost, deliveryFee, pd, pdCost, ownCost, dailyCost };
   });
   const totalCost = cols.reduce((sum,c)=>sum+c.dailyCost, 0);
   const OMNI = 'Omnivore / eats everything';
@@ -7051,7 +7163,10 @@ function buildCateringSummaryGrid(personOk){
     .filter(c=>c.dietaryGeneral || c.dietarySpecific)
     .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const specials = fedOnce.map(c=>({ id:c.id, name:c.name||'', general:c.dietaryGeneral||'', specific:c.dietarySpecific||c.dietary||'' }));
-  return { costs, cols, totalCost, diets, specials, fedPeak: Math.max(0, ...fedPerDay.map(l=>l.length)) };
+  /* everyone fed at least once, blank records included — the dietary columns count the standard eaters too */
+  const fed = [...new Map(fedPerDay.flat().map(c=>[c.id,c])).values()].map(c=>({ id:c.id, name:c.name||'', general:c.dietaryGeneral||'', specific:c.dietarySpecific||c.dietary||'' }));
+  const perDiem = notCatered.filter(id=>cateringModeOf(p, id)==='perdiem'), own = notCatered.filter(id=>cateringModeOf(p, id)==='own');
+  return { costs, cols, totalCost, diets, specials, fed, perDiem, own, fedPeak: Math.max(0, ...fedPerDay.map(l=>l.length)) };
 }
 async function editDietaryNote(crewId){
   const c = crewById(crewId); if(!c) return;
@@ -7073,15 +7188,17 @@ function crewTravelRowHTML(block, p){
   const carInfo = (block.drives==='Yes' && (block.carMakeModel||block.carReg)) ? `<div class="hint">${icon('car')} ${esc([block.carMakeModel,block.carReg].filter(Boolean).join(' — '))}</div>` : '';
   const isEditing = editingCrewId===block.id;
   const costOn = costGridOn();
+  const talent = isTalentEtc(block);
+  const byHTML = talent ? bookedByHTML(block.crewId, 'trip') : '';
   const t = costOn ? travelTermsFor(p, block.crewId) : null;
   const noteHTML = costOn && t.method && t.method!=='Production transport'
     ? `<input type="text" class="cost-in l cost-note" value="${esc(t.note)}" placeholder="Note — e.g. return flight" aria-label="Travel note" onchange="setTravelAmend('${costJs(block.crewId)}','note',this.value)">` : '';
   const head = `<div class="crewgrid crewgrid-row pb-head${costOn?' cost-on':''}" style="--daycols:1; --daycolwidth:210px;${costOn?costGridVars():''}">
     <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
     ${pbDeptCellHTML(topSeniorityEntry(block.entries))}
-    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;"><span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span></div>
+    <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${talent ? talentRoleTextHTML(topSeniorityEntry(block.entries)) : `<span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span>`}</div>
     <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
-    <div style="display:flex; align-items:center; gap:10px;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select></div>
+    <div style="display:flex; align-items:center; gap:10px;"><select style="width:100%;" onchange="setTravelMethod('${block.crewId}',this)">${opts}</select>${byHTML}</div>
     ${costOn ? travelCostCellsHTML(block.crewId, 6) : ''}
     <div class="pb-name-sub${costOn?' cost-tail':''}" style="grid-column:${costOn?10:6} / -1;">${noteHTML}${carInfo}</div>
   </div>`;
@@ -7130,8 +7247,10 @@ function buildTransportSummary(personOk){
   const costs = getTransportCosts(p);
   const travelMethods = p.travelMethods || {};
   const assigned = projectCrew(p).map(c=>c.id).filter(personOk);
-  // only show methods actually chosen by someone on this project, in travelMethodsList order
-  const usedMethods = travelMethodsList.filter(m=>assigned.some(id=>travelMethods[id]===m));
+  // only show methods actually chosen by someone on this project, in travelMethodsList order — and a
+  // method someone has that the list no longer carries still counts (or its fare would vanish)
+  const chosen = [...new Set(assigned.map(id=>travelMethods[id]).filter(Boolean))];
+  const usedMethods = travelMethodsList.filter(m=>chosen.includes(m)).concat(chosen.filter(m=>!travelMethodsList.includes(m)));
   if(!usedMethods.length) return null;
   const cols = days.map(d=>{
     const label = d.date ? fmtDate(d.date) : `Day ${d.dayNum||'?'}`;
@@ -8787,6 +8906,39 @@ function mealRateFor(p, crewId, k){
   return Number(pickVal(a[k], std))||0;
 }
 const mealChanged = (p, crewId, k) => mealRateFor(p, crewId, k)!==(getCateringCosts(p)[k]||0);
+/* CATERING MODE (26 Sep 2026) — how a person eats: 'catered' (the ticks are covers, costed at the meal
+   rates), 'perdiem' (they feed themselves on a daily allowance — the ticks are kept but are nobody's
+   covers; costed at the per diem rate × days on site) or 'own' (their own arrangement — a rider, eating
+   elsewhere — with an optional detail and one cost). Stored in costAmends.catering[crewId].mode; the
+   legacy talent flag e.ownCatering reads as 'own'. */
+function cateringModeOf(p, crewId){
+  const a = costAmendsOf(p).catering[crewId] || {};
+  if(a.mode==='perdiem' || a.mode==='own') return a.mode;
+  return entriesForCrew(crewId, p).some(e=>e.ownCatering) ? 'own' : 'catered';
+}
+const perDiemRateFor = (p, crewId) => Number(pickVal((costAmendsOf(p).catering[crewId]||{}).pd, getCateringCosts(p).perDiem))||0;
+const perDiemChanged = (p, crewId) => perDiemRateFor(p, crewId)!==getCateringCosts(p).perDiem;
+const cateringDetailOf = (p, crewId) => (costAmendsOf(p).catering[crewId]||{}).detail || '';
+const ownCateringCostOf = (p, crewId) => Number((costAmendsOf(p).catering[crewId]||{}).own)||0;
+/* what a per diem or own arrangement costs on ONE day: the allowance on each day on site, or the own
+   cost once, on their first day on site (project-wide, like a fare) */
+function cateringExtraOnDay(p, crewId, d){
+  const mode = cateringModeOf(p, crewId);
+  if(mode==='catered' || !crewOnDay(crewId, d, p)) return 0;
+  if(mode==='perdiem') return perDiemRateFor(p, crewId);
+  const first = projectDays().find(x=>crewOnDay(crewId, x, p));
+  return first && first.id===d.id ? ownCateringCostOf(p, crewId) : 0;
+}
+/* Talent etc: who arranges and pays — 'them' is listed (a bed is a bed on the booking sheet, a car is a
+   car on the call sheet) but never costed. The switch is on each entry (e.stay.by / e.trip.by, as it was
+   when Talent etc had its own hotel and travel fields); a client defaults to Them. */
+const bookedByThem = (p, crewId, group) => entriesForCrew(crewId, p).some(e=>(group==='stay' ? stayOf(e) : tripOf(e)).by==='them');
+async function setBookedBy(crewId, group, by){
+  const p = currentProject(); if(!p) return;
+  selectedCrewTargets(crewId).forEach(id=>entriesForCrew(id, p).forEach(e=>{ e[group] = Object.assign({}, group==='stay' ? stayOf(e) : tripOf(e), {by}); }));
+  renderProjectBody();
+  saveInBackground('db:projects', projectsDB);
+}
 /* travel: the standard is per day for Own car and Public transport; every other method has no
    standard (Train, Flying — a fare is typed per person; Production transport — never costed) */
 function travelStdFor(p, method){
@@ -8809,7 +8961,7 @@ function travelTermsFor(p, crewId){
    on the first day of the project they're on site (a return flight belongs to the shoot, once) */
 function travelCostOnDay(p, crewId, d){
   const t = travelTermsFor(p, crewId);
-  if(t.rate==null || !crewOnDay(crewId, d, p)) return 0;
+  if(t.rate==null || !crewOnDay(crewId, d, p) || bookedByThem(p, crewId, 'trip')) return 0;
   if(t.unit==='day') return t.rate;
   const first = projectDays().find(x=>crewOnDay(crewId, x, p));
   return first && first.id===d.id ? t.rate : 0;
@@ -8822,7 +8974,11 @@ async function setCostAmend(kind, crewIds, patch){
     Object.entries(patch).forEach(([f,v])=>{ if(hasVal(v)) a[f] = v; else delete a[f]; });
     /* store only what differs — a rate typed back to the standard is no change at all */
     if(kind==='hotel' && hasVal(a.rate) && Number(a.rate)===getHotelCosts(p).perRoomNight) delete a.rate;
-    if(kind==='catering') ['b','l','d'].forEach(k=>{ if(hasVal(a[k]) && Number(a[k])===(getCateringCosts(p)[k]||0)) delete a[k]; });
+    if(kind==='catering'){
+      ['b','l','d'].forEach(k=>{ if(hasVal(a[k]) && Number(a[k])===(getCateringCosts(p)[k]||0)) delete a[k]; });
+      if(hasVal(a.pd) && Number(a.pd)===getCateringCosts(p).perDiem) delete a.pd;
+      if(a.mode==='catered') delete a.mode;
+    }
     if(kind==='travel'){
       const std = travelStdFor(p, (p.travelMethods||{})[id]||'');
       if(hasVal(a.rate) && Number(a.rate)===std.rate && (a.unit||std.unit)===std.unit){ delete a.rate; delete a.unit; }
@@ -8859,6 +9015,18 @@ function setMealRate(crewId, k, raw){
   const v = costNum(raw); if(v===null){ renderProjectBody(); return; }
   setCostAmend('catering', selectedCrewTargets(crewId), {[k]: v});
 }
+/* the Catered | Per diem | Own switch — clears the legacy e.ownCatering flag so the two can't disagree */
+function setCateringMode(crewId, mode){
+  const p = currentProject(); if(!p) return;
+  const ids = selectedCrewTargets(crewId);
+  ids.forEach(id=>entriesForCrew(id, p).forEach(e=>{ delete e.ownCatering; }));
+  setCostAmend('catering', ids, { mode: mode==='catered' ? '' : mode });
+}
+function setCateringExtra(crewId, field, raw){
+  const v = field==='detail' ? String(raw||'').trim().slice(0,80) : costNum(raw);
+  if(v===null){ renderProjectBody(); return; }
+  setCostAmend('catering', selectedCrewTargets(crewId), {[field]: v});
+}
 function setTravelAmend(crewId, field, raw){
   const p = currentProject(); if(!p) return;
   let v = field==='rate' ? costNum(raw) : field==='note' ? String(raw||'').trim().slice(0,80) : raw;
@@ -8871,7 +9039,9 @@ function setTravelAmend(crewId, field, raw){
 function resetCostAmend(kind, crewId){
   const p = currentProject(); if(!p) return;
   const rec = costAmendsRec(p)[kind];
-  selectedCrewTargets(crewId).forEach(id=>{ const note = (rec[id]||{}).note; if(note) rec[id] = {note}; else delete rec[id]; });
+  selectedCrewTargets(crewId).forEach(id=>{
+    const keep = {}; ['note','mode','detail'].forEach(f=>{ if((rec[id]||{})[f]) keep[f] = rec[id][f]; });   // the arrangement stays; only its figures go
+    if(Object.keys(keep).length) rec[id] = keep; else delete rec[id]; });
   renderProjectBody();
   saveInBackground('db:projects', projectsDB);
 }
@@ -9155,13 +9325,15 @@ function buildBudgetData(){
     const subtotal = prodSubtotal + prepSubtotal + postSubtotal;
     const claimsPerson = crewOnShoot(c.crewId, p) && !personCostClaimed.has(c.crewId);
     if(claimsPerson) personCostClaimed.add(c.crewId);
-    const hotelCost = claimsPerson
+    const hotelCost = (claimsPerson && !bookedByThem(p, c.crewId, 'stay'))
       ? hotelNightKeysFor(p, c.crewId, days).reduce((s,k)=>s+hotelNightTerms(p, c.crewId, k).rate, 0) * prodOn : 0;
-    const mealCost = (claimsPerson && !crewOwnCatering(c.crewId, p)) ? days.reduce((sum,d)=>{
+    const mealCost = !claimsPerson ? 0 : crewOwnCatering(c.crewId, p)
+      ? days.reduce((sum,d)=>sum + cateringExtraOnDay(p, c.crewId, d), 0) * prodOn
+      : days.reduce((sum,d)=>{
       const m = (d.cateringMeals||{})[c.crewId];
       if(!m) return sum;
       return sum + ['b','l','d'].reduce((n,k)=>n + (m[k] ? mealRateFor(p, c.crewId, k) : 0), 0);
-    }, 0) * prodOn : 0;
+    }, 0) * prodOn;
     const paidDays = daysWorked*prodOn + prepDays*prepOn + postDays*postOn;
     /* ⚠️ A buyout's kit is a share of the FEE, not kit × days — the same reasoning as the
        phase split above. Proportion the kit the same way the rate was agreed. */
@@ -9278,8 +9450,8 @@ function buildBudgetData(){
   const travelTotal = travelRaw * prodOn;
   const firstProjectDay = projectDays()[0];
   const preNightRooms = (firstProjectDay && days.some(d=>d.id===firstProjectDay.id))
-    ? (p.hotelNightBefore||[]).filter(id=>crewOnShoot(id, p) && personInScope(id)).length : 0;
-  const onShootGuests = list => (list||[]).filter(id=>crewOnShoot(id, p) && personInScope(id));
+    ? (p.hotelNightBefore||[]).filter(id=>crewOnShoot(id, p) && personInScope(id) && !bookedByThem(p, id, 'stay')).length : 0;
+  const onShootGuests = list => (list||[]).filter(id=>crewOnShoot(id, p) && personInScope(id) && !bookedByThem(p, id, 'stay'));
   const onShootRooms = list => onShootGuests(list).length;
   const dayHotelRooms = days.map(d=>onShootRooms(d.hotelNights));
   /* rooms at each guest's own rate for that night (hotelNightTerms) — the night before folds into Day 1 */
@@ -9980,6 +10152,19 @@ function buildBudgetLines(data){
           { vatPct:vatCat, costVat:n*r*prodOn*vatCat/100, amendedFor:id, dist:{ days:Object.fromEntries(cols.map(c=>[c.dayId, theirs(c, id)])) } }));
       });
     });
+    /* per diems — everyone at the standard on one line, a changed allowance on its own; own arrangements one each */
+    const pdStd = cateringGrid.perDiem.filter(id=>!perDiemChanged(p, id)), pdRate = cateringCosts.perDiem;
+    const pdDays = ids => c => { const d = inDays.find(x=>x.id===c.dayId); return d ? ids.filter(id=>crewOnDay(id, d, p)).length : 0; };
+    const pdQty = cols.reduce((n,c)=>n+pdDays(pdStd)(c), 0);
+    const pdLine = extra('cat:pd', 'CAT/TRA', 'Per diem', 'per person per day', pdQty, pdRate, { dist:{ days:Object.fromEntries(cols.map(c=>[c.dayId, pdDays(pdStd)(c)])) } });
+    pdLine.costField = { store:'cateringCosts', field:'perDiem' };
+    rateCard.push({ group:'Catering', store:'cateringCosts', field:'perDiem', line:pdLine });
+    if(pdQty && pdRate) X['x:catering'].lines.push(pdLine);
+    cateringGrid.perDiem.filter(id=>perDiemChanged(p, id)).forEach(id=>{ const q = cols.reduce((n,c)=>n+pdDays([id])(c), 0), r = perDiemRateFor(p, id);
+      if(q && r) X['x:catering'].lines.push(extra('cat:pd:'+id, 'CAT/TRA', `Per diem — ${nameOf(id)}`, cateringDetailOf(p, id) || 'per day', q, r, { amendedFor:id, dist:{ days:Object.fromEntries(cols.map(c=>[c.dayId, pdDays([id])(c)])) } })); });
+    cateringGrid.own.forEach(id=>{ const amt = ownCateringCostOf(p, id); if(!amt) return;
+      const byDay = Object.fromEntries(inDays.map(d=>[d.id, cateringExtraOnDay(p, id, d) ? 1 : 0]));
+      if(Object.values(byDay).some(Boolean)) X['x:catering'].lines.push(extra('cat:own:'+id, 'CAT/TRA', `Own catering — ${nameOf(id)}`, cateringDetailOf(p, id) || 'own arrangement', 1, amt, { amendedFor:id, dist:{ days:byDay } })); });
   }
   if(transportSummary){
     const cols = transportSummary.cols.filter(c=>dayIdsInScope.has(c.dayId));
@@ -9987,7 +10172,8 @@ function buildBudgetLines(data){
        on the travel row they sit on, so the person's own row is fee-only and the two still sum to pp.vat */
     const travelVatOf = ids => data.people.reduce((n,pp)=>n + ((pp.vatRegistered && ids.has(pp.crewId)) ? pp.travelCost*VAT_RATE : 0), 0);
     const inDays = days.filter(d=>dayIdsInScope.has(d.id));
-    const travellers = [...new Set(projectCrew(p).map(c=>c.id).filter(id=>personInScope(id) && inDays.some(d=>crewOnDay(id, d, p))))];
+    /* Talent etc booked by Them are listed, never costed — so they are on no line (bookedByThem) */
+    const travellers = [...new Set(projectCrew(p).map(c=>c.id).filter(id=>personInScope(id) && !bookedByThem(p, id, 'trip') && inDays.some(d=>crewOnDay(id, d, p))))];
     /* a name on their own terms — a changed rate, or a fare where the method has no standard — gets its own line */
     const ownTerms = id => { const t = travelTermsFor(p, id); return t.changed || (t.std.rate==null && t.rate!=null); };
     [['Own car', travelCosts.mileage, 'per person per day'], ['Public transport', travelCosts.publicPerDay, 'per person per day']].forEach(([m,rate,unit])=>{
@@ -10087,6 +10273,7 @@ function buildBudgetLines(data){
      is still a rate you need to be able to type */
   [['Catering','cateringCosts','b','cat:b','Breakfast','per head',cateringCosts.b], ['Catering','cateringCosts','l','cat:l','Lunch','per head',cateringCosts.l],
    ['Catering','cateringCosts','d','cat:d','Dinner','per head',cateringCosts.d], ['Catering','cateringCosts','delivery','cat:del','Delivery','per drop',cateringCosts.delivery],
+   ['Catering','cateringCosts','perDiem','cat:pd','Per diem','per person per day',cateringCosts.perDiem],
    ['Travel','transportCosts','publicPerDay','trv:Public transport','Public transport','per person per day',travelCosts.publicPerDay],
    ['Travel','transportCosts','mileage','trv:Own car','Own car','per use',travelCosts.mileage],
    ['Hotel','hotelCosts','perRoomNight','htl:rooms','Hotel rooms','per room per night',hotelCosts.perRoomNight]
@@ -10396,10 +10583,26 @@ function budgetSheetModel(view, data, B){
                    : {h: l.rate ? fmt(l.rate) : dash, c:'n', v:l.rate},
         inp('charged', l.chRate!=null ? fmt(l.chRate) : '', fmt(l.rate), `setBudgetCharged('${escA(l.key)}',this.value,${l.rate})`),
         ...(vatOn ? [M(B.fig(l,mode).vat)] : []), M(B.fig(l,mode).tot)] }); });
+    /* LINES (26 Sep 2026) — the section's typed lines live here too, so a per-person, per-day cost that the
+       rate card has no row for (a driver's allowance, a hire car for one person) can be added and changed
+       without leaving the rate card. The same lines as Line Items (p.budgetSheet.lines) — one store. */
+    const secKey = { Catering:'x:catering', Travel:'x:travel', Hotel:'x:hotel' }[group];
+    const sec = B.sections.find(x=>x.key===secKey);
+    (sec ? sec.lines.filter(l=>l.custom) : []).forEach(l=>{
+      const E = budgetEdit, key = escA(l.key);
+      const txt = (field, value, ph, cls) => E ? { c:'xls-in xls-ed'+(cls?' '+cls:''), x:value, h:`<input type="text" data-fk="${key}|${field}" data-col="${field}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="setBudgetLineField('${l.id}','${field}',this.value)">` }
+                                                : { h: esc(value) || dash, c: cls||'' };
+      const charged = { c:'xls-in', x:l.chRate!=null ? fmt(l.chRate) : '', h:`<input type="text" inputmode="decimal" data-fk="${key}|charged" data-col="charged" data-ref="" data-fx="${escA(l.chRate!=null ? fmt(l.chRate) : fmt(l.rate))}" value="${escA(l.chRate!=null ? fmt(l.chRate) : '')}" placeholder="${escA(fmt(l.rate))}" onchange="setBudgetCharged('${key}',this.value,${l.rate})">` };
+      rows.push({ cells:[ { h:(E ? `<button type="button" class="del" onclick="deleteBudgetLine('${l.id}')" title="Delete this line" aria-label="Delete this line">×</button> ` : '') + `<span class="mu">${esc(l.code)}</span>` },
+        txt('item', l.item, 'Item'), txt('name', l.name, 'per person per day', 'mu'), txt('qty', l.qty||'', '0', 'c'),
+        txt('rate', l.rate ? fmt(l.rate) : '', '0.00', 'n'),
+        charged,
+        ...(vatOn ? [M(B.fig(l,mode).vat)] : []), M(B.fig(l,mode).tot)] }); });
+    if(budgetEdit) rows.push({ cells:[{ h:`<button type="button" class="bnr-tool add" onclick="addBudgetLine('${secKey}','')" title="A line of your own under ${group} — an item, a quantity and a rate; per person per day if that is what it is">+ Add line</button>`, span: vatOn?8:7 }] });
   });
   return { cols:[[66,'Code'],[140,'Item'],[150,'Unit'],[50,'Qty','c'],[90,'Rate','n'],[90,'Charged','n'], ...(vatOn?[[76,'VAT £','n']]:[]), [100,'Total','n']], rows,
     notes:[`<strong>Rate</strong> is your estimate per unit — the same fields as the Catering, Travel and Hotel tabs under Crew, so a change here or there updates both. Turn on <strong>Edit</strong> to change one here. <strong>Qty</strong> is counted from the call sheets: meal ticks, travel methods and hotel nights.`,
-           `Anything else that needs costing — a skip, a permit, insurance — is a line of your own: the + in the left margin of Line Items.`] };
+           `Anything else that needs costing under Catering, Travel or Hotel — a per diem for one person, a hire car, a driver's allowance — is a line of your own: <strong>+ Add line</strong> under the group, with Edit on. Anything else again — a skip, a permit, insurance — is the + in the left margin of Line Items.`] };
 }
 function budgetSheetViewHTML(view, data, B){
   if(view!=='costs' && !data.hasCrew && !data.extrasTotal) return '<div class="empty-note">No crew assigned to this project yet.</div>';
