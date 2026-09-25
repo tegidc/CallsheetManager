@@ -1033,9 +1033,18 @@
      own --costcols (COST_COLS). They are tinted, a costing sheet beside the roster. A name on its
      own rate is amber — the pre-production stage's ink, the one warm colour the app already has. */
   .crewgrid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) var(--costcols) minmax(0,1fr);}
+  /* Hotel, Budget off — the ▸ / All column, then the hotel name (detail, not cost) */
+  .crewgrid.hotel-detail{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), var(--daycolwidth, 38px)) 74px 170px minmax(0,1fr);}
   /* Catering: the ticks, [the cost columns], Dietary, how they eat, the row's All */
-  .crewgrid.catering-grid{column-gap:8px; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 44px) 52px minmax(80px,1fr) 168px;}
-  .crewgrid.catering-grid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 44px) 52px var(--costcols) minmax(80px,1fr) 168px;}
+  .crewgrid.catering-grid{column-gap:8px; grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 56px) 52px minmax(80px,1fr) 150px;}
+  .crewgrid.catering-grid.cost-on{grid-template-columns:var(--pb-controls-w) var(--pb-dept-w) var(--pb-role-w) var(--pb-name-w) repeat(var(--daycols), 56px) 52px var(--costcols) minmax(80px,1fr) 150px;}
+  .meal-marks{display:flex; justify-content:center; gap:3px;}
+  .tri{width:14px; height:16px; border:1px solid rgba(17,10,8,.45); border-radius:2px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; font-weight:700; background:#fff; user-select:none; line-height:1;}
+  .tri.cat{border-color:var(--text); background:var(--text); color:#fff;}
+  .tri.pd{border-color:var(--phase-prep); background:var(--phase-prep-soft); color:var(--phase-prep);}
+  .tri:hover{border-color:var(--tape);}
+  .tri:focus-visible{outline:2px solid var(--tape); outline-offset:1px;}
+  .meal-own .tri{opacity:.35;}
   .catering-grid .crewgrid-remove{justify-content:flex-start; gap:6px;}
   .meal-day-detail{display:flex; gap:16px; align-items:center; font-size:var(--fs-meta);}
   .meal-day-meal{display:inline-flex; align-items:center; gap:6px;}
@@ -1088,7 +1097,7 @@
   .diet-sp{font-size:var(--fs-meta); padding:2px 0 2px 10px; display:flex; gap:6px; align-items:baseline;}
   .diet-sp .muted{flex:1; min-width:0;}
   .diet-unset{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--danger); white-space:nowrap;}
-  .meal-own .crewgrid-check input{opacity:.35;}
+
   .cost-per span{padding:0 6px;}
   .bulk-cost{display:inline-flex; align-items:center; gap:8px 12px; flex-wrap:wrap; padding-right:10px; margin-right:4px; border-right:1px solid var(--line);}
   .bulk-cost-f{display:inline-flex; align-items:center; gap:5px; font-size:var(--fs-meta); color:var(--muted);}
@@ -5619,12 +5628,12 @@ function renderProjectCrew(body){
       const colCount = crewGridView==='hotel' ? days.length+1 : days.length;
       const isCatering = crewGridView==='catering';
       const dayHeaderRow = days.length ? `
-        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}" style="--daycols:${colCount};${costGridVars()}">
+        <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':''}${crewGridView==='hotel'&&!costGridOn()?' hotel-detail':''}" style="--daycols:${colCount};${costGridVars()}">
           ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
           ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
           ${isCatering ? '<div class="crewgrid-header"></div>' : ''}
-          ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : ''}
+          ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : crewGridView==='hotel' ? `<div class="crewgrid-header"></div><div class="crewgrid-header cost-cell l" style="grid-column:${colCount+6};">Hotel</div>` : ''}
           ${isCatering ? CATERING_TAIL_HEAD : (costGridOn() ? '' : '<div class="crewgrid-header"></div>')}
         </div>` : `<div class="hint" style="margin-bottom:10px;">Add shoot days first, then fill this in day by day.</div>`;
       const groupsHTML = groups.map(g=>{
@@ -6157,40 +6166,45 @@ function costHeadCellsHTML(firstCol){
   return h('Days', 0) + h('Rate', 1) + h('Per', 2) + h('xVAT', 3);
 }
 /* ---- HOTEL: the person's hotel, rate and cost; ▸ opens the nights ---- */
-function hotelCostCellsHTML(crewId, firstCol){
+function hotelCostCellsHTML(crewId, firstCol, costOn){
   const p = currentProject(), fmt = budgetFmt;
   const c = i => `grid-column:${firstCol+i};`;
   const keys = hotelNightKeysFor(p, crewId);
-  if(keys.length && bookedByThem(p, crewId, 'stay')) return `<div class="cost-cell muted" style="${c(1)}">Booked by them — not costed</div><div class="cost-cell" style="${c(2)}"></div><div class="cost-cell muted" style="${c(3)}">—</div>`;
-  if(!keys.length) return `<div class="cost-cell" style="${c(1)}"></div><div class="cost-cell" style="${c(2)}"></div><div class="cost-cell r muted" style="${c(3)}">—</div>`;
+  const cid = costJs(crewId);
   const nights = keys.map(k=>hotelNightTerms(p, crewId, k)), person = hotelPersonTerms(p, crewId);
   const open = hotelNightsOpen.has(crewId);
   const hotels = [...new Set(nights.map(n=>n.hotel).filter(Boolean))];
-  const mixedRate = new Set(nights.map(n=>n.rate)).size>1;
-  const cid = costJs(crewId);
-  const hotelCell = hotels.length>1 && !open ? `<span class="cost-mixed">${hotels.length} hotels</span>`
+  /* the hotel — detail, not cost: in both modes */
+  const hotelCell = !keys.length ? '' : hotels.length>1 && !open ? `<span class="cost-mixed">${hotels.length} hotels</span>`
     : `<input type="text" class="cost-in l" value="${esc(person.hotel)}" placeholder="Hotel…" aria-label="Hotel" onchange="setHotelAmend('${cid}', '', 'hotel', this.value)">`;
+  const hotelHTML = `<div class="cost-cell l" style="${c(1)}">${hotelCell}</div>`;
+  if(!costOn) return hotelHTML;
+  if(keys.length && bookedByThem(p, crewId, 'stay')) return hotelHTML + `<div class="cost-cell muted" style="${c(2)}">by them</div><div class="cost-cell muted" style="${c(3)}">—</div>`;
+  if(!keys.length) return hotelHTML + `<div class="cost-cell" style="${c(2)}"></div><div class="cost-cell muted" style="${c(3)}">—</div>`;
+  const mixedRate = new Set(nights.map(n=>n.rate)).size>1;
   const rateCell = mixedRate && !open ? `<span class="cost-mixed">Mixed</span>`
     : `${person.changed ? '' : '<span class="cost-std">std</span>'}${costRateInputHTML(person.rate, person.std, person.changed, `setHotelAmend('${cid}', '', 'rate', this.value)`, 'Rate per night')}`;
-  const changed = nights.some(n=>n.changed) || !!person.hotel;
-  return `<div class="cost-cell l" style="${c(1)}">${hotelCell}</div>
-    <div class="cost-cell r" style="${c(2)}">${rateCell}${changed ? costResetHTML('hotel', crewId, 'Every night back to the standard rate') : ''}</div>
-    <div class="cost-cell r" style="${c(3)}">${fmt(nights.reduce((s,n)=>s+n.rate, 0))}</div>`;
+  const changed = nights.some(n=>n.changed);
+  return hotelHTML + `<div class="cost-cell" style="${c(2)}">${rateCell}${changed ? costResetHTML('hotel', crewId, 'Every night back to the standard rate') : ''}</div>
+    <div class="cost-cell" style="${c(3)}">${fmt(nights.reduce((s,n)=>s+n.rate, 0))}</div>`;
 }
-function hotelNightRowsHTML(crewId, colCount, firstCol){
-  if(!costGridOn() || !hotelNightsOpen.has(crewId)) return '';
+/* the open person's nights beneath — the hotel each night; with Budget on, its rate and cost too */
+function hotelNightRowsHTML(crewId, colCount, firstCol, costOn){
+  if(!hotelNightsOpen.has(crewId)) return '';
   const p = currentProject(), fmt = budgetFmt, person = hotelPersonTerms(p, crewId);
   const own = (costAmendsOf(p).hotel[crewId]||{}).nights || {};
   const days = projectDays(), cid = costJs(crewId);
+  const them = bookedByThem(p, crewId, 'stay');
   return hotelNightKeysFor(p, crewId).map(k=>{
     const t = hotelNightTerms(p, crewId, k), o = own[k] || {};
     const d = k==='pre' ? null : days.find(x=>x.id===k);
     const label = k==='pre' ? 'Night before Day 1' : `Day ${esc(d.dayNum||'?')}${d.date ? ' · '+esc(fmtDate(d.date)) : ''}`;
-    return `<div class="crewgrid pb-role-row cost-on cost-night${t.changed?' cost-changed':''}" style="--daycols:${colCount};${costGridVars()}">
+    return `<div class="crewgrid pb-role-row cost-night${costOn?' cost-on':' hotel-detail'}${costOn&&t.changed?' cost-changed':''}" style="--daycols:${colCount};${costOn?costGridVars():''}">
       <div class="cost-night-lab" style="grid-column:3 / ${firstCol+1};">${label}</div>
       <div class="cost-cell l" style="grid-column:${firstCol+1};"><input type="text" class="cost-in l" value="${esc(o.hotel||'')}" placeholder="${esc(person.hotel||'Same hotel')}" aria-label="Hotel this night" onchange="setHotelAmend('${cid}', '${k}', 'hotel', this.value)"></div>
-      <div class="cost-cell r" style="grid-column:${firstCol+2};">${costRateInputHTML(t.rate, person.rate, hasVal(o.rate), `setHotelAmend('${cid}', '${k}', 'rate', this.value)`, 'Rate this night')}</div>
-      <div class="cost-cell r muted" style="grid-column:${firstCol+3};">${fmt(t.rate)}</div>
+      ${costOn ? (them ? `<div class="cost-cell muted" style="grid-column:${firstCol+2};">by them</div><div class="cost-cell muted" style="grid-column:${firstCol+3};">—</div>`
+        : `<div class="cost-cell" style="grid-column:${firstCol+2};">${costRateInputHTML(t.rate, person.rate, hasVal(o.rate), `setHotelAmend('${cid}', '${k}', 'rate', this.value)`, 'Rate this night')}</div>
+      <div class="cost-cell muted" style="grid-column:${firstCol+3};">${fmt(t.rate)}</div>`) : ''}
     </div>`;
   }).join('');
 }
@@ -6277,8 +6291,9 @@ function crewAssignRowHTML(block, days){
           return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${inHotel?'checked':''} onchange="toggleHotelNight('${block.crewId}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}"></div>`;
         }).join('');
     headRight = `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${block.crewId}','hotel')" title="Toggle all on/off for this person">All</button>`;
-    if(costGridOn() && hotelNightKeysFor(p, block.crewId).length && !bookedByThem(p, block.crewId, 'stay')) headRight = `<button type="button" class="cost-open" onclick="toggleHotelNightsOpen('${block.crewId}')"
-        title="${hotelNightsOpen.has(block.crewId)?'Close the nights':'Night by night — each night its own hotel and rate'}" aria-expanded="${hotelNightsOpen.has(block.crewId)}">${hotelNightsOpen.has(block.crewId)?'▾':'▸'}</button>` + headRight;
+    /* ▸ opens the nights beneath, in both modes: the hotel each night, and with Budget on its rate too */
+    if(hotelNightKeysFor(p, block.crewId).length) headRight = `<button type="button" class="cost-open" onclick="toggleHotelNightsOpen('${block.crewId}')"
+        title="${hotelNightsOpen.has(block.crewId)?'Close the nights':'Night by night — which hotel'+(costGridOn()?', and its rate':'')}" aria-expanded="${hotelNightsOpen.has(block.crewId)}">${hotelNightsOpen.has(block.crewId)?'▾':'▸'}</button>` + headRight;;
     if(isTalentEtc(block)) headRight = bookedByHTML(block.crewId, 'stay') + headRight;   // Talent etc: Us is costed, Them is listed
   }
   const entryCellsHTML = e => isHotel ? '' : days.map(d=>
@@ -6289,15 +6304,16 @@ function crewAssignRowHTML(block, days){
      <button class="icon-btn danger-ic" onclick="removeCrewFromProject('${e.id}')" title="Remove ${esc(block.name)}${e.role?' — '+esc(e.role):''} from this project" aria-label="Remove from project">${icon('trash')}</button>`;
   const roleChipHTML = (e, toggleHTML) => isTalentEtc(block) ? talentRoleTextHTML(e) : `<span class="roles-inline">${roleBannerHTML(e)}${toggleHTML}</span>`;
   const costOn = isHotel && costGridOn();
-  const head = `<div class="crewgrid crewgrid-row pb-head${costOn?' cost-on':''}" style="--daycols:${colCount};${costOn?costGridVars():''}">
+  const gridCls = isHotel ? (costOn ? ' cost-on' : ' hotel-detail') : '';   // Hotel always carries the hotel-name column; Budget adds the rate and the cost
+  const head = `<div class="crewgrid crewgrid-row pb-head${gridCls}" style="--daycols:${colCount};${costOn?costGridVars():''}">
     <div class="crewgrid-controls">${personBlockSelectCbHTML(block)}</div>
     ${pbDeptCellHTML(isHotel?topSeniorityEntry(block.entries):fronted)}
     <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${roleChipHTML(isHotel?topSeniorityEntry(block.entries):fronted, isHotel?'':personBlockToggleHTML(block, rest.length, false))}</div>
     <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(block.crewId))}</div>
     ${isHotel ? headCells : entryCellsHTML(fronted)}
     <div class="crewgrid-remove" style="grid-column:${colCount+5};">${isHotel ? headRight : entryRightHTML(fronted)}</div>
-    ${costOn ? hotelCostCellsHTML(block.crewId, colCount+5) : ''}
-  </div>${costOn ? hotelNightRowsHTML(block.crewId, colCount, colCount+5) : ''}`;
+    ${isHotel ? hotelCostCellsHTML(block.crewId, colCount+5, costOn) : ''}
+  </div>${isHotel ? hotelNightRowsHTML(block.crewId, colCount, colCount+5, costOn) : ''}`;
   // ⚠️ Hotel has no stack: nothing about a room is per role, so a second row would be a
   // duplicate of the first. Days on site keeps its own — but a days block holds exactly
   // one entry now, so `rest` is empty there and this renders nothing either way.
@@ -6317,7 +6333,7 @@ function crewAssignRowHTML(block, days){
    the header — cateringDayHeadsHTML). Used by BOTH tabs: crew and talent eat from one kitchen,
    so each list is its own people (the All | Crew | Talent etc switch is a filter — 26 Sep 2026).
    Talent / client rows carry Shared | Own — see entryOwnCatering(). */
-const CATERING_DAYCOL = '44px';   // one tick a day since 26 Sep 2026; the B L D letters above set the day's meals
+const CATERING_DAYCOL = '56px';   // three marks a day (B L D), each cycling — / ✓ / £; the letters above cycle everyone
 const MEAL_KEYS = [['b','Breakfast'],['l','Lunch'],['d','Dinner']];
 const CATERING_DIET_HEAD = `<div class="crewgrid-header" style="grid-column:span 2; text-align:left; padding-left:12px;" title="From each person's record — anything other than the standard diet, plus their specific notes">Dietary</div>`;
 /* Dietary in its own column, then how they eat (Catered | Per diem | Own), then the row's All */
@@ -6332,17 +6348,19 @@ function cateringDayHeadsHTML(days){
    are left alone) all mean what they look like they mean. All on → all off; otherwise all on. */
 function toggleMealColumn(dayId, mealKey){
   const d = dayById(dayId); if(!d) return;
-  /* everyone on screen — checked or not, or a meal taken off everyone could never come back on */
-  const boxes = [...document.querySelectorAll(`.catering-grid.pb-head input[data-day-id="${dayId}"][data-crew]`)]
+  /* everyone on screen, whatever state they're in, to the SAME next state (groupNextState) */
+  const cells = [...document.querySelectorAll(`.catering-grid.pb-head .meal-marks[data-day-id="${dayId}"][data-crew]`)]
     .filter(el=>el.offsetParent!==null);
-  if(!boxes.length) return;
-  d.cateringMeals = d.cateringMeals || {};
-  const ids = [...new Set(boxes.map(el=>el.dataset.crew))];
-  const on = !ids.every(id=>(d.cateringMeals[id]||{})[mealKey]);
+  if(!cells.length) return;
+  const ids = [...new Set(cells.map(el=>el.dataset.crew))];
+  const to = groupNextState(ids.map(id=>mealStateOf(d, id, mealKey)));
+  d.cateringMeals = d.cateringMeals || {}; d.cateringPerDiem = d.cateringPerDiem || {};
   ids.forEach(id=>{
     const m = d.cateringMeals[id] = d.cateringMeals[id] || {b:false, l:false, d:false};
-    m[mealKey] = on;
+    const q = d.cateringPerDiem[id] = d.cateringPerDiem[id] || {b:false, l:false, d:false};
+    m[mealKey] = to==='cat'; q[mealKey] = to==='pd';
     if(!m.b && !m.l && !m.d) delete d.cateringMeals[id];
+    if(!q.b && !q.l && !q.d) delete d.cateringPerDiem[id];
   });
   renderProjectBody();
   saveInBackground('db:shootdays', shootDaysDB);
@@ -6355,17 +6373,11 @@ function crewCateringBlockHTML(block, days){
   const mode = cateringModeOf(p, crewId), own = mode==='own';
   const costOn = costGridOn();
   const isOpen = cateringOpen.has(crewId);
-  /* ONE TICK A DAY — anything that day (a catered meal or a per diem). Ticking it on gives them the day's
-     meals (dayMealPlan); ▸ opens the person's days, each meal Catered | Per diem | —, as Hotel's ▸ opens the nights. */
-  const cells = days.map(d=>{
-    const on = dayCateredAny(d, crewId);
-    const what = MEAL_KEYS.map(([k,label])=>{ const st = mealStateOf(d, crewId, k); return st==='cat' ? label : st==='pd' ? label+' (per diem)' : ''; }).filter(Boolean).join(', ');
-    return `<div class="crewgrid-check" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" data-crew="${crewId}" data-day-id="${d.id}" ${on?'checked':''}
-      onchange="setCateredDay('${crewId}','${d.id}',this.checked)" title="Day ${esc(d.dayNum||'?')}${what ? ' · '+esc(what) : ' — not catered'}"></div>`;
-  }).join('');
-  const nDays = days.filter(d=>dayCateredAny(d, crewId)).length;
-  const openBtn = (nDays || own) ? `<button type="button" class="cost-open" onclick="toggleCateringOpen('${cid}')" title="${isOpen?'Close':own?'The arrangement — what, and what it costs us':'Day by day — which meals are catered, which are a per diem'}" aria-expanded="${isOpen}">${isOpen?'▾':'▸'}</button>` : '';
-  const allHTML = `<button class="small all-toggle-btn" onclick="toggleAllCateringForPerson('${cid}')" title="Every day on or off for this person">All</button>`;
+  /* THREE MARKS A DAY — B L D, each cycling — / ✓ catered / £ per diem (cycleMealState). The marks are the
+     whole detail; the header's letters and the row's All cycle everyone the same way, absolutely. */
+  const cells = days.map(d=>`<div class="crewgrid-check meal-marks" data-day="D${esc(d.dayNum||'?')}" data-crew="${crewId}" data-day-id="${d.id}">${MEAL_KEYS.map(([k,label])=>mealMarkHTML(crewId, d, k, label)).join('')}</div>`).join('');
+  const openBtn = own ? `<button type="button" class="cost-open" onclick="toggleCateringOpen('${cid}')" title="${isOpen?'Close':'The arrangement — what, and what it costs us'}" aria-expanded="${isOpen}">${isOpen?'▾':'▸'}</button>` : '';
+  const allHTML = `<button class="small all-toggle-btn" onclick="cycleAllCateringForPerson('${cid}')" title="Every meal, every day: all catered → all per diem → none">All</button>`;
   /* what makes this person's plate different — the standard diet says nothing, so it shows nothing */
   const rec = crewById(crewId) || {};
   const diet = [rec.dietaryGeneral && rec.dietaryGeneral!==DIETARY_OPTIONS[0] ? rec.dietaryGeneral : '', rec.dietarySpecific || rec.dietary || ''].filter(Boolean).join(' · ');
@@ -6388,12 +6400,13 @@ function crewCateringBlockHTML(block, days){
   return personBlockWrapHTML(block, head,
     { editing:isEditing, open:false, extraClass: costOn && own && ownCateringCostOf(p, crewId) ? 'cost-changed' : '', expansionHTML:crewExpansionHTML(block, 'pb-editform') });
 }
-/* the open person: Catered — one line per day with anything on it, each meal Catered | Per diem | —;
-   Own — one line: the detail, and what it costs us */
+/* the open person — Own only: one line, the detail, and what it costs us (a catered person's detail IS the
+   day cell: three marks, B L D, each cycling — / ✓ catered / £ per diem — see cycleMealState) */
 function cateringDayRowsHTML(crewId, days, costOn, mode){
   const p = currentProject(), cid = costJs(crewId);
   const row = inner => `<div class="crewgrid pb-role-row catering-grid cost-night${costOn?' cost-on':''}" style="--daycols:${days.length};${costOn?costGridVars():''}">${inner}</div>`;
-  if(mode==='own'){
+  if(mode!=='own') return '';
+  {
     const amt = ownCateringCostOf(p, crewId);
     return row(`<div class="cost-night-lab" style="grid-column:3 / span 2;">Own arrangement</div>
       <div class="meal-day-detail" style="grid-column:5 / -1;">
@@ -6401,44 +6414,31 @@ function cateringDayRowsHTML(crewId, days, costOn, mode){
         <label title="What it costs us, if anything — once for the job">£ <input type="text" inputmode="decimal" class="cost-in${amt?' amd':''}" style="width:64px" value="${amt||''}" placeholder="0" aria-label="Own catering cost" onchange="setCateringExtra('${cid}','own',this.value)"> for the job</label>
       </div>`);
   }
-  return days.filter(d=>dayCateredAny(d, crewId)).map(d=>row(`
-      <div class="cost-night-lab" style="grid-column:3 / span 2;">Day ${esc(d.dayNum||'?')}${d.date ? ' · '+esc(fmtDate(d.date)) : ''}</div>
-      <div class="meal-day-detail" style="grid-column:5 / -1;">${MEAL_KEYS.map(([k,label])=>{ const st = mealStateOf(d, crewId, k);
-        const b = (v, txt, title) => `<span class="${st===v?'on':''}${st===v&&v==='pd'?' them':''}" onclick="setMealState('${cid}','${d.id}','${k}','${v}')" title="${title}">${txt}</span>`;
-        return `<span class="meal-day-meal"><span class="meal-day-name">${label}</span><span class="te-by">${b('cat','Catered','Laid on — in the covers')}${b('pd','Per diem','They buy their own — the standard allowance for this meal')}${b('none','—','Not this meal')}</span></span>`; }).join('')}</div>`)).join('');
 }
+/* the cycle every mark follows: — → ✓ catered → £ per diem → — */
+const nextMealState = st => st==='none' ? 'cat' : st==='cat' ? 'pd' : 'none';
+function cycleMealState(crewId, dayId, k){ const d = dayById(dayId); if(!d) return; setMealState(crewId, dayId, k, nextMealState(mealStateOf(d, crewId, k))); }
+/* a group of marks cycles ABSOLUTELY — all ✓ → all £, all £ → all —, anything else → all ✓ — so the row's All
+   and the header's letters land everyone on the same state, whatever mix they were in */
+const groupNextState = states => states.length && states.every(x=>x==='cat') ? 'pd' : states.length && states.every(x=>x==='pd') ? 'none' : 'cat';
+async function cycleAllCateringForPerson(crewId){
+  const days = projectDays();
+  const ids = selectedCrewTargets(crewId);
+  const to = groupNextState(days.flatMap(d=>ids.flatMap(id=>['b','l','d'].map(k=>mealStateOf(d, id, k)))));
+  days.forEach(d=>{ d.cateringMeals = d.cateringMeals || {}; d.cateringPerDiem = d.cateringPerDiem || {};
+    ids.forEach(id=>{ if(to==='none'){ clearMealDay(d, id); return; }
+      d.cateringMeals[id] = {b:to==='cat', l:to==='cat', d:to==='cat'}; d.cateringPerDiem[id] = {b:to==='pd', l:to==='pd', d:to==='pd'};
+      if(to==='pd') delete d.cateringMeals[id]; else delete d.cateringPerDiem[id]; }); });
+  renderProjectBody();
+  saveInBackground('db:shootdays', shootDaysDB);
+}
+const mealMarkHTML = (crewId, d, k, label) => { const st = mealStateOf(d, crewId, k);
+  return `<span class="tri ${st}" role="button" tabindex="0" onclick="cycleMealState('${costJs(crewId)}','${d.id}','${k}')"
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cycleMealState('${costJs(crewId)}','${d.id}','${k}');}"
+    title="${label} — Day ${esc(d.dayNum||'?')}: ${st==='cat'?'catered':st==='pd'?'per diem':'not this meal'} — click to change">${st==='cat'?'✓':st==='pd'?'£':''}</span>`; };
 let cateringOpen = new Set();   // crewIds whose catering row is open day by day
 function toggleCateringOpen(crewId){ cateringOpen.has(crewId) ? cateringOpen.delete(crewId) : cateringOpen.add(crewId); renderProjectBody(); }
-/* the day's plan — what a newly ticked person gets: the meals anyone catered that day has (and the per
-   diems anyone has, for meals not catered), or lunch */
-function dayMealPlan(d){
-  const cat = {b:false, l:false, d:false}, pd = {b:false, l:false, d:false};
-  Object.values(d.cateringMeals||{}).forEach(m=>['b','l','d'].forEach(k=>{ if(m[k]) cat[k] = true; }));
-  Object.values(d.cateringPerDiem||{}).forEach(q=>['b','l','d'].forEach(k=>{ if(q[k] && !cat[k]) pd[k] = true; }));
-  if(!cat.b && !cat.l && !cat.d && !pd.b && !pd.l && !pd.d) cat.l = true;
-  return {cat, pd};
-}
-const applyMealPlan = (d, id, plan) => {
-  d.cateringMeals = d.cateringMeals || {}; d.cateringPerDiem = d.cateringPerDiem || {};
-  if(plan.cat.b||plan.cat.l||plan.cat.d) d.cateringMeals[id] = Object.assign({}, plan.cat); else delete d.cateringMeals[id];
-  if(plan.pd.b||plan.pd.l||plan.pd.d) d.cateringPerDiem[id] = Object.assign({}, plan.pd); else delete d.cateringPerDiem[id];
-};
 const clearMealDay = (d, id) => { if(d.cateringMeals) delete d.cateringMeals[id]; if(d.cateringPerDiem) delete d.cateringPerDiem[id]; };
-async function setCateredDay(crewId, dayId, on){
-  const d = dayById(dayId); if(!d) return;
-  const plan = dayMealPlan(d);
-  selectedCrewTargets(crewId).forEach(id=>{ if(on) applyMealPlan(d, id, plan); else clearMealDay(d, id); });
-  renderProjectBody();
-  saveInBackground('db:shootdays', shootDaysDB);
-}
-async function toggleAllCateringForPerson(crewId){
-  const p = currentProject(), days = projectDays();
-  const allOn = days.every(d=>dayCateredAny(d, crewId));
-  days.forEach(d=>{ const plan = dayMealPlan(d);
-    selectedCrewTargets(crewId).forEach(id=>{ if(allOn) clearMealDay(d, id); else if(!dayCateredAny(d, id)) applyMealPlan(d, id, plan); }); });
-  renderProjectBody();
-  saveInBackground('db:shootdays', shootDaysDB);
-}
 /* OWN CATERING — a talent / client override, on the project ENTRY (e.ownCatering). Person-level in
    effect (a lunch belongs to a human): any of their entries carrying it takes them out of the
    covers, the dietaries and the cost. The ticks themselves are kept, so switching back restores them. */

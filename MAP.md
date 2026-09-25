@@ -113,6 +113,19 @@ Removed with the old summaries: `cateringSummaryGridBodyHTML`, `cateringDietTabl
   and `perDiem / own / fed` lists; Budget ▸ Line Items gets `Per diem` (standard), `Per diem — Name` and
   `Own catering — Name` lines; the Summary gets Per diem / Own arrangements rows (Budget on) and a
   **Not catered** list (both modes).
+### Fourth pass, 26 Sep 2026 — cycling marks, Hotel's ▸ in both modes
+
+- **Catering: three marks a day, no ▸.** Each day cell holds B L D as `.tri` marks (`mealMarkHTML`), one
+  click cycling **— → ✓ catered → £ per diem → —** (`cycleMealState` → `setMealState`). The marks ARE the
+  detail; ▸ remains only on an Own row (detail + cost). Decided on `demo-catering-detail.html` (option 3).
+- **All and the header letters cycle ABSOLUTELY** (`groupNextState`): all ✓ → all £, all £ → all —, any mix
+  → all ✓. The row's All (`cycleAllCateringForPerson`) covers every meal on every day; a header letter
+  (`toggleMealColumn`) covers that meal for everyone on screen. `setCateredDay` / `dayMealPlan` /
+  `toggleAllCateringForPerson` are gone.
+- **Hotel's ▸ opens the nights in both modes** (`hotelNightRowsHTML(…, costOn)`): the hotel each night is
+  detail, so the row's Hotel column and the night lines' hotel field show with Budget off too
+  (`.crewgrid.hotel-detail` template); Rate / night and xVAT, and the night lines' rate, only with Budget on.
+
 ### Third pass, 26 Sep 2026 — per-meal per diems, Standard costs, one list
 
 - **Per diem is per MEAL, per DAY** (`d.cateringPerDiem[crewId] = {b,l,d}` beside `d.cateringMeals`): a meal

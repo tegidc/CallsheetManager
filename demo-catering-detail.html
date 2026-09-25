@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEMO — Catering detail options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Jost:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --line:rgba(17,10,8,.10); --field-line:rgba(17,10,8,.30); --tape:#017756; --tape-ink:#FFFFF5; --text:#110A08; --muted:#6f6a63;
+    --disp:'Fraunces', Georgia, serif; --label:'Oswald', sans-serif; --body:'Jost', sans-serif; --tint-1:rgba(1,119,86,.03); --tint-3:rgba(1,119,86,.10);
+    --amend:#8A5A0B; --amend-soft:rgba(138,90,11,.12); --fs-field:13px; --fs-meta:12px; --fs-ctl:11px; }
+  *{box-sizing:border-box;}
+  body{margin:0; background:#fff; color:var(--text); font-family:var(--body); -webkit-font-smoothing:antialiased;}
+  .main{max-width:980px; margin:0 auto; padding:22px 22px 80px;}
+  h1{font-family:var(--disp); font-size:24px; margin:0 0 4px;}
+  .lede{color:var(--muted); font-size:var(--fs-field); line-height:1.55; max-width:80ch; margin:0 0 18px;}
+  .opt{margin:34px 0 0; scroll-margin-top:20px;}
+  .opt-h{display:flex; align-items:baseline; gap:10px; margin-bottom:4px;}
+  .opt-n{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; color:var(--tape); font-weight:600;}
+  .opt h2{font-family:var(--body); font-size:15px; font-weight:600; margin:0;}
+  .rec{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--tape); border:1px solid var(--tape); border-radius:3px; padding:0 4px; line-height:14px;}
+  .now{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); border:1px solid var(--line); border-radius:3px; padding:0 4px; line-height:14px;}
+  .why{color:var(--muted); font-size:var(--fs-meta); line-height:1.5; max-width:84ch; margin:0 0 10px;}
+  .why b{color:var(--text); font-weight:600;}
+  .sample{border:1px dashed var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto;}
+
+  /* the grid, as on Crew ▸ Catering */
+  .g{display:grid; grid-template-columns:50px 52px 110px repeat(4, 44px) 60px 1fr; column-gap:8px; align-items:center;}
+  .g.hd{border-bottom:1.5px solid rgba(17,10,8,.35); padding-bottom:6px; margin-bottom:4px;}
+  .g.hd div{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; text-align:center;}
+  .g.hd div:first-child, .g.hd div:nth-child(2), .g.hd div:nth-child(3){text-align:left;}
+  .g.row{min-height:33px; padding:3px 0;}
+  .dept{font-family:var(--label); font-size:var(--fs-meal); letter-spacing:.6px;} .role{color:var(--muted); font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px;}
+  .nm{font-weight:600; font-size:14px;}
+  .c{text-align:center;}
+  input[type=checkbox]{accent-color:var(--text); width:16px; height:16px; margin:0; vertical-align:middle;}
+  .bld{display:block; font-family:var(--body); font-size:9px; letter-spacing:2.2px; color:var(--muted); font-weight:400;}
+  .bld span{cursor:pointer; padding:0 1px;} .bld span:hover{color:var(--tape);}
+  .open{border:none; background:none; color:var(--muted); cursor:pointer; font-size:10px; padding:0 4px;}
+  .all{color:var(--muted); font-size:var(--fs-meta); cursor:pointer;}
+  .sub{background:var(--tint-1); min-height:28px; font-size:var(--fs-meta);}
+  .lab{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); text-align:right; padding-right:8px; grid-column:2 / 4;}
+  /* tri-state box: — / catered ✓ / per diem £ */
+  .tri{width:18px; height:18px; border:1.5px solid rgba(17,10,8,.45); border-radius:3px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:12px; font-weight:700; background:#fff; user-select:none; line-height:1;}
+  .tri.cat{border-color:var(--text); background:var(--text); color:#fff;}
+  .tri.pd{border-color:var(--amend); background:var(--amend-soft); color:var(--amend);}
+  .tri:hover{border-color:var(--tape);}
+  .key{font-size:var(--fs-meta); color:var(--muted); margin-top:8px; display:flex; gap:16px; align-items:center;}
+  .key .tri{cursor:default;}
+  /* the Catered | Per diem | — switch (today) */
+  .te{display:inline-flex; border:1px solid var(--line); border-radius:5px; overflow:hidden;}
+  .te span{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; padding:1px 6px; cursor:pointer; color:var(--muted);}
+  .te span.on{background:var(--text); color:#fff;} .te span.on.pd{background:var(--amend);}
+  .meal-line{display:flex; gap:14px; align-items:center; grid-column:4 / -1; font-size:var(--fs-meta);}
+  .meal-line .mn{min-width:62px;}
+  /* option 2: two ticks per meal */
+  .two{display:inline-grid; grid-template-columns:auto 22px 22px; gap:2px 6px; align-items:center; font-size:var(--fs-meta);}
+  .two .h{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); text-align:center;}
+  .two input.pdbox{accent-color:var(--amend);}
+  /* option 3: day cell with three tri boxes, no expansion */
+  .tri.s{width:12px; height:14px; font-size:9px; border-radius:2px; border-width:1px;}
+  .trio{display:inline-flex; gap:2px;}
+  .pill{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; border:1px solid var(--line); border-radius:3px; padding:0 4px; color:var(--muted); cursor:pointer;}
+  .pill.on{background:var(--amend); border-color:var(--amend); color:#fff;}
+</style>
+</head>
+<body>
+<div class="main">
+  <h1>Catering detail — four ways</h1>
+  <p class="lede">The same three people and four days in each. Everything is clickable. The header's <b>B L D</b> letters turn that meal on or off for everyone beneath, as catered — that is unchanged in every option; what differs is how a person's own days are opened and how a meal is made a per diem.</p>
+
+  <!-- ============ 1 ============ -->
+  <section class="opt" id="o1">
+    <div class="opt-h"><span class="opt-n">01</span><h2>Meal rows under the day columns, one box that cycles</h2><span class="rec">Recommended</span></div>
+    <p class="why">▸ opens three lines — <b>Breakfast, Lunch, Dinner</b> — under the person, each box sitting exactly under its day. One click: <b>—</b> → <b>✓ catered</b> → <b>£ per diem</b> → <b>—</b>. Nothing to read, nothing to choose from; the amber £ is the same amber the rest of Budget uses for "their own figure".</p>
+    <div class="sample" id="s1"></div>
+    <div class="key"><span class="tri"></span> not this meal <span class="tri cat">✓</span> catered <span class="tri pd">£</span> per diem — click to cycle</div>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section class="opt" id="o2">
+    <div class="opt-h"><span class="opt-n">02</span><h2>Two ticks per meal — Catered and Per diem</h2></div>
+    <p class="why">▸ opens one line per day. Each meal has two small ticks under <b>CAT</b> and <b>PD</b>; ticking one clears the other. Plain checkboxes, no cycling to learn, but nine ticks a day is a lot of boxes.</p>
+    <div class="sample" id="s2"></div>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section class="opt" id="o3">
+    <div class="opt-h"><span class="opt-n">03</span><h2>No ▸ at all — three small cycling marks in every day cell</h2></div>
+    <p class="why">The day cell IS the detail: three small boxes (B L D) that cycle — / ✓ / £, so everything is on one line and nothing opens. Densest, but it is the "three ticks a day" look you asked to lose, with a third state on top.</p>
+    <div class="sample" id="s3"></div>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section class="opt" id="o4">
+    <div class="opt-h"><span class="opt-n">04</span><h2>One tick per meal, a "PD" tag to flip it</h2></div>
+    <p class="why">▸ opens one line per day: a normal checkbox per meal (catered), and beside each a small <b>PD</b> tag — click it and that meal becomes a per diem (the tag lights amber, the box empties). The tick stays a tick; the exception is a tag.</p>
+    <div class="sample" id="s4"></div>
+  </section>
+
+  <section class="opt" id="o0">
+    <div class="opt-h"><span class="opt-n">—</span><h2>Today, for comparison</h2><span class="now">Now</span></div>
+    <p class="why">One line per day, a <b>Catered | Per diem | —</b> switch for each of the three meals: nine words of switch per day.</p>
+    <div class="sample" id="s0"></div>
+  </section>
+</div>
+
+<script>
+const DAYS = ['D1','D2','D3','D4'], MEALS = [['b','Breakfast'],['l','Lunch'],['d','Dinner']];
+const mk = () => ({
+  tc:{ dept:'CIN', role:'DOP', name:'Tom Carver', open:true,  m:{ D1:{b:'cat',l:'cat',d:'pd'}, D2:{b:'cat',l:'cat',d:'pd'}, D3:{b:'',l:'cat',d:''}, D4:{b:'',l:'',d:''} } },
+  aw:{ dept:'CIN', role:'CAM', name:'Aisha Webb', open:false, m:{ D1:{b:'',l:'cat',d:''}, D2:{b:'',l:'cat',d:''}, D3:{b:'',l:'cat',d:''}, D4:{b:'',l:'',d:''} } },
+  ra:{ dept:'AUD', role:'SND', name:'Rhys Allen', open:false, m:{ D1:{b:'',l:'cat',d:'cat'}, D2:{b:'',l:'cat',d:''}, D3:{b:'',l:'',d:''}, D4:{b:'',l:'cat',d:''} } },
+});
+const S = { 1:mk(), 2:mk(), 3:mk(), 4:mk(), 0:mk() };
+const anyOn = (P, d) => MEALS.some(([k])=>P.m[d][k]);
+const esc = s => String(s).replace(/</g,'&lt;');
+const next = v => v==='' ? 'cat' : v==='cat' ? 'pd' : '';
+
+function head(o){
+  return `<div class="g hd"><div>Dept</div><div>Role</div><div>Name</div>${DAYS.map(d=>`<div>${d}<span class="bld">${MEALS.map(([k])=>`<span onclick="col(${o},'${d}','${k}')" title="${d} — everyone beneath, catered">${k.toUpperCase()}</span>`).join('')}</span></div>`).join('')}<div></div><div></div></div>`;
+}
+function rowHead(o, id, P, cellsHTML, openable=true){
+  return `<div class="g row"><div class="dept">${P.dept}</div><div class="role">${P.role}</div><div class="nm">${esc(P.name)}</div>${cellsHTML}
+    <div class="c">${openable ? `<button class="open" onclick="tog(${o},'${id}')">${P.open?'▾':'▸'}</button>` : ''}<span class="all" onclick="allDays(${o},'${id}')">All</span></div><div></div></div>`;
+}
+const dayTick = (o, id, P) => DAYS.map(d=>`<div class="c"><input type="checkbox" ${anyOn(P,d)?'checked':''} onchange="day(${o},'${id}','${d}',this.checked)" title="${d}${anyOn(P,d) ? ' · '+MEALS.filter(([k])=>P.m[d][k]).map(([k,l])=>l+(P.m[d][k]==='pd'?' (per diem)':'')).join(', ') : ''}"></div>`).join('');
+
+/* 1 — meal rows under the days, cycling box */
+function r1(id, P){
+  let h = rowHead(1, id, P, dayTick(1, id, P));
+  if(P.open) h += MEALS.map(([k,l])=>`<div class="g row sub"><div></div><div class="lab">${l}</div>${DAYS.map(d=>`<div class="c"><span class="tri ${P.m[d][k]}" onclick="cyc(1,'${id}','${d}','${k}')" title="${l} — ${d}">${P.m[d][k]==='cat'?'✓':P.m[d][k]==='pd'?'£':''}</span></div>`).join('')}<div></div><div></div></div>`).join('');
+  return h;
+}
+/* 2 — two ticks per meal */
+function r2(id, P){
+  let h = rowHead(2, id, P, dayTick(2, id, P));
+  if(P.open) h += DAYS.filter(d=>anyOn(P,d)).map(d=>`<div class="g row sub"><div></div><div class="lab">${d}</div>
+    <div class="meal-line">${MEALS.map(([k,l])=>`<span class="two"><span class="h"></span><span class="h">Cat</span><span class="h">PD</span><span class="mn">${l}</span>
+      <input type="checkbox" ${P.m[d][k]==='cat'?'checked':''} onchange="set(2,'${id}','${d}','${k}',this.checked?'cat':'')">
+      <input type="checkbox" class="pdbox" ${P.m[d][k]==='pd'?'checked':''} onchange="set(2,'${id}','${d}','${k}',this.checked?'pd':'')"></span>`).join('')}</div></div>`).join('');
+  return h;
+}
+/* 3 — the day cell is three small cycling marks */
+function r3(id, P){
+  const cells = DAYS.map(d=>`<div class="c"><span class="trio">${MEALS.map(([k,l])=>`<span class="tri s ${P.m[d][k]}" onclick="cyc(3,'${id}','${d}','${k}')" title="${l} — ${d}">${P.m[d][k]==='cat'?'✓':P.m[d][k]==='pd'?'£':''}</span>`).join('')}</span></div>`).join('');
+  return rowHead(3, id, P, cells, false);
+}
+/* 4 — a tick per meal and a PD tag */
+function r4(id, P){
+  let h = rowHead(4, id, P, dayTick(4, id, P));
+  if(P.open) h += DAYS.filter(d=>anyOn(P,d)).map(d=>`<div class="g row sub"><div></div><div class="lab">${d}</div>
+    <div class="meal-line">${MEALS.map(([k,l])=>`<span style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" ${P.m[d][k]==='cat'?'checked':''} onchange="set(4,'${id}','${d}','${k}',this.checked?'cat':'')"><span class="mn">${l}</span><span class="pill ${P.m[d][k]==='pd'?'on':''}" onclick="set(4,'${id}','${d}','${k}','${P.m[d][k]==='pd'?'':'pd'}')" title="Per diem for this meal">PD</span></span>`).join('')}</div></div>`).join('');
+  return h;
+}
+/* 0 — today */
+function r0(id, P){
+  let h = rowHead(0, id, P, dayTick(0, id, P));
+  if(P.open) h += DAYS.filter(d=>anyOn(P,d)).map(d=>`<div class="g row sub"><div></div><div class="lab">${d}</div>
+    <div class="meal-line">${MEALS.map(([k,l])=>`<span style="display:inline-flex;align-items:center;gap:6px"><span class="mn">${l}</span><span class="te">${[['cat','Catered'],['pd','Per diem'],['','—']].map(([v,t])=>`<span class="${P.m[d][k]===v?'on '+v:''}" onclick="set(0,'${id}','${d}','${k}','${v}')">${t}</span>`).join('')}</span></span>`).join('')}</div></div>`).join('');
+  return h;
+}
+const R = {1:r1, 2:r2, 3:r3, 4:r4, 0:r0};
+function render(o){ const P = S[o]; document.getElementById('s'+o).innerHTML = head(o) + Object.entries(P).map(([id,x])=>R[o](id,x)).join(''); }
+function renderAll(){ [1,2,3,4,0].forEach(render); }
+function tog(o,id){ S[o][id].open = !S[o][id].open; render(o); }
+function cyc(o,id,d,k){ S[o][id].m[d][k] = next(S[o][id].m[d][k]); render(o); }
+function set(o,id,d,k,v){ S[o][id].m[d][k] = v; render(o); }
+function day(o,id,d,on){ const P=S[o][id]; if(on){ const plan = dayPlan(o,d); MEALS.forEach(([k])=>P.m[d][k]=plan[k]); } else MEALS.forEach(([k])=>P.m[d][k]=''); render(o); }
+function dayPlan(o,d){ const plan={b:'',l:'',d:''}; Object.values(S[o]).forEach(P=>MEALS.forEach(([k])=>{ if(P.m[d][k]==='cat') plan[k]='cat'; else if(P.m[d][k]==='pd' && !plan[k]) plan[k]='pd'; })); if(!plan.b&&!plan.l&&!plan.d) plan.l='cat'; return plan; }
+function allDays(o,id){ const P=S[o][id]; const allOn = DAYS.every(d=>anyOn(P,d)); DAYS.forEach(d=>{ if(allOn) MEALS.forEach(([k])=>P.m[d][k]=''); else if(!anyOn(P,d)){ const plan=dayPlan(o,d); MEALS.forEach(([k])=>P.m[d][k]=plan[k]); } }); render(o); }
+/* the header letter: that meal, that day, everyone beneath — catered. All on → off; otherwise all on. */
+function col(o,d,k){ const all = Object.values(S[o]).every(P=>P.m[d][k]==='cat'); Object.values(S[o]).forEach(P=>{ P.m[d][k] = all ? '' : 'cat'; }); render(o); }
+renderAll();
+</script>
+</body>
+</html>
