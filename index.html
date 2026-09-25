@@ -1430,9 +1430,7 @@
   .budget-scope-row.dept-mode .budget-scope-lead{grid-column:1 / 4;}
   .budget-scope-row.dept-mode .budget-scope-name{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .budget-scope-row.dept-mode .budget-scope-count{grid-column:4 / -1;}
-  .budget-scope-row.cost-mode[role=button]{cursor:pointer;}
-  .budget-scope-row.cost-mode.cost-cur .budget-scope-name{font-weight:600;}
-  .budget-scope-row.cost-mode.cost-cur .stage-dot{background:var(--tape);}
+  .budget-scope-row.cost-mode{cursor:pointer;}
   .bnr-left .bnr-toolrow:empty{display:none;}      /* Budget's head has no tool rows of its own — its total sits at the top */
   .budget-scope-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
   .stage-dot.stage-dot-dept{background:var(--tape);}
@@ -4820,7 +4818,7 @@ function filterPanelHTML(spec){
   return `<div class="filter-panel">${selectsRow}${sections}${filterPanelFootHTML(spec.foot||{})}</div>`;
 }
 
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or', costs:new Set() };
 let projectCrewFilterOpen = false;
 let projectCrewFilterRolesOpen = false;
 function toggleProjectFilterRolesSection(){ projectCrewFilterRolesOpen = !projectCrewFilterRolesOpen; renderProjectBody(); }
@@ -4843,9 +4841,37 @@ function personMatchesProjectDayFilter(c){
   return f.daysMode==='and' ? days.every(onDay) : days.some(onDay);
 }
 function personMatchesProjectFilter(c){
-  const matches = matchesCrewFilterState(c, projectCrewFilter) && personMatchesProjectDayFilter(c);
+  const matches = matchesCrewFilterState(c, projectCrewFilter) && personMatchesProjectDayFilter(c) && personMatchesCostFilter(c);
   return projectCrewFilter.inverse ? !matches : matches;
 }
+/* THE COSTS FILTER (26 Sep 2026) — the head's COSTS rows are a filter, not a jump: Hotels lists the people
+   with a hotel night, Catering the people with a meal (or an own arrangement), Travel the people with a
+   method — on EVERY sub-tab, so you can pick "everyone in a hotel" and set their dinners to a per diem on
+   Catering. It writes the shared filter (projectCrewFilter.costs), as the DEPT rows do, so the head's
+   figures narrow with the list. Empty = everyone; several = anyone with any of them. */
+function personHasCost(crewId, kind, p){
+  p = p || currentProject(); if(!p) return false;
+  if(kind==='hotel') return hotelNightKeysFor(p, crewId).length>0;
+  if(kind==='travel') return !!(p.travelMethods||{})[crewId];
+  if(kind==='catering') return cateringModeOf(p, crewId)==='own' || projectDays().some(d=>dayCateredAny(d, crewId));
+  return true;
+}
+function personMatchesCostFilter(c){
+  const f = projectCrewFilter.costs; if(!f.size) return true;
+  const id = personIdOf(c);
+  return [...f].some(k=>personHasCost(id, k));
+}
+function toggleCostFilter(kind){
+  const f = projectCrewFilter.costs;
+  if(f.has(kind)) f.delete(kind); else f.add(kind);
+  renderProjectBody();
+}
+function onlyCostFilter(kind){
+  const f = projectCrewFilter.costs;
+  projectCrewFilter.costs = new Set(f.size===1 && f.has(kind) ? [] : [kind]);
+  renderProjectBody();
+}
+function allCostFilter(){ projectCrewFilter.costs = new Set(); renderProjectBody(); }
 function personHasHotel(c, p, days){
   const id = personIdOf(c);   // hotel is person-level; `c` may be an entry view
   if(((p&&p.hotelNightBefore)||[]).includes(id)) return true;
@@ -4970,12 +4996,12 @@ function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = che
    because those aren't filters and clearing them would be a different, unasked-for
    change; drops every actual exclusion. */
 function clearProjectCrewFilter(){
-  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or' };
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or', costs:new Set() };
   renderProjectBody();
 }
 function projectCrewActiveFilterCount(){
   const f = projectCrewFilter;
-  return f.depts.size + f.roles.size + f.days.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0) + (f.inverse?1:0);
+  return f.depts.size + f.roles.size + f.days.size + f.costs.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0) + (f.inverse?1:0);
 }
 function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
@@ -9660,13 +9686,21 @@ function budgetSummaryBarHTML(data, o){
     const tot = budgetVatToggle ? sum.inc : sum.ex;
     const cells = (f, n) => o.showTotals ? figuresHTML(f) + `<span class="budget-scope-pct">${tot ? Math.round((budgetVatToggle?f.inc:f.ex)/tot*100)+'%' : '—'}</span>`
       : `<span class="budget-scope-count">${n}</span>`;
+    /* a FILTER, like the department rows: a row on its own or with others narrows every list to the people
+       who have that cost; ONLY isolates it; All costs is the way back (personMatchesCostFilter) */
+    const cf = projectCrewFilter.costs, isoCost = cf.size===1 ? [...cf][0] : null;
     const row = ([k, label, ex, vat, fmtN]) => {
-      const f = {ex, vat, inc:ex+vat}, cur = onCrew && crewGridView===k;
-      return `<div class="budget-scope-row dept-mode cost-mode${budgetVatToggle&&o.showTotals?' itemized':''}${cur?' cost-cur':''}" ${onCrew ? `role="button" tabindex="0" onclick="setCrewGridView('${k}')"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setCrewGridView('${k}');}" title="Open Crew ▸ ${label}"` : ''}>
-        <span class="stage-dot stage-dot-dept"></span><span class="budget-scope-name">${label}</span><span></span>${cells(f, fmtN(counts[k]))}</div>`;
+      const f = {ex, vat, inc:ex+vat}, on = !cf.size || cf.has(k);
+      return `<div class="budget-scope-row dept-mode cost-mode${budgetVatToggle&&o.showTotals?' itemized':''}${on?'':' off'}" role="button" tabindex="0" aria-pressed="${on}"
+        onclick="toggleCostFilter('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCostFilter('${k}');}"
+        title="${label} — ${cf.has(k) ? 'in the filter, click to take it out' : cf.size ? 'left out, click to add it' : 'click to list only the people with '+label.toLowerCase()}">
+        <span class="stage-dot stage-dot-dept"></span><span class="budget-scope-name">${label}</span>
+        <button type="button" class="stage-only${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
+          onclick="event.stopPropagation();onlyCostFilter('${k}')" onkeydown="event.stopPropagation()"
+          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button>${cells(f, fmtN(counts[k]))}</div>`;
     };
-    return `<div class="budget-scope-row dept-mode cost-mode budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}">
+    return `<div class="budget-scope-row dept-mode cost-mode budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${cf.size?' off':''}" role="button" tabindex="0" aria-pressed="${!cf.size}"
+        onclick="allCostFilter()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allCostFilter();}" title="Everyone — clear the costs filter">
         <span class="stage-dot stage-dot-all"></span><span class="budget-scope-name">All costs</span><span></span>${cells(sum, '')}</div>${C.map(row).join('')}`;
   };
   const nothingOn = BUDGET_SCOPES.every(([k])=>!budgetScope[k]);

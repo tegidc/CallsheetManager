@@ -73,7 +73,12 @@ transport) carries everyone at the standard; each changed name gets its own line
 
 **Head** — the block's cuts are STAGES / DEPT / **COSTS** (`headBreakdown==='costs'`): All costs, Hotels,
 Catering, Travel with xVAT | VAT | Total | % (Budget on) or room nights / meals / people travelling (off).
-Not a filter — a row opens that Crew sub-tab. Figures: `data.hotelTotal/hotelVat`,
+**A FILTER since 26 Sep 2026 (fifth pass)** — like the DEPT rows: a row narrows every list (all sub-tabs) to
+the people with that cost, ONLY isolates one, All costs is the way back; several rows = anyone with any
+of them. It writes `projectCrewFilter.costs` (`personMatchesCostFilter` / `personHasCost`: hotel = a night
+ticked, catering = a meal mark or an Own arrangement, travel = a method), so the head's figures and the
+Filter count narrow with the list. The use: Only Hotels, then Catering, and set those dinners to £.
+Figures: `data.hotelTotal/hotelVat`,
 `cateringCounted/cateringVat`, `travelTotal/travelVat`.
 
 **Summaries** (`hotelSummaryHTML` / `cateringSummaryHTML` / `transportSummaryHTML`, one fold per sub-tab):
