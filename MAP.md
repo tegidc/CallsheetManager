@@ -224,6 +224,31 @@ interaction … the expanded info in line with the first input column — not in
   with `keep.travel`). Verified on the test copy: seeding a day is neutral (£1,890 → £1,890), unticking a
   day drops the day rate, Trip lands once, Line Items still sum to `travelTotal` (£1,875 = £1,875).
 
+### Eighth pass, 26 Sep 2026 — toggles in their own columns, the cogs in a line, Travel day by day
+
+**"Make sure the in-line toggles have their own columns and are centred in them. The cogs in the header —
+place them in a column next to Only. Travel when expanded should be day by day."**
+
+- **A TOGGLE COLUMN on Hotel and Travel** (`.crewgrid.tog-on`, 84px after ▸ / All and, with Budget on, the
+  total; `togColOf(firstCol, costOn)`): a talent row's **Us | Them** sits there (`.cost-cell.tog`, centred),
+  and Travel's **Day | Trip** on the All days line (`costLineHTML({tog:true, toggleHTML})`). The header row
+  carries a blank head for it; Travel's Method tail moves one column along. Catering keeps its own mode
+  column — **Catered | Own** and its header are centred now (`.meal-mode`, `.meal-mode-head`).
+- **The cogs are a column** in the head's COSTS rows (`.budget-scope-row.cost-mode` has a 22px column
+  after the name; the cog is its own cell, the All costs row an empty span), so the three ⚙ stand in one
+  line beside the three Onlys.
+- **Travel opens day by day** (`travelDayRowsHTML`, replaces `travelTermsRowHTML`): ALL DAYS first — the
+  method as its label, the note for the job, the rate, Day | Trip in the toggle column, `/ day` or `once`
+  and ↺ in the total column — then a line per day ticked: its own note (placeholder the job's note or
+  "Same"), on Day terms its own rate (`travelDayTerms`, stored `costAmends.travel[crewId].days[dayId]
+  = {rate, note}`, a day typed the same as the person's line is no change — `setTravelDayAmend`), and
+  that day's cost. On Trip terms the day lines show the fare once, on the first day ticked, and no rate
+  inputs. `travelTermsFor().dayChanged` = a day on its own rate (amber row, the summary's "at their own
+  day rates", `ownTerms` in Line Items). **Budget ▸ Line Items** gives such a person one line per distinct
+  day cost (`trv:p:crewId|rate`, VAT on the first); the transport summary's units are the days that carry
+  a cost, no longer cost ÷ rate. ↺ keeps a day's note (`resetCostAmend`). Verified: SGor at £15 × 5 + £30
+  on D6 → head £1,890 = Line Items £1,890 (4 × £15 + 1 × £30 on two own lines + everyone else).
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
