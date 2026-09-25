@@ -1434,6 +1434,13 @@
   .budget-scope-row.dept-mode .budget-scope-name{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .budget-scope-row.dept-mode .budget-scope-count{grid-column:4 / -1;}
   .budget-scope-row.cost-mode{cursor:pointer;}
+  .budget-scope-row.cost-mode .budget-scope-name{display:flex; align-items:center; gap:6px; overflow:visible;}
+  .cost-cog{padding:0 5px; font-size:11px; line-height:1.2; margin-left:-4px;}
+  .cost-cog.on{background:var(--c); border-color:var(--c); color:#fff;}
+  .cost-sub-group{margin:0 0 10px;}
+  .cost-sub-h{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:4px;}
+  .cost-sub-chips{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:var(--fs-field);}
+  .cost-sub-chips label{display:inline-flex; align-items:center; gap:6px; cursor:pointer;}
   .bnr-left .bnr-toolrow:empty{display:none;}      /* Budget's head has no tool rows of its own — its total sits at the top */
   .budget-scope-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
   .stage-dot.stage-dot-dept{background:var(--tape);}
@@ -4834,7 +4841,7 @@ function filterPanelHTML(spec){
   return `<div class="filter-panel">${selectsRow}${sections}${filterPanelFootHTML(spec.foot||{})}</div>`;
 }
 
-let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or', costs:new Set() };
+let projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:true, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or', costs:new Set(), costSub:{} };
 let projectCrewFilterOpen = false;
 let projectCrewFilterRolesOpen = false;
 function toggleProjectFilterRolesSection(){ projectCrewFilterRolesOpen = !projectCrewFilterRolesOpen; renderProjectBody(); }
@@ -4867,10 +4874,63 @@ function personMatchesProjectFilter(c){
    figures narrow with the list. Empty = everyone; several = anyone with any of them. */
 function personHasCost(crewId, kind, p){
   p = p || currentProject(); if(!p) return false;
-  if(kind==='hotel') return hotelNightKeysFor(p, crewId).length>0;
-  if(kind==='travel') return !!(p.travelMethods||{})[crewId];
-  if(kind==='catering') return cateringModeOf(p, crewId)==='own' || projectDays().some(d=>dayCateredAny(d, crewId));
+  const sub = costSubOf(kind), days = projectDays();
+  const anyDay = set => !set.size;   // no days ticked = any day
+  if(kind==='hotel'){
+    const keys = hotelNightKeysFor(p, crewId);
+    return anyDay(sub.nights) ? keys.length>0 : keys.some(k=>sub.nights.has(k));
+  }
+  if(kind==='travel'){
+    const m = (p.travelMethods||{})[crewId]; if(!m) return false;
+    if(sub.methods.size && !sub.methods.has(m)) return false;
+    return anyDay(sub.days) || days.some(d=>sub.days.has(d.id) && crewOnDay(crewId, d, p));
+  }
+  if(kind==='catering'){
+    if(!sub.days.size && !sub.meals.size && !sub.states.size) return cateringModeOf(p, crewId)==='own' || days.some(d=>dayCateredAny(d, crewId));
+    const meals = sub.meals.size ? [...sub.meals] : ['b','l','d'];
+    return days.filter(d=>anyDay(sub.days) || sub.days.has(d.id)).some(d=>meals.some(k=>{ const st = mealStateOf(d, crewId, k);
+      return st!=='none' && (!sub.states.size || sub.states.has(st)); }));
+  }
   return true;
+}
+/* THE COG (26 Sep 2026) — a cost row's connected sub-filters, in a popup: Hotels by night; Catering by day,
+   meal and Catered / Per diem; Travel by method and day. Nothing ticked in a group = any. Stored beside the
+   costs set (projectCrewFilter.costSub[kind]); opening the cog puts that cost into the filter. */
+const COST_SUB_SHAPE = { hotel:['nights'], catering:['days','meals','states'], travel:['methods','days'] };
+function costSubOf(kind){
+  const f = projectCrewFilter; f.costSub = f.costSub || {};
+  const sub = f.costSub[kind] = f.costSub[kind] || {};
+  COST_SUB_SHAPE[kind].forEach(g=>{ sub[g] = sub[g] || new Set(); });
+  return sub;
+}
+const costSubCount = () => ['hotel','catering','travel'].reduce((n,k)=>n + (projectCrewFilter.costs.has(k) ? COST_SUB_SHAPE[k].reduce((m,g)=>m+(costSubOf(k)[g].size?1:0), 0) : 0), 0);
+let costSubOpen = null;   // the kind whose popup is open
+function openCostSub(kind){ costSubOpen = kind; if(!projectCrewFilter.costs.has(kind)) projectCrewFilter.costs.add(kind); renderProjectBody(); }
+function closeCostSub(){ costSubOpen = null; renderProjectBody(); }
+function toggleCostSub(kind, group, value, on){ const set = costSubOf(kind)[group]; if(on) set.add(value); else set.delete(value); renderProjectBody(); }
+function clearCostSub(kind){ COST_SUB_SHAPE[kind].forEach(g=>costSubOf(kind)[g].clear()); renderProjectBody(); }
+function costSubDialogHTML(){
+  const kind = costSubOpen; if(!kind) return '';
+  const p = currentProject(), days = projectDays(), sub = costSubOf(kind);
+  const chips = (group, items) => `<div class="cost-sub-group"><div class="cost-sub-h">${items.title}</div><div class="cost-sub-chips">${
+    filterChipsHTML(items.list.map(([v,label])=>({ checked: sub[group].has(v), onchange:`toggleCostSub('${kind}','${group}','${v}',this.checked)`, label })), items.empty)}</div></div>`;
+  const dayItems = (title, withPre) => ({ title, empty:'No shoot days yet.', list:(withPre ? [['pre','Night before Day 1']] : []).concat(days.map(d=>[d.id, `Day ${esc(d.dayNum||'?')}`])) });
+  const L = { hotel:'Hotels', catering:'Catering', travel:'Travel' };
+  let body = '';
+  if(kind==='hotel') body = chips('nights', dayItems('Nights', true));
+  if(kind==='catering') body = chips('days', dayItems('Days')) + chips('meals', { title:'Meals', list:[['b','Breakfast'],['l','Lunch'],['d','Dinner']] })
+    + chips('states', { title:'How', list:[['cat','Catered'],['pd','Per diem']] });
+  if(kind==='travel'){ const methods = [...new Set(Object.values(p.travelMethods||{}).filter(Boolean))].sort();
+    body = chips('methods', { title:'Method', empty:'Nobody has a travel method yet.', list:methods.map(m=>[m, esc(m)]) }) + chips('days', dayItems('Days')); }
+  const n = COST_SUB_SHAPE[kind].reduce((m,g)=>m+sub[g].size, 0);
+  return `<div class="modal-overlay" onclick="if(event.target===this) closeCostSub()">
+    <div class="modal-box filter-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
+      <h3>${L[kind]} — narrow it</h3>
+      <div class="hint" style="margin-bottom:10px;">People with ${L[kind].toLowerCase()} matching what's ticked. Nothing ticked in a group means any.</div>
+      ${body}
+      <div class="toolbar" style="margin:12px 0 0;"><button onclick="closeCostSub()">Done</button>${n ? `<button class="small" onclick="clearCostSub('${kind}')">Clear</button>` : ''}</div>
+    </div>
+  </div>`;
 }
 function personMatchesCostFilter(c){
   const f = projectCrewFilter.costs; if(!f.size) return true;
@@ -5027,12 +5087,12 @@ function toggleProjectFilterFlag(field, checked){ projectCrewFilter[field] = che
    because those aren't filters and clearing them would be a different, unasked-for
    change; drops every actual exclusion. */
 function clearProjectCrewFilter(){
-  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or', costs:new Set() };
+  projectCrewFilter = { depts:new Set(), company:'', roles:new Set(), excludeTalent:false, excludeOtherCompanies:false, inverse:false, sort:'seniority', groupBy:'none', days:new Set(), daysMode:'or', costs:new Set(), costSub:{} };
   renderProjectBody();
 }
 function projectCrewActiveFilterCount(){
   const f = projectCrewFilter;
-  return f.depts.size + f.roles.size + f.days.size + f.costs.size + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0) + (f.inverse?1:0);
+  return f.depts.size + f.roles.size + f.days.size + f.costs.size + costSubCount() + (f.company?1:0) + (f.excludeTalent?1:0) + (f.excludeOtherCompanies?1:0) + (f.inverse?1:0);
 }
 function projectCrewFilterPanelHTML(assignedAll, days){
   const f = projectCrewFilter;
@@ -5753,6 +5813,7 @@ function renderProjectCrew(body){
     </div>` : ''}
     ${addPersonDialogHTML()}
     ${filterDialog}
+    ${costSubDialogHTML()}
     ${crewGridView==='catering' ? mealFillDialogHTML() : ''}`;
   // Phase BX — after this render's innerHTML lands, so the box can measure where it started.
   // Same idiom as renderMain()'s refreshTabScrollCues().
@@ -9728,7 +9789,8 @@ function budgetSummaryBarHTML(data, o){
         <span class="stage-dot cost-dot-${k}"></span><span class="budget-scope-name">${label}</span>
         <button type="button" class="stage-only cost-${k}${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
           onclick="event.stopPropagation();onlyCostFilter('${k}')" onkeydown="event.stopPropagation()"
-          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button>${cells(f, fmtN(counts[k]))}</div>`;
+          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button><button type="button" class="stage-only cost-cog${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
+          onclick="event.stopPropagation();openCostSub('${k}')" onkeydown="event.stopPropagation()" title="Narrow ${label.toLowerCase()} — ${k==='hotel'?'by night':k==='catering'?'by day, meal, catered or per diem':'by method and day'}" aria-label="Narrow ${label}">⚙</button>${cells(f, fmtN(counts[k]))}</div>`;
     };
     return `<div class="budget-scope-row dept-mode cost-mode budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${cf.size?' off':''}" role="button" tabindex="0" aria-pressed="${!cf.size}"
         onclick="allCostFilter()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allCostFilter();}" title="Everyone — clear the costs filter">

@@ -83,6 +83,11 @@ blue, `--cost-catering` orange, `--cost-travel` teal — the rows' dots and thei
 the filter, every view's day cells wear `costDayClass()`: a hotel night fills the cell, a meal puts a bar
 below it, a travel day a bar above; a key on the sub-tab row (`costKeyHTML`) says which. So Only Hotels
 on Roles or Catering shows which days each person is in a hotel.
+**The cog (same pass)** — beside Only on each COSTS row, `⚙` opens a popup of that cost's connected
+sub-filters (`costSubDialogHTML`, state `projectCrewFilter.costSub[kind]`, `COST_SUB_SHAPE`): Hotels by night
+(incl. the night before), Catering by day, meal and Catered / Per diem, Travel by method and day. Nothing
+ticked in a group = any; opening the cog puts that cost into the filter; the cog lights when a sub-filter
+is on; `personHasCost()` honours them and the Filter count includes them (`costSubCount`).
 Figures: `data.hotelTotal/hotelVat`,
 `cateringCounted/cateringVat`, `travelTotal/travelVat`.
 
