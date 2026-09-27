@@ -1057,6 +1057,7 @@
   .meal-day-name{min-width:62px;}
   .meal-day-detail .meal-detail{width:220px;}
   .std-costs{max-width:760px; padding:6px 0 0;}
+  .tab.tab-gear{padding-left:8px; padding-right:8px; font-size:13px; line-height:1;}
   .std-group{margin:0 0 18px;}
   .std-h{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); border-bottom:1.5px solid rgba(17,10,8,.35); padding-bottom:5px; margin-bottom:8px;}
   .std-row{display:flex; gap:8px 28px; flex-wrap:wrap; margin-bottom:8px;}
@@ -1098,6 +1099,10 @@
   .cost-line-all .cost-line-lab{color:var(--text);}
   .cost-own{display:inline-flex; align-items:center; gap:5px; white-space:nowrap; cursor:pointer;}
   /* Travel's tail: the method, and the car from the record */
+  /* a day on site on the Travel row: a mark, not a tick — travel is read from Roles' day ticks */
+  .trv-day{cursor:default; min-height:16px;}
+  .trv-mark{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--cost-travel);}
+  .trv-mark.nomethod{background:none; border:1.5px solid var(--muted);}
   .trv-method{display:flex; align-items:center; gap:10px; min-width:0; padding-left:6px;}
   .trv-method select{width:150px; flex:0 0 auto;}
   .trv-method .hint{margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -2338,13 +2343,11 @@ async function confirmSwap(entryId){
   // ---- person-keyed logistics: moved by hand, never over the new person's own ----
   days.forEach(d=>{
     if(keep.hotel && (d.hotelNights||[]).includes(oldId) && !d.hotelNights.includes(newId)) d.hotelNights.push(newId);
-    if(keep.travel && Array.isArray(d.travelDays) && d.travelDays.includes(oldId) && !d.travelDays.includes(newId)) d.travelDays.push(newId);
     if(keep.catering && (d.cateringMeals||{})[oldId] && !(d.cateringMeals||{})[newId]){
       d.cateringMeals[newId] = Object.assign({}, d.cateringMeals[oldId]);
     }
     if(wasLastEntry){
       if(Array.isArray(d.hotelNights)) d.hotelNights = d.hotelNights.filter(id=>id!==oldId);
-      if(Array.isArray(d.travelDays)) d.travelDays = d.travelDays.filter(id=>id!==oldId);
       if(d.cateringMeals) delete d.cateringMeals[oldId];
     }
   });
@@ -3157,10 +3160,6 @@ async function toggleAllForPerson(id, kind){
       days.forEach(d=>{ d.hotelNights = d.hotelNights||[]; if(!d.hotelNights.includes(crewId)) d.hotelNights.push(crewId); });
     }
     saveInBackground('db:projects', projectsDB);
-  } else if(kind==='travel'){
-    const p = currentProject();
-    const allOn = days.length>0 && days.every(d=>travelOnDay(p, id, d));
-    days.forEach(d=>setTravelOnDay(p, id, d, !allOn));
   } else {
     // 'days' — Days on site, keyed by ENTRY id
     const entryId = id;
@@ -5633,7 +5632,7 @@ function peopleKindSwitchHTML(){
     btn('talent', 'Talent etc', 'Talent and clients only')]);
 }
 function renderProjectCrew(body){
-  if(['preprod','days','post'].includes(crewGridView)) crewGridView = 'roles';   // retired tabs — a stale value lands on Roles
+  if(['preprod','days','post','standards'].includes(crewGridView)) crewGridView = 'roles';   // retired tabs (and the Standard costs sub-tab, a gear + popup since 26 Sep) — a stale value lands on Roles
   /* ⚠️ 26 Sep 2026 — the All | Crew | Talent etc switch is a FILTER: Crew lists crew, Talent etc lists talent
      and clients, All lists both. No sub-tab folds "the other side" underneath any more. Talent etc's
      Hotel, Travel and Catering are Crew's own renderers (night ticks, a method, the meal ticks, and the
@@ -5696,9 +5695,7 @@ function renderProjectCrew(body){
 
   let assignedHTML = '<div class="empty-note">No crew assigned to this project yet.</div>';
   let selectAllHTML = '', rightHeaderHTML = '';
-  if(crewGridView==='standards'){
-    assignedHTML = standardCostsHTML();
-  } else if(assigned.length && !filtered.length){
+  if(assigned.length && !filtered.length){
     assignedHTML = '<div class="empty-note">No crew match the selected stages or filter.</div>';
   } else if(filtered.length){
     const groups = buildProjectCrewGroups(filtered, p, days);
@@ -5763,7 +5760,7 @@ function renderProjectCrew(body){
         <div class="crewgrid crewgrid-header-row${costGridCls()}${isCatering?' catering-grid':' tog-on'}" style="--daycols:${colCount};${costGridVars()}">
           ${pbHeadLeadCellsHTML('crewgrid-header')}
           ${crewGridView==='hotel' ? `<div class="crewgrid-header" title="Night before Day 1">Pre</div>` : ''}
-          ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="${isTravel?'Travelling on ':''}Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
+          ${isCatering ? cateringDayHeadsHTML(days) : days.map(d=>`<div class="crewgrid-header" title="${isTravel?'On site, so travelling — ':''}Day ${esc(d.dayNum||'?')} — ${esc(fmtDate(d.date)||'date not set')}">D${esc(d.dayNum||'?')}</div>`).join('')}
           ${isCatering ? '<div class="crewgrid-header"></div>' : ''}
           ${costGridOn() ? costHeadCellsHTML(isCatering ? 0 : colCount+5) : ''}
           ${isCatering ? CATERING_TAIL_HEAD : (costGridOn() ? '' : '<div class="crewgrid-header"></div>') + '<div class="crewgrid-header"></div>'}
@@ -5830,12 +5827,13 @@ function renderProjectCrew(body){
     ${addPersonDialogHTML()}
     ${filterDialog}
     ${costSubDialogHTML()}
+    ${standardCostsDialogHTML()}
     ${crewGridView==='catering' ? mealFillDialogHTML() : ''}`;
   // Phase BX — after this render's innerHTML lands, so the box can measure where it started.
   // Same idiom as renderMain()'s refreshTabScrollCues().
   setTimeout(() => { sizeRolesTablewrap(); restoreRolesFocus(); }, 0);
   /* ⚠️ 25 Sep 2026 — no body-wide saver any more. The standard rates moved out of the summaries — to the
-     Standard costs sub-tab since 26 Sep (standardCostsHTML), whose fields save on change themselves; a
+     Standard costs popup since 26 Sep (standardCostsDialogHTML), whose fields save on change themselves; a
      body.oninput that ran a rate saver on every keystroke anywhere on the page is exactly what must not outlive them. */
   body.oninput = null;
 }
@@ -6262,9 +6260,22 @@ function bookedByHTML(crewId, group){
     <span class="${them?'':'on'}" onclick="setBookedBy('${cid}','${group}','us')">Us</span><span class="${them?'on them':''}" onclick="setBookedBy('${cid}','${group}','them')">Them</span></span>`;
 }
 const costGridOn = () => crewShowMoney && ['hotel','catering','travel'].includes(crewGridView);
-/* STANDARD COSTS — the project's standard rates, a sub-tab of their own (they were a strip on each sub-tab).
-   The field ids are the old ones, so the savers (saveHotelCosts / saveCateringCosts / saveTransportCosts) and
-   Budget ▸ Costs, which writes the same stores through setBudgetCostRate, are unchanged. */
+/* STANDARD COSTS — the project's standard rates, behind the ⚙ on the sub-tab row, in a popup (26 Sep 2026; they
+   were a sub-tab, and before that a strip on each sub-tab). The field ids are the old ones, so the savers
+   (saveHotelCosts / saveCateringCosts / saveTransportCosts) and Budget ▸ Costs, which writes the same stores
+   through setBudgetCostRate, are unchanged; a field saves on change and the popup stays open through the render. */
+let standardCostsOpen = false;
+function toggleStandardCosts(){ standardCostsOpen = !standardCostsOpen; renderProjectBody(); }
+function standardCostsDialogHTML(){
+  if(!standardCostsOpen) return '';
+  return `<div class="modal-overlay" onclick="if(event.target===this) toggleStandardCosts()">
+    <div class="modal-box filter-box" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Standard costs">
+      <h3>Standard costs</h3>
+      ${standardCostsHTML()}
+      <div class="toolbar" style="margin:12px 0 0;"><button onclick="toggleStandardCosts()">Done</button></div>
+    </div>
+  </div>`;
+}
 function standardCostsHTML(){
   const p = currentProject(), c = getCateringCosts(p), h = getHotelCosts(p), t = getTransportCosts(p);
   const f = (id, v, label, kind) => `<label class="std-f"><span>${label}</span><input type="text" inputmode="decimal" id="${id}" value="${v||''}" placeholder="0" onchange="saveStandardRates('${kind}')"></label>`;
@@ -7222,9 +7233,10 @@ async function editDietaryNote(crewId){
   await saveDB('db:crew', crewDB);
   renderProjectBody();
 }
-/* TRAVEL (25 Sep 2026) — the row is the DAYS THEY TRAVEL: a tick a day (costed at the day rate; a fare lands once),
-   ▸ / All and the total, then the method in the tail with the car from the record. ▸ opens their terms beneath
-   (travelDayRowsHTML — All days, then a line a day). Hotel's shape, so the three sub-tabs read alike. */
+/* TRAVEL (26 Sep 2026) — the row is the DAYS THEY TRAVEL, which are their days on site: a MARK a day, read from
+   Roles' day ticks (travelOnDay) and not ticked here — on site means travelling somehow. Then ▸ and the total, the
+   method in the tail with the car from the record. ▸ opens their terms beneath (travelDayRowsHTML — All days,
+   then a line a day). Hotel's shape, so the three sub-tabs read alike. */
 let travelOpen = new Set();   // crewIds whose travel row is open
 function toggleTravelOpen(crewId){ travelOpen.has(crewId) ? travelOpen.delete(crewId) : travelOpen.add(crewId); renderProjectBody(); }
 function crewTravelRowHTML(block, days){
@@ -7240,10 +7252,10 @@ function crewTravelRowHTML(block, days){
     .concat(['<option value="__add__">+ Add option…</option>']).join('');
   const car = [block.carMakeModel, block.carReg].filter(Boolean).join(' — ');
   const carInfo = (block.drives==='Yes' && car) ? `<span class="hint" title="${esc(car)}">${icon('car')} ${esc(car)}</span>` : '';
-  const cells = days.map(d=>`<div class="crewgrid-check${costDayClass(crewId, d)}" data-day="D${esc(d.dayNum||'?')}"><input type="checkbox" ${travelOnDay(p, crewId, d)?'checked':''} onchange="toggleTravelDay('${cid}','${d.id}',this.checked)" title="Travelling on Day ${esc(d.dayNum||'?')}"></div>`).join('');
+  const cells = days.map(d=>`<div class="crewgrid-check trv-day${costDayClass(crewId, d)}" data-day="D${esc(d.dayNum||'?')}">${travelOnDay(p, crewId, d)
+      ? `<span class="trv-mark${current?'':' nomethod'}" title="On site Day ${esc(d.dayNum||'?')} — travelling${current ? ' by '+esc(current.toLowerCase()) : ', no method yet'}"></span>` : ''}</div>`).join('');
   const isOpen = travelOpen.has(crewId);
-  const openBtn = current ? `<button type="button" class="cost-open" onclick="toggleTravelOpen('${cid}')" title="${isOpen?'Close':'Day by day — a note'+(costOn?', the rate and Day | Trip':'')}" aria-expanded="${isOpen}">${isOpen?'▾':'▸'}</button>` : '';
-  const allHTML = `<button class="small all-toggle-btn" onclick="toggleAllForPerson('${cid}','travel')" title="Every day on / off for this person">All</button>`;
+  const openBtn = current && days.some(d=>travelOnDay(p, crewId, d)) ? `<button type="button" class="cost-open" onclick="toggleTravelOpen('${cid}')" title="${isOpen?'Close':'Day by day — a note'+(costOn?', the rate and Day | Trip':'')}" aria-expanded="${isOpen}">${isOpen?'▾':'▸'}</button>` : '';
   const togCol = togColOf(firstCol, costOn);
   const togHTML = talent ? `<div class="cost-cell tog" style="grid-column:${togCol};">${bookedByHTML(crewId, 'trip')}</div>` : '';   // Talent etc: Us is costed, Them is listed
   const head = `<div class="crewgrid crewgrid-row pb-head tog-on${costOn?' cost-on':''}" style="--daycols:${colCount};${costOn?costGridVars():''}">
@@ -7252,7 +7264,7 @@ function crewTravelRowHTML(block, days){
     <div class="crewgrid-role-cell pb-role-cell" style="grid-column:3;">${talent ? talentRoleTextHTML(topSeniorityEntry(block.entries)) : `<span class="roles-inline">${roleBannerHTML(topSeniorityEntry(block.entries))}</span>`}</div>
     <div class="crewgrid-row-name pb-name">${pbNameHTML(block.name, block.id, repeatStarHTML(crewId))}</div>
     ${cells}
-    <div class="crewgrid-remove" style="grid-column:${firstCol};">${openBtn}${allHTML}</div>
+    <div class="crewgrid-remove" style="grid-column:${firstCol};">${openBtn}</div>
     ${costOn ? travelCostCellsHTML(crewId, firstCol, days) : ''}${togHTML}
     <div class="trv-method" style="grid-column:${togCol+1} / -1;"><select onchange="setTravelMethod('${cid}',this)" aria-label="Travel method">${opts}</select>${carInfo}</div>
   </div>${isOpen ? travelDayRowsHTML(crewId, colCount, firstCol, costOn, days) : ''}`;
@@ -7274,22 +7286,10 @@ async function setTravelMethod(crewId, selectEl){
     }
     applied = newOpt || '';
   }
-  const days = projectDays(); let daysTouched = false;
-  selectedCrewTargets(crewId).forEach(id=>{
-    const had = p.travelMethods[id];
-    p.travelMethods[id] = applied;
-    /* a first method ticks their days on site (a day with no list yet already reads that way — travelOnDay);
-       no method means no travel on our books */
-    days.forEach(d=>{
-      if(!Array.isArray(d.travelDays)) return;
-      if(applied && !had && crewOnDay(id, d, p) && !d.travelDays.includes(id)){ d.travelDays.push(id); daysTouched = true; }
-      if(!applied && d.travelDays.includes(id)){ d.travelDays = d.travelDays.filter(x=>x!==id); daysTouched = true; }
-    });
-  });
+  selectedCrewTargets(crewId).forEach(id=>{ p.travelMethods[id] = applied; });
   // G14 — render first, save after (see saveInBackground)
   renderProjectBody();
   saveInBackground('db:projects', projectsDB);
-  if(daysTouched) saveInBackground('db:shootdays', shootDaysDB);
 }
 function getTransportCosts(p){
   const c = (p && p.transportCosts) || {};
@@ -7356,18 +7356,11 @@ function transportSummaryLines(){
 async function toggleCrewOnDay(entryId, dayId, checked){
   const d = dayById(dayId); if(!d) return;
   d.positions = d.positions || [];
-  const p = currentProject();
   selectedEditTargets(entryId).forEach(id=>{
     if(checked){
       if(!d.positions.some(pos=>pos[0]===id)) d.positions.push([id, '', '', '', '']);
     } else {
       d.positions = d.positions.filter(pos=>pos[0]!==id);
-    }
-    /* travel follows days on site — the default a day with no list already has (travelOnDay) */
-    const e = entryById(id, p);
-    if(e && Array.isArray(d.travelDays) && (p.travelMethods||{})[e.crewId]){
-      if(checked){ if(!d.travelDays.includes(e.crewId)) d.travelDays.push(e.crewId); }
-      else if(!crewOnDay(e.crewId, d, p)) d.travelDays = d.travelDays.filter(x=>x!==e.crewId);
     }
   });
   // G14 — render first, save after (see saveInBackground)
@@ -9008,32 +9001,10 @@ async function setBookedBy(crewId, group, by){
   renderProjectBody();
   saveInBackground('db:projects', projectsDB);
 }
-/* THE DAYS THEY TRAVEL (25 Sep 2026) — d.travelDays, a list of crewIds, the same shape as d.hotelNights. A day
-   with NO list yet (every day from before this landed) reads as the old rule — everyone on site with a method
-   travels — and is written out as that list the first time a tick on it is touched, so nothing already costed
-   moves. A first method ticks their days on site (setTravelMethod); ticking someone onto a day ticks their
-   travel with them when they have a method, and unticking them clears it (toggleCrewOnDay) — the old rule kept
-   as the default, so a tick only ever has to be taken OFF: the driver who stays in the hotel. */
-function travelOnDay(p, crewId, d){
-  if(Array.isArray(d.travelDays)) return d.travelDays.includes(crewId);
-  return !!(p.travelMethods||{})[crewId] && crewOnDay(crewId, d, p);
-}
-function seedTravelDay(p, d){
-  if(Array.isArray(d.travelDays)) return;
-  d.travelDays = projectCrew(p).map(c=>c.id).filter(id=>(p.travelMethods||{})[id] && crewOnDay(id, d, p));
-}
-function setTravelOnDay(p, crewId, d, on){
-  seedTravelDay(p, d);
-  if(on){ if(!d.travelDays.includes(crewId)) d.travelDays.push(crewId); }
-  else d.travelDays = d.travelDays.filter(id=>id!==crewId);
-}
-async function toggleTravelDay(crewId, dayId, checked){
-  const p = currentProject(), d = dayById(dayId); if(!p || !d) return;
-  selectedCrewTargets(crewId).forEach(id=>setTravelOnDay(p, id, d, checked));
-  // G14 — render first, save after (see saveInBackground)
-  renderProjectBody();
-  saveInBackground('db:shootdays', shootDaysDB);
-}
+/* THE DAYS THEY TRAVEL (26 Sep 2026) — the days they are ON SITE. "If they're on site they're travelling somehow":
+   the Travel row shows a mark on each of their days, and nothing is ticked — travel is read from the day ticks on
+   Roles. This is the one reading of it (the summary's counts, the cost, the shading, the cog's Travel by day). */
+const travelOnDay = (p, crewId, d) => crewOnDay(crewId, d, p);
 /* travel: the standard is per day for Own car and Public transport; every other method has no
    standard (Train, Flying — a fare is typed per person; Production transport — never costed) */
 function travelStdFor(p, method){
@@ -9731,9 +9702,10 @@ async function setHeadFolded(on){
 const toolGroupHTML = items => `<span class="bnr-group">${items.filter(Boolean).join('')}</span>`;
 /* the sub-tab row both tabs use; `rightHTML` is the row's own links (Summary, Collapse all) */
 function crewSubTabsHTML(current, setterName, rightHTML){
-  const labels = {roles:'Roles', travel:'Travel', catering:'Catering', hotel:'Hotel', standards:'Standard costs'};
+  const labels = {roles:'Roles', travel:'Travel', catering:'Catering', hotel:'Hotel'};
   return `<div class="tabs crewview-tabs">
     ${Object.keys(labels).map(v=>`<div class="tab ${current===v?'active':''}" onclick="${setterName}('${v}')">${labels[v]}</div>`).join('')}
+    <div class="tab tab-gear${standardCostsOpen?' active':''}" role="button" tabindex="0" onclick="toggleStandardCosts()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleStandardCosts();}" title="Standard costs — the project's rates for meals, per diems, rooms and travel" aria-label="Standard costs">⚙</div>
     ${rightHTML ? `<div class="crew-header-row crew-header-right">${rightHTML}</div>` : ''}
   </div>`;
 }

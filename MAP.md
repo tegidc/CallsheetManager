@@ -210,7 +210,7 @@ interaction … the expanded info in line with the first input column — not in
   `74px 92px`; `travelCostCellsHTML` is the total alone. The old Days · Rate · Per · xVAT row and the
   one-column select are gone; the render lives in `renderProjectCrew()`'s day-grid branch with Hotel and
   Catering (the separate `travel` branch was removed).
-- ⚠️ **THE DAYS THEY TRAVEL — `d.travelDays`** (a list of crewIds, `d.hotelNights`' shape), read ONLY
+- ~~⚠️ **THE DAYS THEY TRAVEL — `d.travelDays`**~~ **(REVERTED in the ninth pass below — travel is read from the day ticks; kept as history)** (a list of crewIds, `d.hotelNights`' shape), read ONLY
   through `travelOnDay(p, crewId, d)`. **A day with no list yet reads as the old rule** — everyone on site
   with a method travels — and `seedTravelDay()` writes that list out the first time a tick on it is touched
   (`setTravelOnDay` → `toggleTravelDay`, `toggleAllForPerson(id,'travel')`), so nothing already costed
@@ -248,6 +248,23 @@ place them in a column next to Only. Travel when expanded should be day by day."
   day cost (`trv:p:crewId|rate`, VAT on the first); the transport summary's units are the days that carry
   a cost, no longer cost ÷ rate. ↺ keeps a day's note (`resetCostAmend`). Verified: SGor at £15 × 5 + £30
   on D6 → head £1,890 = Line Items £1,890 (4 × £15 + 1 × £30 on two own lines + everyone else).
+
+### Ninth pass, 26 Sep 2026 — travel is read from the day ticks; Standard costs is a gear
+
+**"In travel we don't need crosses to mark the travel — if they're on site they're travelling somehow. A
+different icon or other formatting. Standard costs can be a gear icon and a pop up."**
+
+- ⚠️ **`d.travelDays` is GONE** (it lived two passes, never pushed). `travelOnDay(p, crewId, d)` is now
+  `crewOnDay(crewId, d, p)` — the days they travel ARE their days on site, read from Roles' day ticks. It
+  stays the ONE reader (cost, summary counts, the head's "n travelling", shading, the cog's Travel by day,
+  the ▸ lines). Removed with it: `seedTravelDay`, `setTravelOnDay`, `toggleTravelDay`, the travel branch
+  of `toggleAllForPerson`, the seeding in `setTravelMethod`, the hook in `toggleCrewOnDay`, the carry in
+  `confirmSwap`. The Travel row's day cells are **marks, not ticks** (`.trv-day` / `.trv-mark`, a dot in
+  the travel colour; hollow when they have no method yet), with no All — there is nothing to toggle.
+- **Standard costs is a ⚙ on the sub-tab row and a popup** (`standardCostsDialogHTML`, `standardCostsOpen`
+  / `toggleStandardCosts`; the fields are `standardCostsHTML()` unchanged, saving on change and the popup
+  staying open through the render). The `standards` sub-tab is retired — a stale `crewGridView` of it
+  lands on Roles with the other retired views.
 
 ## Canonical lookups — use these, don't re-derive
 
@@ -1281,7 +1298,7 @@ coarse information first, finest detail last.
 | T-2.0.1 | · · Fronted entry | Phase BL — the one real entry a collapsed stack shows: most days in the CURRENT PHASE (`prepDaysOf()` on T-2.9, the shoot-day signal everywhere else INCLUDING T-2.1), ties by `roleSeniorityRank()`. Recomputed on load and tab-switch only, never on an edit | `frontedEntryOfBlock()` |
 | T-2.2 | · Days on site | Person block; day checkboxes + row All + remove belong to whichever entry they're on — the fronted entry's render on the shared head row since Phase BN, a stacked-away entry's on its own row (a position is keyed to an entry) | `crewAssignRowHTML()` |
 | T-2.3 | · Hotel | Person block; the night checkboxes (incl. the night before Day 1) and All sit on the shared head row unconditionally — hotel is keyed to crewId. Collapsible hotel summary (room-booking table, per-night table — Phase O) below it | `hotelSummaryHTML()` / `toggleHotelNight()` / `toggleHotelPre()` |
-| T-2.4 | · Travel | **A day grid since 25 Sep 2026** — DEPT · ROLE · NAME · a tick a day (the days they travel, `d.travelDays`) · ▸ / All · [xVAT] · Method; ▸ opens the terms line (note · rate · Day | Trip). Hotel's shape. Collapsible transport summary (method × the days travelling, a Daily cost row) below it | `crewTravelRowHTML()` / `travelTermsRowHTML()` / `transportSummaryHTML()` |
+| T-2.4 | · Travel | **A day grid since 25 Sep 2026** — DEPT · ROLE · NAME · a MARK a day (their days on site, read from Roles' ticks — `travelOnDay`; 26 Sep) · ▸ · [xVAT] · [Us \| Them] · Method; ▸ opens the lines day by day (note · rate · Day \| Trip, then a line a day). Hotel's shape. Collapsible transport summary (method × the days travelling, a Daily cost row) below it | `crewTravelRowHTML()` / `travelTermsRowHTML()` / `transportSummaryHTML()` |
 | T-2.5 | · Catering | Person block; the three Breakfast/Lunch/Dinner rows are person-level and always their own rows below the head. Collapsible catering summary (cost fields + Breakfast/Lunch/Dinner-by-day grid with a Daily cost row — Phase P2) below it | `crewCateringBlockHTML()` / `cateringSummaryHTML()` |
 | T-2.6 | · Filter panel | Departments, roles, lead company, days (OR/AND), exclusions, sort, group-by. Foot row shared with T-6.0/D-1.2 — see **The filter-panel foot** | `projectCrewFilterPanelHTML()` / `filterPanelFootHTML()` |
 | T-2.7 | · Bulk select & actions | Select all (filtered), bulk remove, bulk edit lead company. Phase BK: a block's checkbox selects the PERSON (its visible entry ids). Phase BL: entry-level bulk fields (rate, days, role) hit only the fronted/visible entry; person-level ones (hotel, travel, catering, Show as) still cover the whole person | `bulkActionBarHTML()` / `bulkEditPanelHTML()` |
