@@ -10021,7 +10021,7 @@ async function deleteAdditionalCost(id){
 
 function budgetOrderedPeople(data){
   const byName = (a,b)=>(a.name||'').localeCompare(b.name||'');
-  if(budgetSort==='dept') return DEPARTMENTS.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
+  if(budgetSort==='dept') return BUDGET_DEPT_ORDER.flatMap(d=>sortHoDFirst(data.people.filter(pp=>pp.department===d)));
   return [...data.people].sort((a,b)=>{
     switch(budgetSort){
       case 'name':   return byName(a,b);
@@ -10187,6 +10187,18 @@ function sheetLineFigures(l){
   return { units, rate, vr, ex: rate*units, vat: rate*units*vr,
            byStage: { preproduction: rate*byUnits.preproduction, production: rate*byUnits.production, post: rate*byUnits.post } };
 }
+/* THE BUDGET'S ORDER (14 Oct 2026) — the crew departments, then Equipment, Grip and Locations & Set, then catering,
+   travel, hotels and the rest at the foot. Used by Line Items, the Department and Per Day views, the head's
+   department rows and Per Person's department sort; the app's own DEPARTMENTS order (Crew lists) is left alone.
+   Two departments have no section of their own on the sheet: Set people head the Locations section ("Locations &
+   Set") and Catering & Travel people head Catering, so neither appears twice. A line typed under either before
+   this lands in the section that took it over (SHEET_ALIAS). */
+const BUDGET_DEPT_ORDER = ['Production','Client','Talent','Cinematography','Audio','Vanities','Post Production','Other',
+  'Equipment','Grip','Set','Catering & Travel'];
+const SHEET_FOLD = { 'Set':'x:loc', 'Catering & Travel':'x:catering' };
+const SHEET_ALIAS = { 'd:Set':'x:loc', 'd:Catering & Travel':'x:catering' };
+const SHEET_PERSON_DEPT = { 'x:loc':'Set', 'x:catering':'Catering & Travel' };   // a name typed in these sections books into this department
+const SHEET_TAIL_ORDER = ['x:loc','x:catering','x:travel','x:hotel','x:vendors','x:other'];
 const SHEET_EXTRA_SECTIONS = [['x:catering','Catering','CAT/TRA'], ['x:travel','Travel','CAT/TRA'], ['x:hotel','Hotels','CAT/TRA'],
   ['x:loc','Locations','SET'], ['x:vendors','Vendors','—'], ['x:other','Other costs','PROD']];
 const VENDOR_TYPE_CODES = { Catering:'CAT/TRA', Equipment:'EQUIP', Transport:'CAT/TRA', Post:'POST', Other:'—' };
@@ -10208,7 +10220,8 @@ function buildBudgetLines(data){
   const extra = (key, code, item, name, qty, rate, o) => mk(Object.assign({ key, code, item, name, qty, rate,
     units: qty*prodOn, costEx: qty*rate*prodOn, dist:{proj:1}, bbc:bbcOfCode(code) }, o||{}));
   const sections = [];
-  DEPARTMENTS.forEach(dept=>{
+  const folded = {};
+  BUDGET_DEPT_ORDER.forEach(dept=>{
     const lines = [];
     sortHoDFirst(data.people.filter(pp=>pp.department===dept)).forEach(pp=>{
       const phaseDays = pp.daysWorked + pp.prepDays + pp.postDays;
@@ -10225,7 +10238,7 @@ function buildBudgetLines(data){
                      post: (pp.isBuyout ? (phaseDays ? pp.postDays/phaseDays : 0) : pp.postDays) * postOn,
                      proj: onIds.length ? 0 : shootW, days: Object.fromEntries(onIds.map(id=>[id, shootW/onIds.length])) };
       const bbcCat = BBC_STRUCTURE.find(cat=>cat.kind==='people' && cat.test(pp));
-      const base = { name:pp.name, pre:pp.prepDays, shoot:pp.daysWorked, post:pp.postDays, qty:pp.isBuyout?1:0, isBuyout:pp.isBuyout,
+      const base = { personDept:dept, name:pp.name, pre:pp.prepDays, shoot:pp.daysWorked, post:pp.postDays, qty:pp.isBuyout?1:0, isBuyout:pp.isBuyout,
         ot:pp.isBuyout?0:pp.otUnits, otOn:(!pp.isBuyout && pp.daysWorked>0) ? pp.otUnits*prodOn : 0,
         vatPct:vr*100, units, entryId:pp.id, crewId:pp.crewId, fullRate:pp.rate, stages, dist,
         bbc: bbcCat ? bbcCat.code : '—' };
@@ -10235,8 +10248,10 @@ function buildBudgetLines(data){
       if(kit>0) lines.push(mk(Object.assign({}, base, { key:'k:'+pp.id, code:'EQUIP', item:`Kit — ${pp.role||''}`, isKit:true, bbc:'6',
         rate:kit, costEx:kit*units, costVat:kit*units*vr })));
     });
-    /* every department is a row header as standard (14 Oct 2026) — empty or not, so a line can be added under any of them */
-    sections.push({ key:'d:'+dept, title:dept, code:DEPARTMENT_CODES[dept]||'—', dayCols:true, lines });
+    /* every department is a row header as standard (14 Oct 2026) — empty or not, so a line can be added under any of
+       them — except Set and Catering & Travel, whose people head the sections that took them over (SHEET_FOLD) */
+    if(SHEET_FOLD[dept]) folded[dept] = lines;
+    else sections.push({ key:'d:'+dept, title:dept, code:DEPARTMENT_CODES[dept]||'—', dayCols:true, lines });
   });
   const X = {}; SHEET_EXTRA_SECTIONS.forEach(([key,title,code])=>{ X[key] = { key, title, code, dayCols:false, lines:[] }; });
   if(cateringGrid && !data.cateringViaVendor){
@@ -10365,12 +10380,14 @@ function buildBudgetLines(data){
   });
   (p.additionalCosts||[]).forEach(c=>{ const amt = parseRateNumber(c.amount)||0;
     if(amt) X['x:other'].lines.push(extra('a:'+c.id, 'PROD', c.label||'Additional cost', c.confirmed?'confirmed':'estimate', 1, amt, { bbc:'13', additionalId:c.id })); });
-  SHEET_EXTRA_SECTIONS.forEach(([key])=>{ sections.push(X[key]); });   // the cost sections too — always there, like the departments
+  X['x:loc'].title = 'Locations & Set'; X['x:loc'].dayCols = true;
+  Object.entries(SHEET_FOLD).forEach(([dept, key])=>{ X[key].lines.unshift(...(folded[dept]||[])); });
+  SHEET_TAIL_ORDER.forEach(key=>{ sections.push(X[key]); });   // the cost sections too — always there, like the departments
   /* the typed lines, each dropped in under the row it was added after (end of the section if
      that row has since gone); a line whose whole section has gone lands in Other costs */
   const byKey = Object.fromEntries(sections.map(sec=>[sec.key, sec]));
   sheet.lines.forEach(l=>{
-    const sec = byKey[l.sec] || byKey['x:other'];
+    const sec = byKey[SHEET_ALIAS[l.sec] || l.sec] || byKey['x:other'];
     const f = sheetLineFigures(l);
     const line = mk({ key:'c:'+l.id, custom:true, id:l.id, code:l.code||sec.code, item:l.item||'', name:l.name||'',
       pre:Number(l.pre)||0, shoot:Number(l.shoot)||0, post:Number(l.post)||0, qty:Number(l.qty)||0,
@@ -10408,7 +10425,7 @@ function buildBudgetLines(data){
      muting Catering & Travel in the head would leave the catering standing. Done after the
      reconciliation above, which has to see everything the engine counted. */
   sections.forEach(sec=>sec.lines.forEach(l=>{
-    l.dept = l.entryId ? sec.title : (CODE_DEPARTMENTS[l.code] || 'Other'); }));
+    l.dept = l.entryId ? (l.personDept || sec.title) : (CODE_DEPARTMENTS[l.code] || 'Other'); }));
   if(projectCrewFilter.depts.size) sections.forEach(sec=>{
     sec.lines = sec.lines.filter(l=>l.entryId || l.locked || (projectCrewFilter.depts.has(l.dept) !== !!projectCrewFilter.inverse)); });
   [...new Set([...all(), ...rateCard.map(r=>r.line)])].forEach(l=>{
@@ -10505,7 +10522,7 @@ function budgetDeptFigs(mode){
     const B = buildBudgetLines(buildBudgetData()), by = {};
     B.lines.forEach(l=>{ const f = B.fig(l, mode), r = by[l.dept] = by[l.dept] || {ex:0, vat:0, people:new Set()};
       r.ex += f.ex + f.fl; r.vat += f.vat; if(l.crewId) r.people.add(l.crewId); });
-    return DEPARTMENTS.filter(d=>by[d]).map(d=>({ dept:d, ex:by[d].ex, vat:by[d].vat, inc:by[d].ex+by[d].vat, people:by[d].people.size }));
+    return BUDGET_DEPT_ORDER.filter(d=>by[d]).map(d=>({ dept:d, ex:by[d].ex, vat:by[d].vat, inc:by[d].ex+by[d].vat, people:by[d].people.size }));
   });
 }
 /* the head's COSTS rows on the Budget page — the sheet's own Catering / Travel / Hotels sections, as the stage and
@@ -10515,7 +10532,7 @@ function budgetCostFigs(mode){
   const B = buildBudgetLines(buildBudgetData()), out = {};
   [['hotel','x:hotel'], ['catering','x:catering'], ['travel','x:travel']].forEach(([k, key])=>{
     const sec = B.sections.find(x=>x.key===key), f = {ex:0, vat:0};
-    (sec ? sec.lines : []).forEach(l=>{ const g = B.fig(l, mode); f.ex += g.ex + g.fl; f.vat += g.vat; });
+    (sec ? sec.lines.filter(l=>!l.entryId) : []).forEach(l=>{ const g = B.fig(l, mode); f.ex += g.ex + g.fl; f.vat += g.vat; });
     out[k] = f; });
   return out;
 }
@@ -10626,7 +10643,7 @@ function budgetSheetModel(view, data, B){
     return { cols:[[70,headA],[290,headB],[130,'Cost','n'],[130,'Charged','n'],[70,'%','n']], rows: rows.concat(footRows(1)) };
   };
   if(view==='department'){
-    const known = DEPARTMENTS.map(d=>[DEPARTMENT_CODES[d]||'—', d]);
+    const known = BUDGET_DEPT_ORDER.map(d=>[DEPARTMENT_CODES[d]||'—', d]);
     const seen = new Set(known.map(k=>k[0]));
     const extraCodes = [...new Set(B.lines.map(l=>l.code))].filter(c=>!seen.has(c)).map(c=>[c, CODE_DEPARTMENTS[c]||'Other']);
     const m = groupedModel(known.concat(extraCodes), l=>l.code, 'Code', 'Department');
@@ -10648,7 +10665,7 @@ function budgetSheetModel(view, data, B){
     const cellsOf = vals => vals.map(v=>M(v)).concat([M(vals.reduce((n,v)=>n+v, 0))]);
     const rows = [ { cells:['', ''].concat(slots.map(s=>({h: s.off ? 'off' : esc(s.sub||''), c:'n mu', t:s.tip||s.sub||''})), ['']) },
                    { cls:'xls-tot', cells:[{h:'Totals', span:2}].concat(cellsOf(rowOf(B.lines))) } ];
-    const codes = DEPARTMENTS.map(d=>[DEPARTMENT_CODES[d]||'—', d]);
+    const codes = BUDGET_DEPT_ORDER.map(d=>[DEPARTMENT_CODES[d]||'—', d]);
     [...new Set(B.lines.map(l=>l.code))].filter(c=>!codes.some(k=>k[0]===c)).forEach(c=>codes.push([c, CODE_DEPARTMENTS[c]||'Other']));
     codes.forEach(([code, name])=>{
       const mine = B.lines.filter(l=>l.code===code); if(!mine.length) return;
@@ -11023,7 +11040,7 @@ async function budgetLineToPerson(lineId, crewId){
   const p = currentProject(); if(!p) return;
   const s = budgetSheetRec(p), l = s.lines.find(x=>x.id===lineId), c = crewById(crewId);
   if(!l || !c) return;
-  const dept = l.sec && l.sec.startsWith('d:') ? l.sec.slice(2) : (c.department||'');
+  const dept = l.sec && l.sec.startsWith('d:') ? l.sec.slice(2) : (SHEET_PERSON_DEPT[l.sec] || c.department || '');
   const role = String(l.item||'').trim() || c.role || '';
   const snaps = beginUndo(['db:projects','db:shootdays']);
   /* the same person in the same role already on the project is that booking; otherwise a booking of its own */
