@@ -1062,7 +1062,7 @@
   .std-h{font-family:var(--label); font-size:var(--fs-ctl); font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); border-bottom:1.5px solid rgba(17,10,8,.35); padding-bottom:5px; margin-bottom:8px;}
   .std-row{display:flex; gap:8px 28px; flex-wrap:wrap; margin-bottom:8px;}
   .std-f{display:inline-flex; align-items:center; gap:8px; font-size:var(--fs-meta); color:var(--muted);}
-  .std-f input{width:64px; text-align:center; font-variant-numeric:tabular-nums;}
+  .std-f input{width:50px; text-align:center; font-variant-numeric:tabular-nums;}
   .meal-day-detail label{display:inline-flex; gap:5px; align-items:center; cursor:pointer;}
   .meal-day-detail input{width:14px; height:14px;}
   /* the cost cells wear Roles' clothes — muted header, centred tabular figures, the same rate input — no tint */
@@ -1073,7 +1073,8 @@
   .cost-unit{font-size:var(--fs-meta); color:var(--muted);}
   .cost-in{width:100%; min-width:0; text-align:center; font-variant-numeric:tabular-nums;}
   .cost-in.l{text-align:left;}
-  .cost-cell .cost-in:not(.l){width:56px;}
+  .cost-cell .cost-in:not(.l){width:50px;}
+  .cost-in:not(.l), .std-f input{padding-left:3px; padding-right:3px;}   /* narrow number boxes — the figure gets the width, not the padding */
   .cost-in::placeholder{color:var(--muted); opacity:1;}
   .cost-in.amd{color:var(--phase-prep); font-weight:600; box-shadow:0 1px 0 var(--phase-prep);}
   .cost-std{font-family:var(--label); font-size:9px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted);}
@@ -1255,7 +1256,8 @@
   .section table.xls td.xls-in input.c{text-align:center;}
   /* every number entry is centred (14 Oct 2026) — a figure you type sits in the middle of its cell, as the ticks do */
   .section table.xls td.xls-in input[inputmode=decimal], .section table.xls td.xls-in.c input, .section table.xls td.xls-btn button{text-align:center;}
-  .section table.xls td.xls-in input[inputmode=decimal]{padding:0 3px;}
+  .section table.xls td.xls-in input[inputmode=decimal], .section table.xls td.xls-in input.c{padding:0 2px;}
+  .section table.xls td.c{padding:0 2px;}
   .section table.xls tr.xls-cols td.c{font-size:10px; letter-spacing:0; padding:0 1px; text-overflow:clip;}
   .section table.xls td.xls-in input::placeholder{color:var(--muted); opacity:.75;}
   .section table.xls td.xls-in input:focus, .section table.xls td.xls-in select:focus{outline:2px solid var(--tape); outline-offset:-2px;}
@@ -9299,6 +9301,9 @@ const ensureMammoth = () => loadScriptOnce(
   'sha384-/cXAMbzovUIKbBERjPmR3SnPTh8siWr5lsvFYj1Uq4XP0yaJUZJmsh0YXyGv5P0y');
 
 function budgetFmt(n){ return '£'+(n||0).toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+/* a RATE as you'd type it (14 Oct 2026): whole pounds without the pence — £450, £12.50 — so the Rate and Charged
+   boxes can be narrow. Totals keep budgetFmt. Every rate setter strips the £ and commas, so either form reads back. */
+function rateFmt(n){ n = n||0; return '£'+n.toLocaleString('en-GB', {minimumFractionDigits: Math.round(n*100)%100 ? 2 : 0, maximumFractionDigits:2}); }
 
 function budgetPersonDisplay(subtotal, vat){ return subtotal + (budgetVatToggle ? vat : 0); }
 
@@ -10721,8 +10726,8 @@ function budgetSheetModel(view, data, B){
         budgetEdit ? edc(inp('post', String(pp.postDays||''), '—', `xlsEdit(setPhaseDays('post','${pp.id}',this.value))`, 'c')) : {h:pp.postDays||'', c:'c'+(budgetScope.post?'':' mu')},
         {h: pp.isBuyout ? '<span class="mu">fee</span>' : (pp.prepDays+pp.daysWorked+pp.postDays||''), c:'c', x: pp.isBuyout ? 'fee' : undefined},
         (budgetEdit && !pp.isBuyout) ? edc(inp('ot', String(pp.otUnits||''), '—', `xlsEdit(setEntryOvertime('${pp.id}',this.value))`, 'c')) : {h:pp.isBuyout?'':(pp.otUnits||''), c:'c mu'},
-        budgetEdit ? edc(inp('rate', pp.hasRate ? fmt(pp.rate) : '', '—', `xlsEdit(saveEntryRate('${pp.id}', ${xlsRaw}))`, 'c')) : {h: pp.hasRate ? fmt(pp.rate) : '<span class="budget-noRate">no rate</span>', c:'c', v: pp.hasRate ? pp.rate : undefined},
-        inp('charged', chFull!=null ? fmt(chFull) : '', fmt(pp.rate), `setBudgetChargedPerson('${pp.id}', this.value, ${pp.rate}, ${labourRate}, ${kitCh})`, 'c'),
+        budgetEdit ? edc(inp('rate', pp.hasRate ? rateFmt(pp.rate) : '', '—', `xlsEdit(saveEntryRate('${pp.id}', ${xlsRaw}))`, 'c')) : {h: pp.hasRate ? rateFmt(pp.rate) : '<span class="budget-noRate">no rate</span>', c:'c', v: pp.hasRate ? pp.rate : undefined},
+        inp('charged', chFull!=null ? rateFmt(chFull) : '', rateFmt(pp.rate), `setBudgetChargedPerson('${pp.id}', this.value, ${pp.rate}, ${labourRate}, ${kitCh})`, 'c'),
         M(exOf(lab)*(1-kitFrac)), kit ? M(exOf(kit)) : folded ? M(exOf(lab)*kitFrac) : {h:dash, c:'n'},
         ...(vatOn ? [{h:pp.vatRegistered?'20%':'0%', c:'c mu'}, M(sumK(mine,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(mine,'fl')) ] });
     });
@@ -10730,8 +10735,8 @@ function budgetSheetModel(view, data, B){
     if(rest.length) rows.push({ cls:'xls-rule', cells:[{h:'<span class="mu">Rows with no person — venues, catering, travel, hotels, lines of your own</span>', span:2, x:'Rows with no person'}, M(tot(rest)), {h:'', span:9},
       ...(vatOn ? ['', M(sumK(rest,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(rest,'fl'))] });
     const noRate = data.people.filter(pp=>!pp.hasRate).length;
-    return { cols:[[150,'Name'],[170,'Role'],[96,'Total','n'],[34,'Pre','c'],[34,'Shoot','c'],[34,'Post','c'],[34,'Days','c'],[34,'OT','c'],[84,'Rate','c'],[84,'Charged','c'],
-        [92,'Labour','n'],[84,'Kit','n'], ...(vatOn ? [[38,'VAT','c'],[80,'VAT £','n']] : []), [76,'Float £','n']], rows,
+    return { cols:[[150,'Name'],[170,'Role'],[96,'Total','n'],[34,'Pre','c'],[34,'Shoot','c'],[34,'Post','c'],[34,'Days','c'],[34,'OT','c'],[64,'Rate','c'],[64,'Charged','c'],
+        [92,'Labour','n'],[84,'Kit','n'], ...(vatOn ? [[34,'VAT','c'],[80,'VAT £','n']] : []), [76,'Float £','n']], rows,
       notes:[`<strong>Charged</strong> is the same cell as on Line Items — change it in either place. With <strong>Edit</strong> on, Rate, Pre, Shoot, Post and OT are the same fields as Crew ▸ Roles. Labour and Kit are ex-VAT; a VAT-registered person's travel VAT is on the Travel row, not here.`,
         noRate ? `${noRate} crew member${noRate>1?'s have':' has'} no day rate on file — enter one in the Rate column, or on their crew database record.` : ''].filter(Boolean) };
   }
@@ -10743,9 +10748,9 @@ function budgetSheetModel(view, data, B){
     mine.forEach(r=>{ const l = r.line;
       const inp = (col, value, ph, call) => ({ c:'xls-in', x:value, h:`<input type="text" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}" data-ref="" data-fx="${escA(value||ph)}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}">` });
       rows.push({ cells:[{h:esc(l.code), c:'mu'}, esc(l.item), {h:esc(l.name), c:'mu'}, {h:l.qty||'', c:'c'},
-        budgetEdit ? Object.assign(inp('rate', l.rate ? fmt(l.rate) : '', '0.00', `setBudgetCostRate('${r.store}','${r.field}',this.value)`), {c:'xls-in xls-ed'})
-                   : {h: l.rate ? fmt(l.rate) : dash, c:'c', v:l.rate},
-        inp('charged', l.chRate!=null ? fmt(l.chRate) : '', fmt(l.rate), `setBudgetCharged('${escA(l.key)}',this.value,${l.rate})`),
+        budgetEdit ? Object.assign(inp('rate', l.rate ? rateFmt(l.rate) : '', '0', `setBudgetCostRate('${r.store}','${r.field}',this.value)`), {c:'xls-in xls-ed'})
+                   : {h: l.rate ? rateFmt(l.rate) : dash, c:'c', v:l.rate},
+        inp('charged', l.chRate!=null ? rateFmt(l.chRate) : '', rateFmt(l.rate), `setBudgetCharged('${escA(l.key)}',this.value,${l.rate})`),
         ...(vatOn ? [M(B.fig(l,mode).vat)] : []), M(B.fig(l,mode).tot)] }); });
     /* LINES (26 Sep 2026) — the section's typed lines live here too, so a per-person, per-day cost that the
        rate card has no row for (a driver's allowance, a hire car for one person) can be added and changed
@@ -10756,15 +10761,15 @@ function budgetSheetModel(view, data, B){
       const E = budgetEdit, key = escA(l.key);
       const txt = (field, value, ph, cls) => E ? { c:'xls-in xls-ed'+(cls?' '+cls:''), x:value, h:`<input type="text" data-fk="${key}|${field}" data-col="${field}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="setBudgetLineField('${l.id}','${field}',this.value)">` }
                                                 : { h: esc(value) || dash, c: cls||'' };
-      const charged = { c:'xls-in', x:l.chRate!=null ? fmt(l.chRate) : '', h:`<input type="text" inputmode="decimal" data-fk="${key}|charged" data-col="charged" data-ref="" data-fx="${escA(l.chRate!=null ? fmt(l.chRate) : fmt(l.rate))}" value="${escA(l.chRate!=null ? fmt(l.chRate) : '')}" placeholder="${escA(fmt(l.rate))}" onchange="setBudgetCharged('${key}',this.value,${l.rate})">` };
+      const charged = { c:'xls-in', x:l.chRate!=null ? rateFmt(l.chRate) : '', h:`<input type="text" inputmode="decimal" data-fk="${key}|charged" data-col="charged" data-ref="" data-fx="${escA(l.chRate!=null ? rateFmt(l.chRate) : rateFmt(l.rate))}" value="${escA(l.chRate!=null ? rateFmt(l.chRate) : '')}" placeholder="${escA(rateFmt(l.rate))}" onchange="setBudgetCharged('${key}',this.value,${l.rate})">` };
       rows.push({ cells:[ { h:(E ? `<button type="button" class="del" onclick="deleteBudgetLine('${l.id}')" title="Delete this line" aria-label="Delete this line">×</button> ` : '') + `<span class="mu">${esc(l.code)}</span>` },
         txt('item', l.item, 'Item'), txt('name', l.name, 'per person per day', 'mu'), txt('qty', l.qty||'', '0', 'c'),
-        txt('rate', l.rate ? fmt(l.rate) : '', '0.00', 'c'),
+        txt('rate', l.rate ? rateFmt(l.rate) : '', '0', 'c'),
         charged,
         ...(vatOn ? [M(B.fig(l,mode).vat)] : []), M(B.fig(l,mode).tot)] }); });
     if(budgetEdit) rows.push({ cells:[{ h:`<button type="button" class="bnr-tool add" onclick="addBudgetLine('${secKey}','')" title="A line of your own under ${group} — an item, a quantity and a rate; per person per day if that is what it is">+ Add line</button>`, span: vatOn?8:7 }] });
   });
-  return { cols:[[66,'Code'],[140,'Item'],[150,'Unit'],[34,'Qty','c'],[90,'Rate','c'],[90,'Charged','c'], ...(vatOn?[[76,'VAT £','n']]:[]), [100,'Total','n']], rows,
+  return { cols:[[66,'Code'],[140,'Item'],[150,'Unit'],[34,'Qty','c'],[64,'Rate','c'],[64,'Charged','c'], ...(vatOn?[[76,'VAT £','n']]:[]), [100,'Total','n']], rows,
     notes:[`<strong>Rate</strong> is your estimate per unit — the same fields as the Catering, Travel and Hotel tabs under Crew, so a change here or there updates both. Turn on <strong>Edit</strong> to change one here. <strong>Qty</strong> is counted from the call sheets: meal ticks, travel methods and hotel nights.`,
            `Anything else that needs costing under Catering, Travel or Hotel — a per diem for one person, a hire car, a driver's allowance — is a line of your own: <strong>+ Add line</strong> under the group, with Edit on. Anything else again — a skip, a permit, insurance — is the + in the left margin of Line Items.`] };
 }
@@ -10878,8 +10883,8 @@ function budgetLinesViewHTML(data, B){
   /* number entries are centred and the day-type columns near-square (14 Oct 2026) — a day count is two digits */
   const cols = [['gut',46,''], ['code',70,'Code'], ['item',150,'Item'], ['name',140,'Name'], ['total',92,'Total','n'],
     ['pre',34,'Pre','c'], ['shoot',34,'Shoot','c'], ['post',34,'Post','c'], ['qty',34,'Qty','c'], ['days',34,'Days','c'], ['ot',34,'OT','c'],
-    ['rate',84,'Rate','c'], ['charged',84,'Charged','c'],
-    ...(vatOn ? [['vatp',38,'VAT','c'], ['vat',80,'VAT £','n']] : []), ['flp',44,'Float %','c'], ['fl',76,'Float £','n']];
+    ['rate',64,'Rate','c'], ['charged',64,'Charged','c'],
+    ...(vatOn ? [['vatp',34,'VAT','c'], ['vat',80,'VAT £','n']] : []), ['flp',34,'Float','c'], ['fl',76,'Float £','n']];
   const letter = Object.fromEntries(cols.slice(1).map((c,i)=>[c[0], String.fromCharCode(65+i)]));
   const sumOf = (lines, k) => lines.reduce((n,l)=>n+B.fig(l,mode)[k], 0);
   const stageOff = k => !budgetScope[k];
@@ -10918,9 +10923,9 @@ function budgetLinesViewHTML(data, B){
       };
       const plain = v => `<td${v.cls?` class="${v.cls}"`:''}${v.t?` title="${escA(v.t)}"`:''}>${v.h}</td>`;
       const rateCell = (()=>{
-        const shown = l.hasRate ? fmt(l.rate) : '';
-        if(custom) return E ? txt('rate','c', l.rate?fmt(l.rate):'', '0.00').replace('class="xls-in"', 'class="xls-in xls-ed"') : plain({cls:'c', h:l.rate?fmt(l.rate):dash});
-        if(!E) return plain({cls:'c', h: l.hasRate ? fmt(l.rate) : '<span class="budget-noRate">no rate</span>'});
+        const shown = l.hasRate ? rateFmt(l.rate) : '';
+        if(custom) return E ? txt('rate','c', l.rate?rateFmt(l.rate):'', '0').replace('class="xls-in"', 'class="xls-in xls-ed"') : plain({cls:'c', h:l.rate?rateFmt(l.rate):dash});
+        if(!E) return plain({cls:'c', h: l.hasRate ? rateFmt(l.rate) : '<span class="budget-noRate">no rate</span>'});
         if(person){ const kit = l.foldedKit ? 0 : Math.round((l.fullRate - l.rate)*100)/100;       // split rows show labour; the day rate is labour + kit
           return ed('rate', '', shown, `xlsEdit(saveEntryRate('${l.entryId}', (v=>v===''?'':String(Number(v)+${kit}))(${xlsRaw})))`, kit ? `Labour part of the day rate — £${kit} of kit is added back on Crew ▸ Roles` : 'The project day rate — the same field as Crew ▸ Roles'); }
         if(l.isKit) return plain({cls:'c', h:shown, t:'Kit is set per role on the crew record'});
@@ -10943,7 +10948,7 @@ function budgetLinesViewHTML(data, B){
         ${num('pre', l.pre, sec.dayCols)}${num('shoot', l.shoot, sec.dayCols)}${num('post', l.post, sec.dayCols)}${num('qty', l.qty, false)}
         <td class="c">${l.isBuyout ? '<span class="mu">fee</span>' : z(days)}</td>${otCell}
         ${rateCell}
-        ${l.locked ? `<td class="c mu">—</td>` : inCell(l, 'charged', 'c', l.chRate!=null?fmt(l.chRate):'', fmt(l.rate),
+        ${l.locked ? `<td class="c mu">—</td>` : inCell(l, 'charged', 'c', l.chRate!=null?rateFmt(l.chRate):'', rateFmt(l.rate),
             l.foldedKit ? `setBudgetChargedPerson('${l.entryId}',this.value,${l.rate},${l.rate-l.foldedKit},${l.kitCharged})` : `setBudgetCharged('${key}',this.value,${l.rate})`,
             l.chRate!=null?l.chRate.toFixed(2):`=${letter.rate}${n}`)}
         ${vatOn ? (custom && E ? txt('vat','c', l.vatPct?l.vatPct+'%':'', '0%').replace('class="xls-in"', 'class="xls-in xls-ed"') : `<td class="c mu">${l.vatPct==null?'mixed':l.vatPct+'%'}</td>`) + `<td class="n">${money(f.vat)}</td>` : ''}

@@ -320,6 +320,16 @@ sections books into Set / Catering & Travel (`SHEET_PERSON_DEPT`). `budgetCostFi
 COSTS rows stay logistics only. The duplicate appeared once every department became a standard header earlier
 the same day.
 
+### Number boxes squarer (14 Oct 2026, second pass)
+
+**"Make the number entries more square — they are wider than they need to be."** Measured, not guessed: the
+widest rate in a sheet was ~47px of text in an 84px column. `rateFmt()` shows a rate as typed — whole pounds with
+no pence (£450, £12.50) — on every Rate and Charged cell and input in Line Items, Per Person and Costs; totals keep
+`budgetFmt`. Every rate setter strips £ and commas, so both forms read back (verified "£450" and "£13,000").
+Rate / Charged 64px (fits £9,999.99), VAT % and Float % 34px (the Float % header is now "Float"), centred cells
+and inputs pad 2px. Crew's cost boxes and the Standard costs popup's boxes are 50px with 3px padding (fits
+1499.5). Checked: no number entry clips in any sheet view, Edit on or off.
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
