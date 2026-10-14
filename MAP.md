@@ -296,6 +296,15 @@ aren't adding up anymore … all number entries can be centred, inputs for days 
   CSS: decimal inputs and `.xls-btn` buttons centre; centred column headers are 10px with no tracking so
   "Shoot" and "Float %" fit. `.xls-pct` inputs centre too.
 
+### Per Person: people together, and a totaliser per person (14 Oct 2026)
+
+**"People should be listed together and an additional totaliser row for their total cash."** In the Per Person
+view (`budgetSheetModel`, `view==='person'`) a person's bookings form ONE block (`blocks`, keyed by crewId),
+placed where the sort first puts them — by cost, blocks go by their combined total — so someone with a
+Production and a Cinematography role is no longer split across the list by the department sort. Anyone with
+two or more bookings gets an `xls-sub` row beneath (`pushPersonTotal`): "Total — Name · n roles", their total,
+days, OT, labour, kit, VAT and float summed. It is in the export too (same model). The Totals row is unchanged.
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
