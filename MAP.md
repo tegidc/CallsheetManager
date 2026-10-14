@@ -266,6 +266,36 @@ different icon or other formatting. Standard costs can be a gear icon and a pop 
   staying open through the render). The `standards` sub-tab is retired — a stale `crewGridView` of it
   lands on Roles with the other retired views.
 
+## Budget feedback, 14 Oct 2026 — totals, standard headers, name search, centred entries
+
+**"Row headers for departments should be there as standard … if inputting a name it searches / offers from the
+database and allocated throughout the document … I entered some lines into line items and the budget totals
+aren't adding up anymore … all number entries can be centred, inputs for days as square as possible."**
+
+- ⚠️ **What didn't add up: the head's COSTS rows.** On Budget, the stage and department rows read the sheet
+  (`budgetStageFigs` / `budgetDeptFigs`), but the COSTS rows read the engine's cost-side figures
+  (`data.hotelTotal` etc.), so a line typed under Catering / Travel / Hotels, a charged rate and the float never
+  reached them while the sheet beneath showed them. Now `budgetCostFigs(mode)` sums the sheet's `x:hotel` /
+  `x:catering` / `x:travel` sections (ex + float, VAT) and the Budget head passes it as `o.costFigs`. Crew's
+  COSTS rows stay cost-side but add the typed lines (`data.customBySec`, built in `buildBudgetData`).
+  Verified: charged = stage rows = department rows = the sheet's Totals row, no unitemised difference.
+  ⚠️ Still true and by design: with a department filter on, the engine (`buildBudgetData().totalExVat`) keeps
+  every typed line and extra while the sheet drops the rows outside the filtered departments. Nothing on screen
+  reads the engine's grand total any more except the reconciliation, which runs before that filter.
+- **Every department and every cost section is a sheet section, always** (`buildBudgetLines` no longer skips
+  empty ones), each with its own + in Edit. The export (`budgetExportRows`) still leaves empty sections out.
+- **A name on a department line searches the crew database** — the Name cell has `list="budgetCrewList"`
+  (`budgetCrewListHTML`, name with role — department as the label). An exact match runs `budgetLineToPerson()`:
+  a booking in the line's Item as role (else their own) and the section's department (or reuses a same-role
+  booking), the line's rate → `e.rate`, pre / post → `phaseWrite`, shoot days ticked on every day when the count
+  covers the shoot, else the Shoot popup opens to pick which; qty with no days → buyout. The line's charged rate
+  and float move to `e:<entryId>`, lines under it move under the booking, the line goes. Undoable. A name not in
+  the database stays as text (`setBudgetLineName` falls through to `setBudgetLineField`). Verified total-neutral.
+- **Number entries are centred and day columns near-square**: Pre / Shoot / Post / Qty / Days / OT 34px, VAT %
+  38, Float % 44, Rate / Charged centred (inputs and read-only cells) on Line Items, Per Person and Costs.
+  CSS: decimal inputs and `.xls-btn` buttons centre; centred column headers are 10px with no tracking so
+  "Shoot" and "Float %" fit. `.xls-pct` inputs centre too.
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
