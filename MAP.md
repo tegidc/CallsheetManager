@@ -305,6 +305,21 @@ Production and a Cinematography role is no longer split across the list by the d
 two or more bookings gets an `xls-sub` row beneath (`pushPersonTotal`): "Total — Name · n roles", their total,
 days, OT, labour, kit, VAT and float summed. It is in the export too (same model). The Totals row is unchanged.
 
+### The Budget's order, and no section twice (14 Oct 2026)
+
+**"Should be crew departments, then equip, Grip, Location & Set and then catering, hotels etc at the bottom … Catering
+and Travel appears twice."** `BUDGET_DEPT_ORDER` — Production, Client, Talent, Cinematography, Audio, Vanities, Post
+Production, Other, Equipment, Grip, Set, Catering & Travel — orders Line Items, the Department and Per Day views,
+the head's department rows (`budgetDeptFigs`) and Per Person's department sort. `DEPARTMENTS` (Crew's lists) is
+unchanged. The sheet's tail is `SHEET_TAIL_ORDER`: Locations & Set, Catering, Travel, Hotels, Vendors, Other costs.
+⚠️ **Set and Catering & Travel have no sheet section of their own** (`SHEET_FOLD`): their people head the
+Locations section (retitled "Locations & Set", `dayCols` on) and the Catering section. A person row keeps its own
+department through `l.personDept`, so the department figures don't move. Lines typed under `d:Set` /
+`d:Catering & Travel` before this land in the section that took them over (`SHEET_ALIAS`). A name typed in those
+sections books into Set / Catering & Travel (`SHEET_PERSON_DEPT`). `budgetCostFigs` skips person rows, so the
+COSTS rows stay logistics only. The duplicate appeared once every department became a standard header earlier
+the same day.
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
