@@ -1244,6 +1244,8 @@
   .section table.xls .mu{color:var(--muted);}
   .section table.xls tr.xls-sec td{background:var(--tint-2); font-weight:600;}
   .section table.xls tr.xls-tot td{font-weight:600;}
+  /* a person's totaliser on Per Person — under their roles, before the next person */
+  .section table.xls tr.xls-sub td{font-weight:600; background:var(--tint-1); border-bottom:1.5px solid var(--field-line);}
   .section table.xls tr.xls-rule td{border-top:1.5px solid var(--field-line);}
   .section table.xls td.xls-in{padding:0;}
   .section table.xls td.xls-in input, .section table.xls td.xls-in select{width:100%; height:25px; min-height:0; margin:0;
@@ -10661,8 +10663,14 @@ function budgetSheetModel(view, data, B){
   }
   if(view==='person'){
     const byEntry = {}; B.lines.forEach(l=>{ if(l.entryId) (byEntry[l.entryId] = byEntry[l.entryId] || []).push(l); });
-    const ordered = budgetOrderedPeople(data).filter(pp=>byEntry[pp.id]);
+    /* PEOPLE TOGETHER (14 Oct 2026) — a person's bookings sit in one block, wherever the sort first puts them (by
+       cost, the block goes by their combined total), and anyone with two or more gets a totaliser row beneath */
     const sumK = (lines, k) => lines.reduce((n,l)=>n+B.fig(l,mode)[k], 0);
+    const blocks = new Map();
+    budgetOrderedPeople(data).filter(pp=>byEntry[pp.id]).forEach(pp=>{ if(!blocks.has(pp.crewId)) blocks.set(pp.crewId, []); blocks.get(pp.crewId).push(pp); });
+    const blockList = [...blocks.values()];
+    if(budgetSort==='cost') blockList.sort((a,b)=>tot(b.flatMap(pp=>byEntry[pp.id])) - tot(a.flatMap(pp=>byEntry[pp.id])));
+    const ordered = blockList.flat();
     const people = B.lines.filter(l=>l.entryId), rest = B.lines.filter(l=>!l.entryId);
     const exOf = l => B.fig(l,mode).ex;
     const edc = cell => Object.assign(cell, { c: cell.c+' xls-ed' });
@@ -10670,7 +10678,17 @@ function budgetSheetModel(view, data, B){
     const rows = [{ cls:'xls-tot', cells:[{h:'Totals', span:2}, M(tot(B.lines)), {h:'', span:7},
       M(people.reduce((n,l)=>n + (l.isKit ? 0 : exOf(l)*(1-kitFracOf(l))), 0)), M(people.reduce((n,l)=>n + (l.isKit ? exOf(l) : exOf(l)*kitFracOf(l)), 0)),
       ...(vatOn ? ['', M(sumK(B.lines,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(B.lines,'fl'))] }];
+    const pushPersonTotal = crewId => {
+      const bk = blocks.get(crewId); if(!bk || bk.length<2) return;
+      const lines = bk.flatMap(pp=>byEntry[pp.id]), sumP = k => bk.reduce((n,pp)=>n+(pp.isBuyout ? 0 : (pp[k]||0)), 0);
+      const num = v => ({h: v || '', c:'c'});
+      rows.push({ cls:'xls-sub', cells:[ {h:`Total — ${esc(bk[0].name)} · ${bk.length} roles`, span:2, t:'Everything this person is paid, across their roles'}, M(tot(lines)),
+        num(sumP('prepDays')), num(sumP('daysWorked')), num(sumP('postDays')), num(sumP('prepDays')+sumP('daysWorked')+sumP('postDays')), num(sumP('otUnits')), '', '',
+        M(lines.reduce((n,l)=>n + (l.isKit ? 0 : exOf(l)*(1-kitFracOf(l))), 0)), M(lines.reduce((n,l)=>n + (l.isKit ? exOf(l) : exOf(l)*kitFracOf(l)), 0)),
+        ...(vatOn ? ['', M(sumK(lines,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(lines,'fl')) ] });
+    };
     ordered.forEach((pp,i)=>{
+      if(i>0 && ordered[i-1].crewId!==pp.crewId) pushPersonTotal(ordered[i-1].crewId);
       const mine = byEntry[pp.id], lab = mine.find(l=>!l.isKit), kit = mine.find(l=>l.isKit);
       const folded = lab.foldedKit || 0;
       const kitCh = kit ? (kit.chRate!=null ? kit.chRate : kit.rate) : folded ? lab.kitCharged : 0;
@@ -10691,6 +10709,7 @@ function budgetSheetModel(view, data, B){
         M(exOf(lab)*(1-kitFrac)), kit ? M(exOf(kit)) : folded ? M(exOf(lab)*kitFrac) : {h:dash, c:'n'},
         ...(vatOn ? [{h:pp.vatRegistered?'20%':'0%', c:'c mu'}, M(sumK(mine,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(mine,'fl')) ] });
     });
+    if(ordered.length) pushPersonTotal(ordered[ordered.length-1].crewId);
     if(rest.length) rows.push({ cls:'xls-rule', cells:[{h:'<span class="mu">Rows with no person — venues, catering, travel, hotels, lines of your own</span>', span:2, x:'Rows with no person'}, M(tot(rest)), {h:'', span:9},
       ...(vatOn ? ['', M(sumK(rest,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(rest,'fl'))] });
     const noRate = data.people.filter(pp=>!pp.hasRate).length;
