@@ -330,6 +330,29 @@ Rate / Charged 64px (fits £9,999.99), VAT % and Float % 34px (the Float % heade
 and inputs pad 2px. Crew's cost boxes and the Standard costs popup's boxes are 50px with 3px padding (fits
 1499.5). Checked: no number entry clips in any sheet view, Edit on or off.
 
+### Production fee spread into departments (21 Oct 2026)
+
+**"An option in settings where production fee is spread into department totals rather than a line item itself —
+some clients are just like that."** Budget settings ▸ Production fee ▸ **Fee shows as**: Its own line (default) |
+Spread into departments — `p.budgetSheet.settings.feeShow` = `'line'` | `'spread'` (in `BUDGET_SETTING_DEFAULTS`,
+stored only when it differs). Decided with the user: split **by share of the charged total**, applied to
+**department totals only**, **Margin unchanged**.
+- `buildBudgetLines()` returns `B.feeShare(lines, mode)` (fee × that group's charged total ÷ the charged total; 0 when
+  off or in Cost) and `B.feeSpread` / `T.feeSpread`. ⚠️ Every grouped-by-department figure reads it through here —
+  never re-derive the share.
+- Carries it: Line Items' section rows and top Totals row (title says how much fee is in each), Per Department and
+  BBC (group Charged, Totals row, % column now of the final), Per Day (department rows scaled by 1 + fee ÷ charged,
+  plus a "Production fee" row so Ex-VAT + VAT + Float + fee = Totals), the head's DEPT and COSTS rows
+  (`budgetDeptFigs`, `budgetCostFigs`), the Line Items export's section rows.
+- Foot rows (`footRows`) when spread: one "Total (… and production fee — in the departments)" that is the Final total,
+  then VAT reclaimed / Margin — no separate fee or Final total rows. The head's final block reads "Prod fee £x · in
+  departments"; the export summary labels the fee row "(spread into the department totals)".
+- ⚠️ By design NOT touched: the lines themselves (a department's rows no longer sum to its total when on), Per
+  Person, the stage rows, `T.charged` / `T.final` / `T.margin`.
+- Verified in a stubbed fixture, With VAT and Ex-VAT, line vs spread: Per Department, BBC, Per Day, head DEPT
+  rows and Line Items sections all equal `T.final` when spread and `T.charged` when not; Margin identical; every
+  view renders with no errors.
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).

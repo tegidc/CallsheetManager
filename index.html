@@ -10053,13 +10053,13 @@ function budgetExportRows(data, view){
   rows.push(['Costing', budgetScopeLabel()],
     ['Showing', mode==='cost' ? 'Cost — true costs, no float or production fee' : 'Charged — charged rates, float and production fee'],
     ['VAT', budgetVatToggle ? 'included in every total' : 'left out — every figure is ex-VAT'], [],
-    ['Cost', money(T.cost)], ['Charged', money(T.charged)], [`Production fee ${B.sheet.feePct}%`, money(T.fee)],
+    ['Cost', money(T.cost)], ['Charged', money(T.charged)], [`Production fee ${B.sheet.feePct}%${T.feeSpread && mode!=='cost' ? ' (spread into the department totals)' : ''}`, money(T.fee)],
     ['Final total', money(T.final)], ...(T.vatBack ? [['VAT reclaimed', money(T.vatBack)]] : []), ['Margin', money(T.margin)], []);
   if(view==='lines'){
     rows.push(['Code','Item','Name','Total','Pre','Shoot','Post','Qty','OT','Rate','Charged', ...(budgetVatToggle?['VAT %','VAT']:[]), 'Float %','Float']);
     B.sections.forEach(sec=>{
       if(!sec.lines.length) return;
-      rows.push([sec.title, '', '', money(sec.lines.reduce((n,l)=>n+B.fig(l,mode).tot, 0))]);
+      rows.push([sec.title, '', '', money(sec.lines.reduce((n,l)=>n+B.fig(l,mode).tot, 0) + B.feeShare(sec.lines, mode))]);
       sec.lines.forEach(l=>{ const f = B.fig(l, mode);
         rows.push([l.code, l.item, l.name, money(f.tot), l.isBuyout?'':(l.pre||''), l.isBuyout?'':(l.shoot||''), l.isBuyout?'':(l.post||''), l.qty||'', l.ot||'', money(l.rate),
           l.chRate!=null ? money(l.chRate) : '', ...(budgetVatToggle ? [l.vatPct==null?'mixed':l.vatPct+'%', money(f.vat)] : []),
@@ -10173,11 +10173,14 @@ function budgetSheetOf(p){
      floatBase    'ex' | 'inc' — float is a % of the line before or after VAT
      floatInMargin  true = unspent float is kept (margin) · false = held for the client
      feeBase      'all' | 'exFloat' — production fee on the whole charged total, or not on float
+     feeShow      'line' | 'spread' — the fee is its own row at the foot, or folded into every DEPARTMENT total
+                  by its share of the charged total (21 Oct 2026). Lines, people, stages and Margin never change —
+                  only grouped-by-department figures carry it. Read through B.feeShare(lines, mode).
      otCharged    'charged' | 'cost' — overtime follows the charged rate, or stays at the cost rate
      vatBack      true = OVERSEAS CLIENT (e.g. USA): the budget is charged with VAT in it as a final figure,
                   and the VAT paid to suppliers is reclaimed afterwards — so it comes back as margin.
                   What comes back is the COST-side VAT (what was actually paid), not the charged VAT. */
-const BUDGET_SETTING_DEFAULTS = { vatBack:false, vatCatering:0, vatHotel:0, kitRows:'split', floatBase:'ex', floatInMargin:true, feeBase:'all', otCharged:'charged' };
+const BUDGET_SETTING_DEFAULTS = { vatBack:false, vatCatering:0, vatHotel:0, kitRows:'split', floatBase:'ex', floatInMargin:true, feeBase:'all', feeShow:'line', otCharged:'charged' };
 function budgetSheetRec(p){
   const s = p.budgetSheet = p.budgetSheet || {};
   s.charged = s.charged || {}; s.floatLines = s.floatLines || {}; s.lines = s.lines || [];
@@ -10466,8 +10469,14 @@ function buildBudgetLines(data){
     return { pre:v*(d.pre||0)/W, post:v*(d.post||0)/W, proj:v*(d.proj||0)/W,
              days:Object.fromEntries(Object.entries(d.days||{}).map(([id,w])=>[id, v*w/W])) };
   };
-  return { sections, lines: all(), fig, split, sheet, rateCard, days,
-           totals: { cost, charged, fee, float: floatTotal, final: charged+fee, vatBack,
+  /* FEE SPREAD INTO DEPARTMENTS (21 Oct 2026, Settings ▸ Production fee ▸ Fee shows as). A group of lines carries
+     the fee in proportion to its share of the charged total, so every department total adds up to the Final total
+     with no fee row. Charged only — Cost has no fee. ⚠️ Lines are never touched: a department's rows no longer sum
+     to its total when this is on, by design. Everything grouped by department reads it through here. */
+  const feeSpread = set.feeShow==='spread' && Math.abs(fee)>0.005 && Math.abs(charged)>0.005;
+  const feeShare = (lines, m) => (!feeSpread || (m||budgetMode)==='cost') ? 0 : fee * lines.reduce((n,l)=>n+fig(l,'charged').tot, 0) / charged;
+  return { sections, lines: all(), fig, split, sheet, rateCard, days, feeShare, feeSpread,
+           totals: { cost, charged, fee, float: floatTotal, final: charged+fee, vatBack, feeSpread,
                      margin: charged+fee-cost + vatBack - (set.floatInMargin ? 0 : floatTotal),
                      marginLabel: `Margin — markup${set.floatInMargin?', float':''} and fee${vatBack?', plus the VAT reclaimed':''}${set.floatInMargin?'':' (float held for the client)'}` } };
 }
@@ -10527,6 +10536,7 @@ function budgetDeptFigs(mode){
     const B = buildBudgetLines(buildBudgetData()), by = {};
     B.lines.forEach(l=>{ const f = B.fig(l, mode), r = by[l.dept] = by[l.dept] || {ex:0, vat:0, people:new Set()};
       r.ex += f.ex + f.fl; r.vat += f.vat; if(l.crewId) r.people.add(l.crewId); });
+    Object.keys(by).forEach(d=>{ by[d].ex += B.feeShare(B.lines.filter(l=>l.dept===d), mode); });   // fee spread into departments
     return BUDGET_DEPT_ORDER.filter(d=>by[d]).map(d=>({ dept:d, ex:by[d].ex, vat:by[d].vat, inc:by[d].ex+by[d].vat, people:by[d].people.size }));
   });
 }
@@ -10537,7 +10547,9 @@ function budgetCostFigs(mode){
   const B = buildBudgetLines(buildBudgetData()), out = {};
   [['hotel','x:hotel'], ['catering','x:catering'], ['travel','x:travel']].forEach(([k, key])=>{
     const sec = B.sections.find(x=>x.key===key), f = {ex:0, vat:0};
-    (sec ? sec.lines.filter(l=>!l.entryId) : []).forEach(l=>{ const g = B.fig(l, mode); f.ex += g.ex + g.fl; f.vat += g.vat; });
+    const mine = sec ? sec.lines.filter(l=>!l.entryId) : [];
+    mine.forEach(l=>{ const g = B.fig(l, mode); f.ex += g.ex + g.fl; f.vat += g.vat; });
+    f.ex += B.feeShare(mine, mode);
     out[k] = f; });
   return out;
 }
@@ -10546,7 +10558,7 @@ function budgetPageHeadHTML(data, B){
   const chVat = budgetVatToggle ? B.lines.reduce((n,l)=>n+l.chVat, 0) : 0;
   const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
   const totals = `<div class="budget-stat bhead-final"><div class="num" title="Final total — charged, plus the production fee">${fmt(T.final)}</div>
-      <div class="bhead-sub">Prod fee ${fmt(T.fee)} <span class="mu">${B.sheet.feePct}%</span></div>
+      <div class="bhead-sub"${T.feeSpread?' title="Spread into the department totals — Settings ▸ Production fee"':''}>Prod fee ${fmt(T.fee)} <span class="mu">${B.sheet.feePct}%${T.feeSpread?' · in departments':''}</span></div>
       <div class="bhead-sub">Total ${!budgetVatToggle ? 'ex-VAT' : chVat>0 ? `inc. ${fmt(chVat)} VAT${set.vatBack?' — final':''}` : '— no VAT in it'}</div>
       ${budgetVatToggle ? `<div class="bhead-sub">xVAT ${fmt(T.final - chVat)}</div>` : ''}</div>`;
   const stat = { cost:['Cost', fmt(T.cost), ''], charged:['Charged', fmt(T.charged), 'inc. float'], floatTotal:['Float', fmt(T.float), B.sheet.floatPct+'%'],
@@ -10627,6 +10639,12 @@ function budgetSheetModel(view, data, B){
   const footRows = lead => {
     const pad = Array(lead).fill('');
     const m = T.margin;
+    /* fee spread: the departments above already carry it, so one Total that IS the final total, then Margin */
+    if(T.feeSpread && !isCost) return [
+             { cls:'xls-tot xls-rule', cells:[{h:`Total${vatOn?' (inc. VAT':' (ex-VAT'}, float and production fee ${B.sheet.feePct}% — in the departments)`, span:lead+1}, M(T.cost), M(T.final), ''] },
+             ...(T.vatBack ? [{ cells:[{h:'VAT reclaimed — paid to suppliers, comes back to you', span:lead+1}, '', M(T.vatBack), ''] }] : []),
+             { cls:'xls-tot', cells:[{h:esc(T.marginLabel), span:lead+1}, '', M(m, m<0?'xls-neg':'xls-pos'),
+               {h: T.final ? (m/T.final*100).toFixed(1)+'%' : '', c:'n mu'}] } ];
     return [ { cls:'xls-tot xls-rule', cells:[{h:`Total${vatOn?' (inc. VAT':' (ex-VAT'}${' and float)'}`, span:lead+1}, M(T.cost), M(T.charged), ''] },
              { cells:[{h:`Production fee ${B.sheet.feePct}%`, span:lead+1}, {h:dash, c:'n'}, M(T.fee), ''] },
              { cls:'xls-tot xls-rule', cells:[{h:'Final total', span:lead+1}, M(T.cost), M(T.final), ''] },
@@ -10636,13 +10654,14 @@ function budgetSheetModel(view, data, B){
   };
   /* Code | heading | Cost | Charged | % — Per Department and BBC are the same table, grouped differently */
   const groupedModel = (groups, keyOf, headA, headB) => {
-    const rows = [{ cls:'xls-tot', cells:[{h:'Totals', span:2}, M(T.cost), M(T.charged), ''] }];
+    const chAll = T.charged + B.feeShare(B.lines, 'charged');      // = the final total when the fee is spread
+    const rows = [{ cls:'xls-tot', cells:[{h:'Totals', span:2}, M(T.cost), M(chAll), ''] }];
     groups.forEach(([code, name, always])=>{
       const mine = B.lines.filter(l=>keyOf(l)===code);
       if(!mine.length && !always) return;
-      const ch = tot(mine,'charged');
+      const ch = tot(mine,'charged') + B.feeShare(mine, 'charged');
       rows.push({ cls: budgetShowLines && mine.length ? 'xls-sec' : '', cells:[{h:esc(code), c:'mu'}, esc(name), M(tot(mine,'cost')), M(ch),
-        {h: T.charged ? Math.round(ch/T.charged*100)+'%' : '', c:'n mu', x: T.charged ? Math.round(ch/T.charged*100)+'%' : ''}] });
+        {h: chAll ? Math.round(ch/chAll*100)+'%' : '', c:'n mu', x: chAll ? Math.round(ch/chAll*100)+'%' : ''}] });
       if(budgetShowLines) mine.forEach(l=>rows.push({ cells:['', lineLabel(l), M(B.fig(l,'cost').tot), M(B.fig(l,'charged').tot), ''] }));
     });
     return { cols:[[70,headA],[290,headB],[130,'Cost','n'],[130,'Charged','n'],[70,'%','n']], rows: rows.concat(footRows(1)) };
@@ -10666,7 +10685,9 @@ function budgetSheetModel(view, data, B){
     const slots = [{k:'pre', head:'Pre-prod', off:!budgetScope.preproduction}, ...dayCols.map(d=>({k:'day', id:d.id, head:d.head, sub:d.sub, tip:[d.sub, d.where].filter(Boolean).join(' — '), off:!budgetScope.production})),
                    {k:'post', head:'Post', off:!budgetScope.post}, {k:'proj', head:'Project', sub:'not dated', off:!budgetScope.production}];
     const pick = (sp, s) => s.k==='day' ? (sp.days[s.id]||0) : sp[s.k];
-    const rowOf = (lines, k) => { const sp = lines.map(l=>B.split(l, mode, k)); return slots.map(s=>sp.reduce((n,x)=>n+pick(x,s), 0)); };
+    /* fee spread: a department's whole row carries its share, so it scales every column by the same factor */
+    const feeF = (T.feeSpread && !isCost && T.charged) ? T.fee/T.charged : 0;
+    const rowOf = (lines, k) => { const sp = lines.map(l=>B.split(l, mode, k)); return slots.map(s=>sp.reduce((n,x)=>n+pick(x,s), 0)*(k ? 1 : 1+feeF)); };
     const cellsOf = vals => vals.map(v=>M(v)).concat([M(vals.reduce((n,v)=>n+v, 0))]);
     const rows = [ { cells:['', ''].concat(slots.map(s=>({h: s.off ? 'off' : esc(s.sub||''), c:'n mu', t:s.tip||s.sub||''})), ['']) },
                    { cls:'xls-tot', cells:[{h:'Totals', span:2}].concat(cellsOf(rowOf(B.lines))) } ];
@@ -10680,8 +10701,9 @@ function budgetSheetModel(view, data, B){
     rows.push({ cls:'xls-rule', cells:['', {h:'Ex-VAT', c:'mu'}].concat(cellsOf(rowOf(B.lines,'ex'))) });
     if(vatOn) rows.push({ cells:['', {h:'VAT', c:'mu'}].concat(cellsOf(rowOf(B.lines,'vat'))) });
     if(!isCost) rows.push({ cells:['', {h:'Float', c:'mu'}].concat(cellsOf(rowOf(B.lines,'fl'))) });
+    if(feeF) rows.push({ cells:['', {h:'Production fee', c:'mu'}].concat(cellsOf(rowOf(B.lines,'tot').map(v=>v*feeF))) });
     return { cols:[[64,'Code'],[170,'Department']].concat(slots.map(s=>[96, s.head, 'n']), [[104,'Total','n']]), rows,
-      notes:[`A buyout venue, catering, travel and hotels fall on the days they were used; prep and edit days sit in their own columns; anything tied to no day — insurance, a venue's extras, a line with only a quantity — is under <strong>Project</strong>. The production fee is on the whole budget, so it is in the strip above, not in a column.`] };
+      notes:[`A buyout venue, catering, travel and hotels fall on the days they were used; prep and edit days sit in their own columns; anything tied to no day — insurance, a venue's extras, a line with only a quantity — is under <strong>Project</strong>. ${feeF ? 'The production fee is spread into the department rows by their share of the budget (Settings), so the Totals row is the final total.' : 'The production fee is on the whole budget, so it is in the strip above, not in a column.'}`] };
   }
   if(view==='person'){
     const byEntry = {}; B.lines.forEach(l=>{ if(l.entryId) (byEntry[l.entryId] = byEntry[l.entryId] || []).push(l); });
@@ -10866,11 +10888,13 @@ function budgetSettingsDialogHTML(){
       ${row('Unspent float', pick('floatInMargin', [[true,'Is kept — counts as margin'], [false,'Goes back to the client']]), 'Goes back: float is still charged, but Margin leaves it out.')}
       <div class="subhead" style="margin-top:16px;">Production fee</div>
       ${row('Fee is charged on', pick('feeBase', [['all','Everything'], ['exFloat','Everything except float']]))}
+      ${row('Fee shows as', pick('feeShow', [['line','Its own line','Department totals, then a Production fee row, then the Final total'], ['spread','Spread into departments','Each department total carries its share of the fee — no fee row']]),
+        'Spread: each department total carries its share of the fee (by its share of the budget), so the departments add up to the Final total. The lines inside stay at their own figures. Margin is the same either way.')}
       <div class="subhead" style="margin-top:16px;">Overtime</div>
       ${row('Overtime is charged', pick('otCharged', [['charged','At the charged rate'], ['cost','At the cost rate']]), 'Only matters for someone whose Charged rate differs from their day rate.')}
       <div class="toolbar" style="margin:16px 0 0;">
         <button class="primary" onclick="toggleBudgetSettings()">Done</button>
-        ${changed ? `<button onclick="resetBudgetSettings()" title="Back to: no catering or hotel VAT, kit on its own row, float on ex-VAT and kept, fee on everything, overtime at the charged rate">Reset to defaults</button>` : ''}
+        ${changed ? `<button onclick="resetBudgetSettings()" title="Back to: no catering or hotel VAT, kit on its own row, float on ex-VAT and kept, fee on everything as its own line, overtime at the charged rate">Reset to defaults</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -10888,18 +10912,19 @@ function budgetLinesViewHTML(data, B){
   const letter = Object.fromEntries(cols.slice(1).map((c,i)=>[c[0], String.fromCharCode(65+i)]));
   const sumOf = (lines, k) => lines.reduce((n,l)=>n+B.fig(l,mode)[k], 0);
   const stageOff = k => !budgetScope[k];
+  const secFee = sec => B.feeShare(sec.lines, mode);      // 0 unless the fee is spread into departments
   let n = 1;
   const gut = (inner) => `<td class="xls-hd"><div class="xls-gut"><span>${n}</span><span>${inner||''}</span></div></td>`;
   const addBtn = (sec, after) => `<button type="button" onclick="addBudgetLine('${sec}','${after}')" title="Add a line below" aria-label="Add a line below">+</button>`;
   const head = `<tr><th class="xls-hd"></th>${cols.slice(1).map(c=>`<th class="xls-hd">${letter[c[0]]}</th>`).join('')}</tr>
     <tr class="xls-cols"><td class="xls-hd">${n++}</td>${cols.slice(1).map(c=>`<td class="${c[3]||''}">${c[2]}</td>`).join('')}</tr>`;
-  const totalsRow = `<tr class="xls-tot"><td class="xls-hd">${n++}</td><td colspan="3">Totals</td><td class="n">${fmt(sumOf(B.lines,'tot'))}</td>
+  const totalsRow = `<tr class="xls-tot"><td class="xls-hd">${n++}</td><td colspan="3">Totals</td><td class="n"${B.feeShare(B.lines, mode)?' title="Includes the production fee, spread into the departments"':''}>${fmt(sumOf(B.lines,'tot') + B.feeShare(B.lines, mode))}</td>
     <td colspan="8"></td>${vatOn?`<td></td><td class="n">${money(sumOf(B.lines,'vat'))}</td>`:''}<td></td>
     <td class="n">${isCost?dash:money(sumOf(B.lines,'fl'))}</td></tr>`;
   const inCell = (l, col, cls, value, ph, call, fx) => `<td class="xls-in"><input type="text" class="${cls}" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}"
       data-ref="${letter[col]}${n}" data-fx="${escA(fx||'')}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}"></td>`;
   const body = B.sections.map(sec=>{
-    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n">${fmt(sumOf(sec.lines,'tot'))}</td><td colspan="${cols.length-5}"></td></tr>`;
+    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n"${secFee(sec)?` title="Includes ${escA(fmt(secFee(sec)))} of production fee — its share of the budget"`:''}>${fmt(sumOf(sec.lines,'tot') + secFee(sec))}</td><td colspan="${cols.length-5}"></td></tr>`;
     n++;
     return secRow + sec.lines.map(l=>{
       const f = B.fig(l, mode), key = escA(l.key), days = l.pre+l.shoot+l.post+l.qty;
