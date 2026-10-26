@@ -1480,6 +1480,14 @@
   .bnr-left .bnr-toolrow:empty{display:none;}      /* Budget's head has no tool rows of its own — its total sits at the top */
   .budget-scope-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
   .stage-dot.stage-dot-dept{background:var(--tape);}
+  /* the solo dot — a real button wearing the 8px dot; a bigger invisible hit area, grows on hover, ringed when soloed */
+  .stage-dot.solo-dot{position:relative; width:8px; height:8px; min-height:0; padding:0; border:none; border-radius:50%;
+    cursor:pointer; justify-self:center; transition:transform .12s ease, box-shadow .12s ease;}
+  .stage-dot.solo-dot::before{content:''; position:absolute; inset:-7px; border-radius:50%;}
+  .stage-dot.solo-dot:hover{transform:scale(1.5); box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--c);}
+  .stage-dot.solo-dot:active{transform:scale(1.3);}
+  .stage-dot.solo-dot.on{transform:scale(1.25); box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--c);}
+  .stage-dot.solo-dot:focus-visible{outline:2px solid var(--c); outline-offset:3px;}
   .stage-dot.dept-dot{margin-right:7px; vertical-align:1px;}   /* the department colour on a heading */
   .bnr-cut{cursor:pointer; user-select:none; opacity:.4;} .bnr-cut.on{opacity:1; color:var(--text);}
   .bnr-cut:hover{opacity:1; color:var(--tape);} .bnr-cut:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
@@ -9280,6 +9288,7 @@ function allBudgetScopes(){ BUDGET_SCOPES.forEach(([k])=>{ budgetScope[k] = true
    role chips, lit toggles, focus rings — follows without knowing about stages. Set as a class on
    #projectBody by the two render functions; the element is rebuilt per tab, so it can't leak. */
 const STAGE_CLASS = { preproduction:'stage-pre', production:'stage-prod', post:'stage-post' };
+const STAGE_COLOR = { preproduction:'--phase-prep', production:'--phase-shoot', post:'--phase-post' };
 function applyStageColour(body){
   ['stage-all','stage-pre','stage-prod','stage-post'].forEach(c=>body.classList.remove(c));
   body.classList.add(STAGE_CLASS[isolatedStage()] || 'stage-all');
@@ -9852,11 +9861,9 @@ function budgetSummaryBarHTML(data, o){
       onclick="toggleBudgetScope('${key}', !budgetScope['${key}'])"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
       title="${budgetScope[key]?'Showing — click to leave it out':'Left out — click to include it'}">
-      <span class="stage-dot ${STAGE_CLASS[key]}"></span>
+      ${soloDotHTML(`var(${STAGE_COLOR[key]})`, iso===key, `onlyBudgetScope('${key}')`, iso===key?'Back to all stages':'Show only '+label)}
       <span class="budget-scope-name">${esc(label)}</span>
-      <button type="button" class="stage-only ${STAGE_CLASS[key]}${iso===key?' on':''}" aria-pressed="${iso===key?'true':'false'}"
-        onclick="event.stopPropagation();onlyBudgetScope('${key}')" onkeydown="event.stopPropagation()"
-        title="${iso===key?'Back to all stages':'Show only '+esc(label)}">Only</button>${o.showTotals?'<span></span>':''}
+      <span></span>${o.showTotals?'<span></span>':''}
       ${o.showTotals ? (()=>{ const f = phaseFigures(key); return budgetVatToggle ? `
         <span class="budget-scope-ex">${fmt(f.ex)}</span>
         <span class="budget-scope-vat">${f.vat ? fmt(f.vat) : '—'}</span>
@@ -9889,11 +9896,9 @@ function budgetSummaryBarHTML(data, o){
     return `<div class="${rowCls(on)}" role="button" tabindex="0" aria-pressed="${on}" onclick="toggleHeadDept('${d}')"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleHeadDept('${d}');}"
       title="${esc(f.dept)} — ${on?'showing, click to leave it out':'left out, click to include it'}">
-      <span class="stage-dot stage-dot-dept" style="background:${deptColorVar(f.dept)}"></span>
+      ${soloDotHTML(deptColorVar(f.dept), isoDept===f.dept, `onlyHeadDept('${d}')`, isoDept===f.dept?'Back to every department':'Show only '+f.dept)}
       <span class="budget-scope-name">${esc(f.dept)}</span>
-      <button type="button" class="stage-only${isoDept===f.dept?' on':''}" style="--c:${deptColorVar(f.dept)}" aria-pressed="${isoDept===f.dept}"
-        onclick="event.stopPropagation();onlyHeadDept('${d}')" onkeydown="event.stopPropagation()"
-        title="${isoDept===f.dept?'Back to every department':'Show only '+esc(f.dept)}">Only</button>
+      <span></span>
       ${deptCells(f)}</div>`; };
   /* ---- the same block, by COST (25 Sep 2026) — Hotels / Catering / Travel, the extras Crew's sub-tabs
      cost. Not a filter: a row opens its sub-tab on Crew. Budget off, it counts instead (room nights,
@@ -9925,11 +9930,9 @@ function budgetSummaryBarHTML(data, o){
       return `<div class="budget-scope-row dept-mode cost-mode${budgetVatToggle&&o.showTotals?' itemized':''}${on?'':' off'}" role="button" tabindex="0" aria-pressed="${on}"
         onclick="toggleCostFilter('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCostFilter('${k}');}"
         title="${label} — ${cf.has(k) ? 'in the filter, click to take it out' : cf.size ? 'left out, click to add it' : 'click to list only the people with '+label.toLowerCase()}">
-        <span class="stage-dot cost-dot-${k}"></span><span class="budget-scope-name">${label}</span><button type="button" class="stage-only cost-cog cost-${k}${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
+        ${soloDotHTML(`var(--cost-${k})`, isoCost===k, `onlyCostFilter('${k}')`, isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase())}<span class="budget-scope-name">${label}</span><button type="button" class="stage-only cost-cog cost-${k}${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
           onclick="event.stopPropagation();openCostSub('${k}')" onkeydown="event.stopPropagation()" title="Narrow ${label.toLowerCase()} — ${k==='hotel'?'by night':k==='catering'?'by day, meal, catered or per diem':'by method and day'}" aria-label="Narrow ${label}">⚙</button>
-        <button type="button" class="stage-only cost-${k}${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
-          onclick="event.stopPropagation();onlyCostFilter('${k}')" onkeydown="event.stopPropagation()"
-          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button>${cells(f, fmtN(counts[k]))}</div>`;
+        <span></span>${cells(f, fmtN(counts[k]))}</div>`;
     };
     return `<div class="budget-scope-row dept-mode cost-mode budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${cf.size?' off':''}" role="button" tabindex="0" aria-pressed="${!cf.size}"
         onclick="allCostFilter()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allCostFilter();}" title="Everyone — clear the costs filter">
@@ -10217,6 +10220,12 @@ const DEPT_COLOR = { 'Production':'--dept-production', 'Client':'--dept-client',
   'Audio':'--dept-audio', 'Grip':'--dept-grip', 'Equipment':'--dept-equipment', 'Set':'--dept-set', 'Vanities':'--dept-vanities',
   'Catering & Travel':'--dept-catering', 'Post Production':'--dept-post', 'Other':'--dept-other' };
 const deptColorVar = d => `var(${DEPT_COLOR[d]||'--tape'})`;
+/* THE SOLO DOT (26 Oct 2026) — the head rows' coloured dot IS the "Only" control now: hover grows it,
+   click solos that stage / department / cost, click the soloed one again for all. The Only buttons are gone. */
+function soloDotHTML(color, on, call, title){
+  return `<button type="button" class="stage-dot solo-dot${on?' on':''}" style="--c:${color}; background:${color}" aria-pressed="${on?'true':'false'}"
+    onclick="event.stopPropagation();${call}" onkeydown="event.stopPropagation()" title="${escA(title)}" aria-label="${escA(title)}"></button>`;
+}
 /* a budget-sheet section's dot — departments their own colour, Hotels / Travel their cost colour */
 const SHEET_SEC_COLOR = { 'x:loc':'--dept-set', 'x:catering':'--cost-catering', 'x:travel':'--cost-travel', 'x:hotel':'--cost-hotel',
   'x:vendors':'--dept-other', 'x:other':'--dept-other' };

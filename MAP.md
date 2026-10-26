@@ -860,6 +860,12 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   groupers get no dot) and the Crew database. Budget sheet section rows use `sheetSecDotHTML(sec.key)` (`d:` keys →
   `DEPT_COLOR`; Locations → Set; Catering / Travel / Hotels → their `--cost-*`; Vendors / Other costs → grey), and the
   Department view's rows carry the dot too. Copy-as-text strips tags, so exports are unchanged.
+- **Solo dots replace Only (26 Oct 2026):** on the head's Stages / Departments / Costs rows the coloured dot is now the
+  "Only" control — `soloDotHTML(color, on, call, title)` draws a `<button class="stage-dot solo-dot">` (hover grows it
+  with a ring, `.on` = soloed, ringed; click again goes back to all). It calls the same `onlyBudgetScope()` /
+  `onlyHeadDept()` / `onlyCostFilter()` as the Only buttons did. Every "Only" button is GONE; its grid column is kept as
+  an empty `<span>` so the figure columns still line up across the three cuts. `STAGE_COLOR` sits beside `STAGE_CLASS`.
+  The costs' ⚙ cog is unchanged.
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`
