@@ -1248,6 +1248,8 @@
   .section table.xls .n{text-align:right;} .section table.xls .c{text-align:center;}
   .section table.xls .mu{color:var(--muted);}
   .section table.xls tr.xls-sec td{background:var(--tint-2); font-weight:600;}
+  /* a department / cost section heading: its own colour, softly — the gutter number keeps the grey */
+  .section table.xls tr.xls-sec.xls-sec-c td:not(.xls-hd){background:color-mix(in srgb, var(--c) 15%, var(--panel));}
   .section table.xls tr.xls-tot td{font-weight:600;}
   /* a person's totaliser on Per Person — under their roles, before the next person */
   .section table.xls tr.xls-sub td{font-weight:600; background:var(--tint-1); border-bottom:1.5px solid var(--field-line);}
@@ -10229,8 +10231,9 @@ function soloDotHTML(color, on, call, title){
 /* a budget-sheet section's dot — departments their own colour, Hotels / Travel their cost colour */
 const SHEET_SEC_COLOR = { 'x:loc':'--dept-set', 'x:catering':'--cost-catering', 'x:travel':'--cost-travel', 'x:hotel':'--cost-hotel',
   'x:vendors':'--dept-other', 'x:other':'--dept-other' };
-const sheetSecDotHTML = key => { const v = key.startsWith('d:') ? DEPT_COLOR[key.slice(2)] : SHEET_SEC_COLOR[key];
-  return v ? `<span class="stage-dot dept-dot" style="background:var(${v})"></span>` : ''; };
+const sheetSecColorVar = key => key.startsWith('d:') ? DEPT_COLOR[key.slice(2)] : SHEET_SEC_COLOR[key];
+/* a section heading row wears a soft tint of its colour instead of the grey (26 Oct 2026) — the dot is dropped there */
+const sheetSecAttrs = key => { const v = sheetSecColorVar(key); return v ? ` xls-sec-c" style="--c:var(${v})` : ''; };
 const BUDGET_DEPT_ORDER = ['Production','Client','Talent','Cinematography','Audio','Vanities','Post Production','Other',
   'Equipment','Grip','Set','Catering & Travel'];
 const SHEET_FOLD = { 'Set':'x:loc', 'Catering & Travel':'x:catering' };
@@ -10524,7 +10527,7 @@ const CODE_DEPARTMENTS = Object.fromEntries(Object.entries(DEPARTMENT_CODES).map
 CODE_DEPARTMENTS.CLIENT = 'Client'; CODE_DEPARTMENTS.TALENT = 'Talent';
 function xlsSheetHTML(cols, rows){
   let n = 1;
-  const tr = r => `<tr class="${r.cls||''}"><td class="xls-hd">${n++}</td>${r.cells.map(cell=>{
+  const tr = r => `<tr class="${r.cls||''}"${r.style?` style="${r.style}"`:''}><td class="xls-hd">${n++}</td>${r.cells.map(cell=>{
     const o = (cell!=null && typeof cell==='object') ? cell : {h:cell};
     return `<td class="${o.c||''}"${o.span?` colspan="${o.span}"`:''}${o.t?` title="${escA(o.t)}"`:''}>${o.h==null?'':o.h}</td>`; }).join('')}</tr>`;
   /* ⚠️ table-layout:fixed only holds with an explicit width — without one a long cell widens its column */
@@ -10726,7 +10729,8 @@ function budgetSheetModel(view, data, B){
     [...new Set(B.lines.map(l=>l.code))].filter(c=>!codes.some(k=>k[0]===c)).forEach(c=>codes.push([c, CODE_DEPARTMENTS[c]||'Other']));
     codes.forEach(([code, name])=>{
       const mine = B.lines.filter(l=>l.code===code); if(!mine.length) return;
-      rows.push({ cls: budgetShowLines ? 'xls-sec' : '', cells:[{h:esc(code), c:'mu'}, `<span class="stage-dot dept-dot" style="background:${deptColorVar(name)}"></span>`+esc(name)].concat(cellsOf(rowOf(mine))) });
+      rows.push({ cls: budgetShowLines ? 'xls-sec xls-sec-c' : '', style:`--c:${deptColorVar(name)}`,
+        cells:[{h:esc(code), c:'mu'}, (budgetShowLines ? '' : `<span class="stage-dot dept-dot" style="background:${deptColorVar(name)}"></span>`)+esc(name)].concat(cellsOf(rowOf(mine))) });
       if(budgetShowLines) mine.forEach(l=>rows.push({ cells:['', lineLabel(l)].concat(cellsOf(rowOf([l]))) }));
     });
     rows.push({ cls:'xls-rule', cells:['', {h:'Ex-VAT', c:'mu'}].concat(cellsOf(rowOf(B.lines,'ex'))) });
@@ -10955,7 +10959,7 @@ function budgetLinesViewHTML(data, B){
   const inCell = (l, col, cls, value, ph, call, fx) => `<td class="xls-in"><input type="text" class="${cls}" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}"
       data-ref="${letter[col]}${n}" data-fx="${escA(fx||'')}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}"></td>`;
   const body = B.sections.map(sec=>{
-    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${sheetSecDotHTML(sec.key)}${esc(sec.title)}</td><td class="n"${secFee(sec)?` title="Includes ${escA(fmt(secFee(sec)))} of production fee — its share of the budget"`:''}>${fmt(sumOf(sec.lines,'tot') + secFee(sec))}</td><td colspan="${cols.length-5}"></td></tr>`;
+    const secRow = `<tr class="xls-sec${sheetSecAttrs(sec.key)}">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n"${secFee(sec)?` title="Includes ${escA(fmt(secFee(sec)))} of production fee — its share of the budget"`:''}>${fmt(sumOf(sec.lines,'tot') + secFee(sec))}</td><td colspan="${cols.length-5}"></td></tr>`;
     n++;
     return secRow + sec.lines.map(l=>{
       const f = B.fig(l, mode), key = escA(l.key), days = l.pre+l.shoot+l.post+l.qty;
