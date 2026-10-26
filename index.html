@@ -10512,7 +10512,7 @@ function xlsSheetHTML(cols, rows){
              View ▾ (replaces the tab strip) | VAT | Settings | Days   ·····   Lines · Edit · Export
    Days, Export, Settings and the shoot-day ticks are popups; nothing pushes the sheet down. */
 const BUDGET_VIEW_STATS = [['cost','Cost',true], ['charged','Charged',true], ['floatTotal','Float',true], ['margin','Margin',true],
-  ['floatPct','Float %',false], ['feePct','Fee',true]];   // key stays feePct so saved ticks carry over — it now shows the fee total, % beneath
+  ['feePct','Fee',true]];   // key stays feePct so saved ticks carry over — it now shows the fee total, % beneath
 const budgetViewShows = (set, key) => { const v = (set.view||{})[key]; return v!=null ? !!v : (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2]; };
 let budgetEdit = false;
 function toggleBudgetEdit(){ budgetEdit = !budgetEdit; renderProjectBody(); }
@@ -10564,7 +10564,7 @@ function budgetPageHeadHTML(data, B){
   /* the fee is a totaliser figure like Float — the £ big, its % beneath (26 Oct 2026; it used to be a line under the total) */
   const stat = { cost:['Cost', fmt(T.cost), ''], charged:['Charged', fmt(T.charged), 'inc. float'], floatTotal:['Float', fmt(T.float), B.sheet.floatPct+'%'],
     margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span>`, pct],
-    floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee', fmt(T.fee), B.sheet.feePct+'%'+(T.feeSpread?' · in departments':'')] };
+    feePct:['Fee', fmt(T.fee), B.sheet.feePct+'%'+(T.feeSpread?' · in departments':'')] };
   const strip = BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>stat[k]).concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack), '']] : []);
   return budgetSummaryBarHTML(data, { listToolsHTML:'', topToolsHTML:'', totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode),
       deptFigs: headBreakdown==='depts' ? budgetDeptFigs(budgetMode) : null, costFigs: headBreakdown==='costs' ? budgetCostFigs(budgetMode) : null, showTotals:true })
