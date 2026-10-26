@@ -40,6 +40,10 @@
     --phase-prep:#8A5A0B; --phase-shoot:#017756; --phase-post:#4A3C8C;
     /* the three costs — Hotels / Catering / Travel (the head's COSTS rows, and the day shading when one is the filter) */
     --cost-hotel:#2E6BA8; --cost-catering:#C0622B; --cost-travel:#1B8A8A;
+    /* departments (26 Oct 2026) — one each, same deep family, spread round the wheel; Post and Catering reuse their stage/cost colour */
+    --dept-production:#A23B3B; --dept-client:#6B7A1F; --dept-talent:#C2416A; --dept-cinematography:#2E5FA8;
+    --dept-audio:#7B4BB0; --dept-grip:#2C7C95; --dept-equipment:#3F7D4E; --dept-set:#A8762A; --dept-vanities:#A3478F;
+    --dept-catering:var(--cost-catering); --dept-post:var(--phase-post); --dept-other:#6B6B6B;
     --cost-hotel-soft:rgba(46,107,168,.16); --cost-catering-soft:rgba(192,98,43,.16); --cost-travel-soft:rgba(27,138,138,.16);
     --phase-prep-soft:rgba(138,90,11,.13); --phase-shoot-soft:rgba(1,119,86,.13);
     --phase-post-soft:rgba(74,60,140,.13);
@@ -9878,9 +9882,9 @@ function budgetSummaryBarHTML(data, o){
     return `<div class="${rowCls(on)}" role="button" tabindex="0" aria-pressed="${on}" onclick="toggleHeadDept('${d}')"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleHeadDept('${d}');}"
       title="${esc(f.dept)} — ${on?'showing, click to leave it out':'left out, click to include it'}">
-      <span class="stage-dot stage-dot-dept"></span>
+      <span class="stage-dot stage-dot-dept" style="background:${deptColorVar(f.dept)}"></span>
       <span class="budget-scope-name">${esc(f.dept)}</span>
-      <button type="button" class="stage-only${isoDept===f.dept?' on':''}" aria-pressed="${isoDept===f.dept}"
+      <button type="button" class="stage-only${isoDept===f.dept?' on':''}" style="--c:${deptColorVar(f.dept)}" aria-pressed="${isoDept===f.dept}"
         onclick="event.stopPropagation();onlyHeadDept('${d}')" onkeydown="event.stopPropagation()"
         title="${isoDept===f.dept?'Back to every department':'Show only '+esc(f.dept)}">Only</button>
       ${deptCells(f)}</div>`; };
@@ -10201,6 +10205,11 @@ function sheetLineFigures(l){
    Two departments have no section of their own on the sheet: Set people head the Locations section ("Locations &
    Set") and Catering & Travel people head Catering, so neither appears twice. A line typed under either before
    this lands in the section that took it over (SHEET_ALIAS). */
+/* each department's colour — the head's Departments rows (dot + Only), as stages and costs have theirs */
+const DEPT_COLOR = { 'Production':'--dept-production', 'Client':'--dept-client', 'Talent':'--dept-talent', 'Cinematography':'--dept-cinematography',
+  'Audio':'--dept-audio', 'Grip':'--dept-grip', 'Equipment':'--dept-equipment', 'Set':'--dept-set', 'Vanities':'--dept-vanities',
+  'Catering & Travel':'--dept-catering', 'Post Production':'--dept-post', 'Other':'--dept-other' };
+const deptColorVar = d => `var(${DEPT_COLOR[d]||'--tape'})`;
 const BUDGET_DEPT_ORDER = ['Production','Client','Talent','Cinematography','Audio','Vanities','Post Production','Other',
   'Equipment','Grip','Set','Catering & Travel'];
 const SHEET_FOLD = { 'Set':'x:loc', 'Catering & Travel':'x:catering' };

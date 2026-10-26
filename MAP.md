@@ -851,6 +851,10 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   totaliser figure like Float — £ total big, `feePct%` beneath (plus `· in departments` when spread). It reuses the
   `feePct` key in `BUDGET_VIEW_STATS` (label now "Fee", default on) so saved Settings ▸ View ticks carry over. The separate Float % checkbox is removed — Float already shows its % beneath. Under
   the total, with VAT on: `xVAT £…` then `VAT £…` (or "No VAT in it"); with VAT off: "Total ex-VAT".
+- **Department colours (26 Oct 2026):** each department has its own token (`--dept-*` in `:root`, mapped by
+  `DEPT_COLOR` / `deptColorVar(dept)` beside `BUDGET_DEPT_ORDER`). The head's Departments rows use it for the dot and the
+  Only button's `--c`, as stages use `--phase-*` and costs `--cost-*`. Post Production = `--phase-post`, Catering &
+  Travel = `--cost-catering`; an unknown department falls back to `--tape`.
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`
