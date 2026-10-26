@@ -870,6 +870,8 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   `onlyHeadDept()` / `onlyCostFilter()` as the Only buttons did. Every "Only" button is GONE; its grid column is kept as
   an empty `<span>` so the figure columns still line up across the three cuts. `STAGE_COLOR` sits beside `STAGE_CLASS`.
   The costs' ⚙ cog is unchanged.
+- **Per Person — person totals on top (26 Oct 2026):** a person with two or more roles gets their `Total — Name · n roles`
+  row (`pushPersonTotal`) ABOVE their role rows instead of beneath; those role rows leave the name cell blank.
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`
