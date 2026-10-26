@@ -861,7 +861,7 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   `DEPT_COLOR`; Locations → Set; Catering / Travel / Hotels → their `--cost-*`; Vendors / Other costs → grey), and the
   Department view's rows carry the dot too. Copy-as-text strips tags, so exports are unchanged.
   REVISED same day: the sheet's section heading rows no longer carry a dot — they wear a soft tint of their colour
-  instead of the grey (`.xls-sec.xls-sec-c`, `--c` set per row, `color-mix(… 15%, var(--panel))`; gutter number stays
+  instead of the grey (`.xls-sec.xls-sec-c`, `--c` set per row) — now SOLID colour with white text (gutter number stays
   grey). `sheetSecColorVar()` / `sheetSecAttrs()` replace `sheetSecDotHTML`. Department view does the same when Lines is
   on (`xlsSheetHTML` rows now take an optional `style`); with Lines off its plain rows keep the dot.
 - **Solo dots replace Only (26 Oct 2026):** on the head's Stages / Departments / Costs rows the coloured dot is now the

@@ -1248,8 +1248,9 @@
   .section table.xls .n{text-align:right;} .section table.xls .c{text-align:center;}
   .section table.xls .mu{color:var(--muted);}
   .section table.xls tr.xls-sec td{background:var(--tint-2); font-weight:600;}
-  /* a department / cost section heading: its own colour, softly — the gutter number keeps the grey */
-  .section table.xls tr.xls-sec.xls-sec-c td:not(.xls-hd){background:color-mix(in srgb, var(--c) 15%, var(--panel));}
+  /* a department / cost section heading: solid in its own colour, white text — the gutter number keeps the grey */
+  .section table.xls tr.xls-sec.xls-sec-c td:not(.xls-hd){background:var(--c); color:#fff;}
+  .section table.xls tr.xls-sec.xls-sec-c td:not(.xls-hd) *{color:inherit;}
   .section table.xls tr.xls-tot td{font-weight:600;}
   /* a person's totaliser on Per Person — under their roles, before the next person */
   .section table.xls tr.xls-sub td{font-weight:600; background:var(--tint-1); border-bottom:1.5px solid var(--field-line);}
