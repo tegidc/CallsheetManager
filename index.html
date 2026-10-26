@@ -1480,6 +1480,7 @@
   .bnr-left .bnr-toolrow:empty{display:none;}      /* Budget's head has no tool rows of its own — its total sits at the top */
   .budget-scope-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
   .stage-dot.stage-dot-dept{background:var(--tape);}
+  .stage-dot.dept-dot{margin-right:7px; vertical-align:1px;}   /* the department colour on a heading */
   .bnr-cut{cursor:pointer; user-select:none; opacity:.4;} .bnr-cut.on{opacity:1; color:var(--text);}
   .bnr-cut:hover{opacity:1; color:var(--tape);} .bnr-cut:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .bnr-cut-sep{opacity:.4; margin:0 4px;}
@@ -2032,10 +2033,11 @@ function pbNameHTML(name, id, afterHTML){
   return `<span class="roles-name-text roles-name-link" role="button" tabindex="0" onclick="event.stopPropagation();editCrew('${id}')"
     onkeydown="if(event.key==='Enter'){event.preventDefault();editCrew('${id}');}" title="Open ${esc(name)}'s record">${esc(rolesNameCollapsed ? rolesShortName(name) : name)}${afterHTML||''}</span>`;
 }
-function deptHeaderHTML(label, count, collapsed, onclickJS, code){
+function deptHeaderHTML(label, count, collapsed, onclickJS, code, dept){
   const c = code===undefined ? (DEPARTMENT_CODES[label]||'') : code;
+  const dot = dept ? `<span class="stage-dot dept-dot" style="background:${deptColorVar(dept)}"></span>` : '';
   return `<div class="subhead dept-toggle" onclick="${onclickJS}">
-      <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${c?`<span class="dept-code">${esc(c)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span>
+      <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${dot}${c?`<span class="dept-code">${esc(c)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span>
     </div>`;
 }
 function expandCollapseAllHTML(onclickExpr, extraLinkHTML, allCollapsed, groupId){
@@ -5731,9 +5733,14 @@ function renderProjectCrew(body){
     /* ⚠️ THE FLAT LIST HAS NO HEAD, and that is the whole of what "None (flat list)" buys —
        one group called "All crew" wearing a subhead that says "All crew (41)" would be a row
        of chrome above every screen for no information. Every other grouper still gets one. */
+    /* a department group wears its department's colour; other groupers (company, role, days…) don't */
+    const gbNow = projectCrewFilter.groupBy;
+    const groupDept = g => gbNow==='deptCompany' ? g.label.split(' — ')[0]
+      : ['company','role','travel','catering','hotel','personType','vat','seniority','daysOnSite','none'].includes(gbNow) ? null
+      : (DEPT_COLOR[g.label] ? g.label : null);
     const groupHeaderHTML = g => g.key==='all' ? '' : deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
-      `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
+      `toggleProjectDeptCollapse('${g.key}')`, g.code||'', groupDept(g));
 
     if(crewGridView==='roles'){
       const spec = rolesColumns(budgetData);
@@ -10210,6 +10217,11 @@ const DEPT_COLOR = { 'Production':'--dept-production', 'Client':'--dept-client',
   'Audio':'--dept-audio', 'Grip':'--dept-grip', 'Equipment':'--dept-equipment', 'Set':'--dept-set', 'Vanities':'--dept-vanities',
   'Catering & Travel':'--dept-catering', 'Post Production':'--dept-post', 'Other':'--dept-other' };
 const deptColorVar = d => `var(${DEPT_COLOR[d]||'--tape'})`;
+/* a budget-sheet section's dot — departments their own colour, Hotels / Travel their cost colour */
+const SHEET_SEC_COLOR = { 'x:loc':'--dept-set', 'x:catering':'--cost-catering', 'x:travel':'--cost-travel', 'x:hotel':'--cost-hotel',
+  'x:vendors':'--dept-other', 'x:other':'--dept-other' };
+const sheetSecDotHTML = key => { const v = key.startsWith('d:') ? DEPT_COLOR[key.slice(2)] : SHEET_SEC_COLOR[key];
+  return v ? `<span class="stage-dot dept-dot" style="background:var(${v})"></span>` : ''; };
 const BUDGET_DEPT_ORDER = ['Production','Client','Talent','Cinematography','Audio','Vanities','Post Production','Other',
   'Equipment','Grip','Set','Catering & Travel'];
 const SHEET_FOLD = { 'Set':'x:loc', 'Catering & Travel':'x:catering' };
@@ -10705,7 +10717,7 @@ function budgetSheetModel(view, data, B){
     [...new Set(B.lines.map(l=>l.code))].filter(c=>!codes.some(k=>k[0]===c)).forEach(c=>codes.push([c, CODE_DEPARTMENTS[c]||'Other']));
     codes.forEach(([code, name])=>{
       const mine = B.lines.filter(l=>l.code===code); if(!mine.length) return;
-      rows.push({ cls: budgetShowLines ? 'xls-sec' : '', cells:[{h:esc(code), c:'mu'}, esc(name)].concat(cellsOf(rowOf(mine))) });
+      rows.push({ cls: budgetShowLines ? 'xls-sec' : '', cells:[{h:esc(code), c:'mu'}, `<span class="stage-dot dept-dot" style="background:${deptColorVar(name)}"></span>`+esc(name)].concat(cellsOf(rowOf(mine))) });
       if(budgetShowLines) mine.forEach(l=>rows.push({ cells:['', lineLabel(l)].concat(cellsOf(rowOf([l]))) }));
     });
     rows.push({ cls:'xls-rule', cells:['', {h:'Ex-VAT', c:'mu'}].concat(cellsOf(rowOf(B.lines,'ex'))) });
@@ -10934,7 +10946,7 @@ function budgetLinesViewHTML(data, B){
   const inCell = (l, col, cls, value, ph, call, fx) => `<td class="xls-in"><input type="text" class="${cls}" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}"
       data-ref="${letter[col]}${n}" data-fx="${escA(fx||'')}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}"></td>`;
   const body = B.sections.map(sec=>{
-    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n"${secFee(sec)?` title="Includes ${escA(fmt(secFee(sec)))} of production fee — its share of the budget"`:''}>${fmt(sumOf(sec.lines,'tot') + secFee(sec))}</td><td colspan="${cols.length-5}"></td></tr>`;
+    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${sheetSecDotHTML(sec.key)}${esc(sec.title)}</td><td class="n"${secFee(sec)?` title="Includes ${escA(fmt(secFee(sec)))} of production fee — its share of the budget"`:''}>${fmt(sumOf(sec.lines,'tot') + secFee(sec))}</td><td colspan="${cols.length-5}"></td></tr>`;
     n++;
     return secRow + sec.lines.map(l=>{
       const f = B.fig(l, mode), key = escA(l.key), days = l.pre+l.shoot+l.post+l.qty;
@@ -11494,7 +11506,7 @@ function renderCrewList(){
   const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML(`toggleAllCrewDbDepts('${deptsCSV}')`, undefined, deptsPresent.every(d=>collapsedDepts.has(d)), 'depts') : '';
   const html = deptsPresent.map(d=>{
     const collapsed = collapsedDepts.has(d);
-    return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`)
+    return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`, undefined, d)
       + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(crewCardHTML).join('')}</div>`;
   }).join('');
   const headRow = `<div class="crewdb-head"><span></span><span class="crewgrid-header" style="text-align:left;">Dept</span><span class="crewgrid-header" style="text-align:left;">Role</span><span class="crewgrid-header" style="text-align:left;">Name</span><span class="crewgrid-header" style="text-align:left;">Contact</span></div>`;

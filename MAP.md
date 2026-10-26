@@ -855,6 +855,11 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   `DEPT_COLOR` / `deptColorVar(dept)` beside `BUDGET_DEPT_ORDER`). The head's Departments rows use it for the dot and the
   Only button's `--c`, as stages use `--phase-*` and costs `--cost-*`. Post Production = `--phase-post`, Catering &
   Travel = `--cost-catering`; an unknown department falls back to `--tape`.
+  Carried onto the headings (same day): `deptHeaderHTML(…, dept)` takes an optional department and draws a
+  `.stage-dot.dept-dot` — used by the Crew tab group heads (only when grouped by department or dept+company; other
+  groupers get no dot) and the Crew database. Budget sheet section rows use `sheetSecDotHTML(sec.key)` (`d:` keys →
+  `DEPT_COLOR`; Locations → Set; Catering / Travel / Hotels → their `--cost-*`; Vendors / Other costs → grey), and the
+  Department view's rows carry the dot too. Copy-as-text strips tags, so exports are unchanged.
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`
