@@ -872,6 +872,9 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   The costs' ⚙ cog is unchanged.
 - **Per Person — person totals on top (26 Oct 2026):** a person with two or more roles gets their `Total — Name · n roles`
   row (`pushPersonTotal`) ABOVE their role rows instead of beneath; those role rows leave the name cell blank.
+- **Double-click to edit (26 Oct 2026):** the Budget page's `.section` has `ondblclick="budgetDblEdit(event)"` — turns
+  `budgetEdit` on (never off), ignores double-clicks on fields/buttons/links/role=button rows/dialogs, and focuses the
+  field that now sits in the cell that was double-clicked (matched by table / row / cell index after the re-render).
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`

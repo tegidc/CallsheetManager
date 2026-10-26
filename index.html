@@ -10550,6 +10550,25 @@ const BUDGET_VIEW_STATS = [['cost','Cost',true], ['charged','Charged',true], ['f
 const budgetViewShows = (set, key) => { const v = (set.view||{})[key]; return v!=null ? !!v : (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2]; };
 let budgetEdit = false;
 function toggleBudgetEdit(){ budgetEdit = !budgetEdit; renderProjectBody(); }
+/* DOUBLE-CLICK TO EDIT (26 Oct 2026) — a double-click anywhere on the Budget page turns Edit on, and when it
+   landed on a sheet cell that becomes a field in Edit, that field gets the cursor. Already editing, or on a
+   field / button / link, it does nothing (a double-click in a field is selecting a word). */
+function budgetDblEdit(ev){
+  if(budgetEdit) return;
+  const t = ev.target;
+  if(t.closest('input, textarea, select, button, a, [role="button"], .modal-overlay')) return;
+  let at = null;
+  const td = t.closest('table.xls td');
+  if(td){ const table = td.closest('table.xls'), tr = td.parentElement;
+    at = { table: [...document.querySelectorAll('table.xls')].indexOf(table), row: [...table.rows].indexOf(tr), cell: [...tr.cells].indexOf(td) }; }
+  try{ window.getSelection().removeAllRanges(); }catch(e){}
+  budgetEdit = true; renderProjectBody();
+  if(at) try{
+    const table = document.querySelectorAll('table.xls')[at.table], tr = table && table.rows[at.row], cell = tr && tr.cells[at.cell];
+    const f = cell && cell.querySelector('input, button');
+    if(f){ f.focus(); if(f.select) f.select(); }
+  }catch(e){}
+}
 /* every stage's figures for the budget being shown, whatever is muted — so the rows are the way
    back, as on Crew. Built with every stage on; float rides with the ex-VAT column. */
 function budgetStageFigs(mode){
@@ -11166,7 +11185,7 @@ function renderProjectBudget(body){
   const data = buildBudgetData(), B = buildBudgetLines(data);
   const viewHTML = budgetView==='lines' ? budgetLinesViewHTML(data, B) : budgetSheetViewHTML(budgetView, data, B);
   body.innerHTML = `
-    <div class="section">
+    <div class="section" ondblclick="budgetDblEdit(event)">
       <div id="budgetSummaryBarWrap">${budgetPageHeadHTML(data, B)}</div>
       ${budgetToolRowHTML()}
       ${viewHTML}
