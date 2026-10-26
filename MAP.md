@@ -847,6 +847,10 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   then ONE tool row, `budgetToolRowHTML()`: **View ▾** (a select — the tab strip is gone) | VAT | Settings | Days,
   with Lines · Edit · Export pushed right. "Days" opens the filter popup and reads `Days (n of N)` when days are
   filtered, `· filtered` when a shared Crew filter is on. Where this note and the one above disagree, this wins.
+- **Fee into the totaliser (26 Oct 2026):** the "Prod fee" line under the big total is GONE. The fee is now a
+  totaliser figure like Float — £ total big, `feePct%` beneath (plus `· in departments` when spread). It reuses the
+  `feePct` key in `BUDGET_VIEW_STATS` (label now "Fee", default on) so saved Settings ▸ View ticks carry over. Under
+  the total, with VAT on: `xVAT £…` then `VAT £…` (or "No VAT in it"); with VAT off: "Total ex-VAT".
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`

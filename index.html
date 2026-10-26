@@ -10505,14 +10505,14 @@ function xlsSheetHTML(cols, rows){
 }
 /* THE BUDGET PAGE HEAD (20 Sep 2026, third pass) — the working budget is the CHARGED one, so there
    is no Cost | Charged switch any more: every view shows charged, and Cost is a figure and a column.
-     left    FINAL TOTAL, big; under it in the small style — Prod fee · Total inc. VAT · xVAT
+     left    FINAL TOTAL, big; under it in the small style — xVAT · VAT (the fee is in the totaliser now)
      right   the stage selector (charged figures; the fee is on the whole budget, so not in a stage)
      foot    the totaliser — Cost | Charged | Float | Margin (what shows is Settings ▸ View)
      ─────   the divider, then ONE tool row on the sheet:
              View ▾ (replaces the tab strip) | VAT | Settings | Days   ·····   Lines · Edit · Export
    Days, Export, Settings and the shoot-day ticks are popups; nothing pushes the sheet down. */
 const BUDGET_VIEW_STATS = [['cost','Cost',true], ['charged','Charged',true], ['floatTotal','Float',true], ['margin','Margin',true],
-  ['floatPct','Float %',false], ['feePct','Fee %',false]];
+  ['floatPct','Float %',false], ['feePct','Fee',true]];   // key stays feePct so saved ticks carry over — it now shows the fee total, % beneath
 const budgetViewShows = (set, key) => { const v = (set.view||{})[key]; return v!=null ? !!v : (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2]; };
 let budgetEdit = false;
 function toggleBudgetEdit(){ budgetEdit = !budgetEdit; renderProjectBody(); }
@@ -10558,12 +10558,13 @@ function budgetPageHeadHTML(data, B){
   const chVat = budgetVatToggle ? B.lines.reduce((n,l)=>n+l.chVat, 0) : 0;
   const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
   const totals = `<div class="budget-stat bhead-final"><div class="num" title="Final total — charged, plus the production fee">${fmt(T.final)}</div>
-      <div class="bhead-sub"${T.feeSpread?' title="Spread into the department totals — Settings ▸ Production fee"':''}>Prod fee ${fmt(T.fee)} <span class="mu">${B.sheet.feePct}%${T.feeSpread?' · in departments':''}</span></div>
-      <div class="bhead-sub">Total ${!budgetVatToggle ? 'ex-VAT' : chVat>0 ? `inc. ${fmt(chVat)} VAT${set.vatBack?' — final':''}` : '— no VAT in it'}</div>
-      ${budgetVatToggle ? `<div class="bhead-sub">xVAT ${fmt(T.final - chVat)}</div>` : ''}</div>`;
+      ${!budgetVatToggle ? `<div class="bhead-sub">Total ex-VAT</div>`
+        : `<div class="bhead-sub">xVAT ${fmt(T.final - chVat)}</div>
+      <div class="bhead-sub">${chVat>0 ? `VAT ${fmt(chVat)}${set.vatBack?' <span class="mu">— final</span>':''}` : 'No VAT in it'}</div>`}</div>`;
+  /* the fee is a totaliser figure like Float — the £ big, its % beneath (26 Oct 2026; it used to be a line under the total) */
   const stat = { cost:['Cost', fmt(T.cost), ''], charged:['Charged', fmt(T.charged), 'inc. float'], floatTotal:['Float', fmt(T.float), B.sheet.floatPct+'%'],
     margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span>`, pct],
-    floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee %', B.sheet.feePct+'%', ''] };
+    floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee', fmt(T.fee), B.sheet.feePct+'%'+(T.feeSpread?' · in departments':'')] };
   const strip = BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>stat[k]).concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack), '']] : []);
   return budgetSummaryBarHTML(data, { listToolsHTML:'', topToolsHTML:'', totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode),
       deptFigs: headBreakdown==='depts' ? budgetDeptFigs(budgetMode) : null, costFigs: headBreakdown==='costs' ? budgetCostFigs(budgetMode) : null, showTotals:true })
@@ -10870,7 +10871,7 @@ function budgetSettingsDialogHTML(){
       <div class="subhead" style="margin-top:16px;">View — the totals row</div>
       ${row('Show', `<div class="filter-chips bset-chips">${BUDGET_VIEW_STATS.map(([k,label])=>
         `<label><input type="checkbox" ${budgetViewShows(set,k)?'checked':''} onchange="setBudgetViewStat('${k}', this.checked)"> ${label}</label>`).join('')}</div>`,
-        'The row along the foot of the header. Final total, the production fee and the VAT lines always sit above it. VAT reclaimed joins the row by itself for an overseas client.')}
+        'The row along the foot of the header. Final total and the xVAT / VAT lines always sit above it. VAT reclaimed joins the row by itself for an overseas client.')}
       <div class="subhead" style="margin-top:16px;">Client</div>
       ${row('Client is', pick('vatBack', [[false,'UK — normal VAT'], [true,'Overseas (e.g. USA) — VAT reclaimed']]),
         `Overseas: everything is charged with VAT in it, as a final figure, and you reclaim the VAT you paid suppliers afterwards. That VAT shows as <strong>VAT reclaimed</strong> and counts towards Margin.${set.vatBack && !budgetVatToggle ? ' <strong>Switch Show VAT to With VAT for this to apply.</strong>' : ''}`)}
