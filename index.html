@@ -296,6 +296,8 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .note-peek:hover{color:var(--tape);}
   .note-peek .muted{color:var(--muted);}
+  .ov-tabs .tab-n{color:var(--muted); font-weight:400; margin-left:3px;}
+  .ov-tabs .tab.active .tab-n{color:inherit;}
   /* Credits (28 Oct 2026) */
   .credits-tools{margin-bottom:12px;}
   .credits-tools .bnr-toolrow{justify-content:flex-start;}
@@ -1959,7 +1961,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes, overviewTab: appSettings.overviewTab, credits: appSettings.credits });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -3084,6 +3086,7 @@ async function initApp(){
   if(savedSettings && !Array.isArray(savedSettings)) appSettings = Object.assign({}, SETTINGS_DEFAULTS, savedSettings);
   applyAppSettings();
   if(['all','crew','talent'].includes(appSettings.crewPeopleKind)) crewPeopleKind = appSettings.crewPeopleKind;
+  if(OVERVIEW_TABS[appSettings.overviewTab]) overviewTab = appSettings.overviewTab;
   renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
@@ -3498,7 +3501,7 @@ function renderProjectBodyNow(body){
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
   // 'notes' was its own tab until 20 Sep 2026 — it is a section of Overview now
-  if(currentProjectTab==='notes'){ currentProjectTab='overview'; notesSectionOpen = true; return renderProjectOverview(body); }
+  if(currentProjectTab==='notes'){ currentProjectTab='overview'; overviewTab = 'notes'; return renderProjectOverview(body); }
   // 'preview' was the Preview & Export tab, folded into Shoot Days on 19 Sep 2026
   if(currentProjectTab==='preview'){ currentProjectTab='days'; return renderProjectDays(body); }
 }
@@ -3508,7 +3511,8 @@ function renderProjectOverview(body){
   const days = projectDays(p.id);
   flushNotesEdits();            // this rebuilds the note editors — bank what's typed in them first
   /* 28 Oct 2026 — the Crew / Venues page shape: the add tools on top, the details straight under
-     them (no heading — the tab says where you are), then every section with the same ▸ header. */
+     them (no heading — the tab says where you are), then Tasks / Notes / Deliverables / Credits as
+     a sub-tab row like Crew's Roles / Travel / Catering / Hotel. Danger zone stays folded at the foot. */
   body.innerHTML = `
     ${quickAddSectionHTML(p)}
     <div class="section">
@@ -3527,10 +3531,11 @@ function renderProjectOverview(body){
       <label>Production description</label>
       <textarea id="ovDescription">${esc(p.description)}</textarea>
     </div>
-    ${renderTasksSection(p, days)}
-    ${notesSectionHTML(p)}
-    ${deliverablesSectionHTML(p)}
-    ${creditsSectionHTML(p)}
+    ${overviewTabsHTML(p, days)}
+    ${overviewTab==='tasks' ? renderTasksSection(p, days)
+      : overviewTab==='deliverables' ? deliverablesSectionHTML(p)
+      : overviewTab==='credits' ? creditsSectionHTML(p)
+      : notesSectionHTML(p)}
     ${collapsibleSectionHTML({
       state: dangerSectionOpen, id: 'dangerSection', title: 'Danger zone', onToggle: 'toggleDangerSection()',
       inner: `<button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>`
@@ -3860,8 +3865,36 @@ function quickAddSectionHTML(p){
     ${mode ? `<div class="ov-tools-panel">${bodyHTML}</div>` : ''}
   </div>`;
 }
-let tasksSectionOpen = false;            // collapsed by default, same convention as AI Scan/summary blocks
-function toggleTasksSection(){ tasksSectionOpen = !tasksSectionOpen; renderProjectBody(); }
+/* OVERVIEW SUB-TABS (28 Oct 2026) — Tasks / Notes / Deliverables / Credits were stacked folding
+   sections; they are a sub-tab row now, Crew's own (crewview-tabs), the last one picked remembered in
+   appSettings.overviewTab. Each tab's count rides on its label; a tab's own button (+ New note)
+   sits at the row's right-hand end, where Crew keeps Summary / Collapse all. */
+const OVERVIEW_TABS = {tasks:'Tasks', notes:'Notes', deliverables:'Deliverables', credits:'Credits'};
+let overviewTab = 'tasks';
+async function setOverviewTab(k){
+  if(!OVERVIEW_TABS[k] || k===overviewTab) return;
+  flushNotesEdits();            // leaving Notes takes its editors away — bank what's typed first
+  overviewTab = k;
+  renderProjectBody();
+  appSettings.overviewTab = k;
+  await saveAppSettings();
+}
+function overviewTabsHTML(p, days){
+  syncFlagTasks(p, days);       // so the Tasks count is right on every tab, not just Tasks
+  const counts = {
+    tasks: buildTaskFlags(p, days).reduce((n,g)=>n+g.elements.length,0) + (p.tasks||[]).filter(t=>!t.completed).length,
+    notes: projectNotes(p).length,
+    deliverables: (p.deliverables||[]).filter(d=>!d.done).length,
+    credits: creditRows(p).length
+  };
+  const right = overviewTab==='notes' ? `<button type="button" class="bnr-tool add" onclick="addProjectNote()">+ New note</button>` : '';
+  return `<div class="tabs crewview-tabs ov-tabs">
+    ${Object.entries(OVERVIEW_TABS).map(([k,label])=>`<div class="tab ${overviewTab===k?'active':''}" role="button" tabindex="0"
+      onclick="setOverviewTab('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setOverviewTab('${k}');}"
+      >${label}${counts[k]?` <span class="tab-n">${counts[k]}</span>`:''}</div>`).join('')}
+    ${right ? `<div class="crew-header-row crew-header-right">${right}</div>` : ''}
+  </div>`;
+}
 let showCompletedTasks = false;
 function toggleShowCompletedTasks(){ showCompletedTasks = !showCompletedTasks; renderProjectBody(); }
 
@@ -3973,7 +4006,7 @@ function flagApply(keys, mode){
     if(mode==='add'){
       p.tasks = p.tasks || [];
       p.tasks.push({ id:uid(), title:e.task, note:'', completed:false, createdAt:new Date().toISOString(), flagKey:e.key });
-      tasksSectionOpen = true;
+      overviewTab = 'tasks';
     } else {
       p.ignoredFlags = p.ignoredFlags || [];
       if(!p.ignoredFlags.includes(e.key)) p.ignoredFlags.push(e.key);
@@ -4220,8 +4253,6 @@ const projectNotes = (p) => ((p||currentProject()||{}).notes||[]);
 /* T-9 is a SECTION OF OVERVIEW since 20 Sep 2026 (it was its own tab). notesSectionHTML() is the
    markup, wireNotesHandlers() the key/paste plumbing; the Overview's own body.oninput routes
    .note-text typing to noteAfterEdit(). */
-let notesSectionOpen = true;
-function toggleNotesSection(){ flushNotesEdits(); notesSectionOpen = !notesSectionOpen; renderProjectBody(); }
 /* ⚠️ saveProjectNotes() READS THE EDITORS. Anything that rebuilds or leaves them calls this first,
    or the last second of typing (the autosave debounce) is lost. The DOM reads happen before the
    first await, so callers needn't await it. */
@@ -4240,12 +4271,8 @@ function notesSectionHTML(p){
         <span class="status" id="notesStatus"></span>
       </div>
       <div id="notesList"></div>`;
-  // + New note sits on the header line, so it is there with the section folded too
-  return collapsibleSectionHTML({
-    state: notesSectionOpen, id: 'notesSection',
-    title: `Notes${n?` (${n})`:''}`, inner, onToggle: 'toggleNotesSection()',
-    actions: `<button type="button" class="bnr-tool add" onclick="addProjectNote()">+ New note</button>`
-  });
+  // + New note is on the sub-tab row (overviewTabsHTML)
+  return `<div class="section" id="notesSection">${inner}</div>`;
 }
 /* Each note folds to its date and first line (28 Oct 2026). Folded unless opened this session —
    a new note opens, and a search opens whatever it finds. */
@@ -4327,8 +4354,8 @@ async function addProjectNote(){
   p.notes.push(n);
   openNoteIds.add(n.id);
   notesQuery = '';
-  if(!notesSectionOpen){ notesSectionOpen = true; renderProjectBody(); }   // the header button works folded too
-  else { const s = document.getElementById('notesSearch'); if(s) s.value = ''; renderNotesList(); }
+  const s = document.getElementById('notesSearch'); if(s) s.value = '';
+  renderNotesList();
   const ta = document.querySelector(`.note-text[data-id="${n.id}"]`); if(ta) ta.focus();
   saveInBackground('db:projects', projectsDB);   // G14 — render first, save after
 }
@@ -4360,8 +4387,6 @@ async function deleteProjectNote(id){
 /* IDEAS DEMO — Deliverables: what this project owes and when — an edit, a
    shoot, a delivery — so the Overview says what "done" means. */
 const DELIVERABLE_TYPES = ['Edit','Shoot','Delivery','Other'];
-let deliverablesSectionOpen = true;
-function toggleDeliverablesSection(){ deliverablesSectionOpen = !deliverablesSectionOpen; renderProjectBody(); }
 function deliverablesSectionHTML(p){
   const items = p.deliverables || [];
   const open = items.filter(d=>!d.done);
@@ -4377,11 +4402,8 @@ function deliverablesSectionHTML(p){
     </div>
     <div class="actions"><button class="icon-btn danger-ic" onclick="deleteDeliverable('${d.id}')" title="Delete">${icon('trash')}</button></div>
   </div>`;
-  // 28 Oct 2026 — the same ▸ header as every other Overview section, and the "+ Add" style for adding
-  return collapsibleSectionHTML({
-    state: deliverablesSectionOpen, id: 'deliverablesSection', onToggle: 'toggleDeliverablesSection()',
-    title: `Deliverables${open.length?` (${open.length})`:''}<span class="pill" style="border:1px solid var(--tape); color:var(--tape);">DEMO</span>`,
-    inner: `
+  // 28 Oct 2026 — an Overview sub-tab, and the "+ Add" style for adding
+  return `<div class="section" id="deliverablesSection">
       ${items.length ? items.map(row).join('') : '<div class="empty-note">Nothing owed yet. A deliverable is what the project has to hand over — an edit, a shoot day, a final delivery.</div>'}
       <div class="toolbar" style="margin-top:10px; flex-wrap:wrap; gap:8px;">
         <input type="text" id="dvTitle" placeholder="What's owed — e.g. 90s hero edit" style="width:220px;"
@@ -4390,8 +4412,8 @@ function deliverablesSectionHTML(p){
         <input type="date" id="dvDue" style="width:auto;">
         <button type="button" class="bnr-tool add" onclick="addDeliverable()">+ Add</button>
       </div>
-      ${feedbackButtonHTML('deliverables', 'Deliverables')}`
-  });
+      ${feedbackButtonHTML('deliverables', 'Deliverables')}
+    </div>`;
 }
 async function addDeliverable(){
   const p = currentProject(); if(!p) return;
@@ -4423,8 +4445,6 @@ function toggleDangerSection(){ dangerSectionOpen = !dangerSectionOpen; renderPr
    what is shown on the clipboard as plain text. People come in Crew's order — department, then
    role seniority — and someone with two roles is one line with both. The switches are remembered
    in appSettings.credits (db:settings), like Crew's All | Crew | Talent etc. */
-let creditsSectionOpen = false;
-function toggleCreditsSection(){ creditsSectionOpen = !creditsSectionOpen; renderProjectBody(); }
 const CREDITS_DEFAULTS = { crew:true, talent:true, client:false, contact:false, social:false };
 const creditsOpts = () => Object.assign({}, CREDITS_DEFAULTS, appSettings.credits||{});
 async function toggleCreditsOpt(k){
@@ -4489,10 +4509,7 @@ function creditsSectionHTML(p){
         ${o.contact ? `<td>${r.contact ? esc(r.contact) : none}</td>` : ''}
       </tr>`).join('')}</tbody>
     </table>` : `<div class="empty-note">${projectEntries(p).length ? 'Nobody to credit with these switches — turn Crew, Talent or Client on.' : 'Nobody on the project yet — add people on the Crew tab.'}</div>`}`;
-  return collapsibleSectionHTML({
-    state: creditsSectionOpen, id: 'creditsSection', onToggle: 'toggleCreditsSection()',
-    title: `Credits${rows.length?` (${rows.length})`:''}`, inner
-  });
+  return `<div class="section" id="creditsSection">${inner}</div>`;
 }
 function renderTasksSection(p, days){
   syncFlagTasks(p, days);
@@ -4510,11 +4527,7 @@ function renderTasksSection(p, days){
       <div class="toolbar" style="margin-bottom:14px;"><button type="button" class="bnr-tool add" onclick="addProjectTask()">+ Add task</button></div>
       ${tasksListHTML(p)}
     `;
-  return collapsibleSectionHTML({
-    state: tasksSectionOpen, id: 'tasksSection',
-    title: `Tasks${flagItems.length||openTaskCount?` (${flagItems.reduce((n,g)=>n+g.elements.length,0)+openTaskCount})`:''}`,
-    inner, onToggle: 'toggleTasksSection()'
-  });
+  return `<div class="section" id="tasksSection">${inner}</div>`;
 }
 const AI_SCAN_ENDPOINT = 'https://ioueoaasqnseuhrtzhbz.supabase.co/functions/v1/ai-scan';
 // Same publishable/anon key already used by the sb client above — not a new
