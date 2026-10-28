@@ -339,6 +339,15 @@
     font-weight:600; display:flex; align-items:baseline; gap:6px; min-width:0;}
   .gt-label .gt-sub{font-weight:400; color:var(--muted); overflow:hidden; text-overflow:ellipsis;}
   .gt-label.meet, .gt-label.edit, .gt-label.shoot{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
+  .gt-label.gt-band{font-family:var(--label); font-weight:600; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;
+    padding-top:12px; border-bottom:1.5px solid rgba(17,10,8,.35);}
+  .gt-label.gt-band .gt-sub{font-family:var(--body); font-weight:400; letter-spacing:0; text-transform:none; font-size:var(--fs-meta);}
+  .gt-band.prep{color:var(--phase-prep);} .gt-band.shoot{color:var(--phase-shoot);} .gt-band.post{color:var(--phase-post);} .gt-band.dept{color:var(--text);}
+  .gt-cell.gt-band-cell{align-items:flex-end; padding-bottom:5px; border-bottom:1.5px solid rgba(17,10,8,.35); padding-top:12px;}
+  .gt-span{display:block; width:100%; height:5px; background:var(--muted); opacity:.45;}
+  .gt-span.prep{background:var(--phase-prep);} .gt-span.shoot{background:var(--phase-shoot);} .gt-span.post{background:var(--phase-post);}
+  .gt-span.s{border-radius:3px 0 0 3px; margin-left:3px;} .gt-span.e{border-radius:0 3px 3px 0; margin-right:3px;}
+  .gt-span.s.e{border-radius:3px;}
   .gt-cell{border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:center; min-height:28px;}
   .gt-cell.wkend, .gt-day.wkend{background:rgba(17,10,8,.035);}
   .gt-cell.today, .gt-day.today{box-shadow:inset 1px 0 0 var(--tape), inset -1px 0 0 var(--tape);}
@@ -2019,7 +2028,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes, overviewTab: appSettings.overviewTab, credits: appSettings.credits, calendarView: appSettings.calendarView, calendarLayers: appSettings.calendarLayers });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes, overviewTab: appSettings.overviewTab, credits: appSettings.credits, calendarView: appSettings.calendarView, calendarLayers: appSettings.calendarLayers, calendarGroup: appSettings.calendarGroup });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -3146,6 +3155,7 @@ async function initApp(){
   if(['all','crew','talent'].includes(appSettings.crewPeopleKind)) crewPeopleKind = appSettings.crewPeopleKind;
   if(OVERVIEW_TABS[appSettings.overviewTab]) overviewTab = appSettings.overviewTab;
   if(['month','gantt'].includes(appSettings.calendarView)) calendarView = appSettings.calendarView;
+  if(['stage','dept','start'].includes(appSettings.calendarGroup)) calGanttGroup = appSettings.calendarGroup;
   renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
@@ -4622,7 +4632,8 @@ function creditsSectionHTML(p){
 const CAL_LAYERS_DEFAULTS = { crew:true, meetings:true, edit:true };
 let calendarView = 'month';            // 'month' | 'gantt'
 let calMonth = null;                   // 'YYYY-MM' the month view shows; null = pick one
-let calMeetingDraft = null;            // the meeting form's fields while it is open — {id?, title, date, time, note}
+let calMeetingDraft = null;
+let calGanttGroup = 'stage';           // 'stage' | 'dept' | 'start' — the Gantt's Group by switch (appSettings.calendarGroup)            // the meeting form's fields while it is open — {id?, title, date, time, note}
 const calLayers = () => Object.assign({}, CAL_LAYERS_DEFAULTS, appSettings.calendarLayers||{});
 const pad2 = n => String(n).padStart(2,'0');
 const isoOf = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
@@ -4645,6 +4656,11 @@ async function setCalendarView(v){
   calendarView = v; renderProjectBody();
   appSettings.calendarView = v; await saveAppSettings();
 }
+async function setCalGanttGroup(g){
+  if(g===calGanttGroup) return;
+  calGanttGroup = g; renderProjectBody();
+  appSettings.calendarGroup = g; await saveAppSettings();
+}
 async function toggleCalLayer(k){
   const l = calLayers(); l[k] = !l[k];
   appSettings.calendarLayers = l; renderProjectBody();
@@ -4664,16 +4680,17 @@ function calendarData(p){
   const days = projectDays(p.id).filter(d=>d.date);
   days.forEach(d=>at(d.date).shoot.push(d));
   const people = sortPersonBlocks(buildPersonBlocks(projectEntryViews(p))).map(b=>{
-    const dates = {};
-    const mark = (iso, kind) => { if(iso && dates[iso]!=='shoot') dates[iso] = kind; };
+    const dates = {}, byStage = {prep:new Set(), shoot:new Set(), post:new Set()};
+    const mark = (iso, kind) => { if(!iso) return; byStage[kind].add(iso); if(dates[iso]!=='shoot') dates[iso] = kind; };
     b.entries.forEach(e=>{
       phaseDatesOf('preprod', e.id, p).forEach(iso=>mark(iso, 'prep'));
       phaseDatesOf('post', e.id, p).forEach(iso=>mark(iso, 'post'));
-      days.forEach(d=>{ if(entryOnDay(e.id, d)) dates[d.date] = 'shoot'; });
+      days.forEach(d=>{ if(entryOnDay(e.id, d)) mark(d.date, 'shoot'); });
     });
     const roles = [...new Set(b.entries.map(e=>e.role||e.showAs||deptBucketKey(e.department)).filter(Boolean))];
-    return { name: b.name||'', role: roles.join(' / '), dates };
-  }).filter(x=>Object.keys(x.dates).length);
+    return { name: b.name||'', role: roles.join(' / '), dept: deptBucketKey(b.entries[0].department), dates, byStage,
+             first: Object.keys(dates).sort()[0] };
+  }).filter(x=>Object.keys(x.dates).length).map((x, i)=>Object.assign(x, {order:i}));
   people.forEach(x=>Object.entries(x.dates).forEach(([iso, kind])=>at(iso)[kind==='shoot'?'shootCrew':kind].push(x)));
   (p.meetings||[]).forEach(m=>{ if(m.date) at(m.date).meetings.push(m); });
   Object.values(byDay).forEach(v=>v.meetings.sort((a,b)=>(a.time||'').localeCompare(b.time||'')));
@@ -4699,6 +4716,10 @@ function renderProjectCalendar(body){
           ${toolGroupHTML([`<button type="button" class="bnr-tool add${calMeetingDraft?' on':''}" onclick="openMeetingForm()">+ Meeting</button>`])}
           ${toolGroupHTML([btn(calendarView==='month','Month',"setCalendarView('month')",'A month at a time'),
                            btn(calendarView==='gantt','Gantt',"setCalendarView('gantt')",'A row per person across the whole project')])}
+          ${calendarView==='gantt' ? toolGroupHTML([
+            btn(calGanttGroup==='stage','Stage',"setCalGanttGroup('stage')",'Pre-production, Production and Post, each its own band'),
+            btn(calGanttGroup==='dept','Dept',"setCalGanttGroup('dept')",'By department, in Crew order'),
+            btn(calGanttGroup==='start','Start',"setCalGanttGroup('start')",'By the first day each person is booked')]) : ''}
           ${toolGroupHTML([btn(L.crew,'Crew',"toggleCalLayer('crew')",'Prep, shoot and post days booked on Crew'),
                            btn(L.meetings,'Meetings',"toggleCalLayer('meetings')",'Meetings'),
                            btn(L.edit,'Resolve',"toggleCalLayer('edit')",'Hours of active work in DaVinci Resolve')])}
@@ -4760,21 +4781,60 @@ function calMonthHTML(p, data, L){
   </div>`;
 }
 
+/* THE GANTT'S ROWS (Group by, 28 Oct 2026). Every mode: Meetings on top. Then
+     stage  three bands — Pre-production (prep marks), Production (the shoot days row + who's on
+            them), Post (Hours in Resolve + post marks) — each with a bar from its first day to its
+            last; a person is in every band they're booked in, with only that stage's days, and
+            people in a band run in start order, so each band is its own staircase
+     dept   Hours in Resolve, Shoot days, then people under their department, in Crew order
+     start  Hours in Resolve, Shoot days, then everyone by their first booked day
+   A band / department heading is {band, label, cls, span:[from,to]}. */
 function calGanttHTML(p, data, L){
   const rows = [];
-  if(L.meetings && (p.meetings||[]).some(m=>m.date)) rows.push({ label:'Meetings', kind:'meet', cells: iso => {
+  const meetRow = () => ({ label:'Meetings', kind:'meet', cells: iso => {
     const ms = (data.byDay[iso]||{}).meetings||[]; if(!ms.length) return '';
     return `<span class="gt-mark meet" role="button" tabindex="0" onclick="openMeetingForm('${ms[0].id}')" title="${esc(ms.map(m=>[m.time, m.title].filter(Boolean).join(' ')).join('\n'))}">${ms.length>1?ms.length:''}</span>`; } });
-  if(L.edit && p.editLog) rows.push({ label:'Hours in Resolve', kind:'edit', cells: iso => {
+  const editRow = () => ({ label:'Hours in Resolve', kind:'edit', cells: iso => {
     const r = data.edit[iso]; if(!r) return '';
     return `<span class="gt-mark edit${editHours(r)?'':' faint'}" title="${esc(editHoursTitle(iso, r))}">${editHours(r) ? editHours(r)+(r.partial?'+':'') : (r.partial?'?':'·')}</span>`; } });
-  rows.push({ label:'Shoot days', kind:'shoot', cells: iso => {
+  const shootRow = () => ({ label:'Shoot days', kind:'shoot', cells: iso => {
     const sd = ((data.byDay[iso]||{}).shoot||[])[0]; if(!sd) return '';
     const loc = locById(sd.locationId);
     return `<span class="gt-mark shoot" title="${esc(['Shoot day '+(sd.dayNum||''), loc&&loc.name].filter(Boolean).join(' — '))}">${esc(sd.dayNum||'')}</span>`; } });
-  if(L.crew) data.people.forEach(x=>rows.push({ label:x.name, sub:x.role, kind:'person', cells: iso => {
-    const k = x.dates[iso]; if(!k) return '';
-    return `<span class="gt-mark ${k}" title="${esc(`${x.name} — ${k==='prep'?'prep':k==='shoot'?'shoot':'post'} — ${fmtDate(iso)}`)}"></span>`; } }));
+  const stageWord = {prep:'prep', shoot:'shoot', post:'post'};
+  // only = one stage's days (the stage bands); otherwise all of them
+  const personRow = (x, only) => ({ label:x.name, sub:x.role, kind:'person', cells: iso => {
+    const k = only ? (x.byStage[only].has(iso) ? only : '') : x.dates[iso]; if(!k) return '';
+    return `<span class="gt-mark ${k}" title="${esc(`${x.name} — ${stageWord[k]} — ${fmtDate(iso)}`)}"></span>`; } });
+  const byStart = (a, b) => (a.first||'').localeCompare(b.first||'') || (a.order - b.order);   // same day: Crew order
+  const spanOf = isos => { const l = [...isos].sort(); return l.length ? [l[0], l[l.length-1]] : null; };
+  const hasShoot = Object.values(data.byDay).some(v=>v.shoot.length);
+  if(L.meetings && (p.meetings||[]).some(m=>m.date)) rows.push(meetRow());
+  if(calGanttGroup==='stage'){
+    [['prep','Pre-production'], ['shoot','Production'], ['post','Post']].forEach(([k, label])=>{
+      const people = L.crew ? data.people.filter(x=>x.byStage[k].size)
+        .map(x=>Object.assign({}, x, {first: [...x.byStage[k]].sort()[0]})).sort(byStart) : [];
+      const isos = new Set(people.flatMap(x=>[...x.byStage[k]]));
+      if(k==='shoot') Object.entries(data.byDay).forEach(([iso, v])=>{ if(v.shoot.length) isos.add(iso); });
+      if(k==='post' && L.edit) Object.keys(data.edit).forEach(iso=>isos.add(iso));
+      const extra = k==='shoot' && hasShoot ? [shootRow()] : k==='post' && L.edit && p.editLog ? [editRow()] : [];
+      if(!people.length && !extra.length) return;
+      rows.push({ band:true, label, cls:k, span: spanOf(isos) });
+      rows.push(...extra, ...people.map(x=>personRow(x, k)));
+    });
+  } else {
+    if(L.edit && p.editLog) rows.push(editRow());
+    rows.push(shootRow());
+    if(L.crew && calGanttGroup==='dept'){
+      let dept = null;
+      data.people.forEach(x=>{
+        if(x.dept!==dept){ dept = x.dept; rows.push({ band:true, label:dept, cls:'dept',
+          span: spanOf(data.people.filter(y=>y.dept===dept).flatMap(y=>Object.keys(y.dates))) }); }
+        rows.push(personRow(x));
+      });
+    }
+    if(L.crew && calGanttGroup==='start') data.people.slice().sort(byStart).forEach(x=>rows.push(personRow(x)));
+  }
   const dates = Object.keys(data.byDay).filter(iso=>{
     const v = data.byDay[iso];
     return v.shoot.length || (L.crew && (v.prep.length||v.post.length||v.shootCrew.length)) || (L.meetings && v.meetings.length) || (L.edit && v.edit);
@@ -4790,7 +4850,10 @@ function calGanttHTML(p, data, L){
   return `<div class="cal-gantt-wrap"><div class="cal-gantt" style="grid-template-columns:var(--gt-label-w) repeat(${cols.length}, var(--gt-col-w));">
     <div class="gt-corner" style="grid-row:1 / span 2;"></div>${monthRow}
     ${cols.map(iso=>`<div class="gt-day${colCls(iso)}" title="${esc(fmtDate(iso))}"><span>${'SMTWTFS'[dow(iso)]}</span>${Number(iso.slice(8))}</div>`).join('')}
-    ${rows.map(r=>`<div class="gt-label ${r.kind}" title="${esc([r.label, r.sub].filter(Boolean).join(' — '))}">${esc(r.label)}${r.sub?`<span class="gt-sub">${esc(r.sub)}</span>`:''}</div>
+    ${rows.map(r=>r.band
+      ? `<div class="gt-label gt-band ${r.cls}" title="${esc(r.label + (r.span ? ` — ${fmtDate(r.span[0])}${r.span[1]!==r.span[0] ? ` to ${fmtDate(r.span[1])}` : ''}` : ''))}">${esc(r.label)}${r.span?`<span class="gt-sub">${esc(fmtDate(r.span[0]).replace(/ \d{4}$/,''))}${r.span[1]!==r.span[0]?` – ${esc(fmtDate(r.span[1]).replace(/ \d{4}$/,''))}`:''}</span>`:''}</div>
+        ${cols.map(iso=>`<div class="gt-cell gt-band-cell${colCls(iso)}">${r.span && iso>=r.span[0] && iso<=r.span[1] ? `<span class="gt-span ${r.cls}${iso===r.span[0]?' s':''}${iso===r.span[1]?' e':''}"></span>` : ''}</div>`).join('')}`
+      : `<div class="gt-label ${r.kind}" title="${esc([r.label, r.sub].filter(Boolean).join(' — '))}">${esc(r.label)}${r.sub?`<span class="gt-sub">${esc(r.sub)}</span>`:''}</div>
       ${cols.map(iso=>`<div class="gt-cell${colCls(iso)}">${r.cells(iso)}</div>`).join('')}`).join('')}
   </div></div>`;
 }
