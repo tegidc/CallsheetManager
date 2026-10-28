@@ -283,6 +283,26 @@
   .flag-row-label{flex:1; min-width:0;}
   .flag-row.handled .flag-row-label{color:var(--muted);}
   .flag-row-state{font-size:var(--fs-meta); color:var(--tape); white-space:nowrap;}
+  /* Overview's tool row (28 Oct 2026) — sits where Crew's + Add person and Venues' + Add venue do */
+  .ov-tools{margin:6px 0 22px;}
+  .ov-tools .bnr-toolrow{justify-content:flex-start;}
+  .ov-tools .bnr-grow{flex:1 1 auto;}
+  .ov-tools-panel{margin-top:12px; padding:12px 0 2px; border-top:1px solid var(--line);}
+  /* a note folds to its date and first line (28 Oct 2026) */
+  .note-fold{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:8px;}
+  .note-fold:hover{color:var(--tape);}
+  .note-fold .dept-caret{font-size:11px; color:inherit;}
+  .note-peek{cursor:pointer; padding:2px 0 0 19px; font-family:var(--body); font-size:var(--fs-name); color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .note-peek:hover{color:var(--tape);}
+  .note-peek .muted{color:var(--muted);}
+  /* Credits (28 Oct 2026) */
+  .credits-tools{margin-bottom:12px;}
+  .credits-tools .bnr-toolrow{justify-content:flex-start;}
+  .section table.credits-table td{vertical-align:baseline;}
+  .credits-table .cr-role{color:var(--muted); width:34%;}
+  .credits-table .cr-name{font-weight:600;}
+  .credits-table .cr-none{color:var(--muted);}
   .notes-bar{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;}
   .notes-search{flex:1 1 260px;}
   .note-row{padding:10px 0; border-top:1px solid var(--line);}
@@ -3487,38 +3507,34 @@ function renderProjectOverview(body){
   const p = currentProject();
   const days = projectDays(p.id);
   flushNotesEdits();            // this rebuilds the note editors — bank what's typed in them first
+  /* 28 Oct 2026 — the Crew / Venues page shape: the add tools on top, the details straight under
+     them (no heading — the tab says where you are), then every section with the same ▸ header. */
   body.innerHTML = `
+    ${quickAddSectionHTML(p)}
     <div class="section">
-      <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label class="req">Client</label><input type="text" id="ovClient" value="${esc(p.client)}"></div>
         <div><label class="req">Working title</label><input type="text" id="ovTitle" value="${esc(p.title)}"></div>
       </div>
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label class="req">Initial shoot date</label><input type="date" id="ovStart" value="${esc(p.startDate)}"></div>
-        <div><label>Production company</label><input type="text" value="${esc(p.company||COMPANY)}" readonly></div>
-      </div>
-      <div class="grid g2" style="margin-bottom:10px;">
-        <div><label>Shoot days</label><input type="text" class="fld-short" inputmode="numeric" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
-        <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Call Sheets tab — both stay in sync.</div></div>
+        <div><label>Shoot days</label><input type="text" class="fld-short" inputmode="numeric" value="${days.length}" onchange="syncShootDayCount(this.value)"
+          title="Add or reduce the day count here, or manage individual days on Call Sheets — both stay in sync"></div>
       </div>
       ${shootDayReductionPanelHTML(days)}
       <label>Log line</label>
       <input type="text" id="ovLogline" value="${esc(p.logline)}" style="margin-bottom:10px;">
       <label>Production description</label>
       <textarea id="ovDescription">${esc(p.description)}</textarea>
-      <div class="toolbar" style="margin-top:12px;">
-        <span class="status" id="ovStatus"></span>
-      </div>
-      ${quickAddSectionHTML(p)}
     </div>
     ${renderTasksSection(p, days)}
     ${notesSectionHTML(p)}
     ${deliverablesSectionHTML(p)}
-    <div class="section">
-      <h2>Danger zone</h2>
-      <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
-    </div>`;
+    ${creditsSectionHTML(p)}
+    ${collapsibleSectionHTML({
+      state: dangerSectionOpen, id: 'dangerSection', title: 'Danger zone', onToggle: 'toggleDangerSection()',
+      inner: `<button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>`
+    })}`;
   // autosave: ~1s after the user stops typing anywhere in this tab, save project
   // details silently (no alert, no button flash — just the existing "Saved" text)
   // — except typing in a note (its own autosave) or in the Tasks / Notes sections' own fields
@@ -3832,18 +3848,16 @@ function quickAddSectionHTML(p){
   } else if(mode === 'ai'){
     bodyHTML = aiScanChatBodyHTML();
   }
-  // No section wrapper / collapsible header here on request — this renders
-  // directly inside the Project details card, below its own toolbar, always
-  // visible rather than behind a "Quick add" disclosure.
-  return `<div style="margin-top:14px;">
-    <div class="toolbar" style="margin-bottom:${mode?'12px':'0'};">
-      ${btn('day','Shoot date')}
-      ${btn('loc','Location')}
-      ${btn('crew','Crew')}
-      ${btn('ai','AI Chat')}
+  // No collapsible header on request — always visible. Since 28 Oct 2026 it is the Overview's
+  // tool row at the top of the tab (one joined control, as Crew's + Add person | Filter | Select),
+  // with the details' "Saved" flash at its right end.
+  return `<div class="ov-tools${mode?' open':''}">
+    <div class="bnr-toolrow">
+      ${toolGroupHTML([btn('day','Shoot date'), btn('loc','Location'), btn('crew','Crew'), btn('ai','AI Chat')])}
+      <span class="bnr-grow"></span><span class="status" id="ovStatus"></span>
     </div>
-    ${quickAddError ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(quickAddError)}</div>` : ''}
-    ${bodyHTML}
+    ${quickAddError ? `<div class="hint" style="color:var(--danger); margin:8px 0 0;">${esc(quickAddError)}</div>` : ''}
+    ${mode ? `<div class="ov-tools-panel">${bodyHTML}</div>` : ''}
   </div>`;
 }
 let tasksSectionOpen = false;            // collapsed by default, same convention as AI Scan/summary blocks
@@ -4221,16 +4235,31 @@ function notesSectionHTML(p){
   const inner = `<div class="notes-bar">
         <div class="notes-search">
           <label for="notesSearch">Search notes</label>
-          <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="notesQuery=this.value;renderNotesList()">
+          <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="flushNotesEdits();notesQuery=this.value;renderNotesList()">
         </div>
-        <button type="button" class="bnr-tool add" onclick="addProjectNote()">+ Note</button>
         <span class="status" id="notesStatus"></span>
       </div>
       <div id="notesList"></div>`;
+  // + New note sits on the header line, so it is there with the section folded too
   return collapsibleSectionHTML({
     state: notesSectionOpen, id: 'notesSection',
-    title: `Notes${n?` (${n})`:''}`, inner, onToggle: 'toggleNotesSection()'
+    title: `Notes${n?` (${n})`:''}`, inner, onToggle: 'toggleNotesSection()',
+    actions: `<button type="button" class="bnr-tool add" onclick="addProjectNote()">+ New note</button>`
   });
+}
+/* Each note folds to its date and first line (28 Oct 2026). Folded unless opened this session —
+   a new note opens, and a search opens whatever it finds. */
+const openNoteIds = new Set();
+function toggleNote(id){
+  flushNotesEdits();
+  if(openNoteIds.has(id)) openNoteIds.delete(id); else openNoteIds.add(id);
+  renderNotesList();
+  if(openNoteIds.has(id)) document.querySelector(`.note-text[data-id="${id}"]`)?.focus();
+}
+function notePeekHTML(n){
+  const lines = (n.text||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!lines.length) return '<span class="muted">Empty note</span>';
+  return esc(lines[0]) + (lines.length>1 ? ` <span class="muted">· ${lines.length-1} more line${lines.length>2?'s':''}</span>` : '');
 }
 function wireNotesHandlers(body){
   try{ document.execCommand('defaultParagraphSeparator', false, 'div'); }catch(e){}
@@ -4261,24 +4290,30 @@ function renderNotesList(){
   const all = projectNotes(p).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   const q = notesQuery.trim().toLowerCase();
   const rows = q ? all.filter(n=>(n.text||'').toLowerCase().includes(q)) : all;
-  if(!all.length){ el.innerHTML = '<div class="empty-note">No notes yet — press + Note and type.</div>'; return; }
+  if(!all.length){ el.innerHTML = '<div class="empty-note">No notes yet — press + New note and type.</div>'; return; }
   if(!rows.length){ el.innerHTML = `<div class="empty-note">Nothing matches “${esc(notesQuery.trim())}”.</div>`; return; }
   el.innerHTML = (q ? `<div class="hint" style="margin:0 0 6px;">${rows.length} of ${all.length} match.</div>` : '') + rows.map(n=>{
     const edited = n.updatedAt && (n.updatedAt||'').slice(0,16) !== (n.createdAt||'').slice(0,16);
-    return `<div class="note-row" data-id="${n.id}">
+    const open = !!q || openNoteIds.has(n.id);
+    return `<div class="note-row${open?'':' folded'}" data-id="${n.id}">
       <div class="note-meta">
-        <span>${esc(fmtDateTime(n.createdAt))}</span>
+        <span class="note-fold" role="button" tabindex="0" aria-expanded="${open}" onclick="toggleNote('${n.id}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNote('${n.id}');}"
+          ><span class="dept-caret">${open?'▾':'▸'}</span>${esc(fmtDateTime(n.createdAt))}</span>
         ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
-        <span class="note-tools" onmousedown="event.preventDefault()">
+        ${open ? '' : `<span class="bnr-grow" style="flex:1"></span>`}
+        ${open ? `<span class="note-tools" onmousedown="event.preventDefault()">
           <button class="icon-btn" data-cmd="bold" onclick="noteCmd(this,'bold')" title="Bold (⌘B)" aria-label="Bold"><b>B</b></button>
           <button class="icon-btn" data-cmd="italic" onclick="noteCmd(this,'italic')" title="Italic (⌘I)" aria-label="Italic"><i>I</i></button>
           <button class="icon-btn" data-cmd="heading" onclick="noteCmd(this,'heading')" title="Heading" aria-label="Heading">H</button>
           <button class="icon-btn" data-cmd="insertUnorderedList" onclick="noteCmd(this,'insertUnorderedList')" title="Bullet list (or type “- ” at the start of a line)" aria-label="Bullet list">•—</button>
           <button class="icon-btn" data-cmd="insertOrderedList" onclick="noteCmd(this,'insertOrderedList')" title="Numbered list (or type “1. ”)" aria-label="Numbered list">1.</button>
-        </span>
+        </span>` : ''}
         <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>
       </div>
-      <div class="note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note" data-id="${n.id}" data-placeholder="Type anything — a number, a name, half a thought.">${noteHTML(n)}</div>
+      ${open
+        ? `<div class="note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note" data-id="${n.id}" data-placeholder="Type anything — a number, a name, half a thought.">${noteHTML(n)}</div>`
+        : `<div class="note-peek" onclick="toggleNote('${n.id}')">${notePeekHTML(n)}</div>`}
     </div>`;
   }).join('');
   el.querySelectorAll('.note-text').forEach(ed=>ed.classList.toggle('is-empty', noteIsEmpty(ed)));
@@ -4290,8 +4325,10 @@ async function addProjectNote(){
   const now = new Date().toISOString();
   const n = { id:uid(), html:'', text:'', createdAt:now, updatedAt:now };
   p.notes.push(n);
-  notesQuery = ''; const s = document.getElementById('notesSearch'); if(s) s.value = '';
-  renderNotesList();
+  openNoteIds.add(n.id);
+  notesQuery = '';
+  if(!notesSectionOpen){ notesSectionOpen = true; renderProjectBody(); }   // the header button works folded too
+  else { const s = document.getElementById('notesSearch'); if(s) s.value = ''; renderNotesList(); }
   const ta = document.querySelector(`.note-text[data-id="${n.id}"]`); if(ta) ta.focus();
   saveInBackground('db:projects', projectsDB);   // G14 — render first, save after
 }
@@ -4340,24 +4377,21 @@ function deliverablesSectionHTML(p){
     </div>
     <div class="actions"><button class="icon-btn danger-ic" onclick="deleteDeliverable('${d.id}')" title="Delete">${icon('trash')}</button></div>
   </div>`;
-  return `<div class="section">
-    <div class="sd-block-head flush" style="margin-bottom:${deliverablesSectionOpen?'10px':'0'};">
-      <span class="sd-block-head-toggle" onclick="toggleDeliverablesSection()">
-        <span class="dept-caret">${deliverablesSectionOpen?'▾':'▸'}</span>
-        <h2 style="display:inline; margin:0;">Deliverables${open.length?` (${open.length})`:''}</h2>
-        <span class="pill" style="border:1px solid var(--tape); color:var(--tape); margin-left:8px;">DEMO</span>
-      </span>
-    </div>
-    ${deliverablesSectionOpen ? `
+  // 28 Oct 2026 — the same ▸ header as every other Overview section, and the "+ Add" style for adding
+  return collapsibleSectionHTML({
+    state: deliverablesSectionOpen, id: 'deliverablesSection', onToggle: 'toggleDeliverablesSection()',
+    title: `Deliverables${open.length?` (${open.length})`:''}<span class="pill" style="border:1px solid var(--tape); color:var(--tape);">DEMO</span>`,
+    inner: `
       ${items.length ? items.map(row).join('') : '<div class="empty-note">Nothing owed yet. A deliverable is what the project has to hand over — an edit, a shoot day, a final delivery.</div>'}
       <div class="toolbar" style="margin-top:10px; flex-wrap:wrap; gap:8px;">
-        <input type="text" id="dvTitle" placeholder="What's owed — e.g. 90s hero edit" style="width:220px;">
+        <input type="text" id="dvTitle" placeholder="What's owed — e.g. 90s hero edit" style="width:220px;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addDeliverable();}">
         <select id="dvType" style="width:auto;">${DELIVERABLE_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
         <input type="date" id="dvDue" style="width:auto;">
-        <button class="small primary" onclick="addDeliverable()">Add</button>
+        <button type="button" class="bnr-tool add" onclick="addDeliverable()">+ Add</button>
       </div>
-      ${feedbackButtonHTML('deliverables', 'Deliverables')}` : ''}
-  </div>`;
+      ${feedbackButtonHTML('deliverables', 'Deliverables')}`
+  });
 }
 async function addDeliverable(){
   const p = currentProject(); if(!p) return;
@@ -4379,6 +4413,86 @@ async function deleteDeliverable(id){
   p.deliverables = (p.deliverables||[]).filter(x=>x.id!==id);
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
+}
+let dangerSectionOpen = false;
+function toggleDangerSection(){ dangerSectionOpen = !dangerSectionOpen; renderProjectBody(); }
+
+/* ---- CREDITS (28 Oct 2026) — T-1.9 ----
+   Everyone on the project as a credit list, one line a person: Role — Name. Crew / Talent / Client
+   pick who is in it; Contact adds email · phone, Social the Instagram handle. Copy puts exactly
+   what is shown on the clipboard as plain text. People come in Crew's order — department, then
+   role seniority — and someone with two roles is one line with both. The switches are remembered
+   in appSettings.credits (db:settings), like Crew's All | Crew | Talent etc. */
+let creditsSectionOpen = false;
+function toggleCreditsSection(){ creditsSectionOpen = !creditsSectionOpen; renderProjectBody(); }
+const CREDITS_DEFAULTS = { crew:true, talent:true, client:false, contact:false, social:false };
+const creditsOpts = () => Object.assign({}, CREDITS_DEFAULTS, appSettings.credits||{});
+async function toggleCreditsOpt(k){
+  const o = creditsOpts(); o[k] = !o[k];
+  appSettings.credits = o;
+  renderProjectBody();
+  await saveAppSettings();
+}
+const creditKind = v => { const k = deptBucketKey(v.department); return k==='Talent' ? 'talent' : k==='Client' ? 'client' : 'crew'; };
+/* "@handle" from whatever was typed — a handle, @handle, or an instagram.com link */
+function socialHandleOf(raw){
+  const s = String(raw||'').trim(); if(!s) return '';
+  const m = s.match(/instagram\.com\/([^/?#\s]+)/i);
+  const h = (m ? m[1] : s).replace(/^@+/, '');
+  return /^[\w.]+$/.test(h) ? '@'+h : s;
+}
+function creditRows(p){
+  const o = creditsOpts();
+  const views = projectEntryViews(p).filter(v=>o[creditKind(v)]);
+  const deptRank = v => { const i = DEPARTMENTS.indexOf(deptBucketKey(v.department)); return i<0 ? DEPARTMENTS.length : i; };
+  const byRank = (x,y) => (deptRank(x)-deptRank(y)) || (seniorityRankOf(x)-seniorityRankOf(y));
+  // a person sits with their first role in that order — a producer who also shoots is with Production
+  return buildPersonBlocks(views)
+    .map(b=>Object.assign({}, b, {entries: b.entries.slice().sort(byRank)}))
+    .sort((a,b)=>byRank(a.entries[0], b.entries[0]) || (a.name||'').localeCompare(b.name||''))
+    .map(b=>{
+      const roles = [...new Set(b.entries.map(e=>e.role||e.showAs||deptBucketKey(e.department)).filter(Boolean))];
+      return { name: b.name||'', role: roles.join(' / '),
+               social: socialHandleOf(b.instagram),
+               // pasted numbers can carry invisible direction marks — they'd ride along on Copy
+               contact: [b.email, b.phone].map(x=>String(x||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim()).filter(Boolean).join(' · ') };
+    });
+}
+function creditsText(p){
+  const o = creditsOpts();
+  return creditRows(p).map(r=>[`${r.role} — ${r.name}`, o.social && r.social, o.contact && r.contact].filter(Boolean).join(' · ')).join('\n');
+}
+async function copyCredits(){
+  const p = currentProject(); if(!p) return;
+  const text = creditsText(p);
+  if(!text) return;
+  await copyText(text);
+  flashStatus('creditsStatus', 'Copied');
+}
+function creditsSectionHTML(p){
+  const o = creditsOpts();
+  const rows = creditRows(p);
+  const opt = (k, label, title) => `<button type="button" class="bnr-tool${o[k]?' on':''}" aria-pressed="${o[k]}" onclick="toggleCreditsOpt('${k}')" title="${title}">${label}</button>`;
+  const none = '<span class="cr-none">—</span>';
+  const inner = `
+    <div class="credits-tools"><div class="bnr-toolrow">
+      ${toolGroupHTML([opt('crew','Crew','Crew on the credits'), opt('talent','Talent','Talent on the credits'), opt('client','Client','Clients on the credits')])}
+      ${toolGroupHTML([opt('contact','Contact','Add each person’s email and phone'), opt('social','Social','Add each person’s Instagram handle')])}
+      <button type="button" class="bnr-tool" onclick="copyCredits()" ${rows.length?'':'disabled'} title="Copy the list as plain text">Copy</button>
+      <span class="status" id="creditsStatus"></span>
+    </div></div>
+    ${rows.length ? `<table class="credits-table">
+      <thead><tr><th>Role</th><th>Name</th>${o.social?'<th>Social</th>':''}${o.contact?'<th>Contact</th>':''}</tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td class="cr-role">${esc(r.role)}</td><td class="cr-name">${esc(r.name)}</td>
+        ${o.social ? `<td>${r.social ? esc(r.social) : none}</td>` : ''}
+        ${o.contact ? `<td>${r.contact ? esc(r.contact) : none}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>` : `<div class="empty-note">${projectEntries(p).length ? 'Nobody to credit with these switches — turn Crew, Talent or Client on.' : 'Nobody on the project yet — add people on the Crew tab.'}</div>`}`;
+  return collapsibleSectionHTML({
+    state: creditsSectionOpen, id: 'creditsSection', onToggle: 'toggleCreditsSection()',
+    title: `Credits${rows.length?` (${rows.length})`:''}`, inner
+  });
 }
 function renderTasksSection(p, days){
   syncFlagTasks(p, days);
