@@ -3867,8 +3867,8 @@ function quickAddSectionHTML(p){
 }
 /* OVERVIEW SUB-TABS (28 Oct 2026) — Tasks / Notes / Deliverables / Credits were stacked folding
    sections; they are a sub-tab row now, Crew's own (crewview-tabs), the last one picked remembered in
-   appSettings.overviewTab. Each tab's count rides on its label; a tab's own button (+ New note)
-   sits at the row's right-hand end, where Crew keeps Summary / Collapse all. */
+   appSettings.overviewTab. Each tab's count rides on its label; the Notes tab opens on a blank note
+   to type into (no + New note button). */
 const OVERVIEW_TABS = {tasks:'Tasks', notes:'Notes', deliverables:'Deliverables', credits:'Credits'};
 let overviewTab = 'tasks';
 async function setOverviewTab(k){
@@ -3876,6 +3876,7 @@ async function setOverviewTab(k){
   flushNotesEdits();            // leaving Notes takes its editors away — bank what's typed first
   overviewTab = k;
   renderProjectBody();
+  if(k==='notes') focusBlankNote();
   appSettings.overviewTab = k;
   await saveAppSettings();
 }
@@ -3887,12 +3888,10 @@ function overviewTabsHTML(p, days){
     deliverables: (p.deliverables||[]).filter(d=>!d.done).length,
     credits: creditRows(p).length
   };
-  const right = overviewTab==='notes' ? `<button type="button" class="bnr-tool add" onclick="addProjectNote()">+ New note</button>` : '';
   return `<div class="tabs crewview-tabs ov-tabs">
     ${Object.entries(OVERVIEW_TABS).map(([k,label])=>`<div class="tab ${overviewTab===k?'active':''}" role="button" tabindex="0"
       onclick="setOverviewTab('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setOverviewTab('${k}');}"
       >${label}${counts[k]?` <span class="tab-n">${counts[k]}</span>`:''}</div>`).join('')}
-    ${right ? `<div class="crew-header-row crew-header-right">${right}</div>` : ''}
   </div>`;
 }
 let showCompletedTasks = false;
@@ -4211,6 +4210,7 @@ function noteCmd(btn, cmd){
   noteAfterEdit(ed);
 }
 function noteAfterEdit(ed){
+  materialiseDraftNote(ed);     // the blank note becomes a note on its first edit
   ed.classList.toggle('is-empty', noteIsEmpty(ed));
   refreshNoteTools();
   scheduleAutosave('notes', saveProjectNotes);
@@ -4271,7 +4271,6 @@ function notesSectionHTML(p){
         <span class="status" id="notesStatus"></span>
       </div>
       <div id="notesList"></div>`;
-  // + New note is on the sub-tab row (overviewTabsHTML)
   return `<div class="section" id="notesSection">${inner}</div>`;
 }
 /* Each note folds to its date and first line (28 Oct 2026). Folded unless opened this session —
@@ -4309,35 +4308,49 @@ function wireNotesHandlers(body){
     document.execCommand('insertHTML', false, html ? sanitizeNoteHTML(html) : esc(text).replace(/\r?\n/g,'<br>'));
     noteAfterEdit(ed);
   };
+  // leaving a note you've just written (the blank one, now a note) puts a fresh blank one on top.
+  // ⚠️ a listener, wired once per element — Chrome has no .onfocusout property to assign
+  if(!body._notesFocusOut){ body._notesFocusOut = true; body.addEventListener('focusout', (e) => {
+    const ed = noteEditorOf(e.target);
+    if(ed && !ed.dataset.new && !document.querySelector('#notesList .note-draft')) topUpBlankNote();
+  }); }
   if(!wireNotesHandlers._sel){ wireNotesHandlers._sel = true; document.addEventListener('selectionchange', ()=>{ if(document.querySelector('.note-tools')) refreshNoteTools(); }); }
 }
+const NOTE_TOOLS_HTML = `<span class="note-tools" onmousedown="event.preventDefault()">
+          <button class="icon-btn" data-cmd="bold" onclick="noteCmd(this,'bold')" title="Bold (⌘B)" aria-label="Bold"><b>B</b></button>
+          <button class="icon-btn" data-cmd="italic" onclick="noteCmd(this,'italic')" title="Italic (⌘I)" aria-label="Italic"><i>I</i></button>
+          <button class="icon-btn" data-cmd="heading" onclick="noteCmd(this,'heading')" title="Heading" aria-label="Heading">H</button>
+          <button class="icon-btn" data-cmd="insertUnorderedList" onclick="noteCmd(this,'insertUnorderedList')" title="Bullet list (or type “- ” at the start of a line)" aria-label="Bullet list">•—</button>
+          <button class="icon-btn" data-cmd="insertOrderedList" onclick="noteCmd(this,'insertOrderedList')" title="Numbered list (or type “1. ”)" aria-label="Numbered list">1.</button>
+        </span>`;
+function noteMetaHTML(n, open){
+  const edited = n.updatedAt && (n.updatedAt||'').slice(0,16) !== (n.createdAt||'').slice(0,16);
+  return `<span class="note-fold" role="button" tabindex="0" aria-expanded="${open}" onclick="toggleNote('${n.id}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNote('${n.id}');}"
+          ><span class="dept-caret">${open?'▾':'▸'}</span>${esc(fmtDateTime(n.createdAt))}</span>
+        ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
+        ${open ? NOTE_TOOLS_HTML : `<span class="bnr-grow" style="flex:1"></span>`}
+        <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>`;
+}
+/* THE BLANK NOTE (28 Oct 2026) — instead of a + New note button, the top of the list is always an
+   empty note ready to type into. It is not a note until something is typed: the first edit makes
+   it one in place (materialiseDraftNote, from noteAfterEdit — so typing, paste and the toolbar all
+   count), and a fresh blank one appears above it once you leave it (topUpBlankNote). */
+const BLANK_NOTE_HTML = `<div class="note-row note-draft">
+      <div class="note-meta"><span>New note</span>${NOTE_TOOLS_HTML}</div>
+      <div class="note-text is-empty" contenteditable="true" role="textbox" aria-multiline="true" aria-label="New note" data-new="1" data-placeholder="Just start typing — a number, a name, half a thought."></div>
+    </div>`;
 function renderNotesList(){
   const el = document.getElementById('notesList'); if(!el) return;
   const p = currentProject(); if(!p) return;
   const all = projectNotes(p).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   const q = notesQuery.trim().toLowerCase();
   const rows = q ? all.filter(n=>(n.text||'').toLowerCase().includes(q)) : all;
-  if(!all.length){ el.innerHTML = '<div class="empty-note">No notes yet — press + New note and type.</div>'; return; }
-  if(!rows.length){ el.innerHTML = `<div class="empty-note">Nothing matches “${esc(notesQuery.trim())}”.</div>`; return; }
-  el.innerHTML = (q ? `<div class="hint" style="margin:0 0 6px;">${rows.length} of ${all.length} match.</div>` : '') + rows.map(n=>{
-    const edited = n.updatedAt && (n.updatedAt||'').slice(0,16) !== (n.createdAt||'').slice(0,16);
+  if(q && !rows.length){ el.innerHTML = `<div class="empty-note">Nothing matches “${esc(notesQuery.trim())}”.</div>`; return; }
+  el.innerHTML = (q ? `<div class="hint" style="margin:0 0 6px;">${rows.length} of ${all.length} match.</div>` : BLANK_NOTE_HTML) + rows.map(n=>{
     const open = !!q || openNoteIds.has(n.id);
     return `<div class="note-row${open?'':' folded'}" data-id="${n.id}">
-      <div class="note-meta">
-        <span class="note-fold" role="button" tabindex="0" aria-expanded="${open}" onclick="toggleNote('${n.id}')"
-          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNote('${n.id}');}"
-          ><span class="dept-caret">${open?'▾':'▸'}</span>${esc(fmtDateTime(n.createdAt))}</span>
-        ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
-        ${open ? '' : `<span class="bnr-grow" style="flex:1"></span>`}
-        ${open ? `<span class="note-tools" onmousedown="event.preventDefault()">
-          <button class="icon-btn" data-cmd="bold" onclick="noteCmd(this,'bold')" title="Bold (⌘B)" aria-label="Bold"><b>B</b></button>
-          <button class="icon-btn" data-cmd="italic" onclick="noteCmd(this,'italic')" title="Italic (⌘I)" aria-label="Italic"><i>I</i></button>
-          <button class="icon-btn" data-cmd="heading" onclick="noteCmd(this,'heading')" title="Heading" aria-label="Heading">H</button>
-          <button class="icon-btn" data-cmd="insertUnorderedList" onclick="noteCmd(this,'insertUnorderedList')" title="Bullet list (or type “- ” at the start of a line)" aria-label="Bullet list">•—</button>
-          <button class="icon-btn" data-cmd="insertOrderedList" onclick="noteCmd(this,'insertOrderedList')" title="Numbered list (or type “1. ”)" aria-label="Numbered list">1.</button>
-        </span>` : ''}
-        <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>
-      </div>
+      <div class="note-meta">${noteMetaHTML(n, open)}</div>
       ${open
         ? `<div class="note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note" data-id="${n.id}" data-placeholder="Type anything — a number, a name, half a thought.">${noteHTML(n)}</div>`
         : `<div class="note-peek" onclick="toggleNote('${n.id}')">${notePeekHTML(n)}</div>`}
@@ -4345,20 +4358,39 @@ function renderNotesList(){
   }).join('');
   el.querySelectorAll('.note-text').forEach(ed=>ed.classList.toggle('is-empty', noteIsEmpty(ed)));
 }
-async function addProjectNote(){
+/* the blank note's first edit: make the record, and turn the row into that note where it stands
+   (no re-render — the cursor is in it). saveProjectNotes() then picks it up by its data-id. */
+function materialiseDraftNote(ed){
+  if(!ed.dataset.new || noteIsEmpty(ed)) return;
   const p = currentProject(); if(!p) return;
-  flushNotesEdits();
-  p.notes = p.notes || [];
   const now = new Date().toISOString();
   const n = { id:uid(), html:'', text:'', createdAt:now, updatedAt:now };
+  p.notes = p.notes || [];
   p.notes.push(n);
   openNoteIds.add(n.id);
-  notesQuery = '';
-  const s = document.getElementById('notesSearch'); if(s) s.value = '';
-  renderNotesList();
-  const ta = document.querySelector(`.note-text[data-id="${n.id}"]`); if(ta) ta.focus();
-  saveInBackground('db:projects', projectsDB);   // G14 — render first, save after
+  delete ed.dataset.new; ed.dataset.id = n.id; ed.setAttribute('aria-label', 'Note');
+  const row = ed.closest('.note-row');
+  row.classList.remove('note-draft'); row.dataset.id = n.id;
+  row.querySelector('.note-meta').innerHTML = noteMetaHTML(n, true);
+  const tab = document.querySelector('.ov-tabs .tab.active .tab-n'), count = projectNotes(p).length;
+  if(tab) tab.textContent = count; else document.querySelector('.ov-tabs .tab.active')?.insertAdjacentHTML('beforeend', ` <span class="tab-n">${count}</span>`);
 }
+/* a fresh blank note once the one you wrote in is left. ⚠️ Not on focusout itself: adding a row at
+   the top moves everything under the pointer, so a click that is still on its way would land on
+   the wrong thing — it waits for that click to finish (or a moment, when focus left by keyboard). */
+function topUpBlankNote(){
+  let done = false;
+  const add = () => {
+    if(done) return; done = true;
+    document.removeEventListener('click', add);
+    const el = document.getElementById('notesList');
+    if(el && !notesQuery.trim() && !el.querySelector('.note-draft')) el.insertAdjacentHTML('afterbegin', BLANK_NOTE_HTML);
+  };
+  document.addEventListener('click', add);
+  setTimeout(add, 600);
+}
+/* switching to Notes puts the cursor in the blank note */
+function focusBlankNote(){ document.querySelector('#notesList .note-draft .note-text')?.focus(); }
 /* reads every note body on screen; writes only the ones that changed */
 async function saveProjectNotes(){
   const p = currentProject(); if(!p) return;
