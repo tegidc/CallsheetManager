@@ -283,6 +283,95 @@
   .flag-row-label{flex:1; min-width:0;}
   .flag-row.handled .flag-row-label{color:var(--muted);}
   .flag-row-state{font-size:var(--fs-meta); color:var(--tape); white-space:nowrap;}
+  /* Overview's tool row (28 Oct 2026) — sits where Crew's + Add person and Venues' + Add venue do */
+  .ov-tools{margin:6px 0 22px;}
+  .ov-tools .bnr-toolrow{justify-content:flex-start;}
+  .ov-tools .bnr-grow{flex:1 1 auto;}
+  .ov-tools-panel{margin-top:12px; padding:12px 0 2px; border-top:1px solid var(--line);}
+  /* a note folds to its date and first line (28 Oct 2026) */
+  .note-fold{cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:8px;}
+  .note-fold:hover{color:var(--tape);}
+  .note-fold .dept-caret{font-size:11px; color:inherit;}
+  .note-peek{cursor:pointer; padding:2px 0 0 19px; font-family:var(--body); font-size:var(--fs-name); color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .note-peek:hover{color:var(--tape);}
+  .note-peek .muted{color:var(--muted);}
+  .ov-tabs .tab-n{color:var(--muted); font-weight:400; margin-left:3px;}
+  .ov-tabs .tab.active .tab-n{color:inherit;}
+  /* ---- CALENDAR (T-11, 28 Oct 2026) ---- */
+  .cal-month{margin-top:4px;}
+  .cal-month-head{margin-bottom:10px;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); border-top:1px solid var(--line); border-left:1px solid var(--line);}
+  .cal-wd{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);
+    padding:5px 6px; border-right:1px solid var(--line); border-bottom:1.5px solid rgba(17,10,8,.35);}
+  .cal-cell{min-height:92px; padding:4px 5px 6px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-width:0;
+    display:flex; flex-direction:column; gap:2px;}
+  .cal-cell.empty{background:var(--tint-1);}
+  .cal-cell.wkend{background:rgba(17,10,8,.025);}
+  .cal-num{font-family:var(--label); font-size:var(--fs-ctl); color:var(--muted); letter-spacing:.6px; margin-bottom:2px;}
+  .cal-cell.today .cal-num{color:var(--tape-ink); background:var(--tape); border-radius:3px; padding:0 5px; align-self:flex-start; font-weight:600;}
+  .cal-chip{font-size:var(--fs-meta); line-height:1.35; border-radius:4px; padding:1px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cal-chip.shoot{background:var(--phase-shoot); color:#fff; font-weight:600;}
+  .cal-chip.meet{border:1px solid var(--text); color:var(--text); cursor:pointer;}
+  .cal-chip.meet:hover{border-color:var(--tape); color:var(--tape);}
+  .cal-chip.edit{background:var(--phase-post); color:#fff; font-weight:600;}
+  .cal-chip.edit.faint{background:var(--phase-post-soft); color:var(--phase-post); font-weight:400;}
+  .cal-ln{font-size:var(--fs-meta); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text);}
+  .cal-ln-k{font-family:var(--label); font-size:10px; letter-spacing:1px; text-transform:uppercase;}
+  .cal-ln.prep .cal-ln-k{color:var(--phase-prep);} .cal-ln.shoot .cal-ln-k{color:var(--phase-shoot);} .cal-ln.post .cal-ln-k{color:var(--phase-post);}
+  .cal-key{display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; font-size:var(--fs-meta); color:var(--muted);}
+  .cal-k::before{content:''; display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px;}
+  .cal-k.prep::before{background:var(--phase-prep-soft); border:1px solid var(--phase-prep);}
+  .cal-k.shoot::before{background:var(--phase-shoot);}
+  .cal-k.post::before{background:var(--phase-post-soft); border:1px solid var(--phase-post);}
+  .cal-k.meet::before{border:1px solid var(--text);}
+  .cal-k.edit::before{background:var(--phase-post);}
+  .cal-edit-note{margin-top:8px; max-width:80ch;}
+  .cal-gantt-wrap{overflow-x:auto; border-left:1px solid var(--line); --gt-label-w:190px; --gt-col-w:26px;}
+  .cal-gantt{display:grid; width:max-content; font-size:var(--fs-meta);}
+  .gt-corner, .gt-label{position:sticky; left:0; z-index:2; background:var(--bg, #fff);}
+  .gt-month{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);
+    padding:2px 4px; border-left:1px solid var(--line); white-space:nowrap; overflow:hidden;}
+  .gt-day{text-align:center; font-family:var(--label); font-size:10px; color:var(--muted); line-height:1.2; padding:2px 0 4px;
+    border-bottom:1.5px solid rgba(17,10,8,.35); display:flex; flex-direction:column;}
+  .gt-day span{font-size:9px; opacity:.7;}
+  .gt-label{grid-column:1; padding:5px 8px 5px 0; border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-weight:600; display:flex; align-items:baseline; gap:6px; min-width:0;}
+  .gt-label .gt-sub{font-weight:400; color:var(--muted); overflow:hidden; text-overflow:ellipsis;}
+  .gt-label.meet, .gt-label.edit, .gt-label.shoot{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
+  .gt-label.gt-band{font-family:var(--label); font-weight:600; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;
+    padding-top:12px; border-bottom:1.5px solid rgba(17,10,8,.35);}
+  .gt-label.gt-band .gt-sub{font-family:var(--body); font-weight:400; letter-spacing:0; text-transform:none; font-size:var(--fs-meta);}
+  .gt-band.prep{color:var(--phase-prep);} .gt-band.shoot{color:var(--phase-shoot);} .gt-band.post{color:var(--phase-post);} .gt-band.dept{color:var(--text);}
+  .gt-cell.gt-band-cell{align-items:flex-end; padding-bottom:5px; border-bottom:1.5px solid rgba(17,10,8,.35); padding-top:12px;}
+  .gt-span{display:block; width:100%; height:5px; background:var(--muted); opacity:.45;}
+  .gt-span.prep{background:var(--phase-prep);} .gt-span.shoot{background:var(--phase-shoot);} .gt-span.post{background:var(--phase-post);}
+  .gt-span.s{border-radius:3px 0 0 3px; margin-left:3px;} .gt-span.e{border-radius:0 3px 3px 0; margin-right:3px;}
+  .gt-span.s.e{border-radius:3px;}
+  .gt-cell{border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:center; min-height:28px;}
+  .gt-cell.wkend, .gt-day.wkend{background:rgba(17,10,8,.035);}
+  .gt-cell.today, .gt-day.today{box-shadow:inset 1px 0 0 var(--tape), inset -1px 0 0 var(--tape);}
+  .gt-day.today{color:var(--tape); font-weight:600;}
+  .gt-mark{display:flex; align-items:center; justify-content:center; width:22px; height:18px; border-radius:3px; font-size:10px; font-weight:600; line-height:1;}
+  .gt-mark.prep{background:var(--phase-prep-soft); border:1px solid var(--phase-prep);}
+  .gt-mark.shoot{background:var(--phase-shoot); color:#fff;}
+  .gt-mark.post{background:var(--phase-post-soft); border:1px solid var(--phase-post);}
+  .gt-mark.meet{border:1px solid var(--text); cursor:pointer;}
+  .gt-mark.meet:hover{border-color:var(--tape);}
+  .gt-mark.edit{background:var(--phase-post); color:#fff;}
+  .gt-mark.edit.faint{background:var(--phase-post-soft); color:var(--phase-post);}
+  @media (max-width:700px){
+    .cal-cell{min-height:64px; padding:3px;}
+    .cal-ln{display:none;}
+    .cal-gantt-wrap{--gt-label-w:120px;}
+  }
+  /* Credits (28 Oct 2026) */
+  .credits-tools{margin-bottom:12px;}
+  .credits-tools .bnr-toolrow{justify-content:flex-start;}
+  .section table.credits-table td{vertical-align:baseline;}
+  .credits-table .cr-role{color:var(--muted); width:34%;}
+  .credits-table .cr-name{font-weight:600;}
+  .credits-table .cr-none{color:var(--muted);}
   .notes-bar{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;}
   .notes-search{flex:1 1 260px;}
   .note-row{padding:10px 0; border-top:1px solid var(--line);}
@@ -1939,7 +2028,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes, overviewTab: appSettings.overviewTab, credits: appSettings.credits, calendarView: appSettings.calendarView, calendarLayers: appSettings.calendarLayers, calendarGroup: appSettings.calendarGroup });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -3064,6 +3153,9 @@ async function initApp(){
   if(savedSettings && !Array.isArray(savedSettings)) appSettings = Object.assign({}, SETTINGS_DEFAULTS, savedSettings);
   applyAppSettings();
   if(['all','crew','talent'].includes(appSettings.crewPeopleKind)) crewPeopleKind = appSettings.crewPeopleKind;
+  if(OVERVIEW_TABS[appSettings.overviewTab]) overviewTab = appSettings.overviewTab;
+  if(['month','gantt'].includes(appSettings.calendarView)) calendarView = appSettings.calendarView;
+  if(['stage','dept','start'].includes(appSettings.calendarGroup)) calGanttGroup = appSettings.calendarGroup;
   renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
@@ -3439,6 +3531,7 @@ function renderProject(m){
     </div>
     <div class="tabs">
       <div class="tab ${currentProjectTab==='overview'?'active':''}" onclick="goProjectTab('overview')">OVERVIEW</div>
+      <div class="tab ${currentProjectTab==='calendar'?'active':''}" onclick="goProjectTab('calendar')">CALENDAR</div>
       <div class="tab ${currentProjectTab==='crew'?'active':''}" onclick="goProjectTab('crew')">CREW</div>
       <div class="tab ${currentProjectTab==='locations'?'active':''}" onclick="goProjectTab('locations')">VENUES</div>
       <div class="tab ${currentProjectTab==='days'?'active':''}" onclick="goProjectTab('days')">CALL SHEETS</div>
@@ -3453,7 +3546,7 @@ function renderProject(m){
    a toggle meant hunting for the person you had been looking at. renderProjectBody() now notes the
    page position and every inner scroller's position before the rebuild and puts them back after —
    but only when it is still the same screen (tab + sub-view); a tab change still starts at the top. */
-const SCROLL_KEEPERS = '.roles-tablewrap, .tablewrap, .xls-wrap, .sd-tablescroll, .filter-box';
+const SCROLL_KEEPERS = '.roles-tablewrap, .tablewrap, .xls-wrap, .sd-tablescroll, .filter-box, .cal-gantt-wrap';
 let _lastBodyScreen = '';
 function renderProjectBody(){
   const body = document.getElementById('projectBody');
@@ -3471,6 +3564,7 @@ function renderProjectBody(){
 function renderProjectBodyNow(body){
   setTimeout(refreshTabScrollCues, 0);
   if(currentProjectTab==='overview') return renderProjectOverview(body);
+  if(currentProjectTab==='calendar') return renderProjectCalendar(body);
   if(currentProjectTab==='crew') return renderProjectCrew(body);
   // 'talent' was the Talent etc tab until 24 Sep 2026 — it is Crew's Talent etc switch now
   if(currentProjectTab==='talent'){ currentProjectTab='crew'; crewPeopleKind='talent'; return renderProjectCrew(body); }
@@ -3478,7 +3572,7 @@ function renderProjectBodyNow(body){
   if(currentProjectTab==='days') return renderProjectDays(body);
   if(currentProjectTab==='budget') return renderProjectBudget(body);
   // 'notes' was its own tab until 20 Sep 2026 — it is a section of Overview now
-  if(currentProjectTab==='notes'){ currentProjectTab='overview'; notesSectionOpen = true; return renderProjectOverview(body); }
+  if(currentProjectTab==='notes'){ currentProjectTab='overview'; overviewTab = 'notes'; return renderProjectOverview(body); }
   // 'preview' was the Preview & Export tab, folded into Shoot Days on 19 Sep 2026
   if(currentProjectTab==='preview'){ currentProjectTab='days'; return renderProjectDays(body); }
 }
@@ -3487,38 +3581,36 @@ function renderProjectOverview(body){
   const p = currentProject();
   const days = projectDays(p.id);
   flushNotesEdits();            // this rebuilds the note editors — bank what's typed in them first
+  /* 28 Oct 2026 — the Crew / Venues page shape: the add tools on top, the details straight under
+     them (no heading — the tab says where you are), then Tasks / Notes / Deliverables / Credits as
+     a sub-tab row like Crew's Roles / Travel / Catering / Hotel. Danger zone stays folded at the foot. */
   body.innerHTML = `
+    ${quickAddSectionHTML(p)}
     <div class="section">
-      <h2>Project details</h2>
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label class="req">Client</label><input type="text" id="ovClient" value="${esc(p.client)}"></div>
         <div><label class="req">Working title</label><input type="text" id="ovTitle" value="${esc(p.title)}"></div>
       </div>
       <div class="grid g2" style="margin-bottom:10px;">
         <div><label class="req">Initial shoot date</label><input type="date" id="ovStart" value="${esc(p.startDate)}"></div>
-        <div><label>Production company</label><input type="text" value="${esc(p.company||COMPANY)}" readonly></div>
-      </div>
-      <div class="grid g2" style="margin-bottom:10px;">
-        <div><label>Shoot days</label><input type="text" class="fld-short" inputmode="numeric" value="${days.length}" onchange="syncShootDayCount(this.value)"></div>
-        <div><label>&nbsp;</label><div class="hint" style="margin-top:9px;">Add or reduce the day count here, or manage individual days in the Call Sheets tab — both stay in sync.</div></div>
+        <div><label>Shoot days</label><input type="text" class="fld-short" inputmode="numeric" value="${days.length}" onchange="syncShootDayCount(this.value)"
+          title="Add or reduce the day count here, or manage individual days on Call Sheets — both stay in sync"></div>
       </div>
       ${shootDayReductionPanelHTML(days)}
       <label>Log line</label>
       <input type="text" id="ovLogline" value="${esc(p.logline)}" style="margin-bottom:10px;">
       <label>Production description</label>
       <textarea id="ovDescription">${esc(p.description)}</textarea>
-      <div class="toolbar" style="margin-top:12px;">
-        <span class="status" id="ovStatus"></span>
-      </div>
-      ${quickAddSectionHTML(p)}
     </div>
-    ${renderTasksSection(p, days)}
-    ${notesSectionHTML(p)}
-    ${deliverablesSectionHTML(p)}
-    <div class="section">
-      <h2>Danger zone</h2>
-      <button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>
-    </div>`;
+    ${overviewTabsHTML(p, days)}
+    ${overviewTab==='tasks' ? renderTasksSection(p, days)
+      : overviewTab==='deliverables' ? deliverablesSectionHTML(p)
+      : overviewTab==='credits' ? creditsSectionHTML(p)
+      : notesSectionHTML(p)}
+    ${collapsibleSectionHTML({
+      state: dangerSectionOpen, id: 'dangerSection', title: 'Danger zone', onToggle: 'toggleDangerSection()',
+      inner: `<button class="danger" onclick="deleteProject('${p.id}')">Delete this project &amp; its shoot days</button>`
+    })}`;
   // autosave: ~1s after the user stops typing anywhere in this tab, save project
   // details silently (no alert, no button flash — just the existing "Saved" text)
   // — except typing in a note (its own autosave) or in the Tasks / Notes sections' own fields
@@ -3832,22 +3924,47 @@ function quickAddSectionHTML(p){
   } else if(mode === 'ai'){
     bodyHTML = aiScanChatBodyHTML();
   }
-  // No section wrapper / collapsible header here on request — this renders
-  // directly inside the Project details card, below its own toolbar, always
-  // visible rather than behind a "Quick add" disclosure.
-  return `<div style="margin-top:14px;">
-    <div class="toolbar" style="margin-bottom:${mode?'12px':'0'};">
-      ${btn('day','Shoot date')}
-      ${btn('loc','Location')}
-      ${btn('crew','Crew')}
-      ${btn('ai','AI Chat')}
+  // No collapsible header on request — always visible. Since 28 Oct 2026 it is the Overview's
+  // tool row at the top of the tab (one joined control, as Crew's + Add person | Filter | Select),
+  // with the details' "Saved" flash at its right end.
+  return `<div class="ov-tools${mode?' open':''}">
+    <div class="bnr-toolrow">
+      ${toolGroupHTML([btn('day','Shoot date'), btn('loc','Location'), btn('crew','Crew'), btn('ai','AI Chat')])}
+      <span class="bnr-grow"></span><span class="status" id="ovStatus"></span>
     </div>
-    ${quickAddError ? `<div class="hint" style="color:var(--danger); margin-bottom:8px;">${esc(quickAddError)}</div>` : ''}
-    ${bodyHTML}
+    ${quickAddError ? `<div class="hint" style="color:var(--danger); margin:8px 0 0;">${esc(quickAddError)}</div>` : ''}
+    ${mode ? `<div class="ov-tools-panel">${bodyHTML}</div>` : ''}
   </div>`;
 }
-let tasksSectionOpen = false;            // collapsed by default, same convention as AI Scan/summary blocks
-function toggleTasksSection(){ tasksSectionOpen = !tasksSectionOpen; renderProjectBody(); }
+/* OVERVIEW SUB-TABS (28 Oct 2026) — Tasks / Notes / Deliverables / Credits were stacked folding
+   sections; they are a sub-tab row now, Crew's own (crewview-tabs), the last one picked remembered in
+   appSettings.overviewTab. Each tab's count rides on its label; the Notes tab opens on a blank note
+   to type into (no + New note button). */
+const OVERVIEW_TABS = {tasks:'Tasks', notes:'Notes', deliverables:'Deliverables', credits:'Credits'};
+let overviewTab = 'tasks';
+async function setOverviewTab(k){
+  if(!OVERVIEW_TABS[k] || k===overviewTab) return;
+  flushNotesEdits();            // leaving Notes takes its editors away — bank what's typed first
+  overviewTab = k;
+  renderProjectBody();
+  if(k==='notes') focusBlankNote();
+  appSettings.overviewTab = k;
+  await saveAppSettings();
+}
+function overviewTabsHTML(p, days){
+  syncFlagTasks(p, days);       // so the Tasks count is right on every tab, not just Tasks
+  const counts = {
+    tasks: buildTaskFlags(p, days).reduce((n,g)=>n+g.elements.length,0) + (p.tasks||[]).filter(t=>!t.completed).length,
+    notes: projectNotes(p).length,
+    deliverables: (p.deliverables||[]).filter(d=>!d.done).length,
+    credits: creditRows(p).length
+  };
+  return `<div class="tabs crewview-tabs ov-tabs">
+    ${Object.entries(OVERVIEW_TABS).map(([k,label])=>`<div class="tab ${overviewTab===k?'active':''}" role="button" tabindex="0"
+      onclick="setOverviewTab('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setOverviewTab('${k}');}"
+      >${label}${counts[k]?` <span class="tab-n">${counts[k]}</span>`:''}</div>`).join('')}
+  </div>`;
+}
 let showCompletedTasks = false;
 function toggleShowCompletedTasks(){ showCompletedTasks = !showCompletedTasks; renderProjectBody(); }
 
@@ -3959,7 +4076,7 @@ function flagApply(keys, mode){
     if(mode==='add'){
       p.tasks = p.tasks || [];
       p.tasks.push({ id:uid(), title:e.task, note:'', completed:false, createdAt:new Date().toISOString(), flagKey:e.key });
-      tasksSectionOpen = true;
+      overviewTab = 'tasks';
     } else {
       p.ignoredFlags = p.ignoredFlags || [];
       if(!p.ignoredFlags.includes(e.key)) p.ignoredFlags.push(e.key);
@@ -4164,6 +4281,7 @@ function noteCmd(btn, cmd){
   noteAfterEdit(ed);
 }
 function noteAfterEdit(ed){
+  materialiseDraftNote(ed);     // the blank note becomes a note on its first edit
   ed.classList.toggle('is-empty', noteIsEmpty(ed));
   refreshNoteTools();
   scheduleAutosave('notes', saveProjectNotes);
@@ -4206,8 +4324,6 @@ const projectNotes = (p) => ((p||currentProject()||{}).notes||[]);
 /* T-9 is a SECTION OF OVERVIEW since 20 Sep 2026 (it was its own tab). notesSectionHTML() is the
    markup, wireNotesHandlers() the key/paste plumbing; the Overview's own body.oninput routes
    .note-text typing to noteAfterEdit(). */
-let notesSectionOpen = true;
-function toggleNotesSection(){ flushNotesEdits(); notesSectionOpen = !notesSectionOpen; renderProjectBody(); }
 /* ⚠️ saveProjectNotes() READS THE EDITORS. Anything that rebuilds or leaves them calls this first,
    or the last second of typing (the autosave debounce) is lost. The DOM reads happen before the
    first await, so callers needn't await it. */
@@ -4221,16 +4337,26 @@ function notesSectionHTML(p){
   const inner = `<div class="notes-bar">
         <div class="notes-search">
           <label for="notesSearch">Search notes</label>
-          <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="notesQuery=this.value;renderNotesList()">
+          <input type="text" id="notesSearch" value="${esc(notesQuery)}" placeholder="Anything — a name, a number, ‘parking’…" autocomplete="off" oninput="flushNotesEdits();notesQuery=this.value;renderNotesList()">
         </div>
-        <button type="button" class="bnr-tool add" onclick="addProjectNote()">+ Note</button>
         <span class="status" id="notesStatus"></span>
       </div>
       <div id="notesList"></div>`;
-  return collapsibleSectionHTML({
-    state: notesSectionOpen, id: 'notesSection',
-    title: `Notes${n?` (${n})`:''}`, inner, onToggle: 'toggleNotesSection()'
-  });
+  return `<div class="section" id="notesSection">${inner}</div>`;
+}
+/* Each note folds to its date and first line (28 Oct 2026). Folded unless opened this session —
+   a new note opens, and a search opens whatever it finds. */
+const openNoteIds = new Set();
+function toggleNote(id){
+  flushNotesEdits();
+  if(openNoteIds.has(id)) openNoteIds.delete(id); else openNoteIds.add(id);
+  renderNotesList();
+  if(openNoteIds.has(id)) document.querySelector(`.note-text[data-id="${id}"]`)?.focus();
+}
+function notePeekHTML(n){
+  const lines = (n.text||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!lines.length) return '<span class="muted">Empty note</span>';
+  return esc(lines[0]) + (lines.length>1 ? ` <span class="muted">· ${lines.length-1} more line${lines.length>2?'s':''}</span>` : '');
 }
 function wireNotesHandlers(body){
   try{ document.execCommand('defaultParagraphSeparator', false, 'div'); }catch(e){}
@@ -4253,48 +4379,89 @@ function wireNotesHandlers(body){
     document.execCommand('insertHTML', false, html ? sanitizeNoteHTML(html) : esc(text).replace(/\r?\n/g,'<br>'));
     noteAfterEdit(ed);
   };
+  // leaving a note you've just written (the blank one, now a note) puts a fresh blank one on top.
+  // ⚠️ a listener, wired once per element — Chrome has no .onfocusout property to assign
+  if(!body._notesFocusOut){ body._notesFocusOut = true; body.addEventListener('focusout', (e) => {
+    const ed = noteEditorOf(e.target);
+    if(ed && !ed.dataset.new && !document.querySelector('#notesList .note-draft')) topUpBlankNote();
+  }); }
   if(!wireNotesHandlers._sel){ wireNotesHandlers._sel = true; document.addEventListener('selectionchange', ()=>{ if(document.querySelector('.note-tools')) refreshNoteTools(); }); }
 }
+const NOTE_TOOLS_HTML = `<span class="note-tools" onmousedown="event.preventDefault()">
+          <button class="icon-btn" data-cmd="bold" onclick="noteCmd(this,'bold')" title="Bold (⌘B)" aria-label="Bold"><b>B</b></button>
+          <button class="icon-btn" data-cmd="italic" onclick="noteCmd(this,'italic')" title="Italic (⌘I)" aria-label="Italic"><i>I</i></button>
+          <button class="icon-btn" data-cmd="heading" onclick="noteCmd(this,'heading')" title="Heading" aria-label="Heading">H</button>
+          <button class="icon-btn" data-cmd="insertUnorderedList" onclick="noteCmd(this,'insertUnorderedList')" title="Bullet list (or type “- ” at the start of a line)" aria-label="Bullet list">•—</button>
+          <button class="icon-btn" data-cmd="insertOrderedList" onclick="noteCmd(this,'insertOrderedList')" title="Numbered list (or type “1. ”)" aria-label="Numbered list">1.</button>
+        </span>`;
+function noteMetaHTML(n, open){
+  const edited = n.updatedAt && (n.updatedAt||'').slice(0,16) !== (n.createdAt||'').slice(0,16);
+  return `<span class="note-fold" role="button" tabindex="0" aria-expanded="${open}" onclick="toggleNote('${n.id}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNote('${n.id}');}"
+          ><span class="dept-caret">${open?'▾':'▸'}</span>${esc(fmtDateTime(n.createdAt))}</span>
+        ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
+        ${open ? NOTE_TOOLS_HTML : `<span class="bnr-grow" style="flex:1"></span>`}
+        <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>`;
+}
+/* THE BLANK NOTE (28 Oct 2026) — instead of a + New note button, the top of the list is always an
+   empty note ready to type into. It is not a note until something is typed: the first edit makes
+   it one in place (materialiseDraftNote, from noteAfterEdit — so typing, paste and the toolbar all
+   count), and a fresh blank one appears above it once you leave it (topUpBlankNote). */
+const BLANK_NOTE_HTML = `<div class="note-row note-draft">
+      <div class="note-meta"><span>New note</span>${NOTE_TOOLS_HTML}</div>
+      <div class="note-text is-empty" contenteditable="true" role="textbox" aria-multiline="true" aria-label="New note" data-new="1" data-placeholder="Just start typing — a number, a name, half a thought."></div>
+    </div>`;
 function renderNotesList(){
   const el = document.getElementById('notesList'); if(!el) return;
   const p = currentProject(); if(!p) return;
   const all = projectNotes(p).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   const q = notesQuery.trim().toLowerCase();
   const rows = q ? all.filter(n=>(n.text||'').toLowerCase().includes(q)) : all;
-  if(!all.length){ el.innerHTML = '<div class="empty-note">No notes yet — press + Note and type.</div>'; return; }
-  if(!rows.length){ el.innerHTML = `<div class="empty-note">Nothing matches “${esc(notesQuery.trim())}”.</div>`; return; }
-  el.innerHTML = (q ? `<div class="hint" style="margin:0 0 6px;">${rows.length} of ${all.length} match.</div>` : '') + rows.map(n=>{
-    const edited = n.updatedAt && (n.updatedAt||'').slice(0,16) !== (n.createdAt||'').slice(0,16);
-    return `<div class="note-row" data-id="${n.id}">
-      <div class="note-meta">
-        <span>${esc(fmtDateTime(n.createdAt))}</span>
-        ${edited ? `<span class="note-edited">· edited ${esc(fmtDateTime(n.updatedAt))}</span>` : ''}
-        <span class="note-tools" onmousedown="event.preventDefault()">
-          <button class="icon-btn" data-cmd="bold" onclick="noteCmd(this,'bold')" title="Bold (⌘B)" aria-label="Bold"><b>B</b></button>
-          <button class="icon-btn" data-cmd="italic" onclick="noteCmd(this,'italic')" title="Italic (⌘I)" aria-label="Italic"><i>I</i></button>
-          <button class="icon-btn" data-cmd="heading" onclick="noteCmd(this,'heading')" title="Heading" aria-label="Heading">H</button>
-          <button class="icon-btn" data-cmd="insertUnorderedList" onclick="noteCmd(this,'insertUnorderedList')" title="Bullet list (or type “- ” at the start of a line)" aria-label="Bullet list">•—</button>
-          <button class="icon-btn" data-cmd="insertOrderedList" onclick="noteCmd(this,'insertOrderedList')" title="Numbered list (or type “1. ”)" aria-label="Numbered list">1.</button>
-        </span>
-        <button class="icon-btn danger-ic note-del" onclick="deleteProjectNote('${n.id}')" title="Delete this note" aria-label="Delete note">${icon('trash')}</button>
-      </div>
-      <div class="note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note" data-id="${n.id}" data-placeholder="Type anything — a number, a name, half a thought.">${noteHTML(n)}</div>
+  if(q && !rows.length){ el.innerHTML = `<div class="empty-note">Nothing matches “${esc(notesQuery.trim())}”.</div>`; return; }
+  el.innerHTML = (q ? `<div class="hint" style="margin:0 0 6px;">${rows.length} of ${all.length} match.</div>` : BLANK_NOTE_HTML) + rows.map(n=>{
+    const open = !!q || openNoteIds.has(n.id);
+    return `<div class="note-row${open?'':' folded'}" data-id="${n.id}">
+      <div class="note-meta">${noteMetaHTML(n, open)}</div>
+      ${open
+        ? `<div class="note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note" data-id="${n.id}" data-placeholder="Type anything — a number, a name, half a thought.">${noteHTML(n)}</div>`
+        : `<div class="note-peek" onclick="toggleNote('${n.id}')">${notePeekHTML(n)}</div>`}
     </div>`;
   }).join('');
   el.querySelectorAll('.note-text').forEach(ed=>ed.classList.toggle('is-empty', noteIsEmpty(ed)));
 }
-async function addProjectNote(){
+/* the blank note's first edit: make the record, and turn the row into that note where it stands
+   (no re-render — the cursor is in it). saveProjectNotes() then picks it up by its data-id. */
+function materialiseDraftNote(ed){
+  if(!ed.dataset.new || noteIsEmpty(ed)) return;
   const p = currentProject(); if(!p) return;
-  flushNotesEdits();
-  p.notes = p.notes || [];
   const now = new Date().toISOString();
   const n = { id:uid(), html:'', text:'', createdAt:now, updatedAt:now };
+  p.notes = p.notes || [];
   p.notes.push(n);
-  notesQuery = ''; const s = document.getElementById('notesSearch'); if(s) s.value = '';
-  renderNotesList();
-  const ta = document.querySelector(`.note-text[data-id="${n.id}"]`); if(ta) ta.focus();
-  saveInBackground('db:projects', projectsDB);   // G14 — render first, save after
+  openNoteIds.add(n.id);
+  delete ed.dataset.new; ed.dataset.id = n.id; ed.setAttribute('aria-label', 'Note');
+  const row = ed.closest('.note-row');
+  row.classList.remove('note-draft'); row.dataset.id = n.id;
+  row.querySelector('.note-meta').innerHTML = noteMetaHTML(n, true);
+  const tab = document.querySelector('.ov-tabs .tab.active .tab-n'), count = projectNotes(p).length;
+  if(tab) tab.textContent = count; else document.querySelector('.ov-tabs .tab.active')?.insertAdjacentHTML('beforeend', ` <span class="tab-n">${count}</span>`);
 }
+/* a fresh blank note once the one you wrote in is left. ⚠️ Not on focusout itself: adding a row at
+   the top moves everything under the pointer, so a click that is still on its way would land on
+   the wrong thing — it waits for that click to finish (or a moment, when focus left by keyboard). */
+function topUpBlankNote(){
+  let done = false;
+  const add = () => {
+    if(done) return; done = true;
+    document.removeEventListener('click', add);
+    const el = document.getElementById('notesList');
+    if(el && !notesQuery.trim() && !el.querySelector('.note-draft')) el.insertAdjacentHTML('afterbegin', BLANK_NOTE_HTML);
+  };
+  document.addEventListener('click', add);
+  setTimeout(add, 600);
+}
+/* switching to Notes puts the cursor in the blank note */
+function focusBlankNote(){ document.querySelector('#notesList .note-draft .note-text')?.focus(); }
 /* reads every note body on screen; writes only the ones that changed */
 async function saveProjectNotes(){
   const p = currentProject(); if(!p) return;
@@ -4323,8 +4490,6 @@ async function deleteProjectNote(id){
 /* IDEAS DEMO — Deliverables: what this project owes and when — an edit, a
    shoot, a delivery — so the Overview says what "done" means. */
 const DELIVERABLE_TYPES = ['Edit','Shoot','Delivery','Other'];
-let deliverablesSectionOpen = true;
-function toggleDeliverablesSection(){ deliverablesSectionOpen = !deliverablesSectionOpen; renderProjectBody(); }
 function deliverablesSectionHTML(p){
   const items = p.deliverables || [];
   const open = items.filter(d=>!d.done);
@@ -4340,24 +4505,18 @@ function deliverablesSectionHTML(p){
     </div>
     <div class="actions"><button class="icon-btn danger-ic" onclick="deleteDeliverable('${d.id}')" title="Delete">${icon('trash')}</button></div>
   </div>`;
-  return `<div class="section">
-    <div class="sd-block-head flush" style="margin-bottom:${deliverablesSectionOpen?'10px':'0'};">
-      <span class="sd-block-head-toggle" onclick="toggleDeliverablesSection()">
-        <span class="dept-caret">${deliverablesSectionOpen?'▾':'▸'}</span>
-        <h2 style="display:inline; margin:0;">Deliverables${open.length?` (${open.length})`:''}</h2>
-        <span class="pill" style="border:1px solid var(--tape); color:var(--tape); margin-left:8px;">DEMO</span>
-      </span>
-    </div>
-    ${deliverablesSectionOpen ? `
+  // 28 Oct 2026 — an Overview sub-tab, and the "+ Add" style for adding
+  return `<div class="section" id="deliverablesSection">
       ${items.length ? items.map(row).join('') : '<div class="empty-note">Nothing owed yet. A deliverable is what the project has to hand over — an edit, a shoot day, a final delivery.</div>'}
       <div class="toolbar" style="margin-top:10px; flex-wrap:wrap; gap:8px;">
-        <input type="text" id="dvTitle" placeholder="What's owed — e.g. 90s hero edit" style="width:220px;">
+        <input type="text" id="dvTitle" placeholder="What's owed — e.g. 90s hero edit" style="width:220px;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addDeliverable();}">
         <select id="dvType" style="width:auto;">${DELIVERABLE_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
         <input type="date" id="dvDue" style="width:auto;">
-        <button class="small primary" onclick="addDeliverable()">Add</button>
+        <button type="button" class="bnr-tool add" onclick="addDeliverable()">+ Add</button>
       </div>
-      ${feedbackButtonHTML('deliverables', 'Deliverables')}` : ''}
-  </div>`;
+      ${feedbackButtonHTML('deliverables', 'Deliverables')}
+    </div>`;
 }
 async function addDeliverable(){
   const p = currentProject(); if(!p) return;
@@ -4380,6 +4539,375 @@ async function deleteDeliverable(id){
   await saveDB('db:projects', projectsDB);
   renderProjectBody();
 }
+let dangerSectionOpen = false;
+function toggleDangerSection(){ dangerSectionOpen = !dangerSectionOpen; renderProjectBody(); }
+
+/* ---- CREDITS (28 Oct 2026) — T-1.9 ----
+   Everyone on the project as a credit list, one line a person: Role — Name. Crew / Talent / Client
+   pick who is in it; Contact adds email · phone, Social the Instagram handle. Copy puts exactly
+   what is shown on the clipboard as plain text. People come in Crew's order — department, then
+   role seniority — and someone with two roles is one line with both. The switches are remembered
+   in appSettings.credits (db:settings), like Crew's All | Crew | Talent etc. */
+const CREDITS_DEFAULTS = { crew:true, talent:true, client:false, contact:false, social:false };
+const creditsOpts = () => Object.assign({}, CREDITS_DEFAULTS, appSettings.credits||{});
+async function toggleCreditsOpt(k){
+  const o = creditsOpts(); o[k] = !o[k];
+  appSettings.credits = o;
+  renderProjectBody();
+  await saveAppSettings();
+}
+const creditKind = v => { const k = deptBucketKey(v.department); return k==='Talent' ? 'talent' : k==='Client' ? 'client' : 'crew'; };
+/* "@handle" from whatever was typed — a handle, @handle, or an instagram.com link */
+function socialHandleOf(raw){
+  const s = String(raw||'').trim(); if(!s) return '';
+  const m = s.match(/instagram\.com\/([^/?#\s]+)/i);
+  const h = (m ? m[1] : s).replace(/^@+/, '');
+  return /^[\w.]+$/.test(h) ? '@'+h : s;
+}
+/* person blocks in Crew's order — department, then role seniority — each block's entries in that
+   order too, so a person sits with their first role (a producer who also shoots is with Production).
+   Credits and the Calendar's Gantt both list people this way. */
+function sortPersonBlocks(blocks){
+  const deptRank = v => { const i = DEPARTMENTS.indexOf(deptBucketKey(v.department)); return i<0 ? DEPARTMENTS.length : i; };
+  const byRank = (x,y) => (deptRank(x)-deptRank(y)) || (seniorityRankOf(x)-seniorityRankOf(y));
+  return blocks.map(b=>Object.assign({}, b, {entries: b.entries.slice().sort(byRank)}))
+    .sort((a,b)=>byRank(a.entries[0], b.entries[0]) || (a.name||'').localeCompare(b.name||''));
+}
+function creditRows(p){
+  const o = creditsOpts();
+  const views = projectEntryViews(p).filter(v=>o[creditKind(v)]);
+  return sortPersonBlocks(buildPersonBlocks(views))
+    .map(b=>{
+      const roles = [...new Set(b.entries.map(e=>e.role||e.showAs||deptBucketKey(e.department)).filter(Boolean))];
+      return { name: b.name||'', role: roles.join(' / '),
+               social: socialHandleOf(b.instagram),
+               // pasted numbers can carry invisible direction marks — they'd ride along on Copy
+               contact: [b.email, b.phone].map(x=>String(x||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim()).filter(Boolean).join(' · ') };
+    });
+}
+function creditsText(p){
+  const o = creditsOpts();
+  return creditRows(p).map(r=>[`${r.role} — ${r.name}`, o.social && r.social, o.contact && r.contact].filter(Boolean).join(' · ')).join('\n');
+}
+async function copyCredits(){
+  const p = currentProject(); if(!p) return;
+  const text = creditsText(p);
+  if(!text) return;
+  await copyText(text);
+  flashStatus('creditsStatus', 'Copied');
+}
+function creditsSectionHTML(p){
+  const o = creditsOpts();
+  const rows = creditRows(p);
+  const opt = (k, label, title) => `<button type="button" class="bnr-tool${o[k]?' on':''}" aria-pressed="${o[k]}" onclick="toggleCreditsOpt('${k}')" title="${title}">${label}</button>`;
+  const none = '<span class="cr-none">—</span>';
+  const inner = `
+    <div class="credits-tools"><div class="bnr-toolrow">
+      ${toolGroupHTML([opt('crew','Crew','Crew on the credits'), opt('talent','Talent','Talent on the credits'), opt('client','Client','Clients on the credits')])}
+      ${toolGroupHTML([opt('contact','Contact','Add each person’s email and phone'), opt('social','Social','Add each person’s Instagram handle')])}
+      <button type="button" class="bnr-tool" onclick="copyCredits()" ${rows.length?'':'disabled'} title="Copy the list as plain text">Copy</button>
+      <span class="status" id="creditsStatus"></span>
+    </div></div>
+    ${rows.length ? `<table class="credits-table">
+      <thead><tr><th>Role</th><th>Name</th>${o.social?'<th>Social</th>':''}${o.contact?'<th>Contact</th>':''}</tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td class="cr-role">${esc(r.role)}</td><td class="cr-name">${esc(r.name)}</td>
+        ${o.social ? `<td>${r.social ? esc(r.social) : none}</td>` : ''}
+        ${o.contact ? `<td>${r.contact ? esc(r.contact) : none}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>` : `<div class="empty-note">${projectEntries(p).length ? 'Nobody to credit with these switches — turn Crew, Talent or Client on.' : 'Nobody on the project yet — add people on the Crew tab.'}</div>`}`;
+  return `<div class="section" id="creditsSection">${inner}</div>`;
+}
+/* ============================================================ CALENDAR (T-11, 28 Oct 2026)
+   Everything on the project that has a date, in one place — a Month grid or a Gantt (a row per
+   person, a column per day). Three layers, each a switch:
+     Crew      prep / post date marks (p.prepSchedule / p.postSchedule .dates) and shoot days the
+               person is on (d.positions) — the SAME stores Crew ▸ Roles writes; read-only here
+     Meetings  p.meetings = [{id, title, date, time, note}] — the one thing made on this tab
+     Edit      p.editLog = {source, projects, from, to, importedAt, days:{iso:{mins, partial}}}, active
+               work read from DaVinci Resolve's project backups by resolve-edit-hours.py. Shown
+               as hours rounded to the nearest hour. ⚠️ Calendar-only for now — nothing else
+               (Budget, Crew, Tasks) reads it yet, by request.
+   View and layers are remembered in appSettings.calendarView / calendarLayers (db:settings). */
+const CAL_LAYERS_DEFAULTS = { crew:true, meetings:true, edit:true };
+let calendarView = 'month';            // 'month' | 'gantt'
+let calMonth = null;                   // 'YYYY-MM' the month view shows; null = pick one
+let calMeetingDraft = null;
+let calGanttGroup = 'stage';           // 'stage' | 'dept' | 'start' — the Gantt's Group by switch (appSettings.calendarGroup)            // the meeting form's fields while it is open — {id?, title, date, time, note}
+const calLayers = () => Object.assign({}, CAL_LAYERS_DEFAULTS, appSettings.calendarLayers||{});
+const pad2 = n => String(n).padStart(2,'0');
+const isoOf = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+const todayISO = () => { const t = new Date(); return isoOf(t.getFullYear(), t.getMonth()+1, t.getDate()); };
+const addDaysISO = (iso, n) => { const d = new Date(iso+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+const editHours = rec => Math.round((rec && rec.mins || 0) / 60);
+/* "7h", "<1h" for a quick touch, "4h+" / "?" where Resolve's thinned backups can't say */
+function editHoursLabel(rec){
+  const h = editHours(rec);
+  if(rec.partial) return h ? `${h}h+` : '?';
+  return h ? `${h}h` : '<1h';
+}
+function editHoursTitle(iso, rec){
+  const m = rec.mins||0, exact = m>=60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`;
+  return `${fmtDate(iso)} — ${exact} of active work in Resolve${rec.partial ? ' (at least — the backups for this day were thinned, so some of it is missing)' : ''}`;
+}
+
+async function setCalendarView(v){
+  if(v===calendarView) return;
+  calendarView = v; renderProjectBody();
+  appSettings.calendarView = v; await saveAppSettings();
+}
+async function setCalGanttGroup(g){
+  if(g===calGanttGroup) return;
+  calGanttGroup = g; renderProjectBody();
+  appSettings.calendarGroup = g; await saveAppSettings();
+}
+async function toggleCalLayer(k){
+  const l = calLayers(); l[k] = !l[k];
+  appSettings.calendarLayers = l; renderProjectBody();
+  await saveAppSettings();
+}
+function shiftCalMonth(n){
+  const [y, m] = calMonth.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m-1+n, 1));
+  calMonth = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}`;
+  renderProjectBody();
+}
+
+/* everything dated, by day: {iso: {shoot:[day], prep:[person], shootCrew:[person], post:[person], meetings:[m], edit:rec}}
+   and by person for the Gantt: [{name, role, dates:{iso:'prep'|'shoot'|'post'}}] in Crew's order */
+function calendarData(p){
+  const byDay = {}, at = iso => (byDay[iso] = byDay[iso] || {shoot:[], prep:[], shootCrew:[], post:[], meetings:[], edit:null});
+  const days = projectDays(p.id).filter(d=>d.date);
+  days.forEach(d=>at(d.date).shoot.push(d));
+  const people = sortPersonBlocks(buildPersonBlocks(projectEntryViews(p))).map(b=>{
+    const dates = {}, byStage = {prep:new Set(), shoot:new Set(), post:new Set()};
+    const mark = (iso, kind) => { if(!iso) return; byStage[kind].add(iso); if(dates[iso]!=='shoot') dates[iso] = kind; };
+    b.entries.forEach(e=>{
+      phaseDatesOf('preprod', e.id, p).forEach(iso=>mark(iso, 'prep'));
+      phaseDatesOf('post', e.id, p).forEach(iso=>mark(iso, 'post'));
+      days.forEach(d=>{ if(entryOnDay(e.id, d)) mark(d.date, 'shoot'); });
+    });
+    const roles = [...new Set(b.entries.map(e=>e.role||e.showAs||deptBucketKey(e.department)).filter(Boolean))];
+    return { name: b.name||'', role: roles.join(' / '), dept: deptBucketKey(b.entries[0].department), dates, byStage,
+             first: Object.keys(dates).sort()[0] };
+  }).filter(x=>Object.keys(x.dates).length).map((x, i)=>Object.assign(x, {order:i}));
+  people.forEach(x=>Object.entries(x.dates).forEach(([iso, kind])=>at(iso)[kind==='shoot'?'shootCrew':kind].push(x)));
+  (p.meetings||[]).forEach(m=>{ if(m.date) at(m.date).meetings.push(m); });
+  Object.values(byDay).forEach(v=>v.meetings.sort((a,b)=>(a.time||'').localeCompare(b.time||'')));
+  const edit = (p.editLog && p.editLog.days) || {};
+  Object.entries(edit).forEach(([iso, rec])=>{ at(iso).edit = rec; });
+  return { byDay, people, edit };
+}
+
+let calProjectId = null;
+function renderProjectCalendar(body){
+  const p = currentProject();
+  if(calProjectId!==p.id){ calProjectId = p.id; calMonth = null; calMeetingDraft = null; }   // another project starts on its own month
+  const L = calLayers();
+  const data = calendarData(p);
+  const btn = (on, label, js, title) => `<button type="button" class="bnr-tool${on?' on':''}" aria-pressed="${on}" onclick="${js}" title="${title}">${label}</button>`;
+  const editDays = Object.values(data.edit);
+  const editTotal = editDays.reduce((n,r)=>n+(r.mins||0),0);
+  const editWorked = editDays.filter(r=>editHours(r)>=1).length;
+  body.innerHTML = `
+    <div class="section">
+      <div class="ov-tools${calMeetingDraft?' open':''}">
+        <div class="bnr-toolrow">
+          ${toolGroupHTML([`<button type="button" class="bnr-tool add${calMeetingDraft?' on':''}" onclick="openMeetingForm()">+ Meeting</button>`])}
+          ${toolGroupHTML([btn(calendarView==='month','Month',"setCalendarView('month')",'A month at a time'),
+                           btn(calendarView==='gantt','Gantt',"setCalendarView('gantt')",'A row per person across the whole project')])}
+          ${calendarView==='gantt' ? toolGroupHTML([
+            btn(calGanttGroup==='stage','Stage',"setCalGanttGroup('stage')",'Pre-production, Production and Post, each its own band'),
+            btn(calGanttGroup==='dept','Dept',"setCalGanttGroup('dept')",'By department, in Crew order'),
+            btn(calGanttGroup==='start','Start',"setCalGanttGroup('start')",'By the first day each person is booked')]) : ''}
+          ${toolGroupHTML([btn(L.crew,'Crew',"toggleCalLayer('crew')",'Prep, shoot and post days booked on Crew'),
+                           btn(L.meetings,'Meetings',"toggleCalLayer('meetings')",'Meetings'),
+                           btn(L.edit,'Resolve',"toggleCalLayer('edit')",'Hours of active work in DaVinci Resolve')])}
+          <span class="bnr-grow"></span><span class="status" id="calStatus"></span>
+        </div>
+        ${calMeetingDraft ? `<div class="ov-tools-panel">${meetingFormHTML()}</div>` : ''}
+      </div>
+      ${calendarView==='gantt' ? calGanttHTML(p, data, L) : calMonthHTML(p, data, L)}
+      <div class="cal-key">
+        ${L.crew ? `<span class="cal-k prep">Prep</span><span class="cal-k shoot">Shoot</span><span class="cal-k post">Post</span>` : ''}
+        ${L.meetings ? `<span class="cal-k meet">Meeting</span>` : ''}
+        ${L.edit ? `<span class="cal-k edit">Hours in Resolve</span>` : ''}
+      </div>
+      ${L.edit ? `<div class="hint cal-edit-note">${p.editLog
+        ? `Hours in Resolve: <strong>${Math.round(editTotal/60)}h</strong> over ${editWorked} day${editWorked===1?'':'s'} (rounded to the nearest hour a day) — active work read from ${esc((p.editLog.projects||[]).join(', ')||'Resolve')}'s project backups, ${esc(fmtDate(p.editLog.from))} to ${esc(fmtDate(p.editLog.to))}. A backup is written only when the project changes, so gaps are breaks. Any change counts — timeline, media pool or colour. Nothing earlier is in the backups.`
+        : 'No edit hours from Resolve on this project yet.'}</div>` : ''}
+    </div>`;
+  if(calMeetingDraft) document.getElementById('mtTitle')?.focus();
+}
+
+function calMonthHTML(p, data, L){
+  if(!calMonth){
+    const all = Object.keys(data.byDay).sort(), t = todayISO();
+    const inRange = all.length && t >= all[0] && t <= addDaysISO(all[all.length-1], 14);
+    calMonth = (inRange || !all.length ? t : all[0]).slice(0,7);
+  }
+  const [y, m] = calMonth.split('-').map(Number);
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m-1, 1)).getUTCDay() + 6) % 7;
+  const t = todayISO();
+  const names = list => list.map(x=>x.name).join(', ');
+  const cells = [];
+  for(let i=0;i<lead;i++) cells.push('<div class="cal-cell empty"></div>');
+  for(let d=1; d<=dim; d++){
+    const iso = isoOf(y, m, d), v = data.byDay[iso] || {shoot:[], prep:[], shootCrew:[], post:[], meetings:[], edit:null};
+    const wk = ((lead + d - 1) % 7) >= 5;
+    const lines = [];
+    v.shoot.forEach(sd=>{ const loc = locById(sd.locationId); lines.push(`<div class="cal-chip shoot" title="${esc(['Shoot day '+(sd.dayNum||''), loc&&loc.name].filter(Boolean).join(' — '))}">Day ${esc(sd.dayNum||'')}${loc?` · ${esc(loc.name)}`:''}</div>`); });
+    if(L.crew){
+      [['prep','Prep',v.prep],['shoot','Crew',v.shootCrew],['post','Post',v.post]].forEach(([k,label,list])=>{
+        if(list.length) lines.push(`<div class="cal-ln ${k}" title="${esc(label+': '+names(list))}"><span class="cal-ln-k">${label}</span> ${esc(names(list))}</div>`);
+      });
+    }
+    if(L.meetings) v.meetings.forEach(mt=>lines.push(`<div class="cal-chip meet" role="button" tabindex="0" onclick="openMeetingForm('${mt.id}')" title="${esc([mt.time, mt.title, mt.note].filter(Boolean).join(' — '))}">${mt.time?`<b>${esc(mt.time)}</b> `:''}${esc(mt.title||'Meeting')}</div>`));
+    if(L.edit && v.edit) lines.push(`<div class="cal-chip edit${editHours(v.edit)?'':' faint'}" title="${esc(editHoursTitle(iso, v.edit))}">Resolve ${editHoursLabel(v.edit)}</div>`);
+    cells.push(`<div class="cal-cell${wk?' wkend':''}${iso===t?' today':''}"><div class="cal-num">${d}</div>${lines.join('')}</div>`);
+  }
+  return `<div class="cal-month">
+    <div class="prep-cal-head cal-month-head">
+      <span class="prep-cal-nav" onclick="shiftCalMonth(-1)" title="Previous month">‹</span>
+      <span class="prep-cal-title">${PREP_MONTH_NAMES[m-1]} ${y}</span>
+      <span class="prep-cal-nav" onclick="shiftCalMonth(1)" title="Next month">›</span>
+      ${calMonth!==t.slice(0,7) ? `<span class="prep-cal-clear" onclick="calMonth='${t.slice(0,7)}';renderProjectBody()">Today</span>` : ''}
+    </div>
+    <div class="cal-grid">
+      ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>`<div class="cal-wd">${w}</div>`).join('')}
+      ${cells.join('')}
+    </div>
+  </div>`;
+}
+
+/* THE GANTT'S ROWS (Group by, 28 Oct 2026). Every mode: Meetings on top. Then
+     stage  three bands — Pre-production (prep marks), Production (the shoot days row + who's on
+            them), Post (Hours in Resolve + post marks) — each with a bar from its first day to its
+            last; a person is in every band they're booked in, with only that stage's days, and
+            people in a band run in start order, so each band is its own staircase
+     dept   Hours in Resolve, Shoot days, then people under their department, in Crew order
+     start  Hours in Resolve, Shoot days, then everyone by their first booked day
+   A band / department heading is {band, label, cls, span:[from,to]}. */
+function calGanttHTML(p, data, L){
+  const rows = [];
+  const meetRow = () => ({ label:'Meetings', kind:'meet', cells: iso => {
+    const ms = (data.byDay[iso]||{}).meetings||[]; if(!ms.length) return '';
+    return `<span class="gt-mark meet" role="button" tabindex="0" onclick="openMeetingForm('${ms[0].id}')" title="${esc(ms.map(m=>[m.time, m.title].filter(Boolean).join(' ')).join('\n'))}">${ms.length>1?ms.length:''}</span>`; } });
+  const editRow = () => ({ label:'Hours in Resolve', kind:'edit', cells: iso => {
+    const r = data.edit[iso]; if(!r) return '';
+    return `<span class="gt-mark edit${editHours(r)?'':' faint'}" title="${esc(editHoursTitle(iso, r))}">${editHours(r) ? editHours(r)+(r.partial?'+':'') : (r.partial?'?':'·')}</span>`; } });
+  const shootRow = () => ({ label:'Shoot days', kind:'shoot', cells: iso => {
+    const sd = ((data.byDay[iso]||{}).shoot||[])[0]; if(!sd) return '';
+    const loc = locById(sd.locationId);
+    return `<span class="gt-mark shoot" title="${esc(['Shoot day '+(sd.dayNum||''), loc&&loc.name].filter(Boolean).join(' — '))}">${esc(sd.dayNum||'')}</span>`; } });
+  const stageWord = {prep:'prep', shoot:'shoot', post:'post'};
+  // only = one stage's days (the stage bands); otherwise all of them
+  const personRow = (x, only) => ({ label:x.name, sub:x.role, kind:'person', cells: iso => {
+    const k = only ? (x.byStage[only].has(iso) ? only : '') : x.dates[iso]; if(!k) return '';
+    return `<span class="gt-mark ${k}" title="${esc(`${x.name} — ${stageWord[k]} — ${fmtDate(iso)}`)}"></span>`; } });
+  const byStart = (a, b) => (a.first||'').localeCompare(b.first||'') || (a.order - b.order);   // same day: Crew order
+  const spanOf = isos => { const l = [...isos].sort(); return l.length ? [l[0], l[l.length-1]] : null; };
+  const hasShoot = Object.values(data.byDay).some(v=>v.shoot.length);
+  if(L.meetings && (p.meetings||[]).some(m=>m.date)) rows.push(meetRow());
+  if(calGanttGroup==='stage'){
+    [['prep','Pre-production'], ['shoot','Production'], ['post','Post']].forEach(([k, label])=>{
+      const people = L.crew ? data.people.filter(x=>x.byStage[k].size)
+        .map(x=>Object.assign({}, x, {first: [...x.byStage[k]].sort()[0]})).sort(byStart) : [];
+      const isos = new Set(people.flatMap(x=>[...x.byStage[k]]));
+      if(k==='shoot') Object.entries(data.byDay).forEach(([iso, v])=>{ if(v.shoot.length) isos.add(iso); });
+      if(k==='post' && L.edit) Object.keys(data.edit).forEach(iso=>isos.add(iso));
+      const extra = k==='shoot' && hasShoot ? [shootRow()] : k==='post' && L.edit && p.editLog ? [editRow()] : [];
+      if(!people.length && !extra.length) return;
+      rows.push({ band:true, label, cls:k, span: spanOf(isos) });
+      rows.push(...extra, ...people.map(x=>personRow(x, k)));
+    });
+  } else {
+    if(L.edit && p.editLog) rows.push(editRow());
+    rows.push(shootRow());
+    if(L.crew && calGanttGroup==='dept'){
+      let dept = null;
+      data.people.forEach(x=>{
+        if(x.dept!==dept){ dept = x.dept; rows.push({ band:true, label:dept, cls:'dept',
+          span: spanOf(data.people.filter(y=>y.dept===dept).flatMap(y=>Object.keys(y.dates))) }); }
+        rows.push(personRow(x));
+      });
+    }
+    if(L.crew && calGanttGroup==='start') data.people.slice().sort(byStart).forEach(x=>rows.push(personRow(x)));
+  }
+  const dates = Object.keys(data.byDay).filter(iso=>{
+    const v = data.byDay[iso];
+    return v.shoot.length || (L.crew && (v.prep.length||v.post.length||v.shootCrew.length)) || (L.meetings && v.meetings.length) || (L.edit && v.edit);
+  }).sort();
+  if(!dates.length) return '<div class="empty-note">Nothing dated on this project yet — shoot days, crew date marks, meetings or edit hours appear here.</div>';
+  const from = addDaysISO(dates[0], -2), to = addDaysISO(dates[dates.length-1], 2), cols = [];
+  for(let iso=from; iso<=to; iso=addDaysISO(iso, 1)) cols.push(iso);
+  const t = todayISO();
+  const dow = iso => new Date(iso+'T12:00:00Z').getUTCDay();
+  const colCls = iso => `${[0,6].includes(dow(iso))?' wkend':''}${iso===t?' today':''}`;
+  const monthRow = cols.map((iso,i)=> (i===0 || iso.slice(8)==='01')
+    ? `<div class="gt-month" style="grid-column:${i+2} / span ${Math.min(cols.length-i, (()=>{ let n=0; while(i+n<cols.length && cols[i+n].slice(0,7)===iso.slice(0,7)) n++; return n; })())};">${PREP_MONTH_NAMES[Number(iso.slice(5,7))-1].slice(0,3)} ${iso.slice(0,4)}</div>` : '').join('');
+  return `<div class="cal-gantt-wrap"><div class="cal-gantt" style="grid-template-columns:var(--gt-label-w) repeat(${cols.length}, var(--gt-col-w));">
+    <div class="gt-corner" style="grid-row:1 / span 2;"></div>${monthRow}
+    ${cols.map(iso=>`<div class="gt-day${colCls(iso)}" title="${esc(fmtDate(iso))}"><span>${'SMTWTFS'[dow(iso)]}</span>${Number(iso.slice(8))}</div>`).join('')}
+    ${rows.map(r=>r.band
+      ? `<div class="gt-label gt-band ${r.cls}" title="${esc(r.label + (r.span ? ` — ${fmtDate(r.span[0])}${r.span[1]!==r.span[0] ? ` to ${fmtDate(r.span[1])}` : ''}` : ''))}">${esc(r.label)}${r.span?`<span class="gt-sub">${esc(fmtDate(r.span[0]).replace(/ \d{4}$/,''))}${r.span[1]!==r.span[0]?` – ${esc(fmtDate(r.span[1]).replace(/ \d{4}$/,''))}`:''}</span>`:''}</div>
+        ${cols.map(iso=>`<div class="gt-cell gt-band-cell${colCls(iso)}">${r.span && iso>=r.span[0] && iso<=r.span[1] ? `<span class="gt-span ${r.cls}${iso===r.span[0]?' s':''}${iso===r.span[1]?' e':''}"></span>` : ''}</div>`).join('')}`
+      : `<div class="gt-label ${r.kind}" title="${esc([r.label, r.sub].filter(Boolean).join(' — '))}">${esc(r.label)}${r.sub?`<span class="gt-sub">${esc(r.sub)}</span>`:''}</div>
+      ${cols.map(iso=>`<div class="gt-cell${colCls(iso)}">${r.cells(iso)}</div>`).join('')}`).join('')}
+  </div></div>`;
+}
+
+/* ---- meetings ---- */
+function openMeetingForm(id){
+  const p = currentProject();
+  const m = id && (p.meetings||[]).find(x=>x.id===id);
+  if(calMeetingDraft && (calMeetingDraft.id||null)===(id||null)){ calMeetingDraft = null; renderProjectBody(); return; }   // the same button closes it
+  calMeetingDraft = m ? Object.assign({}, m) : { title:'', date: calendarView==='month' && calMonth && calMonth!==todayISO().slice(0,7) ? calMonth+'-01' : todayISO(), time:'', note:'' };
+  renderProjectBody();
+}
+function meetingFormHTML(){
+  const d = calMeetingDraft;
+  const enter = `onkeydown="if(event.key==='Enter'){event.preventDefault();saveMeeting();} if(event.key==='Escape'){calMeetingDraft=null;renderProjectBody();}"`;
+  return `<div class="grid g2" style="margin-bottom:8px;">
+      <div><label class="req">Meeting</label><input type="text" id="mtTitle" value="${esc(d.title)}" placeholder="e.g. Kick-off with OFTV" oninput="calMeetingDraft.title=this.value" ${enter}></div>
+      <div class="grid g2" style="gap:10px;">
+        <div><label class="req">Date</label><input type="date" value="${esc(d.date)}" oninput="calMeetingDraft.date=this.value" ${enter}></div>
+        <div><label>Time</label><input type="time" value="${esc(d.time)}" oninput="calMeetingDraft.time=this.value" ${enter}></div>
+      </div>
+    </div>
+    <label>Note</label>
+    <input type="text" value="${esc(d.note)}" placeholder="Who, where, a link…" oninput="calMeetingDraft.note=this.value" ${enter}>
+    <div class="toolbar" style="margin-top:10px;">
+      <button class="small primary" onclick="saveMeeting()">${d.id ? 'Save' : 'Add meeting'}</button>
+      <button class="small" onclick="calMeetingDraft=null;renderProjectBody();">Cancel</button>
+      ${d.id ? `<button class="icon-btn danger-ic" style="margin-left:auto;" onclick="deleteMeeting('${d.id}')" title="Delete this meeting" aria-label="Delete meeting">${icon('trash')}</button>` : ''}
+    </div>`;
+}
+async function saveMeeting(){
+  const p = currentProject(), d = calMeetingDraft; if(!p || !d) return;
+  const title = (d.title||'').trim();
+  if(!title || !d.date){ flashStatus('calStatus', !title ? 'Give the meeting a name' : 'Pick a date'); return; }
+  p.meetings = p.meetings || [];
+  const rec = { id: d.id || uid(), title, date: d.date, time: d.time||'', note: (d.note||'').trim() };
+  const i = p.meetings.findIndex(x=>x.id===rec.id);
+  if(i>=0) p.meetings[i] = rec; else p.meetings.push(rec);
+  calMeetingDraft = null;
+  if(calendarView==='month') calMonth = rec.date.slice(0,7);   // show where it went
+  renderProjectBody();
+  flashSaveResult('calStatus', await saveDB('db:projects', projectsDB));
+}
+async function deleteMeeting(id){
+  const p = currentProject(); if(!p) return;
+  const m = (p.meetings||[]).find(x=>x.id===id); if(!m) return;
+  const snaps = beginUndo(['db:projects']);
+  p.meetings = p.meetings.filter(x=>x.id!==id);
+  calMeetingDraft = null;
+  renderProjectBody();
+  await saveDB('db:projects', projectsDB);
+  finishUndo(`Deleted meeting “${m.title}”.`, snaps);
+}
+
 function renderTasksSection(p, days){
   syncFlagTasks(p, days);
   const flagItems = buildTaskFlags(p, days);
@@ -4396,11 +4924,7 @@ function renderTasksSection(p, days){
       <div class="toolbar" style="margin-bottom:14px;"><button type="button" class="bnr-tool add" onclick="addProjectTask()">+ Add task</button></div>
       ${tasksListHTML(p)}
     `;
-  return collapsibleSectionHTML({
-    state: tasksSectionOpen, id: 'tasksSection',
-    title: `Tasks${flagItems.length||openTaskCount?` (${flagItems.reduce((n,g)=>n+g.elements.length,0)+openTaskCount})`:''}`,
-    inner, onToggle: 'toggleTasksSection()'
-  });
+  return `<div class="section" id="tasksSection">${inner}</div>`;
 }
 const AI_SCAN_ENDPOINT = 'https://ioueoaasqnseuhrtzhbz.supabase.co/functions/v1/ai-scan';
 // Same publishable/anon key already used by the sb client above — not a new
