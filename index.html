@@ -334,7 +334,7 @@
   .cal-k.edit::before{background:var(--phase-post);}
   .cal-k.due::before{border:1px solid var(--tape); transform:rotate(45deg) scale(.8);}
   .cal-edit-note{margin-top:8px; max-width:80ch;}
-  .cal-gantt-wrap{overflow-x:auto; border-left:1px solid var(--line); --gt-label-w:190px; --gt-col-w:26px;}
+  .cal-gantt-wrap{overflow-x:auto; border-left:1px solid var(--line); --gt-label-w:190px; --gt-col-w:26px; --gt-gap-w:30px;}
   .cal-gantt{display:grid; width:max-content; font-size:var(--fs-meta);}
   .gt-corner, .gt-label{position:sticky; left:0; z-index:2; background:var(--bg, #fff);}
   .gt-month{font-family:var(--label); font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);
@@ -351,10 +351,9 @@
   .gt-label.gt-band .gt-sub{font-family:var(--body); font-weight:400; letter-spacing:0; text-transform:none; font-size:var(--fs-meta);}
   .gt-band.prep{color:var(--phase-prep);} .gt-band.shoot{color:var(--phase-shoot);} .gt-band.post{color:var(--phase-post);} .gt-band.dept{color:var(--text);}
   .gt-cell.gt-band-cell{align-items:flex-end; padding-bottom:5px; border-bottom:1.5px solid rgba(17,10,8,.35); padding-top:12px;}
-  .gt-span{display:block; width:100%; height:5px; background:var(--muted); opacity:.45;}
-  .gt-span.prep{background:var(--phase-prep);} .gt-span.shoot{background:var(--phase-shoot);} .gt-span.post{background:var(--phase-post);}
-  .gt-span.s{border-radius:3px 0 0 3px; margin-left:3px;} .gt-span.e{border-radius:0 3px 3px 0; margin-right:3px;}
-  .gt-span.s.e{border-radius:3px;}
+  /* Compact: a run of empty days folds into one hatched column, its header saying how many */
+  .gt-day.gt-gap, .gt-cell.gt-gap{background:repeating-linear-gradient(135deg, transparent 0 4px, rgba(17,10,8,.06) 4px 5px);}
+  .gt-day.gt-gap{justify-content:center; white-space:nowrap; font-size:9.5px; cursor:default;}
   .gt-cell{border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:center; min-height:28px;}
   .gt-cell.wkend, .gt-day.wkend{background:rgba(17,10,8,.035);}
   .gt-cell.today, .gt-day.today{box-shadow:inset 1px 0 0 var(--tape), inset -1px 0 0 var(--tape);}
@@ -370,6 +369,18 @@
   .gt-mark.due{width:13px; height:13px; border-radius:2px; border:1.5px solid var(--tape); color:var(--tape); transform:rotate(45deg); cursor:pointer;}
   .gt-mark.due > i{font-style:normal; transform:rotate(-45deg);}
   .gt-mark.due.done{border-color:var(--muted); color:var(--muted); opacity:.6;}
+  /* hover cards (29 Oct 2026) — anything with data-ct grows a little and #calTip pops out beside it */
+  .gt-mark, .cal-chip, .cal-ln{transition:transform .12s ease, box-shadow .12s ease;}
+  .gt-mark[data-ct]:hover{transform:scale(1.3); box-shadow:0 2px 6px rgba(17,10,8,.28); position:relative; z-index:1;}
+  .gt-mark.due[data-ct]:hover{transform:rotate(45deg) scale(1.3);}
+  .cal-chip[data-ct]:hover, .cal-ln[data-ct]:hover{transform:translateY(-1px); box-shadow:0 2px 6px rgba(17,10,8,.18);}
+  #calTip{position:fixed; z-index:1000; max-width:260px; padding:8px 11px 9px; border-radius:8px; background:var(--text); color:#fff;
+    font-family:var(--body); font-size:12px; line-height:1.4; box-shadow:0 8px 24px rgba(17,10,8,.28); pointer-events:none;
+    opacity:0; transform:translateY(4px); transition:opacity .12s ease, transform .12s ease;}
+  #calTip.on{opacity:1; transform:none;}
+  #calTip .ct-k{display:block; font-family:var(--label); font-size:9.5px; letter-spacing:1.2px; text-transform:uppercase; opacity:.65; margin-bottom:2px;}
+  #calTip b{display:block; font-size:12.5px; font-weight:600; margin-bottom:2px;}
+  #calTip .ct-l{opacity:.85;}
   @media (max-width:700px){
     .cal-cell{min-height:64px; padding:3px;}
     .cal-ln{display:none;}
@@ -2050,7 +2061,7 @@ async function setSetting(field, value){
 }
 async function resetAppSettings(){
   // fonts and colours reset; the Google Sheet connection is not a brand default and survives
-  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes, overviewTab: appSettings.overviewTab, credits: appSettings.credits, calendarView: appSettings.calendarView, calendarLayers: appSettings.calendarLayers, calendarGroup: appSettings.calendarGroup });
+  appSettings = Object.assign({}, SETTINGS_DEFAULTS, { sheetSync: appSettings.sheetSync, hideRolesTips: appSettings.hideRolesTips, headFolded: appSettings.headFolded, crewPeopleKind: appSettings.crewPeopleKind, roleCodes: appSettings.roleCodes, overviewTab: appSettings.overviewTab, credits: appSettings.credits, calendarView: appSettings.calendarView, calendarLayers: appSettings.calendarLayers, calendarGroup: appSettings.calendarGroup, calendarCompact: appSettings.calendarCompact });
   applyAppSettings();
   await saveAppSettings();
   renderMain();
@@ -3184,6 +3195,7 @@ async function initApp(){
   if(OVERVIEW_TABS[appSettings.overviewTab]) overviewTab = appSettings.overviewTab;
   if(['month','gantt'].includes(appSettings.calendarView)) calendarView = appSettings.calendarView;
   if(['stage','dept','start'].includes(appSettings.calendarGroup)) calGanttGroup = appSettings.calendarGroup;
+  calGanttCompact = !!appSettings.calendarCompact;
   renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
@@ -4663,6 +4675,7 @@ const CAL_LAYERS_DEFAULTS = { crew:true, meetings:true, due:true, edit:true };
 let calendarView = 'month';            // 'month' | 'gantt'
 let calMonth = null;                   // 'YYYY-MM' the month view shows; null = pick one
 let calMeetingDraft = null;
+let calGanttCompact = false;          // Gantt only: fold runs of empty days into one column (appSettings.calendarCompact)
 let calGanttGroup = 'stage';           // 'stage' | 'dept' | 'start' — the Gantt's Group by switch (appSettings.calendarGroup)            // the meeting form's fields while it is open — {id?, title, date, time, note}
 const calLayers = () => Object.assign({}, CAL_LAYERS_DEFAULTS, appSettings.calendarLayers||{});
 const pad2 = n => String(n).padStart(2,'0');
@@ -4690,6 +4703,10 @@ async function setCalGanttGroup(g){
   if(g===calGanttGroup) return;
   calGanttGroup = g; renderProjectBody();
   appSettings.calendarGroup = g; await saveAppSettings();
+}
+async function toggleCalCompact(){
+  calGanttCompact = !calGanttCompact; renderProjectBody();
+  appSettings.calendarCompact = calGanttCompact; await saveAppSettings();
 }
 async function toggleCalLayer(k){
   const l = calLayers(); l[k] = !l[k];
@@ -4753,6 +4770,7 @@ function renderProjectCalendar(body){
             btn(calGanttGroup==='stage','Stage',"setCalGanttGroup('stage')",'Pre-production, Production and Post, each its own band'),
             btn(calGanttGroup==='dept','Dept',"setCalGanttGroup('dept')",'By department, in Crew order'),
             btn(calGanttGroup==='start','Start',"setCalGanttGroup('start')",'By the first day each person is booked')]) : ''}
+          ${calendarView==='gantt' ? toolGroupHTML([btn(calGanttCompact,'Compact','toggleCalCompact()','Fold the days with nothing on into one block, so the Gantt reads as a run of what happened')]) : ''}
           ${toolGroupHTML([btn(L.crew,'Crew',"toggleCalLayer('crew')",'Prep, shoot and post days booked on Crew'),
                            btn(L.meetings,'Meetings',"toggleCalLayer('meetings')",'Meetings'),
                            btn(L.due,'Deliverables',"toggleCalLayer('due')",'Deliverables with a due date — from Overview ▸ Deliverables'),
@@ -4773,6 +4791,7 @@ function renderProjectCalendar(body){
         : 'No edit hours from Resolve on this project yet.'}</div>` : ''}
     </div>`;
   if(calMeetingDraft) document.getElementById('mtTitle')?.focus();
+  wireCalTips();
 }
 
 function calMonthHTML(p, data, L){
@@ -4792,15 +4811,15 @@ function calMonthHTML(p, data, L){
     const iso = isoOf(y, m, d), v = data.byDay[iso] || CAL_DAY_EMPTY();
     const wk = ((lead + d - 1) % 7) >= 5;
     const lines = [];
-    v.shoot.forEach(sd=>{ const loc = locById(sd.locationId); lines.push(`<div class="cal-chip shoot" title="${esc(['Shoot day '+(sd.dayNum||''), loc&&loc.name].filter(Boolean).join(' — '))}">Day ${esc(sd.dayNum||'')}${loc?` · ${esc(loc.name)}`:''}</div>`); });
+    v.shoot.forEach(sd=>{ const loc = locById(sd.locationId); lines.push(`<div class="cal-chip shoot"${shootTip(sd, iso, v.shootCrew)}>Day ${esc(sd.dayNum||'')}${loc?` · ${esc(loc.name)}`:''}</div>`); });
     if(L.crew){
       [['prep','Prep',v.prep],['shoot','Crew',v.shootCrew],['post','Post',v.post]].forEach(([k,label,list])=>{
-        if(list.length) lines.push(`<div class="cal-ln ${k}" title="${esc(label+': '+names(list))}"><span class="cal-ln-k">${label}</span> ${esc(names(list))}</div>`);
+        if(list.length) lines.push(`<div class="cal-ln ${k}"${calTipAttr(label, fmtDate(iso), ...list.map(x=>x.role ? `${x.name} — ${x.role}` : x.name))}><span class="cal-ln-k">${label}</span> ${esc(names(list))}</div>`);
       });
     }
-    if(L.meetings) v.meetings.forEach(mt=>lines.push(`<div class="cal-chip meet" role="button" tabindex="0" onclick="openMeetingForm('${mt.id}')" title="${esc([mt.time, mt.title, mt.note].filter(Boolean).join(' — '))}">${mt.time?`<b>${esc(mt.time)}</b> `:''}${esc(mt.title||'Meeting')}</div>`));
-    if(L.due) v.due.forEach(dv=>lines.push(`<div class="cal-chip due${dv.done?' done':''}" role="button" tabindex="0" onclick="openDeliverables()" title="${esc(calDueTitle(dv))}">◆ ${esc(dv.title)}</div>`));
-    if(L.edit && v.edit) lines.push(`<div class="cal-chip edit${editHours(v.edit)?'':' faint'}" title="${esc(editHoursTitle(iso, v.edit))}">Resolve ${editHoursLabel(v.edit)}</div>`);
+    if(L.meetings) v.meetings.forEach(mt=>lines.push(`<div class="cal-chip meet" role="button" tabindex="0" onclick="openMeetingForm('${mt.id}')"${meetTip([mt], mt.date)}>${mt.time?`<b>${esc(mt.time)}</b> `:''}${esc(mt.title||'Meeting')}</div>`));
+    if(L.due) v.due.forEach(dv=>lines.push(`<div class="cal-chip due${dv.done?' done':''}" role="button" tabindex="0" onclick="openDeliverables()"${dueTip([dv], dv.due)}>◆ ${esc(dv.title)}</div>`));
+    if(L.edit && v.edit) lines.push(`<div class="cal-chip edit${editHours(v.edit)?'':' faint'}"${editTip(iso, v.edit)}>Resolve ${editHoursLabel(v.edit)}</div>`);
     cells.push(`<div class="cal-cell${wk?' wkend':''}${iso===t?' today':''}"><div class="cal-num">${d}</div>${lines.join('')}</div>`);
   }
   return `<div class="cal-month">
@@ -4829,22 +4848,22 @@ function calGanttHTML(p, data, L){
   const rows = [];
   const meetRow = () => ({ label:'Meetings', kind:'meet', cells: iso => {
     const ms = (data.byDay[iso]||{}).meetings||[]; if(!ms.length) return '';
-    return `<span class="gt-mark meet" role="button" tabindex="0" onclick="openMeetingForm('${ms[0].id}')" title="${esc(ms.map(m=>[m.time, m.title].filter(Boolean).join(' ')).join('\n'))}">${ms.length>1?ms.length:''}</span>`; } });
+    return `<span class="gt-mark meet" role="button" tabindex="0" onclick="openMeetingForm('${ms[0].id}')"${meetTip(ms, iso)}>${ms.length>1?ms.length:''}</span>`; } });
   const dueRow = () => ({ label:'Deliverables', kind:'due', cells: iso => {
     const ds = (data.byDay[iso]||{}).due||[]; if(!ds.length) return '';
-    return `<span class="gt-mark due${ds.every(d=>d.done)?' done':''}" role="button" tabindex="0" onclick="openDeliverables()" title="${esc(ds.map(calDueTitle).join('\n'))}">${ds.length>1?`<i>${ds.length}</i>`:''}</span>`; } });
+    return `<span class="gt-mark due${ds.every(d=>d.done)?' done':''}" role="button" tabindex="0" onclick="openDeliverables()"${dueTip(ds, iso)}>${ds.length>1?`<i>${ds.length}</i>`:''}</span>`; } });
   const editRow = () => ({ label:'Hours in Resolve', kind:'edit', cells: iso => {
     const r = data.edit[iso]; if(!r) return '';
-    return `<span class="gt-mark edit${editHours(r)?'':' faint'}" title="${esc(editHoursTitle(iso, r))}">${editHours(r) ? editHours(r)+(r.partial?'+':'') : (r.partial?'?':'·')}</span>`; } });
+    return `<span class="gt-mark edit${editHours(r)?'':' faint'}"${editTip(iso, r)}>${editHours(r) ? editHours(r)+(r.partial?'+':'') : (r.partial?'?':'·')}</span>`; } });
   const shootRow = () => ({ label:'Shoot days', kind:'shoot', cells: iso => {
-    const sd = ((data.byDay[iso]||{}).shoot||[])[0]; if(!sd) return '';
-    const loc = locById(sd.locationId);
-    return `<span class="gt-mark shoot" title="${esc(['Shoot day '+(sd.dayNum||''), loc&&loc.name].filter(Boolean).join(' — '))}">${esc(sd.dayNum||'')}</span>`; } });
-  const stageWord = {prep:'prep', shoot:'shoot', post:'post'};
+    const v = data.byDay[iso]||{}, sd = (v.shoot||[])[0]; if(!sd) return '';
+    return `<span class="gt-mark shoot"${shootTip(sd, iso, v.shootCrew||[])}>${esc(sd.dayNum||'')}</span>`; } });
+  const stageWord = {prep:'Prep', shoot:'Shoot', post:'Post'};
   // only = one stage's days (the stage bands); otherwise all of them
   const personRow = (x, only) => ({ label:x.name, sub:x.role, kind:'person', cells: iso => {
     const k = only ? (x.byStage[only].has(iso) ? only : '') : x.dates[iso]; if(!k) return '';
-    return `<span class="gt-mark ${k}" title="${esc(`${x.name} — ${stageWord[k]} — ${fmtDate(iso)}`)}"></span>`; } });
+    const days = x.byStage[k].size;
+    return `<span class="gt-mark ${k}"${calTipAttr(`${stageWord[k]} day`, x.name, x.role, fmtDate(iso), `${days} ${stageWord[k].toLowerCase()} day${days===1?'':'s'} in all`)}></span>`; } });
   const byStart = (a, b) => (a.first||'').localeCompare(b.first||'') || (a.order - b.order);   // same day: Crew order
   const spanOf = isos => { const l = [...isos].sort(); return l.length ? [l[0], l[l.length-1]] : null; };
   const hasShoot = Object.values(data.byDay).some(v=>v.shoot.length);
@@ -4880,25 +4899,76 @@ function calGanttHTML(p, data, L){
     return v.shoot.length || (L.crew && (v.prep.length||v.post.length||v.shootCrew.length)) || (L.meetings && v.meetings.length) || (L.due && v.due.length) || (L.edit && v.edit);
   }).sort();
   if(!dates.length) return '<div class="empty-note">Nothing dated on this project yet — shoot days, crew date marks, meetings, deliverables or edit hours appear here.</div>';
-  const from = addDaysISO(dates[0], -2), to = addDaysISO(dates[dates.length-1], 2), cols = [];
-  for(let iso=from; iso<=to; iso=addDaysISO(iso, 1)) cols.push(iso);
+  /* the columns: {iso} a day, {gap, from, to} a folded run of empty days (Compact only — 29 Oct 2026).
+     Full view runs every day from 2 before the first dated thing to 2 after the last. */
+  const cols = [];
+  if(calGanttCompact){
+    dates.forEach((iso, i)=>{
+      const gap = i ? daysBetweenISO(dates[i-1], iso) - 1 : 0;
+      if(gap>0) cols.push({ gap, from: addDaysISO(dates[i-1], 1), to: addDaysISO(iso, -1) });
+      cols.push({ iso });
+    });
+  } else {
+    for(let iso=addDaysISO(dates[0], -2), to=addDaysISO(dates[dates.length-1], 2); iso<=to; iso=addDaysISO(iso, 1)) cols.push({ iso });
+  }
   const t = todayISO();
   const dow = iso => new Date(iso+'T12:00:00Z').getUTCDay();
-  const colCls = iso => `${[0,6].includes(dow(iso))?' wkend':''}${iso===t?' today':''}`;
-  const monthRow = cols.map((iso,i)=> (i===0 || iso.slice(8)==='01')
-    ? `<div class="gt-month" style="grid-column:${i+2} / span ${Math.min(cols.length-i, (()=>{ let n=0; while(i+n<cols.length && cols[i+n].slice(0,7)===iso.slice(0,7)) n++; return n; })())};">${PREP_MONTH_NAMES[Number(iso.slice(5,7))-1].slice(0,3)} ${iso.slice(0,4)}</div>` : '').join('');
-  return `<div class="cal-gantt-wrap"><div class="cal-gantt" style="grid-template-columns:var(--gt-label-w) repeat(${cols.length}, var(--gt-col-w));">
+  const colCls = c => c.gap ? ' gt-gap' : `${[0,6].includes(dow(c.iso))?' wkend':''}${c.iso===t?' today':''}`;
+  // a month label starts at each column whose month differs from the last day column's, and runs to the next label
+  const starts = []; let lastMonth = null;
+  cols.forEach((c, i)=>{ if(c.iso && c.iso.slice(0,7)!==lastMonth){ starts.push(i); lastMonth = c.iso.slice(0,7); } });
+  const monthRow = starts.map((i, n)=>{ const iso = cols[i].iso, span = (starts[n+1] ?? cols.length) - i;
+    return `<div class="gt-month" style="grid-column:${i+2} / span ${span};">${PREP_MONTH_NAMES[Number(iso.slice(5,7))-1].slice(0,3)} ${iso.slice(0,4)}</div>`; }).join('');
+  const dayHead = c => c.gap
+    ? `<div class="gt-day gt-gap"${calTipAttr('Nothing on', `${c.gap} day${c.gap===1?'':'s'}`, c.gap===1 ? fmtDate(c.from) : `${fmtDate(c.from)} – ${fmtDate(c.to)}`)}><span>···</span>${c.gap}d</div>`
+    : `<div class="gt-day${colCls(c)}" title="${esc(fmtDate(c.iso))}"><span>${'SMTWTFS'[dow(c.iso)]}</span>${Number(c.iso.slice(8))}</div>`;
+  return `<div class="cal-gantt-wrap"><div class="cal-gantt" style="grid-template-columns:var(--gt-label-w) ${cols.map(c=>c.gap?'var(--gt-gap-w)':'var(--gt-col-w)').join(' ')};">
     <div class="gt-corner" style="grid-row:1 / span 2;"></div>${monthRow}
-    ${cols.map(iso=>`<div class="gt-day${colCls(iso)}" title="${esc(fmtDate(iso))}"><span>${'SMTWTFS'[dow(iso)]}</span>${Number(iso.slice(8))}</div>`).join('')}
+    ${cols.map(dayHead).join('')}
     ${rows.map(r=>r.band
       ? `<div class="gt-label gt-band ${r.cls}" title="${esc(r.label + (r.span ? ` — ${fmtDate(r.span[0])}${r.span[1]!==r.span[0] ? ` to ${fmtDate(r.span[1])}` : ''}` : ''))}">${esc(r.label)}${r.span?`<span class="gt-sub">${esc(fmtDate(r.span[0]).replace(/ \d{4}$/,''))}${r.span[1]!==r.span[0]?` – ${esc(fmtDate(r.span[1]).replace(/ \d{4}$/,''))}`:''}</span>`:''}</div>
-        ${cols.map(iso=>`<div class="gt-cell gt-band-cell${colCls(iso)}">${r.span && iso>=r.span[0] && iso<=r.span[1] ? `<span class="gt-span ${r.cls}${iso===r.span[0]?' s':''}${iso===r.span[1]?' e':''}"></span>` : ''}</div>`).join('')}`
+        ${cols.map(c=>`<div class="gt-cell gt-band-cell${colCls(c)}"></div>`).join('')}`
       : `<div class="gt-label ${r.kind}" title="${esc([r.label, r.sub].filter(Boolean).join(' — '))}">${esc(r.label)}${r.sub?`<span class="gt-sub">${esc(r.sub)}</span>`:''}</div>
-      ${cols.map(iso=>`<div class="gt-cell${colCls(iso)}">${r.cells(iso)}</div>`).join('')}`).join('')}
+      ${cols.map(c=>`<div class="gt-cell${colCls(c)}">${c.gap ? '' : r.cells(c.iso)}</div>`).join('')}`).join('')}
   </div></div>`;
 }
 
-const calDueTitle = d => `${d.title} — ${d.type||'Other'} — due ${fmtDate(d.due)}${d.done ? ' — done' : ''}`;
+/* ---- hover cards (29 Oct 2026) ----
+   A mark or chip carries data-ct = "kind\nheading\nline\nline…"; one #calTip, made on first use, pops out
+   above it (below if there's no room). Not data-tip: that's the app's CSS-only one-line tooltip. */
+const calTipAttr = (kind, head, ...lines) => ` data-ct="${escA([kind||'', head||'', ...lines.filter(Boolean)].join('\n'))}"`;
+const shootTip = (sd, iso, crew) => { const loc = locById(sd.locationId);
+  return calTipAttr('Shoot day', `Day ${sd.dayNum||'?'}${loc ? ` · ${loc.name}` : ''}`, fmtDate(iso), crew.length ? `On set: ${crew.map(x=>x.name).join(', ')}` : ''); };
+const meetTip = (ms, iso) => ms.length===1
+  ? calTipAttr('Meeting', ms[0].title||'Meeting', [fmtDate(iso), ms[0].time].filter(Boolean).join(' · '), ms[0].note)
+  : calTipAttr('Meetings', `${ms.length} meetings`, fmtDate(iso), ...ms.map(m=>[m.time, m.title].filter(Boolean).join(' ')));
+const dueTip = (ds, iso) => ds.length===1
+  ? calTipAttr('Deliverable', ds[0].title, `${ds[0].type||'Other'} · due ${fmtDate(iso)}`, ds[0].done ? '✓ Done' : 'Not done yet')
+  : calTipAttr('Deliverables', `${ds.length} due`, fmtDate(iso), ...ds.map(d=>`${d.done?'✓ ':''}${d.title}`));
+const editTip = (iso, rec) => { const m = rec.mins||0;
+  return calTipAttr('Hours in Resolve', `${editHoursLabel(rec)} · ${fmtDate(iso)}`, `${m>=60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`} of active work`,
+    rec.partial ? 'At least — Resolve kept only some of this day’s backups' : ''); };
+const daysBetweenISO = (a, b) => Math.round((new Date(b+'T12:00:00Z') - new Date(a+'T12:00:00Z')) / 86400000);
+function wireCalTips(){
+  let tip = document.getElementById('calTip');
+  if(!tip){ tip = document.createElement('div'); tip.id = 'calTip'; document.body.appendChild(tip); }
+  tip.classList.remove('on');                    // a re-render may have taken its element away
+  if(document._calTipsWired) return;
+  document._calTipsWired = true;
+  document.addEventListener('mouseover', e=>{
+    const el = e.target.closest && e.target.closest('[data-ct]');
+    if(!el){ tip.classList.remove('on'); return; }
+    const [kind, head, ...lines] = el.dataset.ct.split('\n');
+    tip.innerHTML = `${kind?`<span class="ct-k">${esc(kind)}</span>`:''}<b>${esc(head)}</b>${lines.map(l=>`<div class="ct-l">${esc(l)}</div>`).join('')}`;
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    const x = Math.max(8, Math.min(r.left + r.width/2 - w/2, innerWidth - w - 8));
+    const y = r.top - h - 10 >= 8 ? r.top - h - 10 : r.bottom + 10;
+    tip.style.left = x+'px'; tip.style.top = y+'px';
+    tip.classList.add('on');
+  });
+  document.addEventListener('scroll', ()=>tip.classList.remove('on'), true);
+}
+
 function openDeliverables(){ overviewTab = 'deliverables'; appSettings.overviewTab = 'deliverables'; saveAppSettings(); goProjectTab('overview'); }
 
 /* ---- meetings ---- */
