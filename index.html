@@ -2013,6 +2013,8 @@ const sb = supabase.createClient(
 
 <script>
 /* ============================================================ STATE + STORAGE */
+/* this copy's own code, fingerprinted as it starts — see APP STALE GUARD below */
+const APP_CODE_HASH = codeHash(document.currentScript ? document.currentScript.textContent : '');
 const COMPANY = 'Little Film Productions';
 
 const FONT_CHOICES = {
@@ -3047,7 +3049,46 @@ function saveDB(key, value){
   _saveChains[key] = p.catch(()=>{});
   return p;
 }
+/* ---- APP STALE GUARD (29 Oct 2026) ----
+   A tab left open across an update keeps running the OLD code — and old code once wiped a
+   project's newer edits (whole-record merge, fixed since, but only in copies that reloaded).
+   So each copy fingerprints its own main script at start (APP_CODE_HASH) and compares it with
+   the server's: when the tab comes back into view, every 5 minutes, and before a save (at most
+   once a minute). If they differ the copy is out of date: a reload banner goes up and every
+   save from it is refused. A failed check (offline, file://) never blocks — it just tries later. */
+const APP_SCRIPT_MARK = 'STATE + STORAGE */';
+let appStale = false, appStaleCheckedAt = 0, appStaleCheck = null;
+function codeHash(str){ let h = 0x811c9dc5; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h>>>0).toString(16); }
+function checkAppStale(maxAgeMs = 60000){
+  if(appStale || location.protocol==='file:') return Promise.resolve(appStale);
+  if(appStaleCheck) return appStaleCheck;
+  if(Date.now() - appStaleCheckedAt < maxAgeMs) return Promise.resolve(false);
+  appStaleCheck = (async ()=>{
+    try{
+      const res = await fetch(location.pathname + '?fresh=' + Date.now(), { cache:'no-store' });
+      if(!res.ok) return false;
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const main = [...doc.querySelectorAll('script:not([src])')].find(sc=>sc.textContent.includes(APP_SCRIPT_MARK));
+      if(main && codeHash(main.textContent)!==APP_CODE_HASH){ appStale = true; renderAppStaleBanner(); }
+      return appStale;
+    }catch(e){ return false; }
+    finally{ appStaleCheckedAt = Date.now(); appStaleCheck = null; }
+  })();
+  return appStaleCheck;
+}
+function renderAppStaleBanner(){
+  if(document.getElementById('appStaleBanner')) return;
+  const el = document.createElement('div'); el.id = 'appStaleBanner'; el.className = 'save-banner save-banner-lost';
+  el.innerHTML = `<div class="save-banner-text"><strong>This copy of the app is out of date.</strong> It was updated after you opened it, so to protect what's stored, <strong>nothing more will be saved from this copy</strong>. Reload to get the new version — anything changed since this message appeared wasn't saved.</div>
+    <button type="button" class="small primary" onclick="location.reload()">Reload now</button>`;
+  document.body.appendChild(el);
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkAppStale(0); });
+window.addEventListener('focus', ()=>checkAppStale(0));
+setInterval(()=>checkAppStale(0), 5*60*1000);
+
 async function saveDBNow(key, value){
+  if(await checkAppStale()) return { ok:false, kind:'outdated', detail:'this copy of the app is out of date — reload' };
   const stamp = () => new Date().toISOString();
   // `value` is reassigned by the merge below, so this deliberately reads it at
   // call time: a retry should push the merged value, not the pre-merge one.
