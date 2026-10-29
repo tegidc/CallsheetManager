@@ -1659,9 +1659,13 @@ R7, R9, R12) were explicitly declined and should not be re-proposed.
   write — conditional on the row's `updated_at` still matching `dbStamp[key]` — and on
   a failed guard the remote value is fetched and three-way merged against
   `dbBase[key]` (the snapshot matching that stamp) before retrying, up to 3 attempts.
-  Per record: whichever side actually changed it wins (ours on a tie), additions from
-  both sides are kept, and a deletion is only honoured against a side still matching
-  base. Works because every record carries a stable `id`; arrays of bare strings
+  Per record: whichever side actually changed it wins, additions from both sides are
+  kept, and a deletion is only honoured against a side still matching base. **When BOTH
+  sides changed the same record it is merged field by field, recursively** (29 Oct 2026 —
+  before, ours won the whole record, so a stale tab merely opening a project, which saves
+  `lastOpenedAt`, wiped another copy's new tasks / crew / deliverables on it). Only a
+  field both changed goes to ours — plain values and unkeyed arrays (`d.positions` rows)
+  whole, keyed arrays (`crewEntries`, `tasks`…) record by record again. Works because every record carries a stable `id`; arrays of bare strings
   (`db:travelmethods`, `db:coprocompanies`) have no identity to merge on, so ours
   simply wins — they're short config lists, not records — [Shared/utility functions]
   - `applyMergedDB()` writes the merged result back into the live arrays **in place**

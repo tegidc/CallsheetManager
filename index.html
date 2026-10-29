@@ -3000,7 +3000,9 @@ function mergeDB(base, mine, theirs){
     const ids = [...new Set([...theirs.map(r=>r.id), ...mine.map(r=>r.id)])];
     ids.forEach(id=>{
       const b = B.get(id), m = M.get(id), t = T.get(id);
-      if(m && t)  { out.push(same(m,b) ? t : m); return; }           // both have it: the side that changed wins, ours on a tie
+      // both have it: the side that changed wins; if BOTH changed it, merge it field by field (29 Oct 2026 —
+      // whole-record "ours wins" let a stale tab's lastOpenedAt bump wipe another copy's new tasks)
+      if(m && t)  { out.push(same(m,b) ? t : same(t,b) ? m : b ? mergeDB(b, m, t) : m); return; }
       if(m && !t) { if(!b) out.push(m); return; }                    // only ours: new here = keep, else they deleted it
       if(!m && t) { if(!b) out.push(t); return; }                    // only theirs: new there = keep, else we deleted it
     });
@@ -3009,7 +3011,10 @@ function mergeDB(base, mine, theirs){
   if(mine && theirs && typeof mine==='object' && typeof theirs==='object'){
     const out = {...theirs};
     Object.keys(mine).forEach(k=>{
-      if(!same(mine[k], (base||{})[k]) || !(k in theirs)) out[k] = mine[k];   // we changed it, or it's new here
+      const b = (base||{})[k];
+      if(!(k in theirs)){ out[k] = mine[k]; return; }                  // new here
+      if(same(mine[k], b)) return;                                     // only they changed it (or nobody): theirs
+      out[k] = same(theirs[k], b) ? mine[k] : mergeDB(b, mine[k], theirs[k]);   // both changed it: a level deeper — plain values and unkeyed arrays still go to ours
     });
     Object.keys(base||{}).forEach(k=>{ if(!(k in mine) && same((base||{})[k], theirs[k])) delete out[k]; });
     return out;
