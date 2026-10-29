@@ -1653,6 +1653,7 @@ different entry point on a different screen and was left alone.
 Built from the `refinement-review.html` answers. Items marked **not wanted** (R3, R5,
 R7, R9, R12) were explicitly declined and should not be re-proposed.
 
+- `APP_CODE_HASH` / `codeHash()` / `checkAppStale()` / `renderAppStaleBanner()` / `appStale` — **stale-copy guard** (29 Oct 2026). A tab left open across an update keeps running the old code (one such tab twice wiped a project with the old whole-record merge). Each copy FNV-hashes its own main `<script>` as it starts (`document.currentScript`, first line of the STATE + STORAGE script) and compares it with the server's copy of that script (found by `APP_SCRIPT_MARK`, fetched `no-store` with a cache-busting query) on tab focus / visibility, every 5 min, and before a save (`saveDBNow()`, at most once a minute). On a mismatch: a non-dismissable `.save-banner-lost` banner with **Reload now**, and every save returns `{ok:false, kind:'outdated'}` without touching the database. A failed check (offline, `file://`) never blocks. ⚠️ Only protects copies loaded AFTER it shipped; any edit to the main script — even a comment — counts as an update — [Shared/utility functions]
 - `dbStamp` / `dbBase` / `dbClone()` / `mergeDB()` / `applyMergedDB()` (**R18**) —
   **the fix for two tabs silently overwriting each other.** `saveDB()` writes a whole
   collection back on every save, so with a plain upsert the second writer won
