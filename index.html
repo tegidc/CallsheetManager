@@ -316,6 +316,8 @@
   .cal-chip.meet:hover{border-color:var(--tape); color:var(--tape);}
   .cal-chip.edit{background:var(--phase-post); color:#fff; font-weight:600;}
   .cal-chip.edit.faint{background:var(--phase-post-soft); color:var(--phase-post); font-weight:400;}
+  .cal-chip.due{border:1px solid var(--tape); color:var(--tape); font-weight:600; cursor:pointer;}
+  .cal-chip.due.done{border-color:var(--line); color:var(--muted); font-weight:400; text-decoration:line-through;}
   .cal-ln{font-size:var(--fs-meta); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text);}
   .cal-ln-k{font-family:var(--label); font-size:10px; letter-spacing:1px; text-transform:uppercase;}
   .cal-ln.prep .cal-ln-k{color:var(--phase-prep);} .cal-ln.shoot .cal-ln-k{color:var(--phase-shoot);} .cal-ln.post .cal-ln-k{color:var(--phase-post);}
@@ -326,6 +328,7 @@
   .cal-k.post::before{background:var(--phase-post-soft); border:1px solid var(--phase-post);}
   .cal-k.meet::before{border:1px solid var(--text);}
   .cal-k.edit::before{background:var(--phase-post);}
+  .cal-k.due::before{border:1px solid var(--tape); transform:rotate(45deg) scale(.8);}
   .cal-edit-note{margin-top:8px; max-width:80ch;}
   .cal-gantt-wrap{overflow-x:auto; border-left:1px solid var(--line); --gt-label-w:190px; --gt-col-w:26px;}
   .cal-gantt{display:grid; width:max-content; font-size:var(--fs-meta);}
@@ -338,7 +341,7 @@
   .gt-label{grid-column:1; padding:5px 8px 5px 0; border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     font-weight:600; display:flex; align-items:baseline; gap:6px; min-width:0;}
   .gt-label .gt-sub{font-weight:400; color:var(--muted); overflow:hidden; text-overflow:ellipsis;}
-  .gt-label.meet, .gt-label.edit, .gt-label.shoot{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
+  .gt-label.meet, .gt-label.due, .gt-label.edit, .gt-label.shoot{font-family:var(--label); font-weight:500; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
   .gt-label.gt-band{font-family:var(--label); font-weight:600; font-size:var(--fs-ctl); letter-spacing:1.2px; text-transform:uppercase;
     padding-top:12px; border-bottom:1.5px solid rgba(17,10,8,.35);}
   .gt-label.gt-band .gt-sub{font-family:var(--body); font-weight:400; letter-spacing:0; text-transform:none; font-size:var(--fs-meta);}
@@ -360,6 +363,9 @@
   .gt-mark.meet:hover{border-color:var(--tape);}
   .gt-mark.edit{background:var(--phase-post); color:#fff;}
   .gt-mark.edit.faint{background:var(--phase-post-soft); color:var(--phase-post);}
+  .gt-mark.due{width:13px; height:13px; border-radius:2px; border:1.5px solid var(--tape); color:var(--tape); transform:rotate(45deg); cursor:pointer;}
+  .gt-mark.due > i{font-style:normal; transform:rotate(-45deg);}
+  .gt-mark.due.done{border-color:var(--muted); color:var(--muted); opacity:.6;}
   @media (max-width:700px){
     .cal-cell{min-height:64px; padding:3px;}
     .cal-ln{display:none;}
@@ -4624,12 +4630,14 @@ function creditsSectionHTML(p){
      Crew      prep / post date marks (p.prepSchedule / p.postSchedule .dates) and shoot days the
                person is on (d.positions) — the SAME stores Crew ▸ Roles writes; read-only here
      Meetings  p.meetings = [{id, title, date, time, note}] — the one thing made on this tab
+     Due       p.deliverables with a due date (Overview ▸ Deliverables) — cuts, deadlines, release;
+               read-only here, a click opens that tab (29 Oct 2026)
      Edit      p.editLog = {source, projects, from, to, importedAt, days:{iso:{mins, partial}}}, active
                work read from DaVinci Resolve's project backups by resolve-edit-hours.py. Shown
                as hours rounded to the nearest hour. ⚠️ Calendar-only for now — nothing else
                (Budget, Crew, Tasks) reads it yet, by request.
    View and layers are remembered in appSettings.calendarView / calendarLayers (db:settings). */
-const CAL_LAYERS_DEFAULTS = { crew:true, meetings:true, edit:true };
+const CAL_LAYERS_DEFAULTS = { crew:true, meetings:true, due:true, edit:true };
 let calendarView = 'month';            // 'month' | 'gantt'
 let calMonth = null;                   // 'YYYY-MM' the month view shows; null = pick one
 let calMeetingDraft = null;
@@ -4673,10 +4681,11 @@ function shiftCalMonth(n){
   renderProjectBody();
 }
 
-/* everything dated, by day: {iso: {shoot:[day], prep:[person], shootCrew:[person], post:[person], meetings:[m], edit:rec}}
+/* everything dated, by day: {iso: {shoot:[day], prep:[person], shootCrew:[person], post:[person], meetings:[m], due:[deliverable], edit:rec}}
    and by person for the Gantt: [{name, role, dates:{iso:'prep'|'shoot'|'post'}}] in Crew's order */
+const CAL_DAY_EMPTY = () => ({shoot:[], prep:[], shootCrew:[], post:[], meetings:[], due:[], edit:null});
 function calendarData(p){
-  const byDay = {}, at = iso => (byDay[iso] = byDay[iso] || {shoot:[], prep:[], shootCrew:[], post:[], meetings:[], edit:null});
+  const byDay = {}, at = iso => (byDay[iso] = byDay[iso] || CAL_DAY_EMPTY());
   const days = projectDays(p.id).filter(d=>d.date);
   days.forEach(d=>at(d.date).shoot.push(d));
   const people = sortPersonBlocks(buildPersonBlocks(projectEntryViews(p))).map(b=>{
@@ -4693,6 +4702,7 @@ function calendarData(p){
   }).filter(x=>Object.keys(x.dates).length).map((x, i)=>Object.assign(x, {order:i}));
   people.forEach(x=>Object.entries(x.dates).forEach(([iso, kind])=>at(iso)[kind==='shoot'?'shootCrew':kind].push(x)));
   (p.meetings||[]).forEach(m=>{ if(m.date) at(m.date).meetings.push(m); });
+  (p.deliverables||[]).forEach(d=>{ if(d.due) at(d.due).due.push(d); });
   Object.values(byDay).forEach(v=>v.meetings.sort((a,b)=>(a.time||'').localeCompare(b.time||'')));
   const edit = (p.editLog && p.editLog.days) || {};
   Object.entries(edit).forEach(([iso, rec])=>{ at(iso).edit = rec; });
@@ -4722,6 +4732,7 @@ function renderProjectCalendar(body){
             btn(calGanttGroup==='start','Start',"setCalGanttGroup('start')",'By the first day each person is booked')]) : ''}
           ${toolGroupHTML([btn(L.crew,'Crew',"toggleCalLayer('crew')",'Prep, shoot and post days booked on Crew'),
                            btn(L.meetings,'Meetings',"toggleCalLayer('meetings')",'Meetings'),
+                           btn(L.due,'Deliverables',"toggleCalLayer('due')",'Deliverables with a due date — from Overview ▸ Deliverables'),
                            btn(L.edit,'Resolve',"toggleCalLayer('edit')",'Hours of active work in DaVinci Resolve')])}
           <span class="bnr-grow"></span><span class="status" id="calStatus"></span>
         </div>
@@ -4731,6 +4742,7 @@ function renderProjectCalendar(body){
       <div class="cal-key">
         ${L.crew ? `<span class="cal-k prep">Prep</span><span class="cal-k shoot">Shoot</span><span class="cal-k post">Post</span>` : ''}
         ${L.meetings ? `<span class="cal-k meet">Meeting</span>` : ''}
+        ${L.due ? `<span class="cal-k due">Deliverable due</span>` : ''}
         ${L.edit ? `<span class="cal-k edit">Hours in Resolve</span>` : ''}
       </div>
       ${L.edit ? `<div class="hint cal-edit-note">${p.editLog
@@ -4754,7 +4766,7 @@ function calMonthHTML(p, data, L){
   const cells = [];
   for(let i=0;i<lead;i++) cells.push('<div class="cal-cell empty"></div>');
   for(let d=1; d<=dim; d++){
-    const iso = isoOf(y, m, d), v = data.byDay[iso] || {shoot:[], prep:[], shootCrew:[], post:[], meetings:[], edit:null};
+    const iso = isoOf(y, m, d), v = data.byDay[iso] || CAL_DAY_EMPTY();
     const wk = ((lead + d - 1) % 7) >= 5;
     const lines = [];
     v.shoot.forEach(sd=>{ const loc = locById(sd.locationId); lines.push(`<div class="cal-chip shoot" title="${esc(['Shoot day '+(sd.dayNum||''), loc&&loc.name].filter(Boolean).join(' — '))}">Day ${esc(sd.dayNum||'')}${loc?` · ${esc(loc.name)}`:''}</div>`); });
@@ -4764,6 +4776,7 @@ function calMonthHTML(p, data, L){
       });
     }
     if(L.meetings) v.meetings.forEach(mt=>lines.push(`<div class="cal-chip meet" role="button" tabindex="0" onclick="openMeetingForm('${mt.id}')" title="${esc([mt.time, mt.title, mt.note].filter(Boolean).join(' — '))}">${mt.time?`<b>${esc(mt.time)}</b> `:''}${esc(mt.title||'Meeting')}</div>`));
+    if(L.due) v.due.forEach(dv=>lines.push(`<div class="cal-chip due${dv.done?' done':''}" role="button" tabindex="0" onclick="openDeliverables()" title="${esc(calDueTitle(dv))}">◆ ${esc(dv.title)}</div>`));
     if(L.edit && v.edit) lines.push(`<div class="cal-chip edit${editHours(v.edit)?'':' faint'}" title="${esc(editHoursTitle(iso, v.edit))}">Resolve ${editHoursLabel(v.edit)}</div>`);
     cells.push(`<div class="cal-cell${wk?' wkend':''}${iso===t?' today':''}"><div class="cal-num">${d}</div>${lines.join('')}</div>`);
   }
@@ -4794,6 +4807,9 @@ function calGanttHTML(p, data, L){
   const meetRow = () => ({ label:'Meetings', kind:'meet', cells: iso => {
     const ms = (data.byDay[iso]||{}).meetings||[]; if(!ms.length) return '';
     return `<span class="gt-mark meet" role="button" tabindex="0" onclick="openMeetingForm('${ms[0].id}')" title="${esc(ms.map(m=>[m.time, m.title].filter(Boolean).join(' ')).join('\n'))}">${ms.length>1?ms.length:''}</span>`; } });
+  const dueRow = () => ({ label:'Deliverables', kind:'due', cells: iso => {
+    const ds = (data.byDay[iso]||{}).due||[]; if(!ds.length) return '';
+    return `<span class="gt-mark due${ds.every(d=>d.done)?' done':''}" role="button" tabindex="0" onclick="openDeliverables()" title="${esc(ds.map(calDueTitle).join('\n'))}">${ds.length>1?`<i>${ds.length}</i>`:''}</span>`; } });
   const editRow = () => ({ label:'Hours in Resolve', kind:'edit', cells: iso => {
     const r = data.edit[iso]; if(!r) return '';
     return `<span class="gt-mark edit${editHours(r)?'':' faint'}" title="${esc(editHoursTitle(iso, r))}">${editHours(r) ? editHours(r)+(r.partial?'+':'') : (r.partial?'?':'·')}</span>`; } });
@@ -4810,6 +4826,7 @@ function calGanttHTML(p, data, L){
   const spanOf = isos => { const l = [...isos].sort(); return l.length ? [l[0], l[l.length-1]] : null; };
   const hasShoot = Object.values(data.byDay).some(v=>v.shoot.length);
   if(L.meetings && (p.meetings||[]).some(m=>m.date)) rows.push(meetRow());
+  if(L.due && (p.deliverables||[]).some(d=>d.due)) rows.push(dueRow());
   if(calGanttGroup==='stage'){
     [['prep','Pre-production'], ['shoot','Production'], ['post','Post']].forEach(([k, label])=>{
       const people = L.crew ? data.people.filter(x=>x.byStage[k].size)
@@ -4837,9 +4854,9 @@ function calGanttHTML(p, data, L){
   }
   const dates = Object.keys(data.byDay).filter(iso=>{
     const v = data.byDay[iso];
-    return v.shoot.length || (L.crew && (v.prep.length||v.post.length||v.shootCrew.length)) || (L.meetings && v.meetings.length) || (L.edit && v.edit);
+    return v.shoot.length || (L.crew && (v.prep.length||v.post.length||v.shootCrew.length)) || (L.meetings && v.meetings.length) || (L.due && v.due.length) || (L.edit && v.edit);
   }).sort();
-  if(!dates.length) return '<div class="empty-note">Nothing dated on this project yet — shoot days, crew date marks, meetings or edit hours appear here.</div>';
+  if(!dates.length) return '<div class="empty-note">Nothing dated on this project yet — shoot days, crew date marks, meetings, deliverables or edit hours appear here.</div>';
   const from = addDaysISO(dates[0], -2), to = addDaysISO(dates[dates.length-1], 2), cols = [];
   for(let iso=from; iso<=to; iso=addDaysISO(iso, 1)) cols.push(iso);
   const t = todayISO();
@@ -4857,6 +4874,9 @@ function calGanttHTML(p, data, L){
       ${cols.map(iso=>`<div class="gt-cell${colCls(iso)}">${r.cells(iso)}</div>`).join('')}`).join('')}
   </div></div>`;
 }
+
+const calDueTitle = d => `${d.title} — ${d.type||'Other'} — due ${fmtDate(d.due)}${d.done ? ' — done' : ''}`;
+function openDeliverables(){ overviewTab = 'deliverables'; appSettings.overviewTab = 'deliverables'; saveAppSettings(); goProjectTab('overview'); }
 
 /* ---- meetings ---- */
 function openMeetingForm(id){
