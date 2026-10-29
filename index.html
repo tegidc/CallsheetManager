@@ -4741,6 +4741,7 @@ function renderProjectCalendar(body){
   const editDays = Object.values(data.edit);
   const editTotal = editDays.reduce((n,r)=>n+(r.mins||0),0);
   const editWorked = editDays.filter(r=>editHours(r)>=1).length;
+  const editPartial = editDays.some(r=>r.partial);
   body.innerHTML = `
     <div class="section">
       <div class="ov-tools${calMeetingDraft?' open':''}">
@@ -4768,7 +4769,7 @@ function renderProjectCalendar(body){
         ${L.edit ? `<span class="cal-k edit">Hours in Resolve</span>` : ''}
       </div>
       ${L.edit ? `<div class="hint cal-edit-note">${p.editLog
-        ? `Hours in Resolve: <strong>${Math.round(editTotal/60)}h</strong> over ${editWorked} day${editWorked===1?'':'s'} (rounded to the nearest hour a day) — active work read from ${esc((p.editLog.projects||[]).join(', ')||'Resolve')}'s project backups, ${esc(fmtDate(p.editLog.from))} to ${esc(fmtDate(p.editLog.to))}. A backup is written only when the project changes, so gaps are breaks. Any change counts — timeline, media pool or colour. Nothing earlier is in the backups.`
+        ? `Hours in Resolve: <strong>${editPartial?'at least ':''}${Math.round(editTotal/60)}h</strong> over ${editWorked} day${editWorked===1?'':'s'} (rounded to the nearest hour a day)${editPartial ? `, with work seen on ${editDays.length} day${editDays.length===1?'':'s'}. Days marked + or ? are a floor — Resolve kept only some of their backups` : ''} — active work read from ${esc((p.editLog.projects||[]).join(', ')||'Resolve')}'s project backups, ${esc(fmtDate(p.editLog.from))} to ${esc(fmtDate(p.editLog.to))}. A backup is written only when the project changes, so gaps are breaks. Any change counts — timeline, media pool or colour. Nothing earlier is in the backups.`
         : 'No edit hours from Resolve on this project yet.'}</div>` : ''}
     </div>`;
   if(calMeetingDraft) document.getElementById('mtTitle')?.focus();
