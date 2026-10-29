@@ -3195,7 +3195,7 @@ async function initApp(){
   if(OVERVIEW_TABS[appSettings.overviewTab]) overviewTab = appSettings.overviewTab;
   if(['month','gantt'].includes(appSettings.calendarView)) calendarView = appSettings.calendarView;
   if(['stage','dept','start'].includes(appSettings.calendarGroup)) calGanttGroup = appSettings.calendarGroup;
-  calGanttCompact = !!appSettings.calendarCompact;
+  calGanttCompact = appSettings.calendarCompact !== false;
   renderLoadFailureBanner();
   if(!travelMethodsList.length){
     travelMethodsList = ['Own car','Production transport','Train','Flying','Public transport'];
@@ -4675,7 +4675,7 @@ const CAL_LAYERS_DEFAULTS = { crew:true, meetings:true, due:true, edit:true };
 let calendarView = 'month';            // 'month' | 'gantt'
 let calMonth = null;                   // 'YYYY-MM' the month view shows; null = pick one
 let calMeetingDraft = null;
-let calGanttCompact = false;          // Gantt only: fold runs of empty days into one column (appSettings.calendarCompact)
+let calGanttCompact = true;           // Gantt only: fold runs of empty days into one column — the "Hide gaps" switch, ON unless turned off (appSettings.calendarCompact)
 let calGanttGroup = 'stage';           // 'stage' | 'dept' | 'start' — the Gantt's Group by switch (appSettings.calendarGroup)            // the meeting form's fields while it is open — {id?, title, date, time, note}
 const calLayers = () => Object.assign({}, CAL_LAYERS_DEFAULTS, appSettings.calendarLayers||{});
 const pad2 = n => String(n).padStart(2,'0');
@@ -4770,7 +4770,7 @@ function renderProjectCalendar(body){
             btn(calGanttGroup==='stage','Stage',"setCalGanttGroup('stage')",'Pre-production, Production and Post, each its own band'),
             btn(calGanttGroup==='dept','Dept',"setCalGanttGroup('dept')",'By department, in Crew order'),
             btn(calGanttGroup==='start','Start',"setCalGanttGroup('start')",'By the first day each person is booked')]) : ''}
-          ${calendarView==='gantt' ? toolGroupHTML([btn(calGanttCompact,'Compact','toggleCalCompact()','Fold the days with nothing on into one block, so the Gantt reads as a run of what happened')]) : ''}
+          ${calendarView==='gantt' ? toolGroupHTML([btn(calGanttCompact,'Hide gaps','toggleCalCompact()',calGanttCompact ? 'Days with nothing on are folded into one block — click to show every day' : 'Every day is shown — click to fold the days with nothing on into one block')]) : ''}
           ${toolGroupHTML([btn(L.crew,'Crew',"toggleCalLayer('crew')",'Prep, shoot and post days booked on Crew'),
                            btn(L.meetings,'Meetings',"toggleCalLayer('meetings')",'Meetings'),
                            btn(L.due,'Deliverables',"toggleCalLayer('due')",'Deliverables with a due date — from Overview ▸ Deliverables'),
