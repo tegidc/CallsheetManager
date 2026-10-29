@@ -330,6 +330,29 @@ Rate / Charged 64px (fits £9,999.99), VAT % and Float % 34px (the Float % heade
 and inputs pad 2px. Crew's cost boxes and the Standard costs popup's boxes are 50px with 3px padding (fits
 1499.5). Checked: no number entry clips in any sheet view, Edit on or off.
 
+### Production fee spread into departments (21 Oct 2026)
+
+**"An option in settings where production fee is spread into department totals rather than a line item itself —
+some clients are just like that."** Budget settings ▸ Production fee ▸ **Fee shows as**: Its own line (default) |
+Spread into departments — `p.budgetSheet.settings.feeShow` = `'line'` | `'spread'` (in `BUDGET_SETTING_DEFAULTS`,
+stored only when it differs). Decided with the user: split **by share of the charged total**, applied to
+**department totals only**, **Margin unchanged**.
+- `buildBudgetLines()` returns `B.feeShare(lines, mode)` (fee × that group's charged total ÷ the charged total; 0 when
+  off or in Cost) and `B.feeSpread` / `T.feeSpread`. ⚠️ Every grouped-by-department figure reads it through here —
+  never re-derive the share.
+- Carries it: Line Items' section rows and top Totals row (title says how much fee is in each), Per Department and
+  BBC (group Charged, Totals row, % column now of the final), Per Day (department rows scaled by 1 + fee ÷ charged,
+  plus a "Production fee" row so Ex-VAT + VAT + Float + fee = Totals), the head's DEPT and COSTS rows
+  (`budgetDeptFigs`, `budgetCostFigs`), the Line Items export's section rows.
+- Foot rows (`footRows`) when spread: one "Total (… and production fee — in the departments)" that is the Final total,
+  then VAT reclaimed / Margin — no separate fee or Final total rows. The head's final block reads "Prod fee £x · in
+  departments"; the export summary labels the fee row "(spread into the department totals)".
+- ⚠️ By design NOT touched: the lines themselves (a department's rows no longer sum to its total when on), Per
+  Person, the stage rows, `T.charged` / `T.final` / `T.margin`.
+- Verified in a stubbed fixture, With VAT and Ex-VAT, line vs spread: Per Department, BBC, Per Day, head DEPT
+  rows and Line Items sections all equal `T.final` when spread and `T.charged` when not; Margin identical; every
+  view renders with no errors.
+
 ## Canonical lookups — use these, don't re-derive
 
 Every screen needs the same handful of records. These are the single place that knows how to find each; reaching past them with an inline `.find`/`.filter`/`.sort` is what lets sort order and fallbacks drift between screens (and is how the tech-specs export bug went unnoticed).
@@ -835,6 +858,34 @@ Every line carries: `code` (department code), `bbc` (BBC code), `entryId`/`crewI
   then ONE tool row, `budgetToolRowHTML()`: **View ▾** (a select — the tab strip is gone) | VAT | Settings | Days,
   with Lines · Edit · Export pushed right. "Days" opens the filter popup and reads `Days (n of N)` when days are
   filtered, `· filtered` when a shared Crew filter is on. Where this note and the one above disagree, this wins.
+- **Fee into the totaliser (26 Oct 2026):** the "Prod fee" line under the big total is GONE. The fee is now a
+  totaliser figure like Float — £ total big, `feePct%` beneath (plus `· in departments` when spread). It reuses the
+  `feePct` key in `BUDGET_VIEW_STATS` (label now "Fee", default on) so saved Settings ▸ View ticks carry over. The separate Float % checkbox is removed — Float already shows its % beneath. Under
+  the total, with VAT on: `xVAT £…` then `VAT £…` (or "No VAT in it"); with VAT off: "Total ex-VAT".
+- **Department colours (26 Oct 2026):** each department has its own token (`--dept-*` in `:root`, mapped by
+  `DEPT_COLOR` / `deptColorVar(dept)` beside `BUDGET_DEPT_ORDER`). The head's Departments rows use it for the dot and the
+  Only button's `--c`, as stages use `--phase-*` and costs `--cost-*`. Post Production = `--phase-post`, Catering &
+  Travel = `--cost-catering`; an unknown department falls back to `--tape`.
+  Carried onto the headings (same day): `deptHeaderHTML(…, dept)` takes an optional department and draws a
+  `.stage-dot.dept-dot` — used by the Crew tab group heads (only when grouped by department or dept+company; other
+  groupers get no dot) and the Crew database. Budget sheet section rows use `sheetSecDotHTML(sec.key)` (`d:` keys →
+  `DEPT_COLOR`; Locations → Set; Catering / Travel / Hotels → their `--cost-*`; Vendors / Other costs → grey), and the
+  Department view's rows carry the dot too. Copy-as-text strips tags, so exports are unchanged.
+  REVISED same day: the sheet's section heading rows no longer carry a dot — they wear a soft tint of their colour
+  instead of the grey (`.xls-sec.xls-sec-c`, `--c` set per row) — now SOLID colour with white text (gutter number stays
+  grey). `sheetSecColorVar()` / `sheetSecAttrs()` replace `sheetSecDotHTML`. Department view does the same when Lines is
+  on (`xlsSheetHTML` rows now take an optional `style`); with Lines off its plain rows keep the dot.
+- **Solo dots replace Only (26 Oct 2026):** on the head's Stages / Departments / Costs rows the coloured dot is now the
+  "Only" control — `soloDotHTML(color, on, call, title)` draws a `<button class="stage-dot solo-dot">` (hover grows it
+  with a ring, `.on` = soloed, ringed; click again goes back to all). It calls the same `onlyBudgetScope()` /
+  `onlyHeadDept()` / `onlyCostFilter()` as the Only buttons did. Every "Only" button is GONE; its grid column is kept as
+  an empty `<span>` so the figure columns still line up across the three cuts. `STAGE_COLOR` sits beside `STAGE_CLASS`.
+  The costs' ⚙ cog is unchanged.
+- **Per Person — person totals on top (26 Oct 2026):** a person with two or more roles gets their `Total — Name · n roles`
+  row (`pushPersonTotal`) ABOVE their role rows instead of beneath; those role rows leave the name cell blank.
+- **Double-click to edit (26 Oct 2026):** the Budget page's `.section` has `ondblclick="budgetDblEdit(event)"` — turns
+  `budgetEdit` on (never off), ignores double-clicks on fields/buttons/links/role=button rows/dialogs, and focuses the
+  field that now sits in the cell that was double-clicked (matched by table / row / cell index after the re-render).
 - **Fifth pass:** no "Final total" word under the big figure (it is the `title`); the three lines under it are
   plain body text and the totaliser figures are weight 400, so the head has one headline. Tool row order is
   View ▾ | Edit | VAT | Settings | Days ····· Lines · Export. The view picker is a button + `.bhead-view-menu`

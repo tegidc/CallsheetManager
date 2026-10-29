@@ -40,6 +40,10 @@
     --phase-prep:#8A5A0B; --phase-shoot:#017756; --phase-post:#4A3C8C;
     /* the three costs — Hotels / Catering / Travel (the head's COSTS rows, and the day shading when one is the filter) */
     --cost-hotel:#2E6BA8; --cost-catering:#C0622B; --cost-travel:#1B8A8A;
+    /* departments (26 Oct 2026) — one each, same deep family, spread round the wheel; Post and Catering reuse their stage/cost colour */
+    --dept-production:#A23B3B; --dept-client:#6B7A1F; --dept-talent:#C2416A; --dept-cinematography:#2E5FA8;
+    --dept-audio:#7B4BB0; --dept-grip:#2C7C95; --dept-equipment:#3F7D4E; --dept-set:#A8762A; --dept-vanities:#A3478F;
+    --dept-catering:var(--cost-catering); --dept-post:var(--phase-post); --dept-other:#6B6B6B;
     --cost-hotel-soft:rgba(46,107,168,.16); --cost-catering-soft:rgba(192,98,43,.16); --cost-travel-soft:rgba(27,138,138,.16);
     --phase-prep-soft:rgba(138,90,11,.13); --phase-shoot-soft:rgba(1,119,86,.13);
     --phase-post-soft:rgba(74,60,140,.13);
@@ -1339,6 +1343,9 @@
   .section table.xls .n{text-align:right;} .section table.xls .c{text-align:center;}
   .section table.xls .mu{color:var(--muted);}
   .section table.xls tr.xls-sec td{background:var(--tint-2); font-weight:600;}
+  /* a department / cost section heading: solid in its own colour, white text — the gutter number keeps the grey */
+  .section table.xls tr.xls-sec.xls-sec-c td:not(.xls-hd){background:var(--c); color:#fff;}
+  .section table.xls tr.xls-sec.xls-sec-c td:not(.xls-hd) *{color:inherit;}
   .section table.xls tr.xls-tot td{font-weight:600;}
   /* a person's totaliser on Per Person — under their roles, before the next person */
   .section table.xls tr.xls-sub td{font-weight:600; background:var(--tint-1); border-bottom:1.5px solid var(--field-line);}
@@ -1571,6 +1578,15 @@
   .bnr-left .bnr-toolrow:empty{display:none;}      /* Budget's head has no tool rows of its own — its total sits at the top */
   .budget-scope-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
   .stage-dot.stage-dot-dept{background:var(--tape);}
+  /* the solo dot — a real button wearing the 8px dot; a bigger invisible hit area, grows on hover, ringed when soloed */
+  .stage-dot.solo-dot{position:relative; width:8px; height:8px; min-height:0; padding:0; border:none; border-radius:50%;
+    cursor:pointer; justify-self:center; transition:transform .12s ease, box-shadow .12s ease;}
+  .stage-dot.solo-dot::before{content:''; position:absolute; inset:-7px; border-radius:50%;}
+  .stage-dot.solo-dot:hover{transform:scale(1.5); box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--c);}
+  .stage-dot.solo-dot:active{transform:scale(1.3);}
+  .stage-dot.solo-dot.on{transform:scale(1.25); box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--c);}
+  .stage-dot.solo-dot:focus-visible{outline:2px solid var(--c); outline-offset:3px;}
+  .stage-dot.dept-dot{margin-right:7px; vertical-align:1px;}   /* the department colour on a heading */
   .bnr-cut{cursor:pointer; user-select:none; opacity:.4;} .bnr-cut.on{opacity:1; color:var(--text);}
   .bnr-cut:hover{opacity:1; color:var(--tape);} .bnr-cut:focus-visible{outline:2px solid var(--tape); outline-offset:2px;}
   .bnr-cut-sep{opacity:.4; margin:0 4px;}
@@ -2123,10 +2139,11 @@ function pbNameHTML(name, id, afterHTML){
   return `<span class="roles-name-text roles-name-link" role="button" tabindex="0" onclick="event.stopPropagation();editCrew('${id}')"
     onkeydown="if(event.key==='Enter'){event.preventDefault();editCrew('${id}');}" title="Open ${esc(name)}'s record">${esc(rolesNameCollapsed ? rolesShortName(name) : name)}${afterHTML||''}</span>`;
 }
-function deptHeaderHTML(label, count, collapsed, onclickJS, code){
+function deptHeaderHTML(label, count, collapsed, onclickJS, code, dept){
   const c = code===undefined ? (DEPARTMENT_CODES[label]||'') : code;
+  const dot = dept ? `<span class="stage-dot dept-dot" style="background:${deptColorVar(dept)}"></span>` : '';
   return `<div class="subhead dept-toggle" onclick="${onclickJS}">
-      <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${c?`<span class="dept-code">${esc(c)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span>
+      <span class="dept-caret">${collapsed?'▸':'▾'}</span> ${dot}${c?`<span class="dept-code">${esc(c)}</span> `:''}${esc(label)} <span class="dept-count">(${count})</span>
     </div>`;
 }
 function expandCollapseAllHTML(onclickExpr, extraLinkHTML, allCollapsed, groupId){
@@ -6271,9 +6288,14 @@ function renderProjectCrew(body){
     /* ⚠️ THE FLAT LIST HAS NO HEAD, and that is the whole of what "None (flat list)" buys —
        one group called "All crew" wearing a subhead that says "All crew (41)" would be a row
        of chrome above every screen for no information. Every other grouper still gets one. */
+    /* a department group wears its department's colour; other groupers (company, role, days…) don't */
+    const gbNow = projectCrewFilter.groupBy;
+    const groupDept = g => gbNow==='deptCompany' ? g.label.split(' — ')[0]
+      : ['company','role','travel','catering','hotel','personType','vat','seniority','daysOnSite','none'].includes(gbNow) ? null
+      : (DEPT_COLOR[g.label] ? g.label : null);
     const groupHeaderHTML = g => g.key==='all' ? '' : deptHeaderHTML(
       g.label, g.items.length, collapsedProjectDepts.has(g.key),
-      `toggleProjectDeptCollapse('${g.key}')`, g.code||'');
+      `toggleProjectDeptCollapse('${g.key}')`, g.code||'', groupDept(g));
 
     if(crewGridView==='roles'){
       const spec = rolesColumns(budgetData);
@@ -9813,6 +9835,7 @@ function allBudgetScopes(){ BUDGET_SCOPES.forEach(([k])=>{ budgetScope[k] = true
    role chips, lit toggles, focus rings — follows without knowing about stages. Set as a class on
    #projectBody by the two render functions; the element is rebuilt per tab, so it can't leak. */
 const STAGE_CLASS = { preproduction:'stage-pre', production:'stage-prod', post:'stage-post' };
+const STAGE_COLOR = { preproduction:'--phase-prep', production:'--phase-shoot', post:'--phase-post' };
 function applyStageColour(body){
   ['stage-all','stage-pre','stage-prod','stage-post'].forEach(c=>body.classList.remove(c));
   body.classList.add(STAGE_CLASS[isolatedStage()] || 'stage-all');
@@ -10385,11 +10408,9 @@ function budgetSummaryBarHTML(data, o){
       onclick="toggleBudgetScope('${key}', !budgetScope['${key}'])"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBudgetScope('${key}', !budgetScope['${key}']);}"
       title="${budgetScope[key]?'Showing — click to leave it out':'Left out — click to include it'}">
-      <span class="stage-dot ${STAGE_CLASS[key]}"></span>
+      ${soloDotHTML(`var(${STAGE_COLOR[key]})`, iso===key, `onlyBudgetScope('${key}')`, iso===key?'Back to all stages':'Show only '+label)}
       <span class="budget-scope-name">${esc(label)}</span>
-      <button type="button" class="stage-only ${STAGE_CLASS[key]}${iso===key?' on':''}" aria-pressed="${iso===key?'true':'false'}"
-        onclick="event.stopPropagation();onlyBudgetScope('${key}')" onkeydown="event.stopPropagation()"
-        title="${iso===key?'Back to all stages':'Show only '+esc(label)}">Only</button>${o.showTotals?'<span></span>':''}
+      <span></span>${o.showTotals?'<span></span>':''}
       ${o.showTotals ? (()=>{ const f = phaseFigures(key); return budgetVatToggle ? `
         <span class="budget-scope-ex">${fmt(f.ex)}</span>
         <span class="budget-scope-vat">${f.vat ? fmt(f.vat) : '—'}</span>
@@ -10422,11 +10443,9 @@ function budgetSummaryBarHTML(data, o){
     return `<div class="${rowCls(on)}" role="button" tabindex="0" aria-pressed="${on}" onclick="toggleHeadDept('${d}')"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleHeadDept('${d}');}"
       title="${esc(f.dept)} — ${on?'showing, click to leave it out':'left out, click to include it'}">
-      <span class="stage-dot stage-dot-dept"></span>
+      ${soloDotHTML(deptColorVar(f.dept), isoDept===f.dept, `onlyHeadDept('${d}')`, isoDept===f.dept?'Back to every department':'Show only '+f.dept)}
       <span class="budget-scope-name">${esc(f.dept)}</span>
-      <button type="button" class="stage-only${isoDept===f.dept?' on':''}" aria-pressed="${isoDept===f.dept}"
-        onclick="event.stopPropagation();onlyHeadDept('${d}')" onkeydown="event.stopPropagation()"
-        title="${isoDept===f.dept?'Back to every department':'Show only '+esc(f.dept)}">Only</button>
+      <span></span>
       ${deptCells(f)}</div>`; };
   /* ---- the same block, by COST (25 Sep 2026) — Hotels / Catering / Travel, the extras Crew's sub-tabs
      cost. Not a filter: a row opens its sub-tab on Crew. Budget off, it counts instead (room nights,
@@ -10458,11 +10477,9 @@ function budgetSummaryBarHTML(data, o){
       return `<div class="budget-scope-row dept-mode cost-mode${budgetVatToggle&&o.showTotals?' itemized':''}${on?'':' off'}" role="button" tabindex="0" aria-pressed="${on}"
         onclick="toggleCostFilter('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCostFilter('${k}');}"
         title="${label} — ${cf.has(k) ? 'in the filter, click to take it out' : cf.size ? 'left out, click to add it' : 'click to list only the people with '+label.toLowerCase()}">
-        <span class="stage-dot cost-dot-${k}"></span><span class="budget-scope-name">${label}</span><button type="button" class="stage-only cost-cog cost-${k}${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
+        ${soloDotHTML(`var(--cost-${k})`, isoCost===k, `onlyCostFilter('${k}')`, isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase())}<span class="budget-scope-name">${label}</span><button type="button" class="stage-only cost-cog cost-${k}${cf.has(k)&&COST_SUB_SHAPE[k].some(g=>costSubOf(k)[g].size)?' on':''}"
           onclick="event.stopPropagation();openCostSub('${k}')" onkeydown="event.stopPropagation()" title="Narrow ${label.toLowerCase()} — ${k==='hotel'?'by night':k==='catering'?'by day, meal, catered or per diem':'by method and day'}" aria-label="Narrow ${label}">⚙</button>
-        <button type="button" class="stage-only cost-${k}${isoCost===k?' on':''}" aria-pressed="${isoCost===k}"
-          onclick="event.stopPropagation();onlyCostFilter('${k}')" onkeydown="event.stopPropagation()"
-          title="${isoCost===k?'Back to everyone':'Only the people with '+label.toLowerCase()}">Only</button>${cells(f, fmtN(counts[k]))}</div>`;
+        <span></span>${cells(f, fmtN(counts[k]))}</div>`;
     };
     return `<div class="budget-scope-row dept-mode cost-mode budget-scope-all${budgetVatToggle&&o.showTotals?' itemized':''}${cf.size?' off':''}" role="button" tabindex="0" aria-pressed="${!cf.size}"
         onclick="allCostFilter()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();allCostFilter();}" title="Everyone — clear the costs filter">
@@ -10597,13 +10614,13 @@ function budgetExportRows(data, view){
   rows.push(['Costing', budgetScopeLabel()],
     ['Showing', mode==='cost' ? 'Cost — true costs, no float or production fee' : 'Charged — charged rates, float and production fee'],
     ['VAT', budgetVatToggle ? 'included in every total' : 'left out — every figure is ex-VAT'], [],
-    ['Cost', money(T.cost)], ['Charged', money(T.charged)], [`Production fee ${B.sheet.feePct}%`, money(T.fee)],
+    ['Cost', money(T.cost)], ['Charged', money(T.charged)], [`Production fee ${B.sheet.feePct}%${T.feeSpread && mode!=='cost' ? ' (spread into the department totals)' : ''}`, money(T.fee)],
     ['Final total', money(T.final)], ...(T.vatBack ? [['VAT reclaimed', money(T.vatBack)]] : []), ['Margin', money(T.margin)], []);
   if(view==='lines'){
     rows.push(['Code','Item','Name','Total','Pre','Shoot','Post','Qty','OT','Rate','Charged', ...(budgetVatToggle?['VAT %','VAT']:[]), 'Float %','Float']);
     B.sections.forEach(sec=>{
       if(!sec.lines.length) return;
-      rows.push([sec.title, '', '', money(sec.lines.reduce((n,l)=>n+B.fig(l,mode).tot, 0))]);
+      rows.push([sec.title, '', '', money(sec.lines.reduce((n,l)=>n+B.fig(l,mode).tot, 0) + B.feeShare(sec.lines, mode))]);
       sec.lines.forEach(l=>{ const f = B.fig(l, mode);
         rows.push([l.code, l.item, l.name, money(f.tot), l.isBuyout?'':(l.pre||''), l.isBuyout?'':(l.shoot||''), l.isBuyout?'':(l.post||''), l.qty||'', l.ot||'', money(l.rate),
           l.chRate!=null ? money(l.chRate) : '', ...(budgetVatToggle ? [l.vatPct==null?'mixed':l.vatPct+'%', money(f.vat)] : []),
@@ -10717,11 +10734,14 @@ function budgetSheetOf(p){
      floatBase    'ex' | 'inc' — float is a % of the line before or after VAT
      floatInMargin  true = unspent float is kept (margin) · false = held for the client
      feeBase      'all' | 'exFloat' — production fee on the whole charged total, or not on float
+     feeShow      'line' | 'spread' — the fee is its own row at the foot, or folded into every DEPARTMENT total
+                  by its share of the charged total (21 Oct 2026). Lines, people, stages and Margin never change —
+                  only grouped-by-department figures carry it. Read through B.feeShare(lines, mode).
      otCharged    'charged' | 'cost' — overtime follows the charged rate, or stays at the cost rate
      vatBack      true = OVERSEAS CLIENT (e.g. USA): the budget is charged with VAT in it as a final figure,
                   and the VAT paid to suppliers is reclaimed afterwards — so it comes back as margin.
                   What comes back is the COST-side VAT (what was actually paid), not the charged VAT. */
-const BUDGET_SETTING_DEFAULTS = { vatBack:false, vatCatering:0, vatHotel:0, kitRows:'split', floatBase:'ex', floatInMargin:true, feeBase:'all', otCharged:'charged' };
+const BUDGET_SETTING_DEFAULTS = { vatBack:false, vatCatering:0, vatHotel:0, kitRows:'split', floatBase:'ex', floatInMargin:true, feeBase:'all', feeShow:'line', otCharged:'charged' };
 function budgetSheetRec(p){
   const s = p.budgetSheet = p.budgetSheet || {};
   s.charged = s.charged || {}; s.floatLines = s.floatLines || {}; s.lines = s.lines || [];
@@ -10742,6 +10762,23 @@ function sheetLineFigures(l){
    Two departments have no section of their own on the sheet: Set people head the Locations section ("Locations &
    Set") and Catering & Travel people head Catering, so neither appears twice. A line typed under either before
    this lands in the section that took it over (SHEET_ALIAS). */
+/* each department's colour — the head's Departments rows (dot + Only), as stages and costs have theirs */
+const DEPT_COLOR = { 'Production':'--dept-production', 'Client':'--dept-client', 'Talent':'--dept-talent', 'Cinematography':'--dept-cinematography',
+  'Audio':'--dept-audio', 'Grip':'--dept-grip', 'Equipment':'--dept-equipment', 'Set':'--dept-set', 'Vanities':'--dept-vanities',
+  'Catering & Travel':'--dept-catering', 'Post Production':'--dept-post', 'Other':'--dept-other' };
+const deptColorVar = d => `var(${DEPT_COLOR[d]||'--tape'})`;
+/* THE SOLO DOT (26 Oct 2026) — the head rows' coloured dot IS the "Only" control now: hover grows it,
+   click solos that stage / department / cost, click the soloed one again for all. The Only buttons are gone. */
+function soloDotHTML(color, on, call, title){
+  return `<button type="button" class="stage-dot solo-dot${on?' on':''}" style="--c:${color}; background:${color}" aria-pressed="${on?'true':'false'}"
+    onclick="event.stopPropagation();${call}" onkeydown="event.stopPropagation()" title="${escA(title)}" aria-label="${escA(title)}"></button>`;
+}
+/* a budget-sheet section's dot — departments their own colour, Hotels / Travel their cost colour */
+const SHEET_SEC_COLOR = { 'x:loc':'--dept-set', 'x:catering':'--cost-catering', 'x:travel':'--cost-travel', 'x:hotel':'--cost-hotel',
+  'x:vendors':'--dept-other', 'x:other':'--dept-other' };
+const sheetSecColorVar = key => key.startsWith('d:') ? DEPT_COLOR[key.slice(2)] : SHEET_SEC_COLOR[key];
+/* a section heading row wears a soft tint of its colour instead of the grey (26 Oct 2026) — the dot is dropped there */
+const sheetSecAttrs = key => { const v = sheetSecColorVar(key); return v ? ` xls-sec-c" style="--c:var(${v})` : ''; };
 const BUDGET_DEPT_ORDER = ['Production','Client','Talent','Cinematography','Audio','Vanities','Post Production','Other',
   'Equipment','Grip','Set','Catering & Travel'];
 const SHEET_FOLD = { 'Set':'x:loc', 'Catering & Travel':'x:catering' };
@@ -11010,8 +11047,14 @@ function buildBudgetLines(data){
     return { pre:v*(d.pre||0)/W, post:v*(d.post||0)/W, proj:v*(d.proj||0)/W,
              days:Object.fromEntries(Object.entries(d.days||{}).map(([id,w])=>[id, v*w/W])) };
   };
-  return { sections, lines: all(), fig, split, sheet, rateCard, days,
-           totals: { cost, charged, fee, float: floatTotal, final: charged+fee, vatBack,
+  /* FEE SPREAD INTO DEPARTMENTS (21 Oct 2026, Settings ▸ Production fee ▸ Fee shows as). A group of lines carries
+     the fee in proportion to its share of the charged total, so every department total adds up to the Final total
+     with no fee row. Charged only — Cost has no fee. ⚠️ Lines are never touched: a department's rows no longer sum
+     to its total when this is on, by design. Everything grouped by department reads it through here. */
+  const feeSpread = set.feeShow==='spread' && Math.abs(fee)>0.005 && Math.abs(charged)>0.005;
+  const feeShare = (lines, m) => (!feeSpread || (m||budgetMode)==='cost') ? 0 : fee * lines.reduce((n,l)=>n+fig(l,'charged').tot, 0) / charged;
+  return { sections, lines: all(), fig, split, sheet, rateCard, days, feeShare, feeSpread,
+           totals: { cost, charged, fee, float: floatTotal, final: charged+fee, vatBack, feeSpread,
                      margin: charged+fee-cost + vatBack - (set.floatInMargin ? 0 : floatTotal),
                      marginLabel: `Margin — markup${set.floatInMargin?', float':''} and fee${vatBack?', plus the VAT reclaimed':''}${set.floatInMargin?'':' (float held for the client)'}` } };
 }
@@ -11029,7 +11072,7 @@ const CODE_DEPARTMENTS = Object.fromEntries(Object.entries(DEPARTMENT_CODES).map
 CODE_DEPARTMENTS.CLIENT = 'Client'; CODE_DEPARTMENTS.TALENT = 'Talent';
 function xlsSheetHTML(cols, rows){
   let n = 1;
-  const tr = r => `<tr class="${r.cls||''}"><td class="xls-hd">${n++}</td>${r.cells.map(cell=>{
+  const tr = r => `<tr class="${r.cls||''}"${r.style?` style="${r.style}"`:''}><td class="xls-hd">${n++}</td>${r.cells.map(cell=>{
     const o = (cell!=null && typeof cell==='object') ? cell : {h:cell};
     return `<td class="${o.c||''}"${o.span?` colspan="${o.span}"`:''}${o.t?` title="${escA(o.t)}"`:''}>${o.h==null?'':o.h}</td>`; }).join('')}</tr>`;
   /* ⚠️ table-layout:fixed only holds with an explicit width — without one a long cell widens its column */
@@ -11040,17 +11083,36 @@ function xlsSheetHTML(cols, rows){
 }
 /* THE BUDGET PAGE HEAD (20 Sep 2026, third pass) — the working budget is the CHARGED one, so there
    is no Cost | Charged switch any more: every view shows charged, and Cost is a figure and a column.
-     left    FINAL TOTAL, big; under it in the small style — Prod fee · Total inc. VAT · xVAT
+     left    FINAL TOTAL, big; under it in the small style — xVAT · VAT (the fee is in the totaliser now)
      right   the stage selector (charged figures; the fee is on the whole budget, so not in a stage)
      foot    the totaliser — Cost | Charged | Float | Margin (what shows is Settings ▸ View)
      ─────   the divider, then ONE tool row on the sheet:
              View ▾ (replaces the tab strip) | VAT | Settings | Days   ·····   Lines · Edit · Export
    Days, Export, Settings and the shoot-day ticks are popups; nothing pushes the sheet down. */
 const BUDGET_VIEW_STATS = [['cost','Cost',true], ['charged','Charged',true], ['floatTotal','Float',true], ['margin','Margin',true],
-  ['floatPct','Float %',false], ['feePct','Fee %',false]];
+  ['feePct','Fee',true]];   // key stays feePct so saved ticks carry over — it now shows the fee total, % beneath
 const budgetViewShows = (set, key) => { const v = (set.view||{})[key]; return v!=null ? !!v : (BUDGET_VIEW_STATS.find(x=>x[0]===key)||[])[2]; };
 let budgetEdit = false;
 function toggleBudgetEdit(){ budgetEdit = !budgetEdit; renderProjectBody(); }
+/* DOUBLE-CLICK TO EDIT (26 Oct 2026) — a double-click anywhere on the Budget page turns Edit on, and when it
+   landed on a sheet cell that becomes a field in Edit, that field gets the cursor. Already editing, or on a
+   field / button / link, it does nothing (a double-click in a field is selecting a word). */
+function budgetDblEdit(ev){
+  if(budgetEdit) return;
+  const t = ev.target;
+  if(t.closest('input, textarea, select, button, a, [role="button"], .modal-overlay')) return;
+  let at = null;
+  const td = t.closest('table.xls td');
+  if(td){ const table = td.closest('table.xls'), tr = td.parentElement;
+    at = { table: [...document.querySelectorAll('table.xls')].indexOf(table), row: [...table.rows].indexOf(tr), cell: [...tr.cells].indexOf(td) }; }
+  try{ window.getSelection().removeAllRanges(); }catch(e){}
+  budgetEdit = true; renderProjectBody();
+  if(at) try{
+    const table = document.querySelectorAll('table.xls')[at.table], tr = table && table.rows[at.row], cell = tr && tr.cells[at.cell];
+    const f = cell && cell.querySelector('input, button');
+    if(f){ f.focus(); if(f.select) f.select(); }
+  }catch(e){}
+}
 /* every stage's figures for the budget being shown, whatever is muted — so the rows are the way
    back, as on Crew. Built with every stage on; float rides with the ex-VAT column. */
 function budgetStageFigs(mode){
@@ -11071,6 +11133,7 @@ function budgetDeptFigs(mode){
     const B = buildBudgetLines(buildBudgetData()), by = {};
     B.lines.forEach(l=>{ const f = B.fig(l, mode), r = by[l.dept] = by[l.dept] || {ex:0, vat:0, people:new Set()};
       r.ex += f.ex + f.fl; r.vat += f.vat; if(l.crewId) r.people.add(l.crewId); });
+    Object.keys(by).forEach(d=>{ by[d].ex += B.feeShare(B.lines.filter(l=>l.dept===d), mode); });   // fee spread into departments
     return BUDGET_DEPT_ORDER.filter(d=>by[d]).map(d=>({ dept:d, ex:by[d].ex, vat:by[d].vat, inc:by[d].ex+by[d].vat, people:by[d].people.size }));
   });
 }
@@ -11081,7 +11144,9 @@ function budgetCostFigs(mode){
   const B = buildBudgetLines(buildBudgetData()), out = {};
   [['hotel','x:hotel'], ['catering','x:catering'], ['travel','x:travel']].forEach(([k, key])=>{
     const sec = B.sections.find(x=>x.key===key), f = {ex:0, vat:0};
-    (sec ? sec.lines.filter(l=>!l.entryId) : []).forEach(l=>{ const g = B.fig(l, mode); f.ex += g.ex + g.fl; f.vat += g.vat; });
+    const mine = sec ? sec.lines.filter(l=>!l.entryId) : [];
+    mine.forEach(l=>{ const g = B.fig(l, mode); f.ex += g.ex + g.fl; f.vat += g.vat; });
+    f.ex += B.feeShare(mine, mode);
     out[k] = f; });
   return out;
 }
@@ -11090,12 +11155,13 @@ function budgetPageHeadHTML(data, B){
   const chVat = budgetVatToggle ? B.lines.reduce((n,l)=>n+l.chVat, 0) : 0;
   const pct = T.final ? (T.margin/T.final*100).toFixed(1)+'%' : '';
   const totals = `<div class="budget-stat bhead-final"><div class="num" title="Final total — charged, plus the production fee">${fmt(T.final)}</div>
-      <div class="bhead-sub">Prod fee ${fmt(T.fee)} <span class="mu">${B.sheet.feePct}%</span></div>
-      <div class="bhead-sub">Total ${!budgetVatToggle ? 'ex-VAT' : chVat>0 ? `inc. ${fmt(chVat)} VAT${set.vatBack?' — final':''}` : '— no VAT in it'}</div>
-      ${budgetVatToggle ? `<div class="bhead-sub">xVAT ${fmt(T.final - chVat)}</div>` : ''}</div>`;
+      ${!budgetVatToggle ? `<div class="bhead-sub">Total ex-VAT</div>`
+        : `<div class="bhead-sub">xVAT ${fmt(T.final - chVat)}</div>
+      <div class="bhead-sub">${chVat>0 ? `VAT ${fmt(chVat)}${set.vatBack?' <span class="mu">— final</span>':''}` : 'No VAT in it'}</div>`}</div>`;
+  /* the fee is a totaliser figure like Float — the £ big, its % beneath (26 Oct 2026; it used to be a line under the total) */
   const stat = { cost:['Cost', fmt(T.cost), ''], charged:['Charged', fmt(T.charged), 'inc. float'], floatTotal:['Float', fmt(T.float), B.sheet.floatPct+'%'],
     margin:['Margin'+(set.floatInMargin?'':' ex float'), `<span class="${T.margin<0?'xls-neg':'xls-pos'}">${T.margin<0?'−':'+'}${fmt(Math.abs(T.margin))}</span>`, pct],
-    floatPct:['Float %', B.sheet.floatPct+'%', ''], feePct:['Fee %', B.sheet.feePct+'%', ''] };
+    feePct:['Fee', fmt(T.fee), B.sheet.feePct+'%'+(T.feeSpread?' · in departments':'')] };
   const strip = BUDGET_VIEW_STATS.filter(([k])=>budgetViewShows(set, k)).map(([k])=>stat[k]).concat(T.vatBack ? [['VAT reclaimed', fmt(T.vatBack), '']] : []);
   return budgetSummaryBarHTML(data, { listToolsHTML:'', topToolsHTML:'', totalsOverrideHTML: totals, stageFigs: budgetStageFigs(budgetMode),
       deptFigs: headBreakdown==='depts' ? budgetDeptFigs(budgetMode) : null, costFigs: headBreakdown==='costs' ? budgetCostFigs(budgetMode) : null, showTotals:true })
@@ -11171,6 +11237,12 @@ function budgetSheetModel(view, data, B){
   const footRows = lead => {
     const pad = Array(lead).fill('');
     const m = T.margin;
+    /* fee spread: the departments above already carry it, so one Total that IS the final total, then Margin */
+    if(T.feeSpread && !isCost) return [
+             { cls:'xls-tot xls-rule', cells:[{h:`Total${vatOn?' (inc. VAT':' (ex-VAT'}, float and production fee ${B.sheet.feePct}% — in the departments)`, span:lead+1}, M(T.cost), M(T.final), ''] },
+             ...(T.vatBack ? [{ cells:[{h:'VAT reclaimed — paid to suppliers, comes back to you', span:lead+1}, '', M(T.vatBack), ''] }] : []),
+             { cls:'xls-tot', cells:[{h:esc(T.marginLabel), span:lead+1}, '', M(m, m<0?'xls-neg':'xls-pos'),
+               {h: T.final ? (m/T.final*100).toFixed(1)+'%' : '', c:'n mu'}] } ];
     return [ { cls:'xls-tot xls-rule', cells:[{h:`Total${vatOn?' (inc. VAT':' (ex-VAT'}${' and float)'}`, span:lead+1}, M(T.cost), M(T.charged), ''] },
              { cells:[{h:`Production fee ${B.sheet.feePct}%`, span:lead+1}, {h:dash, c:'n'}, M(T.fee), ''] },
              { cls:'xls-tot xls-rule', cells:[{h:'Final total', span:lead+1}, M(T.cost), M(T.final), ''] },
@@ -11180,13 +11252,14 @@ function budgetSheetModel(view, data, B){
   };
   /* Code | heading | Cost | Charged | % — Per Department and BBC are the same table, grouped differently */
   const groupedModel = (groups, keyOf, headA, headB) => {
-    const rows = [{ cls:'xls-tot', cells:[{h:'Totals', span:2}, M(T.cost), M(T.charged), ''] }];
+    const chAll = T.charged + B.feeShare(B.lines, 'charged');      // = the final total when the fee is spread
+    const rows = [{ cls:'xls-tot', cells:[{h:'Totals', span:2}, M(T.cost), M(chAll), ''] }];
     groups.forEach(([code, name, always])=>{
       const mine = B.lines.filter(l=>keyOf(l)===code);
       if(!mine.length && !always) return;
-      const ch = tot(mine,'charged');
+      const ch = tot(mine,'charged') + B.feeShare(mine, 'charged');
       rows.push({ cls: budgetShowLines && mine.length ? 'xls-sec' : '', cells:[{h:esc(code), c:'mu'}, esc(name), M(tot(mine,'cost')), M(ch),
-        {h: T.charged ? Math.round(ch/T.charged*100)+'%' : '', c:'n mu', x: T.charged ? Math.round(ch/T.charged*100)+'%' : ''}] });
+        {h: chAll ? Math.round(ch/chAll*100)+'%' : '', c:'n mu', x: chAll ? Math.round(ch/chAll*100)+'%' : ''}] });
       if(budgetShowLines) mine.forEach(l=>rows.push({ cells:['', lineLabel(l), M(B.fig(l,'cost').tot), M(B.fig(l,'charged').tot), ''] }));
     });
     return { cols:[[70,headA],[290,headB],[130,'Cost','n'],[130,'Charged','n'],[70,'%','n']], rows: rows.concat(footRows(1)) };
@@ -11210,7 +11283,9 @@ function budgetSheetModel(view, data, B){
     const slots = [{k:'pre', head:'Pre-prod', off:!budgetScope.preproduction}, ...dayCols.map(d=>({k:'day', id:d.id, head:d.head, sub:d.sub, tip:[d.sub, d.where].filter(Boolean).join(' — '), off:!budgetScope.production})),
                    {k:'post', head:'Post', off:!budgetScope.post}, {k:'proj', head:'Project', sub:'not dated', off:!budgetScope.production}];
     const pick = (sp, s) => s.k==='day' ? (sp.days[s.id]||0) : sp[s.k];
-    const rowOf = (lines, k) => { const sp = lines.map(l=>B.split(l, mode, k)); return slots.map(s=>sp.reduce((n,x)=>n+pick(x,s), 0)); };
+    /* fee spread: a department's whole row carries its share, so it scales every column by the same factor */
+    const feeF = (T.feeSpread && !isCost && T.charged) ? T.fee/T.charged : 0;
+    const rowOf = (lines, k) => { const sp = lines.map(l=>B.split(l, mode, k)); return slots.map(s=>sp.reduce((n,x)=>n+pick(x,s), 0)*(k ? 1 : 1+feeF)); };
     const cellsOf = vals => vals.map(v=>M(v)).concat([M(vals.reduce((n,v)=>n+v, 0))]);
     const rows = [ { cells:['', ''].concat(slots.map(s=>({h: s.off ? 'off' : esc(s.sub||''), c:'n mu', t:s.tip||s.sub||''})), ['']) },
                    { cls:'xls-tot', cells:[{h:'Totals', span:2}].concat(cellsOf(rowOf(B.lines))) } ];
@@ -11218,19 +11293,22 @@ function budgetSheetModel(view, data, B){
     [...new Set(B.lines.map(l=>l.code))].filter(c=>!codes.some(k=>k[0]===c)).forEach(c=>codes.push([c, CODE_DEPARTMENTS[c]||'Other']));
     codes.forEach(([code, name])=>{
       const mine = B.lines.filter(l=>l.code===code); if(!mine.length) return;
-      rows.push({ cls: budgetShowLines ? 'xls-sec' : '', cells:[{h:esc(code), c:'mu'}, esc(name)].concat(cellsOf(rowOf(mine))) });
+      rows.push({ cls: budgetShowLines ? 'xls-sec xls-sec-c' : '', style:`--c:${deptColorVar(name)}`,
+        cells:[{h:esc(code), c:'mu'}, (budgetShowLines ? '' : `<span class="stage-dot dept-dot" style="background:${deptColorVar(name)}"></span>`)+esc(name)].concat(cellsOf(rowOf(mine))) });
       if(budgetShowLines) mine.forEach(l=>rows.push({ cells:['', lineLabel(l)].concat(cellsOf(rowOf([l]))) }));
     });
     rows.push({ cls:'xls-rule', cells:['', {h:'Ex-VAT', c:'mu'}].concat(cellsOf(rowOf(B.lines,'ex'))) });
     if(vatOn) rows.push({ cells:['', {h:'VAT', c:'mu'}].concat(cellsOf(rowOf(B.lines,'vat'))) });
     if(!isCost) rows.push({ cells:['', {h:'Float', c:'mu'}].concat(cellsOf(rowOf(B.lines,'fl'))) });
+    if(feeF) rows.push({ cells:['', {h:'Production fee', c:'mu'}].concat(cellsOf(rowOf(B.lines,'tot').map(v=>v*feeF))) });
     return { cols:[[64,'Code'],[170,'Department']].concat(slots.map(s=>[96, s.head, 'n']), [[104,'Total','n']]), rows,
-      notes:[`A buyout venue, catering, travel and hotels fall on the days they were used; prep and edit days sit in their own columns; anything tied to no day — insurance, a venue's extras, a line with only a quantity — is under <strong>Project</strong>. The production fee is on the whole budget, so it is in the strip above, not in a column.`] };
+      notes:[`A buyout venue, catering, travel and hotels fall on the days they were used; prep and edit days sit in their own columns; anything tied to no day — insurance, a venue's extras, a line with only a quantity — is under <strong>Project</strong>. ${feeF ? 'The production fee is spread into the department rows by their share of the budget (Settings), so the Totals row is the final total.' : 'The production fee is on the whole budget, so it is in the strip above, not in a column.'}`] };
   }
   if(view==='person'){
     const byEntry = {}; B.lines.forEach(l=>{ if(l.entryId) (byEntry[l.entryId] = byEntry[l.entryId] || []).push(l); });
     /* PEOPLE TOGETHER (14 Oct 2026) — a person's bookings sit in one block, wherever the sort first puts them (by
-       cost, the block goes by their combined total), and anyone with two or more gets a totaliser row beneath */
+       cost, the block goes by their combined total), and anyone with two or more gets a totaliser row ABOVE their roles
+       (26 Oct 2026 — it was beneath); under it the role rows leave the name blank, as the total already says who */
     const sumK = (lines, k) => lines.reduce((n,l)=>n+B.fig(l,mode)[k], 0);
     const blocks = new Map();
     budgetOrderedPeople(data).filter(pp=>byEntry[pp.id]).forEach(pp=>{ if(!blocks.has(pp.crewId)) blocks.set(pp.crewId, []); blocks.get(pp.crewId).push(pp); });
@@ -11254,7 +11332,7 @@ function budgetSheetModel(view, data, B){
         ...(vatOn ? ['', M(sumK(lines,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(lines,'fl')) ] });
     };
     ordered.forEach((pp,i)=>{
-      if(i>0 && ordered[i-1].crewId!==pp.crewId) pushPersonTotal(ordered[i-1].crewId);
+      if(i===0 || ordered[i-1].crewId!==pp.crewId) pushPersonTotal(pp.crewId);
       const mine = byEntry[pp.id], lab = mine.find(l=>!l.isKit), kit = mine.find(l=>l.isKit);
       const folded = lab.foldedKit || 0;
       const kitCh = kit ? (kit.chRate!=null ? kit.chRate : kit.rate) : folded ? lab.kitCharged : 0;
@@ -11262,7 +11340,7 @@ function budgetSheetModel(view, data, B){
       /* folded: the row's one figure is split back into its labour and kit halves for the two columns */
       const kitFrac = folded ? (isCost ? folded/lab.rate : kitCh/((lab.chRate!=null ? lab.chRate : lab.rate)||1)) : 0;
       const labourRate = folded ? lab.rate - folded : lab.rate;
-      const same = i>0 && ordered[i-1].crewId===pp.crewId;
+      const same = (i>0 && ordered[i-1].crewId===pp.crewId) || (blocks.get(pp.crewId)||[]).length>1;
       const inp = (col, value, ph, call, cls) => ({ c:'xls-in', x:value, h:`<input type="text" class="${cls||''}" inputmode="decimal" data-fk="${escA(pp.id)}|${col}" data-col="${col}" data-ref="" data-fx="${escA(value||ph)}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}">` });
       rows.push({ cells:[ same ? '' : esc(pp.name), {h:esc(pp.role||'') + (kit || folded ? ' <span class="mu">+ kit</span>' : ''), t:pp.role||''}, M(tot(mine)),
         budgetEdit ? edc(inp('pre', String(pp.prepDays||''), '—', `xlsEdit(setPhaseDays('preprod','${pp.id}',this.value))`, 'c')) : {h:pp.prepDays||'', c:'c'+(budgetScope.preproduction?'':' mu')},
@@ -11275,7 +11353,6 @@ function budgetSheetModel(view, data, B){
         M(exOf(lab)*(1-kitFrac)), kit ? M(exOf(kit)) : folded ? M(exOf(lab)*kitFrac) : {h:dash, c:'n'},
         ...(vatOn ? [{h:pp.vatRegistered?'20%':'0%', c:'c mu'}, M(sumK(mine,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(mine,'fl')) ] });
     });
-    if(ordered.length) pushPersonTotal(ordered[ordered.length-1].crewId);
     if(rest.length) rows.push({ cls:'xls-rule', cells:[{h:'<span class="mu">Rows with no person — venues, catering, travel, hotels, lines of your own</span>', span:2, x:'Rows with no person'}, M(tot(rest)), {h:'', span:9},
       ...(vatOn ? ['', M(sumK(rest,'vat'))] : []), isCost ? {h:dash,c:'n'} : M(sumK(rest,'fl'))] });
     const noRate = data.people.filter(pp=>!pp.hasRate).length;
@@ -11392,7 +11469,7 @@ function budgetSettingsDialogHTML(){
       <div class="subhead" style="margin-top:16px;">View — the totals row</div>
       ${row('Show', `<div class="filter-chips bset-chips">${BUDGET_VIEW_STATS.map(([k,label])=>
         `<label><input type="checkbox" ${budgetViewShows(set,k)?'checked':''} onchange="setBudgetViewStat('${k}', this.checked)"> ${label}</label>`).join('')}</div>`,
-        'The row along the foot of the header. Final total, the production fee and the VAT lines always sit above it. VAT reclaimed joins the row by itself for an overseas client.')}
+        'The row along the foot of the header. Final total and the xVAT / VAT lines always sit above it. VAT reclaimed joins the row by itself for an overseas client.')}
       <div class="subhead" style="margin-top:16px;">Client</div>
       ${row('Client is', pick('vatBack', [[false,'UK — normal VAT'], [true,'Overseas (e.g. USA) — VAT reclaimed']]),
         `Overseas: everything is charged with VAT in it, as a final figure, and you reclaim the VAT you paid suppliers afterwards. That VAT shows as <strong>VAT reclaimed</strong> and counts towards Margin.${set.vatBack && !budgetVatToggle ? ' <strong>Switch Show VAT to With VAT for this to apply.</strong>' : ''}`)}
@@ -11410,11 +11487,13 @@ function budgetSettingsDialogHTML(){
       ${row('Unspent float', pick('floatInMargin', [[true,'Is kept — counts as margin'], [false,'Goes back to the client']]), 'Goes back: float is still charged, but Margin leaves it out.')}
       <div class="subhead" style="margin-top:16px;">Production fee</div>
       ${row('Fee is charged on', pick('feeBase', [['all','Everything'], ['exFloat','Everything except float']]))}
+      ${row('Fee shows as', pick('feeShow', [['line','Its own line','Department totals, then a Production fee row, then the Final total'], ['spread','Spread into departments','Each department total carries its share of the fee — no fee row']]),
+        'Spread: each department total carries its share of the fee (by its share of the budget), so the departments add up to the Final total. The lines inside stay at their own figures. Margin is the same either way.')}
       <div class="subhead" style="margin-top:16px;">Overtime</div>
       ${row('Overtime is charged', pick('otCharged', [['charged','At the charged rate'], ['cost','At the cost rate']]), 'Only matters for someone whose Charged rate differs from their day rate.')}
       <div class="toolbar" style="margin:16px 0 0;">
         <button class="primary" onclick="toggleBudgetSettings()">Done</button>
-        ${changed ? `<button onclick="resetBudgetSettings()" title="Back to: no catering or hotel VAT, kit on its own row, float on ex-VAT and kept, fee on everything, overtime at the charged rate">Reset to defaults</button>` : ''}
+        ${changed ? `<button onclick="resetBudgetSettings()" title="Back to: no catering or hotel VAT, kit on its own row, float on ex-VAT and kept, fee on everything as its own line, overtime at the charged rate">Reset to defaults</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -11432,18 +11511,19 @@ function budgetLinesViewHTML(data, B){
   const letter = Object.fromEntries(cols.slice(1).map((c,i)=>[c[0], String.fromCharCode(65+i)]));
   const sumOf = (lines, k) => lines.reduce((n,l)=>n+B.fig(l,mode)[k], 0);
   const stageOff = k => !budgetScope[k];
+  const secFee = sec => B.feeShare(sec.lines, mode);      // 0 unless the fee is spread into departments
   let n = 1;
   const gut = (inner) => `<td class="xls-hd"><div class="xls-gut"><span>${n}</span><span>${inner||''}</span></div></td>`;
   const addBtn = (sec, after) => `<button type="button" onclick="addBudgetLine('${sec}','${after}')" title="Add a line below" aria-label="Add a line below">+</button>`;
   const head = `<tr><th class="xls-hd"></th>${cols.slice(1).map(c=>`<th class="xls-hd">${letter[c[0]]}</th>`).join('')}</tr>
     <tr class="xls-cols"><td class="xls-hd">${n++}</td>${cols.slice(1).map(c=>`<td class="${c[3]||''}">${c[2]}</td>`).join('')}</tr>`;
-  const totalsRow = `<tr class="xls-tot"><td class="xls-hd">${n++}</td><td colspan="3">Totals</td><td class="n">${fmt(sumOf(B.lines,'tot'))}</td>
+  const totalsRow = `<tr class="xls-tot"><td class="xls-hd">${n++}</td><td colspan="3">Totals</td><td class="n"${B.feeShare(B.lines, mode)?' title="Includes the production fee, spread into the departments"':''}>${fmt(sumOf(B.lines,'tot') + B.feeShare(B.lines, mode))}</td>
     <td colspan="8"></td>${vatOn?`<td></td><td class="n">${money(sumOf(B.lines,'vat'))}</td>`:''}<td></td>
     <td class="n">${isCost?dash:money(sumOf(B.lines,'fl'))}</td></tr>`;
   const inCell = (l, col, cls, value, ph, call, fx) => `<td class="xls-in"><input type="text" class="${cls}" inputmode="decimal" data-fk="${escA(l.key)}|${col}" data-col="${col}"
       data-ref="${letter[col]}${n}" data-fx="${escA(fx||'')}" value="${escA(value)}" placeholder="${escA(ph)}" onchange="${call}"></td>`;
   const body = B.sections.map(sec=>{
-    const secRow = `<tr class="xls-sec">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n">${fmt(sumOf(sec.lines,'tot'))}</td><td colspan="${cols.length-5}"></td></tr>`;
+    const secRow = `<tr class="xls-sec${sheetSecAttrs(sec.key)}">${gut(budgetEdit ? addBtn(sec.key,'') : '')}<td colspan="3">${esc(sec.title)}</td><td class="n"${secFee(sec)?` title="Includes ${escA(fmt(secFee(sec)))} of production fee — its share of the budget"`:''}>${fmt(sumOf(sec.lines,'tot') + secFee(sec))}</td><td colspan="${cols.length-5}"></td></tr>`;
     n++;
     return secRow + sec.lines.map(l=>{
       const f = B.fig(l, mode), key = escA(l.key), days = l.pre+l.shoot+l.post+l.qty;
@@ -11649,7 +11729,7 @@ function renderProjectBudget(body){
   const data = buildBudgetData(), B = buildBudgetLines(data);
   const viewHTML = budgetView==='lines' ? budgetLinesViewHTML(data, B) : budgetSheetViewHTML(budgetView, data, B);
   body.innerHTML = `
-    <div class="section">
+    <div class="section" ondblclick="budgetDblEdit(event)">
       <div id="budgetSummaryBarWrap">${budgetPageHeadHTML(data, B)}</div>
       ${budgetToolRowHTML()}
       ${viewHTML}
@@ -12003,7 +12083,7 @@ function renderCrewList(){
   const toggleRow = deptsPresent.length>1 ? expandCollapseAllHTML(`toggleAllCrewDbDepts('${deptsCSV}')`, undefined, deptsPresent.every(d=>collapsedDepts.has(d)), 'depts') : '';
   const html = deptsPresent.map(d=>{
     const collapsed = collapsedDepts.has(d);
-    return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`)
+    return deptHeaderHTML(d, buckets[d].length, collapsed, `toggleDeptCollapse('${d}')`, undefined, d)
       + `<div class="dept-group" style="display:${collapsed?'none':'block'}">${buckets[d].map(crewCardHTML).join('')}</div>`;
   }).join('');
   const headRow = `<div class="crewdb-head"><span></span><span class="crewgrid-header" style="text-align:left;">Dept</span><span class="crewgrid-header" style="text-align:left;">Role</span><span class="crewgrid-header" style="text-align:left;">Name</span><span class="crewgrid-header" style="text-align:left;">Contact</span></div>`;
